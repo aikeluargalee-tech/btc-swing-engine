@@ -1,0 +1,14 @@
+{
+  "last_reviewed_utc": "2026-10-27T00:00:00Z",
+  "liq_cascade_72h_over_300m": "CONFIRMED_CLEAR",
+  "liq_cascade_reclaimed_within_24h": "CONFIRMED_CLEAR",
+  "fomc_cpi_window_override": "AUTO",
+  "s2_risk_level": "LOW",
+  "etf_net_outflow_weakness": "NOT_CONFIRMED",
+  "catalyst_technical_breakdown": "NOT_CONFIRMED",
+  "enforce_200d_hard_veto_on_tab1": false,
+  "cycle_ath_override_usd": 109588.0,
+  "short_liq_magnet_override_usd": 0.0,
+  "long_liq_magnet_override_usd": 0.0,
+  "headline_classification": "NONE_SIGNIFICANT"
+}

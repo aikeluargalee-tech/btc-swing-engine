@@ -1,0 +1,90 @@
+{
+  "benchmark_description": "Quarantined Time-Series Foundation Model (TSFM) baselines for Tab [S2] volatility comparison. Zero capital weight.",
+  "benchmark_anchor_price": 80910.0,
+  "models": [
+    {
+      "id": "kronos_base",
+      "name": "Kronos-base",
+      "developer": "Kronos Project",
+      "architecture": "Decoder-only BSQ Candlestick Transformer",
+      "training_domain": "Financial K-lines (OHLCV + Vol across 45+ exchanges)",
+      "direction_label": "UP +0.13%",
+      "mean_predicted_close": 81013.0,
+      "range_min": 80282.0,
+      "range_max": 81666.0,
+      "range_spread_usd": 1384.0,
+      "range_spread_pct": 1.71,
+      "relative_range_min_pct": -0.776,
+      "relative_range_max_pct": 0.934,
+      "trajectory_relative_pct": {
+        "1": 0.320,
+        "6": 0.167,
+        "12": 0.433,
+        "18": 0.934
+      },
+      "trajectory_raw_closes": {
+        "1": 81169.0,
+        "6": 81045.0,
+        "12": 81260.0,
+        "18": 81666.0
+      },
+      "quarantine_status": "BENCHMARK-ONLY (0.0% CAPITAL WEIGHT)"
+    },
+    {
+      "id": "chronos_bolt_small",
+      "name": "Chronos-Bolt-small",
+      "developer": "Amazon Science",
+      "architecture": "T5 Patch Quantile Encoder-Decoder",
+      "training_domain": "General Time-Series (Traffic, Energy, Retail Sales)",
+      "direction_label": "UP +0.22%",
+      "mean_predicted_close": 81087.0,
+      "range_min": 80900.0,
+      "range_max": 81226.0,
+      "range_spread_usd": 326.0,
+      "range_spread_pct": 0.40,
+      "relative_range_min_pct": -0.012,
+      "relative_range_max_pct": 0.391,
+      "trajectory_relative_pct": {
+        "1": -0.012,
+        "6": 0.126,
+        "12": 0.371,
+        "18": 0.328
+      },
+      "trajectory_raw_closes": {
+        "1": 80900.0,
+        "6": 81012.0,
+        "12": 81210.0,
+        "18": 81175.0
+      },
+      "quarantine_status": "BENCHMARK-ONLY (0.0% CAPITAL WEIGHT)"
+    },
+    {
+      "id": "timesfm_25",
+      "name": "TimesFM 2.5",
+      "developer": "Google Research",
+      "architecture": "Decoder-only 200M Patched Transformer",
+      "training_domain": "100B+ Real-World General Time Points (Search, Retail)",
+      "direction_label": "DOWN -0.15%",
+      "mean_predicted_close": 80790.0,
+      "range_min": 80626.0,
+      "range_max": 80923.0,
+      "range_spread_usd": 297.0,
+      "range_spread_pct": 0.37,
+      "relative_range_min_pct": -0.351,
+      "relative_range_max_pct": 0.016,
+      "trajectory_relative_pct": {
+        "1": -0.044,
+        "6": -0.059,
+        "12": -0.146,
+        "18": -0.349
+      },
+      "trajectory_raw_closes": {
+        "1": 80874.0,
+        "6": 80862.0,
+        "12": 80792.0,
+        "18": 80628.0
+      },
+      "quarantine_status": "BENCHMARK-ONLY (0.0% CAPITAL WEIGHT)"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+# BTC Swing Engine & Unified 4-Tab Rich Live TUI HUD Rules
+
+- Preserve the 5-panel retro IBM / Bloomberg terminal layout (`rich.box.ROUNDED` outer panels + `rich.box.SIMPLE_HEAVY` tables) and the 2-row Top Status Banner (with `UTC`, `SGP (Asia)`, `LON (EU)`, `NYC (US)` clocks and the `ACTIVE MARKET` regional session badge) across all 4 instant-switchable views (`[1] Swing Engine`, `[2] Protocol v1.3`, `[3] Macro Radar`, `[4] Regime Matrix A–J`) in `ui/terminal_hud.py`.
+- Never increase vertical row height on any single tab beyond a single terminal screen (~42–48 lines) so `rich.live.Live` updates at `2 Hz` (`0.5s`) and switches tabs in `0.0s` (`msvcrt` keys `1`, `2`, `3`, `4`) without scrolling or flickering.
+- Maintain the 4 synchronized `asyncio` update loops (real-time WebSockets, `2 Hz` HUD & signal evaluation with `20 Hz` keyboard listener, `15s` REST derivatives poller, and `60s` kline sync) and Zero-Cold-Start historical warmup (`[1/3] -> [2/3] -> [3/3]` loading `1W`, `1D`, `1H`, and `15m` klines).
+- Always keep **Panel 5 (`5. Executive Bottom Line`)** at the bottom of every tab with a color-coded traffic-light headline (`GREEN LIGHT`, `BLUE LIGHT`, `YELLOW LIGHT`, `RED LIGHT`, `STANDBY`) and plain-English lines.

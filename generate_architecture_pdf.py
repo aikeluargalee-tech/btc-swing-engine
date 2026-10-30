@@ -1,0 +1,631 @@
+"""
+Generates the comprehensive institutional manual PDF for the BTC Quantitative Swing Engine:
+Covering Mainstream Core Engine (Tabs 1-5) and Specialist Satellites (Tabs S1-S5).
+Uses Microsoft Edge headless to produce publication-grade PDF formatting.
+"""
+
+import os
+import subprocess
+import sys
+
+OUTPUT_HTML = r"C:\Users\aikel\.gemini\antigravity\scratch\btc_swing_engine\docs\btc_swing_engine_manual.html"
+OUTPUT_PDF = r"C:\Users\aikel\Downloads\BTC_SWING_ENGINE_COMPLETE_MANUAL.pdf"
+EDGE_EXE = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+if not os.path.exists(EDGE_EXE):
+    EDGE_EXE = r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"
+
+html_content = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BTC Quantitative Swing Desk: The Complete 10-Tab Manual</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 16mm 14mm 16mm 14mm;
+    @bottom-right {
+      content: "Page " counter(page) " of " counter(pages);
+      font-size: 8pt;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      color: #64748b;
+    }
+    @bottom-left {
+      content: "BTC Quantitative Swing Engine • Institutional Fiduciary Architecture";
+      font-size: 8pt;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      color: #64748b;
+    }
+  }
+
+  body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+    color: #1e293b;
+    background-color: #ffffff;
+    line-height: 1.5;
+    font-size: 9.5pt;
+  }
+
+  h1, h2, h3, h4 {
+    color: #0f172a;
+    font-weight: 700;
+    margin-top: 1.2em;
+    margin-bottom: 0.4em;
+    page-break-after: avoid;
+  }
+
+  h1 {
+    font-size: 20pt;
+    border-bottom: 2px solid #0284c7;
+    padding-bottom: 4px;
+    margin-top: 0;
+    color: #0369a1;
+  }
+
+  h2 {
+    font-size: 14pt;
+    border-left: 4px solid #0284c7;
+    padding-left: 8px;
+    background-color: #f0f9ff;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    margin-top: 1.4em;
+  }
+
+  h3 {
+    font-size: 11.5pt;
+    color: #1e40af;
+    border-bottom: 1px dashed #cbd5e1;
+    padding-bottom: 2px;
+  }
+
+  p {
+    margin-top: 0.3em;
+    margin-bottom: 0.6em;
+  }
+
+  .page-break {
+    page-break-before: always;
+  }
+
+  .avoid-break {
+    page-break-inside: avoid;
+  }
+
+  /* Title Block */
+  .title-block {
+    text-align: center;
+    padding: 24px 16px;
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+    color: #ffffff;
+    border-radius: 8px;
+    margin-bottom: 20px;
+  }
+
+  .title-block h1 {
+    color: #38bdf8;
+    border-bottom: none;
+    font-size: 22pt;
+    margin-bottom: 6px;
+  }
+
+  .title-block .subtitle {
+    font-size: 12pt;
+    color: #e2e8f0;
+    font-weight: 400;
+    margin-bottom: 12px;
+  }
+
+  .title-block .meta {
+    font-size: 8.5pt;
+    color: #94a3b8;
+    letter-spacing: 0.5px;
+  }
+
+  /* Architecture Box Diagram */
+  .diagram-box {
+    background-color: #0f172a;
+    color: #f8fafc;
+    border-radius: 6px;
+    padding: 14px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 8.5pt;
+    line-height: 1.35;
+    white-space: pre;
+    overflow-x: auto;
+    margin: 12px 0;
+    border: 1px solid #334155;
+  }
+
+  /* Table styling */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0 14px 0;
+    font-size: 8.5pt;
+    page-break-inside: avoid;
+  }
+
+  th {
+    background-color: #0f172a;
+    color: #ffffff;
+    font-weight: 600;
+    text-align: left;
+    padding: 6px 8px;
+    border: 1px solid #334155;
+  }
+
+  td {
+    padding: 5px 8px;
+    border: 1px solid #cbd5e1;
+    vertical-align: top;
+  }
+
+  tr:nth-child(even) {
+    background-color: #f8fafc;
+  }
+
+  /* Callout Badges & Alerts */
+  .alert {
+    padding: 10px 12px;
+    border-radius: 6px;
+    margin: 10px 0;
+    font-size: 9pt;
+    page-break-inside: avoid;
+  }
+
+  .alert-info {
+    background-color: #f0fdf4;
+    border-left: 4px solid #16a34a;
+    color: #166534;
+  }
+
+  .alert-warning {
+    background-color: #fffbeb;
+    border-left: 4px solid #d97706;
+    color: #92400e;
+  }
+
+  .alert-danger {
+    background-color: #fef2f2;
+    border-left: 4px solid #dc2626;
+    color: #991b1b;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 7.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .badge-core { background-color: #0284c7; color: #ffffff; }
+  .badge-spec { background-color: #7c3aed; color: #ffffff; }
+  .badge-veto { background-color: #dc2626; color: #ffffff; }
+  .badge-long { background-color: #16a34a; color: #ffffff; }
+
+  code {
+    font-family: 'Consolas', monospace;
+    font-size: 8.5pt;
+    background-color: #f1f5f9;
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: #0f172a;
+  }
+</style>
+</head>
+<body>
+
+<!-- TITLE COVER -->
+<div class="title-block">
+  <h1>BITCOIN QUANTITATIVE SWING DESK</h1>
+  <div class="subtitle">Complete 10-Tab Architectural & Fiduciary Trading Manual</div>
+  <div class="meta">
+    SYSTEM VERSION: v2.4 Multi-Venue Order Flow & Synthetic Derivatives Engine • DATE: OCTOBER 2026<br>
+    FIDUCIARY CLASSIFICATION: Institutional Quantitative Trade Execution & Risk Governance
+  </div>
+</div>
+
+<div class="alert alert-info">
+  <strong>Executive Architecture Overview:</strong> This manual documents the dual-tier design of the Bitcoin Spot Swing Engine. The desk is strictly organized into two interdependent operational layers: the <strong>Mainstream Core Engine (Tabs 1–5)</strong> which governs structural auction health and master capital vetoes, and the <strong>Specialist Satellite Radars (Tabs S1–S5)</strong> which hunt high-probability tactical anomalies and asymmetric microstructure setups.
+</div>
+
+<h2>1. The Two-Tier Desk Governance Hierarchy</h2>
+<p>
+Professional quantitative trading desks strictly avoid confusing <em>structural market health</em> with <em>tactical pattern hunting</em>. The engine enforces an invariant fiduciary rule:
+<strong>Core Engine Vetoes (Tabs 1–5) strictly govern and overrule all Specialist Satellites (Tabs S1–S5) at all times.</strong>
+</p>
+
+<div class="diagram-box">
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                          MAINSTREAM CORE ENGINE (TABS 1–5)                             │
+│  [1: SWING]   Tactical Swing Execution & Real-Time Order Flow (Volume Profile & CVD)   │
+│  [2: PROTOCOL] Systematic Safety Audit & 8C Non-Trade Zone Master Veto Engine          │
+│  [3: MACRO]   1D 200 SMA Gatekeeper, 14D Wilder RSI & 0.5% Capital Crash Rungs         │
+│  [4: REGIME]  Regime Matrix Configurations A through J (Mathematical Market State)     │
+│  [5: MASTER]  Supreme Order of Battle Reconciled Execution Playbook (Tracks A & B)     │
+└───────────────────────────────────────────┬────────────────────────────────────────────┘
+                                            │ Governs & Authorizes Capital Deployment
+                                            ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                           SPECIALIST SATELLITES (TABS S1–S5)                           │
+│  [S1: MM-BTC]   Market Maker Inventory Skew, Gamma Cushion & Microstructure Spread     │
+│  [S2: 72H CONE] Garman-Klass Volatility Cones, TSFM Baselines & Capital Quarantine     │
+│  [S3: GARTLEY]  Gartley 222 Harmonic & S1–S5 Quant Horizon State Machine (0.12 Tol)   │
+│  [S4: SFP TRAP] Asia Session Sweeps, 3-Bar Displacement FVGs & 50% CE Reclaim Snipers  │
+│  [S5: EXHAUST]  Tom DeMark TD-9 Setups, CVD Delta Exhaustion & 1.272/1.618 Fib Pivots  │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+</div>
+
+<div class="avoid-break">
+<h3>Key Operational Principles</h3>
+<ul>
+  <li><strong>Continuous Baseline vs. Event-Driven:</strong> Tabs 1–5 evaluate continuous auction and macro state. If the Core Engine issues a <em>Red Light Master Veto</em> (e.g. Protocol v1.3 8D FOMC window or sub-200 SMA markdown), capital deployment is frozen—no Specialist Tab is permitted to open risk.</li>
+  <li><strong>Single-Digit Keyboard Navigation:</strong> Number keys <code>1</code> to <code>5</code> access the Core Engine. Number keys <code>6</code> to <code>0</code> access Specialist Satellites S1 through S5 instantaneously with zero latency.</li>
+  <li><strong>Dedicated Global Clock Banner:</strong> Real-time synchronized clocks for UTC, Singapore (Asia), London (EU), and New York (US) with automatic session overlap badges (Asia/London Overlap, London/NY Peak US ETF Liquidity).</li>
+</ul>
+</div>
+
+<div class="page-break"></div>
+
+<h2>2. Part I: The Mainstream Core Engine (Tabs 1–5)</h2>
+
+<h3>Tab [1]: Tactical Swing & Order Flow Execution Desk (Key 1)</h3>
+<p>
+Tab 1 serves as the live cockpit for execution, streaming multi-venue order flow across Binance Spot (<code>BTCUSDT</code>), Binance Futures, and Coinbase Exchange (<code>BTC-USD</code>).
+</p>
+<table>
+  <thead>
+    <tr>
+      <th style="width: 25%;">Module / Panel</th>
+      <th style="width: 35%;">Quantitative Telemetry</th>
+      <th style="width: 40%;">Institutional Mechanics</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>1. Spot vs. Perp Health</strong></td>
+      <td>Coinbase Premium Index (CPI), Futures OI, 15m/1H/4H Delta OI, 8H Funding Rate, 5m Taker L/S.</td>
+      <td>Measures whether price discovery is driven by institutional US spot accumulation or offshore leveraged derivative chasing.</td>
+    </tr>
+    <tr>
+      <td><strong>2. Composite Volume Profile</strong></td>
+      <td>30D Macro and 7D Tactical Value Areas (70% Volume): cVAH, cPOC, cVAL, High/Low Volume Nodes.</td>
+      <td>Defines objective price acceptance vs. rejection. Rejection below cVAL triggers mean-reversion long setups; failure indicates markdown.</td>
+    </tr>
+    <tr>
+      <td><strong>3. Multi-Timeframe Matrix</strong></td>
+      <td>1W, 1D, 4H, 1H, 15m Trend, Volume Delta, and Volatility regime state.</td>
+      <td>Prevents counter-trend execution across conflicting horizons.</td>
+    </tr>
+    <tr>
+      <td><strong>4. 4-Gate Signal Engine</strong></td>
+      <td>Gate 1 (Location), Gate 2 (Microstructure CVD Divergence), Gate 3 (Derivatives Health), Gate 4 (Execution Trigger).</td>
+      <td>Requires confluence across all 4 gates before generating asymmetric trade geometry.</td>
+    </tr>
+    <tr>
+      <td><strong>5. Executive Bottom Line</strong></td>
+      <td>Traffic-Light Banner (GREEN / BLUE / YELLOW / RED), Driver diagnosis, What's Happening, Next Move.</td>
+      <td>Translates complex tick telemetry into plain-English fiduciary instructions for instantaneous decision-making.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Tab [2]: Protocol v1.3 Safety Audit & Master Veto Engine (Key 2)</h3>
+<p>
+Protocol v1.3 conducts a rigorous 6-panel derivatives audit inspired by institutional analytics platforms (CoinGlass). Its primary purpose is <strong>capital preservation</strong> through the 8C Non-Trade Zone master veto rule.
+</p>
+<ul>
+  <li><strong>The 6 Audit Panels:</strong> Liquidation Heatmap Topology, Open Interest Delta Velocity, Funding Rate Skew, Long/Short Ratio Distribution, Coinbase Premium Index Z-score, and Cross-Exchange Basis.</li>
+  <li><strong>The 8C Non-Trade Zone (NTZ) Veto:</strong> Completely blocks spot accumulation whenever price is drifting within low-volume dead zones between HVNs, during high-volatility FOMC/CPI release windows, or when perpetual swap funding rates exceed toxic thresholds (+0.03% or -0.02%).</li>
+</ul>
+
+<h3>Tab [3]: Macro Radar & 200-Day SMA Gatekeeper (Key 3)</h3>
+<p>
+Operates on daily and weekly macro horizons to prevent catastrophic drawdowns during secular bear market cycles.
+</p>
+<ul>
+  <li><strong>200-Day Simple Moving Average (SMA) Gatekeeper:</strong> If Bitcoin trades below its daily 200 SMA, the desk enters defensive mode. All trend-continuation buys are vetoed. Capital allocation is capped at a maximum of 0.5% risk.</li>
+  <li><strong>14-Day Wilder RSI Regime:</strong> Classifies momentum into Bullish Expansion (&gt;55), Neutral Churn (45–55), and Severe Markdown (&lt;30).</li>
+  <li><strong>Asymmetric Crash Rungs:</strong> Pre-calculated institutional spot limit accumulation orders laddered at major macro historical support levels (-20%, -35%, -50% from cycle peaks).</li>
+</ul>
+
+<div class="page-break"></div>
+
+<h3>Tab [4]: Regime Matrix Configurations A through J (Key 4)</h3>
+<p>
+The Regime Matrix uses an objective mathematical classifier to categorize Bitcoin's current market state into one of 10 distinct configurations (A through J). Each configuration has an explicit trading mandate:
+</p>
+<table>
+  <thead>
+    <tr>
+      <th style="width: 15%;">Regime Code</th>
+      <th style="width: 25%;">Market State Definition</th>
+      <th style="width: 25%;">Order Flow Driver</th>
+      <th style="width: 35%;">Operational Mandate</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Config A</strong></td>
+      <td>Aggressive Bullish Expansion</td>
+      <td>Spot-Led (+CVD, +CPI, +OI)</td>
+      <td>Aggressive Trend Following. Hold full swing size.</td>
+    </tr>
+    <tr>
+      <td><strong>Config B</strong></td>
+      <td>Healthy Bullish Trend</td>
+      <td>Spot & Perp Harmony</td>
+      <td>Accumulate pullbacks to 4H 20 EMA / cPOC.</td>
+    </tr>
+    <tr>
+      <td><strong>Config C</strong></td>
+      <td>Leveraged Perp-Led Rally</td>
+      <td>Perp CVD Up / Spot CVD Flat</td>
+      <td><span class="badge badge-warning">Caution</span> Tighten stops; trim 50% at resistance.</td>
+    </tr>
+    <tr>
+      <td><strong>Config D</strong></td>
+      <td>Balanced Range Churn</td>
+      <td>Neutral Flow within Value Area</td>
+      <td>Trade range extremes (cVAL to cVAH). No breakout buys.</td>
+    </tr>
+    <tr>
+      <td><strong>Config E</strong></td>
+      <td>Volatile Squeeze Expansion</td>
+      <td>Short Liquidations Surging</td>
+      <td>Trail stops to breakeven; do not add size.</td>
+    </tr>
+    <tr>
+      <td><strong>Config F</strong></td>
+      <td>Passive Bid Absorption</td>
+      <td>Spot Buying Absorbing Perp Dumps</td>
+      <td><span class="badge badge-long">High Expectancy</span> Accumulate cVAL sweep longs.</td>
+    </tr>
+    <tr>
+      <td><strong>Config G</strong></td>
+      <td>Distribution at Highs</td>
+      <td>Spot Selling into Perp FOMO</td>
+      <td><span class="badge badge-veto">Veto Longs</span> Sell spot into strength; move to cash.</td>
+    </tr>
+    <tr>
+      <td><strong>Config H</strong></td>
+      <td>Long Liquidation Flush</td>
+      <td>OI Cascading Down / Price Piercing</td>
+      <td>Await exhaustion flush completion before bidding.</td>
+    </tr>
+    <tr>
+      <td><strong>Config I</strong></td>
+      <td>Passive Ask Absorption</td>
+      <td>Perp Buying Absorbed by Spot Walls</td>
+      <td><span class="badge badge-veto">Trap Alert</span> Stand aside; breakout will fail.</td>
+    </tr>
+    <tr>
+      <td><strong>Config J</strong></td>
+      <td>Secular Bearish Markdown</td>
+      <td>Multi-Horizon Spot Selling</td>
+      <td><span class="badge badge-veto">Full Cash Mandate</span> 100% USDT / Cash preservation.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Tab [5]: Master Conclusion & Supreme Order of Battle Execution (Key 5)</h3>
+<p>
+Tab 5 is the supreme synthesis terminal. It aggregates the findings of all 4 prior core tabs into a dual-track fiduciary execution playbook:
+</p>
+<ul>
+  <li><strong>Track A (If Flat in Cash):</strong> Provides exact entry dollar tranches (Tranche 1: 50% limit at cVAL; Tranche 2: 50% on SFP reclaim confirmation), hard invalidation stop-loss, and multi-stage profit targets (TP1 cPOC, TP2 cVAH).</li>
+  <li><strong>Track B (If Already Holding Spot BTC):</strong> Provides portfolio protection rules—identifying exact trailing stop levels, hedge triggers via USDT, or mandatory profit-taking rungs.</li>
+</ul>
+
+<div class="page-break"></div>
+
+<h2>3. Part II: The Specialist Tactical Satellites (Tabs S1–S5)</h2>
+<p>
+Specialist Satellites provide specialized microstructure and mathematical telemetry. They do not replace the Core Engine; they provide high-precision tactical timing.
+</p>
+
+<h3>Tab [S1]: Market Maker Microstructure Desk (<code>MM-BTC</code> / Key 6)</h3>
+<p>
+Analyzes how institutional market makers quote two-sided limit books, manage delta inventory risk, and adjust spreads.
+</p>
+<ul>
+  <li><strong>Inventory Skew:</strong> Detects whether market-making algorithms are heavily long or short inventory relative to their neutral benchmark. Heavy short inventory forces market makers to defend bid levels.</li>
+  <li><strong>Gamma Exposure & Volatility Cushion:</strong> Identifies options gamma clusters where market-maker delta-hedging dampens or accelerates realized volatility.</li>
+  <li><strong>Microstructure Spread Toxicity:</strong> Evaluates order book spread widening and adverse selection against retail taker flows.</li>
+</ul>
+
+<h3>Tab [S2]: 72H Volatility Cone & Capital Quarantine (<code>72H CONE</code> / Key 7)</h3>
+<p>
+Applies high-frequency statistical volatility mathematics to protect capital against regime shifts and explosive volatility expansions.
+</p>
+<ul>
+  <li><strong>Garman-Klass Volatility Math:</strong> Uses continuous Open-High-Low-Close price path integration (5x more statistically efficient than standard close-to-close deviation) to compute true realized variance:
+    <br><code>σ²_GK = 0.5·(ln(H/L))² - (2·ln(2) - 1)·(ln(C/O))²</code></li>
+  <li><strong>4 Forward Horizons (6H, 12H, 24H, 72H):</strong> Models expected volatility expansion fan curves (t^H scaling) against Time-Series Foundation Model (TSFM) historical baselines.</li>
+  <li><strong>Volatility Compression Ratio (VCR) & Automatic Quarantine:</strong> When volatility compresses to extreme percentiles (&lt;10th percentile), an explosive directional breakout is imminent. The engine triggers an automatic <strong>Capital Quarantine (0.0% allocation)</strong> to prevent getting chopped up prior to the expansion.</li>
+</ul>
+
+<h3>Tab [S3]: Gartley 222 Harmonic & Quant Horizon State Machine (<code>GARTLEY</code> / Key 8)</h3>
+<p>
+Synthesizes classical quantitative indicators with strict algorithmic Fibonacci harmonic pattern recognition.
+</p>
+<ul>
+  <li><strong>The S1–S5 Classical Horizon Indicator Suite:</strong> S1 (20-bar Donchian Breakout), S2 (Daily 200 SMA Trend Filter), S3 (EMA 20/50 Golden/Death Cross), S4 (14D Wilder RSI Filter), and S5 (2.0σ Bollinger Band Mean-Reversion).</li>
+  <li><strong>S6 Bull Gartley & S7 Bear Gartley Scanner:</strong> Scans 1D and 4H fractal pivots (X-A-B-C-D) using strict 0.12 mathematical tolerance constraints:
+    <ul>
+      <li>B/XA Retracement: 0.618 (0.55 – 0.72)</li>
+      <li>C/AB Retracement: 0.382 – 0.886</li>
+      <li>D/XA Potential Reversal Zone (PRZ): 0.786 (0.68 – 0.86)</li>
+      <li>AB = CD Projection: 0.70 – 1.50 ratio</li>
+    </ul>
+  </li>
+  <li><strong>Multi-Horizon State Machine:</strong> Only issues a <code>CONFLUENCE + GARTLEY BUY</code> when both classical S1–S5 indicators and the S6 Gartley PRZ align on daily and 4-hour horizons.</li>
+</ul>
+
+<div class="page-break"></div>
+
+<h3>Tab [S4]: SFP Trap & Fair Value Gap (FVG) Displacement Engine (<code>SFP TRAP</code> / Key 9)</h3>
+<p>
+Weaponizes retail chart pattern predictability by identifying when pattern boundaries and session extremes are swept by algorithms and reclaimed with institutional absorption.
+</p>
+
+<div class="diagram-box">
+                      THE 4-STEP SFP & DISPLACEMENT (FVG) CYCLE
+  1. THE LIQUIDITY SWEEP           2. PASSIVE ABSORPTION         3. FVG DISPLACEMENT         4. 50% CE RETEST
+┌─────────────────────────┐     ┌────────────────────────┐    ┌─────────────────────────┐   ┌────────────────────────┐
+│ Price breaches Asia Low │     │ Aggressive Perp sells  │    │ Buyers launch price     │   │ Limit entry resting at │
+│ or Double Bottom shelf, │────▶│ absorbed by Spot limit │───▶│ back inside boundary,   │──▶│ 50% CE midpoint with   │
+│ flushing retail stops.  │     │ bids. CVD diverges.    │    │ leaving 3-bar FVG void. │   │ tight stop under wick. │
+└─────────────────────────┘     └────────────────────────┘    └─────────────────────────┘   └────────────────────────┘
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width: 25%;">Component</th>
+      <th style="width: 35%;">Detection Algorithm</th>
+      <th style="width: 40%;">Tactical Application</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Asia Session Range (00:00–08:00 UTC)</strong></td>
+      <td>Locks exact Asia High and Low price levels at 08:00 UTC. Tracks London Open (08:00–10:00) sweeps.</td>
+      <td>London sweep below Asia Low with immediate 15m candle close back inside = Confirmed Bullish SFP.</td>
+    </tr>
+    <tr>
+      <td><strong>Equal Lows / Double Bottoms</strong></td>
+      <td>Discovers fractal pivots within 0.75% price tolerance where retail clusters stop-loss orders.</td>
+      <td>Identifies high-density stop-loss pools engineered for liquidity hunting.</td>
+    </tr>
+    <tr>
+      <td><strong>3-Bar Displacement Imbalance (FVG)</strong></td>
+      <td>Bullish FVG: <code>Low(t) - High(t-2) &gt; 0.05%</code><br>Bearish FVG: <code>Low(t-2) - High(t) &gt; 0.05%</code></td>
+      <td>Detects institutional volume voids where price moved too fast to clear two-sided trade.</td>
+    </tr>
+    <tr>
+      <td><strong>Consequent Encroachment (50% CE)</strong></td>
+      <td><code>CE = (Top + Bottom) / 2.0</code></td>
+      <td>Serves as the optimal limit pullback entry zone rather than chasing market momentum.</td>
+    </tr>
+    <tr>
+      <td><strong>Asymmetric Trade Geometry</strong></td>
+      <td>Hard stop anchored 0.25x ATR beyond sweep wick extreme. TP1 at cPOC; TP2 at opposing boundary.</td>
+      <td>Guarantees asymmetric risk/reward ratios: <strong>R:R ≥ 1:3.0R</strong>.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Tab [S5]: Terminal Impulse Exhaustion Radar (<code>EXHAUST</code> / Key 0)</h3>
+<p>
+Replaces subjective, non-falsifiable Elliott Wave counts with deterministic Tom DeMark (TD) 9-count setups, multi-horizon Cumulative Volume Delta (CVD) divergences, and Open Interest climax stress.
+</p>
+<ul>
+  <li><strong>Tom DeMark (TD) Sequential 9-Count Engine:</strong> Tracks objective 9-candle sequences on 1H and 4H charts where each candle closes higher than the candle 4 bars earlier. A setup is <em>perfected</em> when bar 8 or 9 prints a higher high than bars 6 and 7, signaling structural trend exhaustion.</li>
+  <li><strong>Multi-Horizon CVD Divergence Matrix:</strong> Detects institutional distribution when price prints a higher high while rolling 1H/4H Spot and Perp CVD print lower highs (aggressive buyers drying up).</li>
+  <li><strong>Open Interest & Funding Climax Stress:</strong> Flags speculative exhaustion when 1H Open Interest surges (&gt;+1.5%) while funding reaches excessive levels right into a TD-9 count.</li>
+  <li><strong>Algorithmic Fibonacci Extension Targets:</strong> Auto-anchors 1.272 and 1.618 Fibonacci extensions from fractal pivots to mark precise mathematical turning points.</li>
+</ul>
+
+<div class="page-break"></div>
+
+<h2>4. Part III: Complete Systems Integration & Fiduciary Execution Playbook</h2>
+
+<h3>The Fiduciary Rulebook: When Can You Trade?</h3>
+<p>
+The core purpose of this quantitative framework is to eliminate emotional biases, FOMO, and undisciplined execution. The trading desk enforces a strict decision checklist:
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width: 10%;">Step</th>
+      <th style="width: 25%;">Fiduciary Gate</th>
+      <th style="width: 30%;">Required Condition</th>
+      <th style="width: 35%;">Action if Condition Fails</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Step 1</strong></td>
+      <td><strong>Macro Gatekeeper (Tab 3)</strong></td>
+      <td>Price above 200-Day SMA or RSI &gt; 35</td>
+      <td><span class="badge badge-veto">Hard Halt</span> Limit max risk to 0.5% or stay 100% in cash.</td>
+    </tr>
+    <tr>
+      <td><strong>Step 2</strong></td>
+      <td><strong>Safety Protocol Audit (Tab 2)</strong></td>
+      <td>No active 8C NTZ Veto, FOMC window, or funding stress</td>
+      <td><span class="badge badge-veto">Hard Halt</span> Freeze execution. Await veto clearance.</td>
+    </tr>
+    <tr>
+      <td><strong>Step 3</strong></td>
+      <td><strong>Volatility Quarantine (Tab S2)</strong></td>
+      <td>VCR &gt; 10th percentile; no active quarantine</td>
+      <td><span class="badge badge-veto">Hard Halt</span> 0.0% capital quarantine until volatility expands.</td>
+    </tr>
+    <tr>
+      <td><strong>Step 4</strong></td>
+      <td><strong>Market Regime State (Tab 4)</strong></td>
+      <td>Regime Config A, B, D, or F active</td>
+      <td>Stand aside if Config G, I, or J is active.</td>
+    </tr>
+    <tr>
+      <td><strong>Step 5</strong></td>
+      <td><strong>Tactical Setup Alignment (Tab 1 / S3 / S4 / S5)</strong></td>
+      <td>Confluence across 4-Gate Engine, Gartley 222 PRZ, SFP Reclaim, or TD-9 exhaustion</td>
+      <td>Await tactical trigger; do not front-run boundaries.</td>
+    </tr>
+    <tr>
+      <td><strong>Step 6</strong></td>
+      <td><strong>Execution Tranching (Tab 5)</strong></td>
+      <td>Execute Tranche 1 (50%) & Tranche 2 (50%) with hard stops and TP1/TP2 targets</td>
+      <td>Follow Supreme Order of Battle with strict mathematical R:R ≥ 1:3.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>AI Telemetry Export Protocol (The 'C' Hotkey)</h3>
+<p>
+At any time during live operation, pressing the <strong><code>C</code></strong> key instantaneously compiles the entire multi-tab quantitative state into an 11-section structured markdown file (<code>latest_ai_data_packet.md</code>) and copies it directly to your system clipboard.
+</p>
+<p>
+This packet contains complete cross-exchange order flow, Volume Profile coordinates, CoinGlass derivatives audits, Gartley harmonic ratios, active FVGs, and Tom DeMark sequential counts—formatted specifically for zero-latency pasting into external Large Language Models (Gemini, Claude, ChatGPT) for automated second-opinion audits.
+</p>
+
+<div class="alert alert-info">
+  <strong>Summary Fiduciary Directive:</strong> The Bitcoin Quantitative Swing Engine is designed to protect capital first and capture asymmetric upside second. Respect the hierarchy: <em>Core Engine governs, Specialist Satellites optimize, and strict mathematical invalidation rules preserve the balance sheet.</em>
+</div>
+
+</body>
+</html>
+"""
+
+print(f"Writing HTML manual to: {OUTPUT_HTML}")
+with open(OUTPUT_HTML, "w", encoding="utf-8") as f:
+    f.write(html_content)
+
+print(f"Running Microsoft Edge headless to compile PDF: {EDGE_EXE}")
+cmd = [
+    EDGE_EXE,
+    "--headless",
+    "--disable-gpu",
+    "--no-pdf-header-footer",
+    f"--print-to-pdf={OUTPUT_PDF}",
+    OUTPUT_HTML
+]
+
+result = subprocess.run(cmd, capture_output=True, text=True)
+if result.returncode != 0:
+    print(f"Error compiling PDF: {result.stderr}")
+    sys.exit(1)
+
+if os.path.exists(OUTPUT_PDF):
+    size_kb = os.path.getsize(OUTPUT_PDF) / 1024.0
+    print(f"SUCCESS! Created PDF manual at: {OUTPUT_PDF} ({size_kb:.1f} KB)")
+else:
+    print(f"Failed to find generated PDF at {OUTPUT_PDF}")
+    sys.exit(1)

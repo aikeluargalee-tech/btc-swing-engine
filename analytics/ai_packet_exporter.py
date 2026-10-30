@@ -622,7 +622,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             f"* **Exhaustion Regime**: **`{ex.exhaustion_regime.value}`**",
             f"* **Primary Tactical Signal**: **`{ex.active_exhaustion_signal}`**",
             f"* **Open Interest Velocity**: 1H dOI: `{ex.oi_climax_pct:+.3f}%` (Climax Flag: `{ex.oi_climax_flag}`)",
-            f"* **Funding Rate Stress**: Live 8H Funding: `{ex.current_funding_pct * 100:+.4f}%` (Funding Climax Flag: `{ex.funding_climax_flag}`)",
+            f"* **Funding Rate Stress**: Live 8H Funding: `{ex.current_funding_pct:+.4f}%` (Funding Climax Flag: `{ex.funding_climax_flag}`)",
             f"* **Quantitative Takeaway**: {ex.quantitative_takeaway}",
             f"* **Plain English Summary**: {ex.plain_english_summary}",
             "",

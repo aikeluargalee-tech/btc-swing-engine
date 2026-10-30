@@ -517,12 +517,21 @@ class MasterSynthesisEvaluator:
         )
 
         tp2_candidates = [
-            c
-            for c in [tp.tp2_vah if tp else sig.c_vah, sig.c_poc, mev.ema_21_1d, pev.daily_resistance]
+            (c, src)
+            for c, src in [
+                (tp.tp2_vah if tp else sig.c_vah, "30D cVAH Resistance"),
+                (mev.ema_21_1d, "1D 21 EMA Mean Reversion"),
+                (pev.daily_resistance, "1D Structural Resistance"),
+            ]
             if c > holder_tp1_usd + 300.0
         ]
-        holder_tp2_usd = round(min(tp2_candidates), 2) if tp2_candidates else round(max(sig.c_vah, holder_tp1_usd * 1.025), 2)
-        holder_tp2_source = "cVAH / Macro Resistance"
+        if tp2_candidates:
+            min_c, min_src = min(tp2_candidates, key=lambda x: x[0])
+            holder_tp2_usd = round(min_c, 2)
+            holder_tp2_source = min_src
+        else:
+            holder_tp2_usd = round(max(sig.c_vah, holder_tp1_usd * 1.025), 2)
+            holder_tp2_source = "cVAH / Macro Resistance"
 
         if pev.any_sell_confirmed:
             holder_action = "EXIT / REDUCE IMMEDIATELY (SELL TRIGGER ACTIVE)"

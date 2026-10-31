@@ -216,9 +216,10 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
     lines.append(
         f"| **`UTC Day (00:00)`** | `N/A` | `{flow.utc_day_spot_cvd:+,.2f} BTC` | `N/A` | `{flow.utc_day_perp_cvd:+,.2f} BTC` | `N/A` | `N/A` | `N/A` |"
     )
-    lines.append(
-        f"| **`Live WS Session`** | `N/A` | {(f'`{flow.session_spot_cvd:+,.2f} BTC`' if (flow.session_spot_cvd != 0 or flow.session_perp_cvd != 0) else '`0.00 BTC (On-Demand CLI — see 24H / UTC Day)`')} | `N/A` | {(f'`{flow.session_perp_cvd:+,.2f} BTC`' if (flow.session_spot_cvd != 0 or flow.session_perp_cvd != 0) else '`0.00 BTC (On-Demand CLI — see 24H / UTC Day)`')} | `N/A` | `N/A` | `Bull Div: {flow.bullish_pivot_divergence} / Abs Div: {flow.absorption_divergence}` |"
-    )
+    if flow.session_spot_cvd != 0 or flow.session_perp_cvd != 0:
+        lines.append(
+            f"| **`Live WS Session`** | `N/A` | `{flow.session_spot_cvd:+,.2f} BTC` | `N/A` | `{flow.session_perp_cvd:+,.2f} BTC` | `N/A` | `N/A` | `Bull Div: {flow.bullish_pivot_divergence} / Abs Div: {flow.absorption_divergence}` |"
+        )
 
     if pev is not None:
         lines.extend([

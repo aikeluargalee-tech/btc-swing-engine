@@ -35,6 +35,7 @@ class MacroIntermarketSnapshot:
     us_10y_real_yield_source: str = "FRED (`DFII10`)"
     us_10y_tips_direction_5_10d: Optional[str] = None
     us_10y_breakeven_inflation: Optional[float] = None
+    us_10y_breakeven_source: str = "FRED (`T10YIE`)"
     us_10y_breakeven_change: Optional[str] = None
     dxy_index: Optional[float] = None
     dxy_direction_5_10d: Optional[str] = None
@@ -144,12 +145,70 @@ async def _fetch_coingecko_dominance(session: aiohttp.ClientSession) -> Optional
     return None
 
 
+def _fetch_farside_etf_flows_sync() -> Optional[Tuple[str, float, float]]:
+    """Fetches US Spot Bitcoin ETF flows from Farside Investors (total net flow across all issuers)."""
+    import re
+    import urllib.request
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+    }
+    url = "https://farside.co.uk/btc/"
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=5.0) as resp:
+            if resp.status != 200:
+                return None
+            html = resp.read().decode("utf-8", errors="ignore")
+
+        rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.DOTALL)
+        parsed_rows = []
+        months = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+        for row_html in rows:
+            cells = re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row_html, re.DOTALL)
+            cleaned = [re.sub(r"<[^>]+>", "", c).strip().replace("\xa0", " ") for c in cells]
+            if cleaned and any(mo in cleaned[0] for mo in months):
+                parsed_rows.append(cleaned)
+
+        def _parse_val(v: str) -> Optional[float]:
+            v = v.strip().replace("$", "").replace(",", "")
+            if not v or v in ("-", "0.0", "0"):
+                return 0.0
+            if v.startswith("(") and v.endswith(")"):
+                return -float(v[1:-1])
+            try:
+                return float(v)
+            except ValueError:
+                return None
+
+        valid_totals = []
+        for pr in parsed_rows:
+            val = _parse_val(pr[-1])
+            if val is not None:
+                valid_totals.append((pr[0], val))
+
+        if valid_totals:
+            last_date, daily_net_m = valid_totals[-1]
+            cum_3d_m = sum(v for _, v in valid_totals[-3:])
+            return last_date, daily_net_m * 1_000_000.0, cum_3d_m * 1_000_000.0
+    except Exception as e:
+        logger.debug("Failed Farside ETF flow fetch: %s", e)
+    return None
+
+
 async def _fetch_binance_depth_ratios(session: aiohttp.ClientSession) -> Tuple[Optional[float], Optional[float]]:
     """Fetches Binance Spot L2 depth and computes +/-1% and +/-2% bid/ask ratios."""
     for base in ("https://data-api.binance.vision", "https://api.binance.com", "https://api1.binance.com"):
-        res = await _fetch_depth_from(session, f"{base}/api/v3/depth?symbol=BTCUSDT&limit=1000")
-        if res[0] is not None:
-            return res
+        for limit in (5000, 1000):
+            res = await _fetch_depth_from(session, f"{base}/api/v3/depth?symbol=BTCUSDT&limit={limit}")
+            if res[0] is not None:
+                return res
     return None, None
 
 
@@ -252,6 +311,7 @@ async def fetch_macro_and_intermarket_snapshot(
     depth_task = _fetch_binance_depth_ratios(session)
     fred_tips_task = _fetch_fred_series(session, "DFII10")
     fred_breakeven_task = _fetch_fred_series(session, "T10YIE")
+    farside_task = asyncio.to_thread(_fetch_farside_etf_flows_sync)
 
     (
         yahoo_data,
@@ -260,6 +320,7 @@ async def fetch_macro_and_intermarket_snapshot(
         (depth_1pct, depth_2pct),
         fred_tips,
         fred_breakeven,
+        farside_res,
     ) = await asyncio.gather(
         yahoo_task,
         fng_task,
@@ -267,6 +328,7 @@ async def fetch_macro_and_intermarket_snapshot(
         depth_task,
         fred_tips_task,
         fred_breakeven_task,
+        farside_task,
         return_exceptions=True,
     )
 
@@ -344,7 +406,7 @@ async def fetch_macro_and_intermarket_snapshot(
             if len(closes) >= 5:
                 snap.vix_change_5d = round(closes[-1] - closes[-5], 2)
 
-    # Populate FRED
+    # Populate FRED & Treasury Fallbacks
     if isinstance(fred_tips, float):
         snap.us_10y_real_yield_tips = round(fred_tips, 3)
     else:
@@ -352,7 +414,21 @@ async def fetch_macro_and_intermarket_snapshot(
         if treas is not None:
             snap.us_10y_real_yield_tips = round(treas, 3)
             snap.us_10y_real_yield_source = "US Treasury real yield curve (10 YR)"
+
     if isinstance(fred_breakeven, float):
         snap.us_10y_breakeven_inflation = round(fred_breakeven, 3)
+        snap.us_10y_breakeven_source = "FRED (`T10YIE`)"
+    elif snap.us_10y_treasury_yield is not None and snap.us_10y_real_yield_tips is not None:
+        # Nominal 10Y Yield minus 10Y TIPS Real Yield gives theoretical breakeven inflation
+        snap.us_10y_breakeven_inflation = round(snap.us_10y_treasury_yield - snap.us_10y_real_yield_tips, 3)
+        snap.us_10y_breakeven_source = "Treasury Yield Spread (Nominal - TIPS)"
+
+    # Populate ETF Flows (Farside Fallback)
+    if isinstance(farside_res, tuple) and len(farside_res) == 3:
+        last_date, daily_net, cum_3d = farside_res
+        snap.etf_daily_net_flow_usd = round(daily_net, 2)
+        snap.etf_daily_net_flow_status = f"CONFIRMED (Farside {last_date})"
+        snap.etf_3d_cumulative_flow_usd = round(cum_3d, 2)
+        snap.etf_3d_cumulative_flow_status = f"CONFIRMED (Farside 3D to {last_date})"
 
     return snap

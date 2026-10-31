@@ -478,10 +478,13 @@ class RegimeMatrixEvaluator:
         score_i = (
             (30.0 if i_c1 else (15.0 if current_price < ema_20_1d else 0.0))
             + (30.0 if i_c2 else 0.0)
-            + (15.0 if i_c3 else 5.0)
-            + (15.0 if i_c4 else 5.0)
+            + (15.0 if i_c3 else 0.0)
+            + (15.0 if i_c4 else 0.0)
             + (10.0 if i_c5 else 0.0)
         )
+        # Mutual exclusivity: If 4H spot CVD is positive (+200+ BTC absorption), Bear Trend continuation is invalid
+        if flow.w_4h.spot_delta_btc > 0:
+            score_i = min(score_i, 35.0)
         configs.append(
             RegimeConfigItem(
                 code="Config I",
@@ -520,10 +523,13 @@ class RegimeMatrixEvaluator:
         score_j = (
             (20.0 if j_c1 else 0.0)
             + (25.0 if j_c2 else 0.0)
-            + (20.0 if j_c3 else 5.0)
+            + (20.0 if j_c3 else 0.0)
             + (20.0 if j_c4 else 0.0)
             + (15.0 if j_c5 else 0.0)
         )
+        # Mutual exclusivity: If 4H spot CVD is negative (net selling), Bear Trap capitulation absorption cannot be active
+        if flow.w_4h.spot_delta_btc < 0:
+            score_j = min(score_j, 35.0)
         configs.append(
             RegimeConfigItem(
                 code="Config J",

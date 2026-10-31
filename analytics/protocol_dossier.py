@@ -198,10 +198,15 @@ def compute_protocol_metrics_dossier(
     oi_3d_pct = round(store.get_oi_change_pct(86400 * 3), 2)
 
     funding_8h_pct = round(store.funding_rate_pct, 4)
-    # Basis annualized: perp vs spot
-    futures_basis_annualized = None
-    if spot_price > 0 and perp_price > 0:
-        futures_basis_annualized = round(((perp_price - spot_price) / spot_price) * 100.0 * 365.0, 2)
+    # Basis annualized: Carry matching Section 1 (Spread carry + Annualized funding)
+    rmev = store.regime_matrix_evaluation
+    if rmev and rmev.annualized_basis_pct is not None:
+        futures_basis_annualized = rmev.annualized_basis_pct
+    elif spot_price > 0 and perp_price > 0:
+        perp_spread_pct = ((perp_price - spot_price) / spot_price) * 100.0
+        futures_basis_annualized = round((perp_spread_pct * 12.0) + (funding_8h_pct * 3.0 * 365.0), 2)
+    else:
+        futures_basis_annualized = round(funding_8h_pct * 3.0 * 365.0, 2)
 
     flow = store.flow_snapshot
     deriv = store.derivatives_snapshot
@@ -462,11 +467,11 @@ def format_protocol_metrics_dossier_markdown(dossier: Dict[str, Any]) -> str:
         "| :--- | :--- | :--- | :--- | :--- |",
         f"| **Open Interest (BTC)** | Current | `{_fmt_val(dp.get('open_interest_btc'), ' BTC')}` | {dp.get('perp_source', 'Binance USD-M')} | `LIVE COINS` |",
         f"| **Open Interest (USD)** | Current | `{_fmt_price(dp.get('open_interest_usd'))}` | {dp.get('perp_source', 'Binance USD-M')} | `NOTIONAL VALUE` |",
-        f"| **OI 1h % Change** | Last 1 hour | `{_fmt_val(dp.get('oi_change_1h_pct'), '%')}` | Regime Radar Window | `RAPID EXPANSION/FLUSH` |",
-        f"| **OI 24h % Change** | Last 24 hours | `{_fmt_val(dp.get('oi_change_24h_pct'), '%')}` | 24h Positioning Drift | `DAILY TREND` |",
-        f"| **OI 3D % Change** | Last 3 days (72h) | `{_fmt_val(dp.get('oi_change_3d_pct'), '%')}` | Regime Radar Window | `CYCLE BUILD` |",
+        f"| **OI 1h % Change** | Last 1 hour | `{_fmt_val(dp.get('oi_change_1h_pct'), '%')}` | Regime Radar Window | `{'RAPID EXPANSION' if (dp.get('oi_change_1h_pct') or 0) >= 0.8 else ('RAPID FLUSH' if (dp.get('oi_change_1h_pct') or 0) <= -0.8 else 'STABLE / CHURN')}` |",
+        f"| **OI 24h % Change** | Last 24 hours | `{_fmt_val(dp.get('oi_change_24h_pct'), '%')}` | 24h Positioning Drift | `{'LEVERAGE EXPANSION' if (dp.get('oi_change_24h_pct') or 0) >= 2.0 else ('DELEVERAGING FLUSH' if (dp.get('oi_change_24h_pct') or 0) <= -2.0 else 'STEADY DRIFT')}` |",
+        f"| **OI 3D % Change** | Last 3 days (72h) | `{_fmt_val(dp.get('oi_change_3d_pct'), '%')}` | Regime Radar Window | `{'CYCLE ACCUMULATION' if (dp.get('oi_change_3d_pct') or 0) >= 3.5 else ('CYCLE DELEVERAGING' if (dp.get('oi_change_3d_pct') or 0) <= -3.5 else 'RANGE CHURN')}` |",
         f"| **Funding Rate (8h)** | Current 8h Perp Rate | `{_fmt_val(dp.get('funding_rate_8h_pct'), '% / 8h')}` | {dp.get('perp_source', 'Binance USD-M')} | `{'Data unavailable' if not dp.get('funding_rate_8h_pct') else ('ELEVATED' if dp.get('funding_rate_8h_pct') > 0.01 else 'HEALTHY / NEUTRAL')}` |",
-        f"| **Futures Basis (Ann.)**| Current Annualized | `{_fmt_val(dp.get('futures_basis_annualized_pct'), '% / yr')}` | (Perp - Spot) / Spot | `COST OF CARRY` |",
+        f"| **Futures Basis (Ann.)**| Current Annualized Carry | `{_fmt_val(dp.get('futures_basis_annualized_pct'), '% / yr')}` | Perp vs. Spot Carry | `{'HEALTHY CARRY' if (dp.get('futures_basis_annualized_pct') or 0) >= 0 else 'BACKWARDATION DISCOUNT'}` |",
         f"| **Spot CVD (24h)** | Last 24 hours (12–48h Magnet) | `{_fmt_val(dp.get('spot_cvd_24h_btc'), ' BTC')} ({dp.get('spot_cvd_direction')})` | Binance Spot Net Taker | `CVD DELTA` |",
         f"| **Perp CVD (24h)** | Last 24 hours (12–48h Magnet) | `{_fmt_val(dp.get('perp_cvd_24h_btc'), ' BTC')} ({dp.get('perp_cvd_direction')})` | {dp.get('perp_source', 'Binance USD-M')} Net Taker | `LEVERAGE FLOW` |",
         f"| **Short-Liq Magnet** | 1-Month Liquidation Pool Above | `{_fmt_price(dp.get('short_liq_magnet_usd'))}` | {dp.get('short_liq_source')} | `UPSIDE TARGET` |",

@@ -266,9 +266,11 @@ class EMAStrategyEngine:
         else:
             setup_status = "NEUTRAL_CHOP (AVOID)"
 
-        # 9. Stop Loss Math (1.2 - 1.5 x ATR below 50 EMA)
+        # 9. Stop Loss Math: Strictly anchored below current price & pullback floor by >= 1x ATR
         ref_50 = ema_4h_50 if ema_4h_50 > 0 else d_ema_50
-        suggested_atr_stop = round(max(0.0, ref_50 - 1.35 * atr_4h), 2)
+        pullback_floor = min(b.low for b in bars_4h[-6:]) if bars_4h else current_price
+        anchor_level = min(ref_50, pullback_floor, current_price)
+        suggested_atr_stop = round(max(0.0, min(anchor_level - 1.25 * atr_4h, current_price - 1.0 * atr_4h)), 2)
         suggested_risk = 0.75 if daily_regime == "STRONG_BULL" else 0.50
 
         summary_text = (

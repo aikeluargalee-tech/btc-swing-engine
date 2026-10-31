@@ -439,7 +439,8 @@ class MasterSynthesisEvaluator:
         )
         upgrade_catalysts.append(
             f"To Trigger RED Hard Exit: Daily close below 1D Support (${pev.daily_support:,.0f}) "
-            f"/ Hard Stop (${tp.stop_loss if tp else pev.downside_ref_1d_atr:,.0f}) with expanding Spot selling."
+            f"/ Tab 1 Tactical Stop (${tp.stop_loss if tp else pev.downside_ref_1d_atr:,.0f}) "
+            f"or Track B Macro Liquidation Floor (${pev.long_liq_magnet_usd:,.0f}) with expanding Spot selling."
         )
 
         # =====================================================================
@@ -506,26 +507,21 @@ class MasterSynthesisEvaluator:
         tab4_stop = active_cfg.computed_stop_usd
         valid_stops = [s for s in (tab1_stop, tab4_stop) if 0 < s < price * 0.998]
         reconciled_stop = round(min(valid_stops), 2) if valid_stops else round(price * 0.985, 2)
-        stop_source = f"Tab 1: ${tab1_stop:,.0f} • Tab 4: ${tab4_stop:,.0f} • 50D: ${pev.sma_50_1d:,.0f}"
+        stop_source = f"Tab 1 Tactical: ${tab1_stop:,.0f} • Tab 4 Macro Floor: ${tab4_stop:,.0f} • 50D: ${pev.sma_50_1d:,.0f}"
 
-        tp1_candidates = [c for c in [tp.tp1_poc if tp else sig.c_poc, pev.short_liq_magnet_usd] if c > price]
-        holder_tp1_usd = round(min(tp1_candidates), 2) if tp1_candidates else round(max(sig.c_poc, price * 1.02), 2)
-        is_poc = abs(holder_tp1_usd - sig.c_poc) < 2.0 or (tp and abs(holder_tp1_usd - tp.tp1_poc) < 2.0)
-        is_liq = abs(holder_tp1_usd - pev.short_liq_magnet_usd) < 2.0
-        if is_poc and is_liq:
-            holder_tp1_source = "Short-Liq Magnet + cPOC"
-        elif is_poc:
-            holder_tp1_source = "30D cPOC Magnet"
-        elif is_liq:
-            holder_tp1_source = f"Short-Liq Magnet (${pev.short_liq_magnet_usd:,.0f})"
+        # Track B: Macro Spot Holder Targets (Multi-Day Swing / Reversion)
+        macro_tp1_candidates = [c for c in [sig.c_poc, mev.ema_21_1d if mev else sig.c_poc] if c > price]
+        holder_tp1_usd = round(min(macro_tp1_candidates), 2) if macro_tp1_candidates else round(max(sig.c_poc, price * 1.03), 2)
+        if mev and abs(holder_tp1_usd - mev.ema_21_1d) < 5.0:
+            holder_tp1_source = "1D 21 EMA Mean Reversion"
         else:
-            holder_tp1_source = "Tactical Upside Pivot"
+            holder_tp1_source = "30D cPOC Fair Value Magnet"
 
         tp2_candidates = [
             (c, src)
             for c, src in [
-                (tp.tp2_vah if tp else sig.c_vah, "30D cVAH Resistance"),
-                (mev.ema_21_1d, "1D 21 EMA Mean Reversion"),
+                (sig.c_vah, "30D cVAH Value Extreme"),
+                (pev.short_liq_magnet_usd, f"Short-Liq Magnet (${pev.short_liq_magnet_usd:,.0f})"),
                 (pev.daily_resistance, "1D Structural Resistance"),
             ]
             if c > holder_tp1_usd + 300.0

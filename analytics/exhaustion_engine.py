@@ -346,17 +346,20 @@ class ExhaustionEngine:
         vah_target = active_vp.c_vah if active_vp else (current_price + 4.0 * atr_1h)
 
         if regime in (ExhaustionRegime.ACTIVE_REVERSAL_TRIGGER, ExhaustionRegime.TERMINAL_EXHAUSTION_ARMED):
+            min_stop_dist = max(atr_1h * 1.0, 300.0)
             if is_bearish_exhaustion and not is_bullish_exhaustion:
                 active_signal = f"🚨 BEARISH EXHAUSTION (Score: {total_score:.0f}/100 • TD-9 + CVD Divergence)"
-                sl_price = (td_1h.invalidation_level or current_price) + 0.5 * atr_1h
-                risk = max(sl_price - current_price, 10.0)
-                reward = max(current_price - poc_target, 10.0)
+                short_poc = active_vp.c_poc if (active_vp and active_vp.c_poc < current_price) else (current_price - 2.5 * atr_1h)
+                wick_ref = max(td_1h.invalidation_level or current_price, current_price + 0.5 * atr_1h)
+                sl_price = max(wick_ref + 0.5 * atr_1h, current_price + min_stop_dist)
+                risk = max(sl_price - current_price, min_stop_dist)
+                reward = max(current_price - short_poc, risk * 2.0)
                 rr = reward / risk
                 trade_plan = ExhaustionTradePlan(
                     direction="SHORT (WAVE 5 EXHAUSTION SQUEEZE)",
                     entry_price=round(current_price, 2),
                     stop_loss=round(sl_price, 2),
-                    tp1_fast_mean=round(poc_target, 2),
+                    tp1_fast_mean=round(short_poc, 2),
                     tp2_value_poc=round(val_target, 2),
                     risk_dollars=round(risk, 2),
                     reward_dollars=round(reward, 2),
@@ -365,15 +368,17 @@ class ExhaustionEngine:
                 )
                 summary = (
                     f"Terminal upside exhaustion confirmed (Score: {total_score:.0f}/100). Aggressive buyers are hitting passive limit walls "
-                    f"with TD-9 setup perfected on {td_1h.horizon} and delta deceleration. Target mean reversion to Composite POC (${poc_target:,.0f})."
+                    f"with TD-9 setup perfected on {td_1h.horizon} and delta deceleration. Target mean reversion to Composite POC (${short_poc:,.0f})."
                 )
                 takeaway = "TRIM SPOT / HEDGE DERIVATIVES — Do not chase late breakout highs into terminal exhaustion."
 
             elif is_bullish_exhaustion:
                 active_signal = f"✅ BULLISH EXHAUSTION (Score: {total_score:.0f}/100 • TD-9 + CVD Absorption)"
-                sl_price = (td_1h.invalidation_level or current_price) - 0.5 * atr_1h
-                risk = max(current_price - sl_price, 10.0)
-                reward = max(poc_target - current_price, 10.0)
+                long_poc = active_vp.c_poc if (active_vp and active_vp.c_poc > current_price) else (current_price + 2.5 * atr_1h)
+                wick_ref = min(td_1h.invalidation_level or current_price, current_price - 0.5 * atr_1h)
+                sl_price = min(wick_ref - 0.5 * atr_1h, current_price - min_stop_dist)
+                risk = max(current_price - sl_price, min_stop_dist)
+                reward = max(long_poc - current_price, risk * 2.0)
                 rr = reward / risk
                 trade_plan = ExhaustionTradePlan(
                     direction="LONG (WAVE C CLIMAX REVERSAL)",

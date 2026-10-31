@@ -126,14 +126,14 @@ class SignalDetector:
             base_floor = min(floor_candidates)
             stop_loss = base_floor - (self.config.stop_atr_buffer_mult * atr_1h)
 
-            # Structural targets: TP1 -> 7D Tactical cPOC (if >= min R:R) or 30D cVAL, TP2 -> 30D Macro cPOC
+            # Structural targets: TP1 -> 7D Tactical cPOC / 30D cPOC, TP2 -> 30D Macro cVAH ($84k+)
             min_tp1_dist = max(self.config.min_structural_rr_to_poc * max(ref_entry - stop_loss, 1.0), atr_1h)
             tp1_poc = (
                 tactical_vp.c_poc
                 if (tactical_vp is not None and tactical_vp.c_poc >= ref_entry + min_tp1_dist)
-                else max(c_val, ref_entry + min_tp1_dist)
+                else max(c_poc, ref_entry + min_tp1_dist)
             )
-            tp2_vah = max(c_poc, tp1_poc + 1.5 * atr_1h)
+            tp2_vah = max(c_vah, tp1_poc + 1.5 * atr_1h)
         else:
             # Standard cVAL Sweep & Reclaim Geometry
             ref_entry = max(current_price, c_val) if abs(current_price - c_val) <= atr_1h else c_val

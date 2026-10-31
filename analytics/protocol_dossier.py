@@ -208,8 +208,9 @@ def compute_protocol_metrics_dossier(
     spot_cvd_24h = round(flow.w_24h.spot_delta_btc, 1) if flow and flow.w_24h else round(store.utc_day_spot_cvd, 1)
     perp_cvd_24h = round(flow.w_24h.perp_delta_btc, 1) if flow and flow.w_24h else round(store.utc_day_perp_cvd, 1)
 
-    spot_cvd_dir = "ACCUMULATION / NET BUY" if spot_cvd_24h > 0 else "DISTRIBUTION / NET SELL"
-    perp_cvd_dir = "LEVERAGED BUY" if perp_cvd_24h > 0 else "AGGRESSIVE SHORT"
+    # Zero CVD means the feed did not populate (e.g. geo-blocked venue) -> do not interpret it.
+    spot_cvd_dir = "Data unavailable" if spot_cvd_24h == 0 else ("ACCUMULATION / NET BUY" if spot_cvd_24h > 0 else "DISTRIBUTION / NET SELL")
+    perp_cvd_dir = "Data unavailable" if perp_cvd_24h == 0 else ("LEVERAGED BUY" if perp_cvd_24h > 0 else "AGGRESSIVE SHORT")
 
     short_liq_usd = pev.short_liq_magnet_usd if pev else None
     short_liq_src = pev.short_liq_source if pev else "N/A"
@@ -321,6 +322,7 @@ def compute_protocol_metrics_dossier(
             "va_position_pct": round(va_pos_pct, 1),
         },
         "derivatives_and_positioning": {
+            "perp_source": store.perp_source,
             "open_interest_btc": oi_btc,
             "open_interest_usd": oi_usd,
             "oi_change_1h_pct": oi_1h_pct,
@@ -354,6 +356,7 @@ def compute_protocol_metrics_dossier(
             "us_10y_treasury_yield": us_10y_yield,
             "us_10y_yield_change_5d": us_10y_yield_5d,
             "us_10y_real_yield_tips": us_tips_yield,
+            "us_10y_real_yield_source": macro_snap.us_10y_real_yield_source if macro_snap else "FRED (`DFII10`)",
             "us_10y_tips_direction": us_tips_dir,
             "us_10y_breakeven_inflation": us_breakeven,
             "us_10y_breakeven_change": us_breakeven_chg,
@@ -457,19 +460,19 @@ def format_protocol_metrics_dossier_markdown(dossier: Dict[str, Any]) -> str:
         "",
         "| Metric | Preferred Lookback | Value | Source / Benchmark | Status |",
         "| :--- | :--- | :--- | :--- | :--- |",
-        f"| **Open Interest (BTC)** | Current | `{_fmt_val(dp.get('open_interest_btc'), ' BTC')}` | Binance Futures | `LIVE COINS` |",
-        f"| **Open Interest (USD)** | Current | `{_fmt_price(dp.get('open_interest_usd'))}` | Binance Futures | `NOTIONAL VALUE` |",
+        f"| **Open Interest (BTC)** | Current | `{_fmt_val(dp.get('open_interest_btc'), ' BTC')}` | {dp.get('perp_source', 'Binance USD-M')} | `LIVE COINS` |",
+        f"| **Open Interest (USD)** | Current | `{_fmt_price(dp.get('open_interest_usd'))}` | {dp.get('perp_source', 'Binance USD-M')} | `NOTIONAL VALUE` |",
         f"| **OI 1h % Change** | Last 1 hour | `{_fmt_val(dp.get('oi_change_1h_pct'), '%')}` | Regime Radar Window | `RAPID EXPANSION/FLUSH` |",
         f"| **OI 24h % Change** | Last 24 hours | `{_fmt_val(dp.get('oi_change_24h_pct'), '%')}` | 24h Positioning Drift | `DAILY TREND` |",
         f"| **OI 3D % Change** | Last 3 days (72h) | `{_fmt_val(dp.get('oi_change_3d_pct'), '%')}` | Regime Radar Window | `CYCLE BUILD` |",
-        f"| **Funding Rate (8h)** | Current 8h Perp Rate | `{_fmt_val(dp.get('funding_rate_8h_pct'), '% / 8h')}` | Binance BTCUSDT Perp | `{'ELEVATED' if (dp.get('funding_rate_8h_pct') or 0) > 0.01 else 'HEALTHY / NEUTRAL'}` |",
+        f"| **Funding Rate (8h)** | Current 8h Perp Rate | `{_fmt_val(dp.get('funding_rate_8h_pct'), '% / 8h')}` | {dp.get('perp_source', 'Binance USD-M')} | `{'Data unavailable' if not dp.get('funding_rate_8h_pct') else ('ELEVATED' if dp.get('funding_rate_8h_pct') > 0.01 else 'HEALTHY / NEUTRAL')}` |",
         f"| **Futures Basis (Ann.)**| Current Annualized | `{_fmt_val(dp.get('futures_basis_annualized_pct'), '% / yr')}` | (Perp - Spot) / Spot | `COST OF CARRY` |",
         f"| **Spot CVD (24h)** | Last 24 hours (12–48h Magnet) | `{_fmt_val(dp.get('spot_cvd_24h_btc'), ' BTC')} ({dp.get('spot_cvd_direction')})` | Binance Spot Net Taker | `CVD DELTA` |",
-        f"| **Perp CVD (24h)** | Last 24 hours (12–48h Magnet) | `{_fmt_val(dp.get('perp_cvd_24h_btc'), ' BTC')} ({dp.get('perp_cvd_direction')})` | Binance Perp Net Taker | `LEVERAGE FLOW` |",
+        f"| **Perp CVD (24h)** | Last 24 hours (12–48h Magnet) | `{_fmt_val(dp.get('perp_cvd_24h_btc'), ' BTC')} ({dp.get('perp_cvd_direction')})` | {dp.get('perp_source', 'Binance USD-M')} Net Taker | `LEVERAGE FLOW` |",
         f"| **Short-Liq Magnet** | 1-Month Liquidation Pool Above | `{_fmt_price(dp.get('short_liq_magnet_usd'))}` | {dp.get('short_liq_source')} | `UPSIDE TARGET` |",
         f"| **Long-Liq Magnet** | 1-Month Liquidation Pool Below | `{_fmt_price(dp.get('long_liq_magnet_usd'))}` | {dp.get('long_liq_source')} | `DOWNSIDE TARGET` |",
-        f"| **Order-Book Depth (+/-1%)**| Current Snapshot | `{_fmt_val(dp.get('orderbook_depth_ratio_1pct'))} (Bids / Asks)` | Binance Spot L2 (1000 lvls) | `{'BID SUPPORT DOMINANT' if (dp.get('orderbook_depth_ratio_1pct') or 1) >= 1.0 else 'ASK OVERHANG DOMINANT'}` |",
-        f"| **Order-Book Depth (+/-2%)**| Current Snapshot | `{_fmt_val(dp.get('orderbook_depth_ratio_2pct'))} (Bids / Asks)` | Binance Spot L2 (1000 lvls) | `{'BID SUPPORT DOMINANT' if (dp.get('orderbook_depth_ratio_2pct') or 1) >= 1.0 else 'ASK OVERHANG DOMINANT'}` |",
+        f"| **Order-Book Depth (+/-1%)**| Current Snapshot | `{_fmt_val(dp.get('orderbook_depth_ratio_1pct'))} (Bids / Asks)` | Binance Spot L2 (1000 lvls) | `{'Data unavailable' if dp.get('orderbook_depth_ratio_1pct') is None else ('BID SUPPORT DOMINANT' if dp.get('orderbook_depth_ratio_1pct') >= 1.0 else 'ASK OVERHANG DOMINANT')}` |",
+        f"| **Order-Book Depth (+/-2%)**| Current Snapshot | `{_fmt_val(dp.get('orderbook_depth_ratio_2pct'))} (Bids / Asks)` | Binance Spot L2 (1000 lvls) | `{'Data unavailable' if dp.get('orderbook_depth_ratio_2pct') is None else ('BID SUPPORT DOMINANT' if dp.get('orderbook_depth_ratio_2pct') >= 1.0 else 'ASK OVERHANG DOMINANT')}` |",
         f"| **Coinbase Premium** | Current Snapshot | `{_fmt_val(dp.get('coinbase_premium_pct'), '%')} ({_fmt_val(dp.get('coinbase_premium_zscore'), 'σ')})` | US Institutional Demand | `COINBASE VS BINANCE` |",
         "",
         "### 12D. ETF Flows & Demand Proxies",
@@ -485,7 +488,7 @@ def format_protocol_metrics_dossier_markdown(dossier: Dict[str, Any]) -> str:
         "| Metric | Preferred Lookback | Value | Source / Benchmark | Status |",
         "| :--- | :--- | :--- | :--- | :--- |",
         f"| **Brent Crude Oil** | Current + 5–10d Range | `{_fmt_price(m.get('brent_crude_price'))} ({m.get('brent_crude_range_5_10d', 'N/A')})` | Yahoo Finance (`BZ=F`) | `LIVE QUOTE` |",
-        f"| **US 10Y Real Yield (TIPS)**| Current + 5–10d Direction | `{_fmt_val(m.get('us_10y_real_yield_tips'), '%')}` | FRED (`DFII10`) | `{'CONFIRMED' if m.get('us_10y_real_yield_tips') is not None else 'UNAVAILABLE (No Guessing)'}` |",
+        f"| **US 10Y Real Yield (TIPS)**| Current + 5–10d Direction | `{_fmt_val(m.get('us_10y_real_yield_tips'), '%')}` | {m.get('us_10y_real_yield_source', 'FRED (`DFII10`)')} | `{'CONFIRMED' if m.get('us_10y_real_yield_tips') is not None else 'UNAVAILABLE (No Guessing)'}` |",
         f"| **US 10Y Breakeven Infl.**| Current + Recent Change | `{_fmt_val(m.get('us_10y_breakeven_inflation'), '%')}` | FRED (`T10YIE`) | `{'CONFIRMED' if m.get('us_10y_breakeven_inflation') is not None else 'UNAVAILABLE (No Guessing)'}` |",
         f"| **US 10Y Treasury Yield** | Current + 5d Change | `{_fmt_val(m.get('us_10y_treasury_yield'), '%')} ({_fmt_val(m.get('us_10y_yield_change_5d'), '% over 5d')})` | Yahoo Finance (`^TNX`) | `LIVE YIELD` |",
         f"| **US Dollar Index (DXY)**| Current + 5–10d Direction | `{_fmt_val(m.get('dxy_index'))} ({m.get('dxy_direction_5_10d', 'N/A')})` | Yahoo Finance (`DX-Y.NYB`) | `LIVE INDEX` |",

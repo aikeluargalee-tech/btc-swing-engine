@@ -19,8 +19,8 @@ class EngineConfig:
     # --- Public REST Endpoints (with automatic geo-resilient fallbacks) ---
     binance_spot_rest_urls: List[str] = field(
         default_factory=lambda: [
-            "https://api.binance.com",
             "https://data-api.binance.vision",
+            "https://api.binance.com",
             "https://api1.binance.com",
         ]
     )
@@ -30,14 +30,16 @@ class EngineConfig:
         ]
     )
     okx_rest_url: str = "https://www.okx.com"
+    okx_perp_inst_id: str = "BTC-USDT-SWAP"   # Fallback perp venue (fapi.binance.com 451 / Bybit 403 on some hosts)
+    okx_perp_ws_url: str = "wss://ws.okx.com:8443/ws/v5/public"
     bybit_rest_url: str = "https://api.bybit.com"
     coinbase_rest_url: str = "https://api.exchange.coinbase.com"
 
     # --- Public WebSocket Endpoints (with automatic fallbacks) ---
     binance_spot_ws_urls: List[str] = field(
         default_factory=lambda: [
-            "wss://stream.binance.com:9443/ws/btcusdt@aggTrade",
             "wss://data-stream.binance.vision/ws/btcusdt@aggTrade",
+            "wss://stream.binance.com:9443/ws/btcusdt@aggTrade",
         ]
     )
     binance_perp_ws_urls: List[str] = field(

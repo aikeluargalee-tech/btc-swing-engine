@@ -129,7 +129,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
         "| :--- | :--- | :--- |",
         f"| **Binance Spot Price (`BTCUSDT`)** | `${atomic_spot_price:,.2f}` | Primary Spot Reference |",
         f"| **Coinbase Spot Price (`BTC-USD`)** | `${store.coinbase_spot_price:,.2f}` | US Institutional Spot Reference |",
-        f"| **Binance USD-M Perp Price** | `${store.binance_perp_price:,.2f}` | Perpetual Futures Reference (`{store.perp_source}`) |",
+        f"| **Perp Price ({store.perp_source})** | `{f'${store.binance_perp_price:,.2f}' if store.binance_perp_price > 0 else 'Data unavailable'}` | Perpetual Futures Reference (`{store.perp_source}`) |",
         f"| **Coinbase Premium Index (CPI)** | `${deriv.coinbase_premium_usd:+,.2f}` (`{deriv.coinbase_premium_pct:+.4f}%`) | Rolling Z-Score: `{deriv.coinbase_premium_zscore:+.2f}σ` |",
         f"| **Open Interest (Strict BTC Coins)** | `{deriv.open_interest_btc:,.2f} BTC` | Notional: `${deriv.open_interest_usd:,.0f}` |",
         f"| **Open Interest Delta (`15m / 1H / 4H / 24H`)** | `15m: {deriv.oi_change_15m_pct:+.2f}%` • `1H: {deriv.oi_change_1h_pct:+.2f}%` • `4H: {deriv.oi_change_4h_pct:+.2f}%` | `24H dOI: {(rmev.oi_change_24h_pct if rmev else 0.0):+.2f}%` |",

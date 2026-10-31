@@ -32,6 +32,7 @@ class MacroIntermarketSnapshot:
     us_10y_treasury_yield: Optional[float] = None
     us_10y_yield_change_5d: Optional[float] = None
     us_10y_real_yield_tips: Optional[float] = None
+    us_10y_real_yield_source: str = "FRED (`DFII10`)"
     us_10y_tips_direction_5_10d: Optional[str] = None
     us_10y_breakeven_inflation: Optional[float] = None
     us_10y_breakeven_change: Optional[str] = None
@@ -145,7 +146,14 @@ async def _fetch_coingecko_dominance(session: aiohttp.ClientSession) -> Optional
 
 async def _fetch_binance_depth_ratios(session: aiohttp.ClientSession) -> Tuple[Optional[float], Optional[float]]:
     """Fetches Binance Spot L2 depth and computes +/-1% and +/-2% bid/ask ratios."""
-    url = "https://api.binance.com/api/v3/depth?symbol=BTCUSDT&limit=1000"
+    for base in ("https://data-api.binance.vision", "https://api.binance.com", "https://api1.binance.com"):
+        res = await _fetch_depth_from(session, f"{base}/api/v3/depth?symbol=BTCUSDT&limit=1000")
+        if res[0] is not None:
+            return res
+    return None, None
+
+
+async def _fetch_depth_from(session: aiohttp.ClientSession, url: str) -> Tuple[Optional[float], Optional[float]]:
     try:
         async with session.get(url, timeout=aiohttp.ClientTimeout(total=4.0)) as r:
             if r.status == 200:
@@ -184,6 +192,35 @@ async def _fetch_fred_series(session: aiohttp.ClientSession, series_id: str) -> 
                         return val
     except Exception as e:
         logger.debug("Failed FRED fetch for %s: %s", series_id, e)
+    return None
+
+
+async def _fetch_treasury_real_yield_10y(session: aiohttp.ClientSession) -> Optional[float]:
+    """Fallback for DFII10: US Treasury daily real yield curve CSV ("10 YR" column, newest row first)."""
+    headers = {"User-Agent": "Mozilla/5.0"}
+    year = datetime.now(timezone.utc).year
+    for y in (year, year - 1):
+        url = (
+            "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/"
+            f"daily-treasury-rates.csv/{y}/all?type=daily_treasury_real_yield_curve&field_tdr_date_value={y}"
+        )
+        try:
+            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=8.0)) as r:
+                if r.status != 200:
+                    continue
+                lines = [ln.strip() for ln in (await r.text()).splitlines() if ln.strip()]
+                if len(lines) < 2:
+                    continue
+                cols = [c.strip().strip('"') for c in lines[0].split(",")]
+                if "10 YR" not in cols:
+                    continue
+                idx = cols.index("10 YR")
+                for line in lines[1:]:
+                    parts = [p.strip().strip('"') for p in line.split(",")]
+                    if len(parts) > idx and parts[idx]:
+                        return float(parts[idx])
+        except Exception as e:
+            logger.debug("Failed Treasury real-yield fetch (%s): %s", y, e)
     return None
 
 
@@ -310,6 +347,11 @@ async def fetch_macro_and_intermarket_snapshot(
     # Populate FRED
     if isinstance(fred_tips, float):
         snap.us_10y_real_yield_tips = round(fred_tips, 3)
+    else:
+        treas = await _fetch_treasury_real_yield_10y(session)
+        if treas is not None:
+            snap.us_10y_real_yield_tips = round(treas, 3)
+            snap.us_10y_real_yield_source = "US Treasury real yield curve (10 YR)"
     if isinstance(fred_breakeven, float):
         snap.us_10y_breakeven_inflation = round(fred_breakeven, 3)
 

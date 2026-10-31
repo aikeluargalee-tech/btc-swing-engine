@@ -73,7 +73,12 @@ async def fetch_binance_perp_klines(
         except Exception as exc:
             logger.debug("Perp kline fetch failed on %s: %s", base_url, exc)
 
-    # Geo-resilient fallback: Bybit V5 Linear klines (approximating taker buy via candle body direction/ratio)
+    # Geo-resilient fallback #1: OKX BTC-USDT-SWAP
+    okx_bars = await fetch_okx_perp_klines(session, config, interval=interval, limit=limit)
+    if okx_bars:
+        return okx_bars
+
+    # Geo-resilient fallback #2: Bybit V5 Linear klines (approximating taker buy via candle body direction/ratio)
     interval_map = {"1h": "60", "15m": "15", "1d": "D", "1w": "W"}
     bybit_interval = interval_map.get(interval, "60")
     url = f"{config.bybit_rest_url}/v5/market/kline"
@@ -179,6 +184,138 @@ async def fetch_initial_oi_and_funding(
                     store.perp_5m_delta_btc = buy_v - sell_v
     except Exception as exc:
         logger.debug("Primary Binance futures OI/Funding warmup failed: %s", exc)
+
+    if store.binance_perp_price == 0.0 or store.funding_rate_pct == 0.0:
+        await fetch_okx_oi_and_funding(session, config, store)
+
+
+# ---------------- OKX BTC-USDT-SWAP fallback (used when Binance USD-M / Bybit are geo-blocked) ----------------
+
+OKX_SOURCE_LABEL = "OKX BTC-USDT-SWAP"
+_OKX_BAR = {"15m": "15m", "1h": "1H", "4h": "4H", "1d": "1Dutc", "1w": "1Wutc"}
+_OKX_TAKER_PERIOD = {"15m": "15m", "1h": "1H", "1d": "1D"}
+
+
+async def _okx_get(session: aiohttp.ClientSession, config: EngineConfig, path: str, params: dict) -> Optional[list]:
+    try:
+        async with session.get(
+            f"{config.okx_rest_url}{path}", params=params, timeout=aiohttp.ClientTimeout(total=10)
+        ) as resp:
+            if resp.status == 200:
+                payload = await resp.json()
+                if str(payload.get("code")) == "0":
+                    return payload.get("data", [])
+    except Exception as exc:
+        logger.debug("OKX GET %s failed: %s", path, exc)
+    return None
+
+
+async def fetch_okx_perp_klines(
+    session: aiohttp.ClientSession,
+    config: EngineConfig,
+    interval: str = "1h",
+    limit: int = 750,
+) -> List[KlineBar]:
+    """OKX BTC-USDT-SWAP candles (volCcy = BTC) with taker-buy volume from rubik taker-volume-contract.
+
+    Rubik returns at most 100 recent bars; older bars fall back to the candle-body taker approximation
+    (same method the engine already uses for its Bybit fallback).
+    """
+    bar = _OKX_BAR.get(interval)
+    if not bar:
+        return []
+    rows: List[list] = []
+    after: Optional[str] = None
+    while len(rows) < limit:
+        params = {"instId": config.okx_perp_inst_id, "bar": bar, "limit": "100"}
+        if after:
+            params["after"] = after
+        data = await _okx_get(session, config, "/api/v5/market/history-candles", params)
+        if not data:
+            break
+        rows.extend(data)
+        after = data[-1][0]
+        if len(data) < 100:
+            break
+    if not rows:
+        return []
+    rows = rows[:limit]
+
+    taker_buy: dict = {}
+    period = _OKX_TAKER_PERIOD.get(interval)
+    if period:
+        tv = await _okx_get(
+            session,
+            config,
+            "/api/v5/rubik/stat/taker-volume-contract",
+            {"instId": config.okx_perp_inst_id, "period": period, "unit": "0", "limit": "100"},
+        )
+        for r in tv or []:
+            # [ts, sellVol, buyVol] in BTC
+            taker_buy[int(r[0])] = float(r[2])
+
+    bars: List[KlineBar] = []
+    for row in reversed(rows):  # oldest first
+        ts = int(row[0])
+        o, h, l, c = float(row[1]), float(row[2]), float(row[3]), float(row[4])
+        v = float(row[6])  # volCcy = BTC
+        if ts in taker_buy:
+            tb = min(taker_buy[ts], v) if v > 0 else taker_buy[ts]
+        else:
+            rng = max(h - l, 1e-6)
+            buy_ratio = min(0.95, max(0.05, 0.5 + 0.4 * ((c - o) / rng)))
+            tb = v * buy_ratio
+        bars.append(KlineBar(timestamp_ms=ts, open=o, high=h, low=l, close=c, volume=v, taker_buy_volume=tb))
+    return bars
+
+
+async def fetch_okx_oi_and_funding(
+    session: aiohttp.ClientSession,
+    config: EngineConfig,
+    store: StateStore,
+) -> bool:
+    """OKX fallback for OI (BTC via oiCcy), OI history, funding, mark price and 5m taker ratio."""
+    inst = config.okx_perp_inst_id
+    ok = False
+    tk = await _okx_get(session, config, "/api/v5/market/ticker", {"instId": inst})
+    if tk and float(tk[0].get("last", 0.0)) > 0:
+        store.binance_perp_price = float(tk[0]["last"])
+    else:
+        mp = await _okx_get(session, config, "/api/v5/public/mark-price", {"instType": "SWAP", "instId": inst})
+        if mp and float(mp[0].get("markPx", 0.0)) > 0:
+            store.binance_perp_price = float(mp[0]["markPx"])
+    hist = await _okx_get(
+        session, config, "/api/v5/rubik/stat/contracts/open-interest-history",
+        {"instId": inst, "period": "15m", "limit": "300"},
+    )
+    for r in reversed(hist or []):  # [ts, oi_contracts, oiCcy(BTC), oiUsd]
+        oi_btc = float(r[2])
+        if oi_btc > 0:
+            store.record_oi_sample(oi_btc, ts_sec=int(r[0]) / 1000.0)
+    cur = await _okx_get(session, config, "/api/v5/public/open-interest", {"instType": "SWAP", "instId": inst})
+    if cur:
+        oi_btc = float(cur[0].get("oiCcy", 0.0))
+        if oi_btc > 0:
+            store.record_oi_sample(oi_btc)
+            oi_usd = float(cur[0].get("oiUsd", 0.0) or 0.0)
+            if oi_usd > 0:
+                store.open_interest_usd = oi_usd
+            ok = True
+    fr = await _okx_get(session, config, "/api/v5/public/funding-rate", {"instId": inst})
+    if fr:
+        store.funding_rate_pct = float(fr[0].get("fundingRate", 0.0)) * 100.0
+        ok = True
+    tv = await _okx_get(
+        session, config, "/api/v5/rubik/stat/taker-volume-contract",
+        {"instId": inst, "period": "5m", "unit": "0", "limit": "1"},
+    )
+    if tv:
+        sell_v, buy_v = float(tv[0][1]), float(tv[0][2])
+        store.taker_long_short_ratio_5m = (buy_v / sell_v) if sell_v > 0 else 1.0
+        store.perp_5m_delta_btc = buy_v - sell_v
+    if ok:
+        store.perp_source = OKX_SOURCE_LABEL
+    return ok
 
 
 async def fetch_initial_coinbase_basis(

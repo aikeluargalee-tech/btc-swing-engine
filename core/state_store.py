@@ -97,6 +97,8 @@ class StateStore:
         self.trap_evaluation: Optional[TrapRadarEvaluation] = None
         self.exhaustion_evaluation: Optional[ExhaustionRadarEvaluation] = None
         self.ema_strategy: Optional[EMAStrategySnapshot] = None
+        self.macro_intermarket: Any = None
+        self.protocol_dossier: Optional[Dict[str, Any]] = None
 
         # --- Connection & System Health ---
         self.warmup_complete: bool = False

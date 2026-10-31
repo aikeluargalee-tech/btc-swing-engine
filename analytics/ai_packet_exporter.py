@@ -671,6 +671,23 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             "* **Sequential Invalidation**: A TD-9 setup is immediately invalidated if a subsequent candle body closes beyond the setup's true extreme price bar. Always enforce deterministic stops.",
         ])
 
+    # --- SECTION 12: CONSOLIDATED PROTOCOL METRICS DOSSIER (SUPER GROK SPECIFICATION) ---
+    from analytics.protocol_dossier import (
+        compute_protocol_metrics_dossier,
+        format_protocol_metrics_dossier_markdown,
+    )
+
+    dossier = store.protocol_dossier
+    if dossier is None:
+        dossier = compute_protocol_metrics_dossier(config, store, store.macro_intermarket)
+        store.protocol_dossier = dossier
+
+    dossier_text = format_protocol_metrics_dossier_markdown(dossier)
+    lines.extend([
+        "",
+        dossier_text.strip(),
+    ])
+
     return "\n".join(lines) + "\n"
 
 

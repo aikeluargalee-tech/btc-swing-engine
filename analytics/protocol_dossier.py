@@ -30,7 +30,9 @@ def compute_protocol_metrics_dossier(
 ) -> Dict[str, Any]:
     """Computes and structures all quantitative metrics required by the 7 active trading protocols."""
     now_utc = datetime.now(timezone.utc)
+    now_myt = now_utc + timedelta(hours=8)
     ts_utc_str = now_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
+    as_of_myt_str = now_myt.strftime("%Y-%m-%d %H:%M:%S MYT")
 
     spot_price = store.binance_spot_price
     perp_price = store.binance_perp_price
@@ -287,7 +289,9 @@ def compute_protocol_metrics_dossier(
         log_spread_zscore = round(log_spread_raw / (log_spread_50d_std + 1e-9), 2)
 
     return {
+        "as_of_myt": as_of_myt_str,
         "timestamp_utc": ts_utc_str,
+        "spot_price": spot_price,
         "price_and_structure": {
             "spot_price": spot_price,
             "change_24h_pct": change_24h_pct,

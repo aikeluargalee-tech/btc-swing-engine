@@ -58,6 +58,16 @@ async def execute_engine(
     with open(json_path, "w", encoding="utf-8") as jf:
         json.dump(dossier, jf, indent=2)
 
+    # Mirror to btc_metrics_latest.json for Bot A1–A14 Handover compatibility
+    for alt_name in ("btc_metrics_latest.json", "data/btc_metrics_latest.json"):
+        try:
+            alt_path = pathlib.Path(alt_name)
+            alt_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(alt_path, "w", encoding="utf-8") as ajf:
+                json.dump(dossier, ajf, indent=2)
+        except Exception:
+            pass
+
     # Export full Markdown packet
     packet_md = build_ai_telemetry_packet(config, store)
     out_path = pathlib.Path(output_file)

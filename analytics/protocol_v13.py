@@ -232,9 +232,12 @@ class ProtocolV13Evaluator:
             if deriv.oi_change_4h_pct >= 0.35
             else ("FALLING" if deriv.oi_change_4h_pct <= -0.35 else "FLAT")
         )
-        oi_above_90k = oi_btc > self.config.protocol_oi_high_threshold_btc
+        is_okx = "OKX" in getattr(store, "perp_source", "")
+        oi_threshold = 32_000.0 if is_okx else self.config.protocol_oi_high_threshold_btc
+        oi_above_thresh = oi_btc > oi_threshold
+        thresh_label = f"{oi_threshold:,.0f} BTC ({'OKX' if is_okx else 'Binance'})"
         oi_status_str = (
-            f"{oi_dir} | {'[ ELEVATED > 90,000 BTC ]' if oi_above_90k else 'BELOW 90,000 BTC CAP'}"
+            f"{oi_dir} | {'[ ELEVATED > ' + thresh_label + ' ]' if oi_above_thresh else 'BELOW ' + thresh_label + ' CAP'}"
         )
 
         # Panel 5: Funding Rates
@@ -276,7 +279,7 @@ class ProtocolV13Evaluator:
                 metric_name="4. Open Interest (BTC)",
                 value_1d=f"{oi_btc:,.1f} BTC (Coins)",
                 value_4h=f"4H:{deriv.oi_change_4h_pct:+.2f}% | 1H:{deriv.oi_change_1h_pct:+.2f}%",
-                direction_status=f"{oi_dir} ({'>90k BTC' if oi_above_90k else '<=90k BTC'})",
+                direction_status=f"{oi_dir} ({'>' + thresh_label if oi_above_thresh else '<=' + thresh_label})",
             ),
             CoinGlassPanelRow(
                 panel_num=5,
@@ -309,17 +312,17 @@ class ProtocolV13Evaluator:
         dist_round_pct = abs(current_price - nearest_round) / max(nearest_round, 1.0) * 100.0
         within_round_2pct = dist_round_pct <= self.config.protocol_round_proximity_pct
 
-        # 8A: Weekend/Holiday + within 2.0% of $80k/$85k/$100k + OI > 90,000 BTC (ALL 3 required)
-        ntz_8a_triggered = is_weekend and within_round_2pct and oi_above_90k
+        # 8A: Weekend/Holiday + within 2.0% of $80k/$85k/$100k + OI > Threshold (ALL 3 required)
+        ntz_8a_triggered = is_weekend and within_round_2pct and oi_above_thresh
         ntz_8a = ProtocolNonTradeZoneItem(
             code="8A",
-            rule_name="Weekend + <=2% of $80k/$85k/$100k + OI>90k BTC",
+            rule_name=f"Weekend + <=2% of $80k/$85k/$100k + OI>{thresh_label}",
             status="TRIGGERED" if ntz_8a_triggered else "CLEAR",
             detail=(
                 f"{'Weekend' if is_weekend else 'Weekday'} | "
                 f"{dist_round_pct:.2f}% from ${nearest_round:,.0f} "
                 f"({'<=2%' if within_round_2pct else '>2%'}) | "
-                f"OI {oi_btc:,.0f} BTC ({'>90k' if oi_above_90k else '<=90k'})"
+                f"OI {oi_btc:,.0f} BTC ({'>' + thresh_label if oi_above_thresh else '<=' + thresh_label})"
             ),
         )
 

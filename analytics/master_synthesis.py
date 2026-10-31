@@ -510,11 +510,16 @@ class MasterSynthesisEvaluator:
 
         tp1_candidates = [c for c in [tp.tp1_poc if tp else sig.c_poc, pev.short_liq_magnet_usd] if c > price]
         holder_tp1_usd = round(min(tp1_candidates), 2) if tp1_candidates else round(max(sig.c_poc, price * 1.02), 2)
-        holder_tp1_source = (
-            "Short-Liq + cPOC"
-            if abs(sig.c_poc - pev.short_liq_magnet_usd) / max(price, 1.0) < 0.015
-            else ("cPOC Magnet" if holder_tp1_usd == round(sig.c_poc, 2) else "Short-Liq Cluster")
-        )
+        is_poc = abs(holder_tp1_usd - sig.c_poc) < 2.0 or (tp and abs(holder_tp1_usd - tp.tp1_poc) < 2.0)
+        is_liq = abs(holder_tp1_usd - pev.short_liq_magnet_usd) < 2.0
+        if is_poc and is_liq:
+            holder_tp1_source = "Short-Liq Magnet + cPOC"
+        elif is_poc:
+            holder_tp1_source = "30D cPOC Magnet"
+        elif is_liq:
+            holder_tp1_source = f"Short-Liq Magnet (${pev.short_liq_magnet_usd:,.0f})"
+        else:
+            holder_tp1_source = "Tactical Upside Pivot"
 
         tp2_candidates = [
             (c, src)

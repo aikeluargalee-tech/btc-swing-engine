@@ -185,7 +185,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
         if sig.ema_strategy is not None:
             es = sig.ema_strategy
             lines.append(
-                f"* • **3-EMA Industrial Trend & Pullback System**: Daily Regime: `{es.daily_regime}` "
+                f"* • **3-EMA Industrial Trend System (Macro Multi-Week Horizon)**: Macro Trend Regime:`{es.daily_regime}` "
                 f"(200 EMA `${es.daily_ema_200:,.0f}`, Slope `{es.daily_ema_200_slope:+,.1f}$/day`, ADX `{es.daily_adx:.1f}`) | "
                 f"4H 50-EMA: `${es.ema_4h_50:,.0f}` (Pullback Zone: `{es.pullback_zone_active}`) | "
                 f"Positioning Confluence: `{es.positioning_confirmations_met}/3` | "
@@ -217,7 +217,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
         f"| **`UTC Day (00:00)`** | `N/A` | `{flow.utc_day_spot_cvd:+,.2f} BTC` | `N/A` | `{flow.utc_day_perp_cvd:+,.2f} BTC` | `N/A` | `N/A` | `N/A` |"
     )
     lines.append(
-        f"| **`Live WS Session`** | `N/A` | `{flow.session_spot_cvd:+,.2f} BTC` | `N/A` | `{flow.session_perp_cvd:+,.2f} BTC` | `N/A` | `N/A` | `Bull Div: {flow.bullish_pivot_divergence} / Abs Div: {flow.absorption_divergence}` |"
+        f"| **`Live WS Session`** | `N/A` | {(f'`{flow.session_spot_cvd:+,.2f} BTC`' if (flow.session_spot_cvd != 0 or flow.session_perp_cvd != 0) else '`0.00 BTC (On-Demand CLI — see 24H / UTC Day)`')} | `N/A` | {(f'`{flow.session_perp_cvd:+,.2f} BTC`' if (flow.session_spot_cvd != 0 or flow.session_perp_cvd != 0) else '`0.00 BTC (On-Demand CLI — see 24H / UTC Day)`')} | `N/A` | `N/A` | `Bull Div: {flow.bullish_pivot_divergence} / Abs Div: {flow.absorption_divergence}` |"
     )
 
     if pev is not None:
@@ -230,7 +230,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             "### 3A. Daily Completed `[-2]` vs. Forming `[-1]` & ATR 14 Reference Bounds",
             f"* **1D Completed Candle `[-2]` (Closed)**: Open `${pev.completed_1d_open:,.2f}` • High `${pev.completed_1d_high:,.2f}` • Low `${pev.completed_1d_low:,.2f}` • Close `${pev.completed_1d_close:,.2f}` (`{pev.completed_1d_change_pct:+.2f}%`)",
             f"* **1D Forming Candle `[-1]` (Live)**: Open `${pev.forming_1d_open:,.2f}` • High `${pev.forming_1d_high:,.2f}` • Low `${pev.forming_1d_low:,.2f}` • Close `${pev.forming_1d_close:,.2f}` (`{pev.forming_1d_change_pct:+.2f}%`)",
-            f"* **1D Support / Resistance**: Support `${pev.daily_support:,.0f}` • Resistance `${pev.daily_resistance:,.0f}` • **1D Bias**: `{pev.daily_bias}` • **4H Structure**: `{pev.structure_4h}` (`4H Ready: {pev.timing_4h_ready}`)",
+            f"* **1D Support / Resistance**: Support `${pev.daily_support:,.0f}` • Resistance `${pev.daily_resistance:,.0f}` • **Daily Candlestick Bias (Single 1D Bar)**: `{pev.daily_bias}` (Completed 1D Close < Open) • **4H Structure**: `{pev.structure_4h}` (`4H Ready: {pev.timing_4h_ready}`)",
             f"* **ATR 14 Volatility Bounds**: `1D ATR 14 = ${pev.atr_14_1d:,.0f}` (`-1xATR: ${pev.downside_ref_1d_atr:,.0f}` / `+1xATR: ${pev.upside_ref_1d_atr:,.0f}`) | `4H ATR 14 = ${pev.atr_14_4h:,.0f}` (`-1xATR: ${pev.downside_ref_4h_atr:,.0f}` / `+1xATR: ${pev.upside_ref_4h_atr:,.0f}`)",
             f"* **Daily Liquidation Magnet & Range Pivot Protocol**: `1D 50 SMA = ${pev.sma_50_1d:,.0f}` • `30D Range Pivot = ${pev.range_pivot_usd:,.0f}` • **Nearest Short-Liq Magnet Above**: `${pev.short_liq_magnet_usd:,.0f}` (`{pev.short_liq_source}`) • **Nearest Long-Liq Magnet Below**: `${pev.long_liq_magnet_usd:,.0f}` (`{pev.long_liq_source}`) • **Headline Filter**: `{pev.headline_filter_status}` • **5-Factor Magnet Confluence**: `{pev.magnet_confluence_aligned}/5`",
             "",
@@ -364,11 +364,11 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             f"  - **Reconciled Bid Zone**: `{msev.cash_entry_zone_str}`",
             f"  - **Reconciled Size Math**: `{msev.cash_base_risk_pct:.2f}% [T3] × {msev.cash_regime_multiplier:.2f}x [T4] -> {msev.cash_edge_size_btc:.4f} BTC (${msev.cash_edge_notional_usd:,.0f} at {msev.cash_edge_risk_pct:.2f}% risk)`",
             f"  - **Execution Rule**: `{msev.cash_trigger_instruction}`",
-            f"* **TRACK B (IF HOLDING SPOT BTC)**: `{msev.holder_action}`",
+            f"* **TRACK B (IF HOLDING SPOT BTC — MACRO HORIZON)**: `{msev.holder_action}`",
             f"  - **Reconciled Hard Stop**: `${msev.holder_hard_stop_usd:,.0f}` (`${msev.holder_hard_stop_usd:,.2f}` exact | `{msev.holder_hard_stop_source}`)",
             f"  - **Profit Targets (1/2)**: `TP1 (40%): ${msev.holder_tp1_usd:,.0f} ({msev.holder_tp1_source}) • TP2 (60%): ${msev.holder_tp2_usd:,.0f} ({msev.holder_tp2_source})`",
             f"  - **Management Rule**: `{msev.holder_management_note}`",
-            f"* **Tab [1] TradePlan R:R**: Entry `${tp.entry_zone_low:,.0f}–${tp.entry_zone_high:,.0f}` | Stop `${tp.stop_loss:,.0f}` | `TP1 ${tp.tp1_poc:,.0f} ({tp.rr_to_poc:.2f}R)` | `TP2 ${tp.tp2_vah:,.0f} ({tp.rr_to_vah:.2f}R)`" if tp else "",
+            f"* **Tab [1] Tactical TradePlan (Intraday/Swing)**: Entry `${tp.entry_zone_low:,.0f}–${tp.entry_zone_high:,.0f}` | Tactical Stop `${tp.stop_loss:,.0f}` (ATR/Swing Low) | `Tactical TP1 ${tp.tp1_poc:,.0f} (30D cPOC Fair Value)` | `Tactical TP2 ${tp.tp2_vah:,.0f} (30D cVAH Value Extreme)`" if tp else "",
             "",
             "### 6E. Panel 5 — Executive Bottom Line (Supreme Master Conclusion)",
             f"* **Master Traffic Light & Headline**: `{msev.master_traffic_light}` — `{msev.master_headline}`",

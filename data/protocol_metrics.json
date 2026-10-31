@@ -1,23 +1,23 @@
 {
-  "timestamp_utc": "2026-10-31 06:21:47 UTC",
+  "timestamp_utc": "2026-10-31 07:43:55 UTC",
   "price_and_structure": {
-    "spot_price": 77262.96,
-    "change_24h_pct": -0.14,
-    "change_7d_pct": -4.48,
-    "daily_sma50": 81953.89,
-    "daily_sma200": 73177.49,
+    "spot_price": 77340.44,
+    "change_24h_pct": -0.04,
+    "change_7d_pct": -4.39,
+    "daily_sma50": 81955.44,
+    "daily_sma200": 73177.88,
     "sma200_slope_15d_pct": 1.08,
-    "sma200_slope_usd_day": 51.94,
-    "weekly_sma200": 81691.4,
+    "sma200_slope_usd_day": 51.96,
+    "weekly_sma200": 81692.69,
     "weekly_sma_note": "60w available avg",
     "range_high_45d": 87395.67,
     "range_low_45d": 76000.0,
     "daily_atr14": 1961.68,
-    "daily_vwap": 77371.1,
-    "weekly_vwap": 79473.52,
-    "daily_ema20": 80686.04,
-    "daily_ema50": 80452.57,
-    "daily_ema200": 74415.38,
+    "daily_vwap": 77378.05,
+    "weekly_vwap": 79462.25,
+    "daily_ema20": 80693.42,
+    "daily_ema50": 80455.61,
+    "daily_ema200": 74416.15,
     "daily_support": 76325.98,
     "daily_resistance": 84898.0
   },
@@ -28,12 +28,12 @@
     "prior_day_high": 78804.01,
     "prior_day_low": 76325.98,
     "prior_day_volume_btc": 24295.9,
-    "prior_day_location": "INSIDE VALUE (38.6%)",
+    "prior_day_location": "INSIDE VALUE (45.0%)",
     "prior_week_poc": 81740.02,
     "prior_week_vah": 83585.13,
     "prior_week_val": 80888.44,
-    "prior_week_location": "BELOW VAL (-4.48%)",
-    "developing_poc": 77458.53,
+    "prior_week_location": "BELOW VAL (-4.39%)",
+    "developing_poc": 77390.98,
     "top_hvns": [
       80184.28,
       80819.76,
@@ -43,36 +43,36 @@
       77914.69,
       79185.66
     ],
-    "va_position_pct": -62.1
+    "va_position_pct": -60.3
   },
   "derivatives_and_positioning": {
-    "perp_source": "OKX BTC-USDT-SWAP",
-    "open_interest_btc": 34597.7,
-    "open_interest_usd": 2671119366.94,
-    "oi_change_1h_pct": 0.02,
-    "oi_change_24h_pct": 2.1,
-    "oi_change_3d_pct": 1.35,
+    "perp_source": "Binance USD-M",
+    "open_interest_btc": 96975.2,
+    "open_interest_usd": 7500104637.09,
+    "oi_change_1h_pct": 0.62,
+    "oi_change_24h_pct": 0.41,
+    "oi_change_3d_pct": 0.41,
     "funding_rate_8h_pct": 0.01,
-    "futures_basis_annualized_pct": -29.74,
-    "spot_cvd_24h_btc": -606.8,
+    "futures_basis_annualized_pct": -20.02,
+    "spot_cvd_24h_btc": -435.8,
     "spot_cvd_direction": "DISTRIBUTION / NET SELL",
-    "perp_cvd_24h_btc": -2680.9,
+    "perp_cvd_24h_btc": -2157.5,
     "perp_cvd_direction": "AGGRESSIVE SHORT",
     "short_liq_magnet_usd": 85322.49,
     "short_liq_source": "[EST. SWING LIQ POOL]",
     "long_liq_magnet_usd": 75944.35,
     "long_liq_source": "[EST. SWING LIQ POOL]",
-    "orderbook_depth_ratio_1pct": 0.765,
-    "orderbook_depth_ratio_2pct": 0.765,
-    "coinbase_premium_pct": -0.221,
-    "coinbase_premium_zscore": -0.13,
-    "taker_long_short_ratio_5m": 34.21
+    "orderbook_depth_ratio_1pct": 1.615,
+    "orderbook_depth_ratio_2pct": 1.615,
+    "coinbase_premium_pct": -0.204,
+    "coinbase_premium_zscore": 0.64,
+    "taker_long_short_ratio_5m": 1.2
   },
   "flows_and_demand": {
     "etf_daily_net_flow_usd": null,
     "etf_3d_cumulative_flow_usd": null,
     "etf_status": "unavailable",
-    "passive_absorption_ratio": 0.31
+    "passive_absorption_ratio": 0.0
   },
   "macro_and_intermarket": {
     "brent_crude_price": 113.43,
@@ -95,21 +95,21 @@
     "vix_index": 19.42,
     "vix_change_1d": 2.22,
     "vix_change_5d": 1.03,
-    "btc_spx_corr_20d": 0.429,
-    "btc_spx_corr_60d": -0.036
+    "btc_spx_corr_20d": 0.426,
+    "btc_spx_corr_60d": -0.037
   },
   "sentiment_and_context": {
     "fear_and_greed_score": 30,
     "fear_and_greed_classification": "Fear",
-    "btc_dominance_pct": 59.2,
+    "btc_dominance_pct": 59.3,
     "material_headlines_6_48h": "[NATIVE AI CONTEXT] Handled natively by LLM",
     "usdt_health_markers": "[NATIVE AI CONTEXT] Handled natively by LLM",
     "catalysts_next_14d": "[NATIVE AI CONTEXT] Handled natively by LLM"
   },
   "mean_reversion_landscape": {
-    "daily_rsi14": 32.6,
-    "log_spread_raw": -0.0589,
+    "daily_rsi14": 32.8,
+    "log_spread_raw": -0.058,
     "log_spread_50d_std": 0.0536,
-    "log_spread_zscore": -1.1
+    "log_spread_zscore": -1.08
   }
 }

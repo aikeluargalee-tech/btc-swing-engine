@@ -106,6 +106,7 @@ async def fetch_binance_perp_klines(
                             close=c,
                             volume=v,
                             taker_buy_volume=v * buy_ratio,
+                            estimated=True,
                         )
                     )
                 return bars
@@ -251,21 +252,27 @@ async def fetch_okx_perp_klines(
             {"instId": config.okx_perp_inst_id, "period": period, "unit": "0", "limit": "100"},
         )
         for r in tv or []:
-            # [ts, sellVol, buyVol] in BTC
-            taker_buy[int(r[0])] = float(r[2])
+            # [ts, sellVol, buyVol] in BTC -> measured buy share (rubik totals != candle volCcy,
+            # so apply the measured buy/sell ratio to candle volume instead of raw buyVol)
+            sell_v, buy_v = float(r[1]), float(r[2])
+            if sell_v + buy_v > 0:
+                taker_buy[int(r[0])] = buy_v / (sell_v + buy_v)
 
     bars: List[KlineBar] = []
     for row in reversed(rows):  # oldest first
         ts = int(row[0])
         o, h, l, c = float(row[1]), float(row[2]), float(row[3]), float(row[4])
         v = float(row[6])  # volCcy = BTC
-        if ts in taker_buy:
-            tb = min(taker_buy[ts], v) if v > 0 else taker_buy[ts]
+        estimated = ts not in taker_buy
+        if not estimated:
+            tb = v * taker_buy[ts]
         else:
             rng = max(h - l, 1e-6)
             buy_ratio = min(0.95, max(0.05, 0.5 + 0.4 * ((c - o) / rng)))
             tb = v * buy_ratio
-        bars.append(KlineBar(timestamp_ms=ts, open=o, high=h, low=l, close=c, volume=v, taker_buy_volume=tb))
+        bars.append(
+            KlineBar(timestamp_ms=ts, open=o, high=h, low=l, close=c, volume=v, taker_buy_volume=tb, estimated=estimated)
+        )
     return bars
 
 

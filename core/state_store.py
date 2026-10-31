@@ -74,6 +74,8 @@ class StateStore:
         self.taker_long_short_ratio_5m: float = 1.0
         self.perp_5m_delta_btc: float = 0.0
         self.perp_source: str = "Binance USD-M"
+        # interval -> number of candle-body-estimated perp bars excluded from analytics
+        self.perp_estimated_bars_excluded: Dict[str, int] = {}
 
         # (timestamp_sec, oi_btc)
         self.oi_history: Deque[Tuple[float, float]] = deque(maxlen=600)
@@ -325,6 +327,12 @@ class StateStore:
             elif venue == "spot" and interval == "1w":
                 target = self.spot_klines_1w
 
+            if target is not None and venue == "perp":
+                measured = [b for b in bars if not getattr(b, "estimated", False)]
+                self.perp_estimated_bars_excluded[interval] = len(bars) - len(measured)
+                bars = measured
+                if not bars:
+                    target.clear()
             if target is not None and bars:
                 target.clear()
                 target.extend(bars)

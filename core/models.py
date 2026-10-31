@@ -47,6 +47,9 @@ class KlineBar:
     close: float
     volume: float
     taker_buy_volume: float
+    # True when taker_buy_volume is a candle-body estimate (not measured taker flow).
+    # Estimated perp bars are dropped by StateStore.set_klines and never feed CVD/regime/scoring.
+    estimated: bool = False
 
     @property
     def taker_sell_volume(self) -> float:

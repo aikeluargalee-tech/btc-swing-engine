@@ -202,7 +202,16 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
 
     for w in (flow.w_15m, flow.w_1h, flow.w_4h, flow.w_24h):
         lines.append(
-            f"| **`{w.window_label}`** | `{w.price_change_pct:+.2f}%` | `{w.spot_delta_btc:+,.2f} BTC` (`{w.spot_delta_ratio*100:+.1f}%`) | `{w.spot_zscore:+.2f}σ` | `{w.perp_delta_btc:+,.2f} BTC` (`{w.perp_delta_ratio*100:+.1f}%`) | `{w.perp_zscore:+.2f}σ` | `{w.flow_divergence_z:+.2f}σ` | `{w.absorption_index:.2f}` |"
+            f"| **`{w.window_label}`** | `{w.price_change_pct:+.2f}%` | `{w.spot_delta_btc:+,.2f} BTC` (`{w.spot_delta_ratio*100:+.1f}%`) | `{w.spot_zscore:+.2f}σ` | {(f'`{w.perp_delta_btc:+,.2f} BTC` (`{w.perp_delta_ratio*100:+.1f}%`) | `{w.perp_zscore:+.2f}σ` | `{w.flow_divergence_z:+.2f}σ`' if w.perp_volume_btc > 0 else '`Data unavailable` | `Data unavailable` | `Data unavailable`')} | `{w.absorption_index:.2f}` |"
+        )
+    _excl = getattr(store, "perp_estimated_bars_excluded", {}) or {}
+    if any(_excl.values()):
+        lines.append("")
+        lines.append(
+            f"> Perp CVD source `{store.perp_source}`: measured taker bars only. Candle-body-estimated bars EXCLUDED "
+            f"from CVD, regime matching, scoring and divergences: "
+            + ", ".join(f"{k}: {v}" for k, v in sorted(_excl.items()))
+            + ". Windows without enough measured bars show `Data unavailable`."
         )
     lines.append(
         f"| **`UTC Day (00:00)`** | `N/A` | `{flow.utc_day_spot_cvd:+,.2f} BTC` | `N/A` | `{flow.utc_day_perp_cvd:+,.2f} BTC` | `N/A` | `N/A` | `N/A` |"

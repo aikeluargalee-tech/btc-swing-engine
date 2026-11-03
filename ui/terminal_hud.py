@@ -428,7 +428,7 @@ def _build_tab1_plain_english_panel(sig, flow, deriv, macro_ev) -> Panel:
     ]
     return Panel(
         "\n".join(lines),
-        title="[bold white]5. Executive Bottom Line (Plain-English Quick Glance — Press 1/2/3/4/5 to Switch Tabs)[/bold white]",
+        title="[bold white]5. Executive Bottom Line (Plain-English Quick Glance — Press 0: Master • 1–9: Desks)[/bold white]",
         border_style=border_style,
         box=box.ROUNDED,
     )
@@ -856,7 +856,7 @@ def _build_tab2_protocol_hud(store: StateStore, header_panel: Panel) -> Group:
     ]
     bottom_panel = Panel(
         "\n".join(p5_lines),
-        title="[bold white]5. Executive Bottom Line Verdict (Protocol Sections 12–14 — Press 1/2/3/4/5 to Switch Tabs)[/bold white]",
+        title="[bold white]5. Executive Bottom Line Verdict (Protocol Sections 12–14 — Press 0: Master • 1–9: Desks)[/bold white]",
         border_style=border_style,
         box=box.ROUNDED,
     )
@@ -1066,7 +1066,7 @@ def _build_tab3_macro_hud(store: StateStore, header_panel: Panel) -> Group:
     ]
     bottom_panel = Panel(
         "\n".join(p5_lines),
-        title="[bold white]5. Executive Bottom Line (Macro & Cycle Quick Glance — Press 1/2/3/4/5 to Switch Tabs)[/bold white]",
+        title="[bold white]5. Executive Bottom Line (Macro & Cycle Quick Glance — Press 0: Master • 1–9: Desks)[/bold white]",
         border_style=border_style,
         box=box.ROUNDED,
     )
@@ -1758,7 +1758,7 @@ def _build_tab5_mm_btc_hud(store: StateStore, header_panel: Panel) -> Group:
     ]
     bottom_panel = Panel(
         "\n".join(p5_lines),
-        title="[bold white]5. MM-BTC Executive Action Plan (Press S/6 to Stay • 1/2/3/4/5 to Switch Tabs • Press C to Copy AI Data Packet)[/bold white]",
+        title="[bold white]5. MM-BTC Executive Action Plan (Press 0: Master • 1–9: Desks • Press C to Copy AI Data Packet)[/bold white]",
         border_style=p5_color,
         box=box.ROUNDED,
     )
@@ -2253,7 +2253,7 @@ def _build_tab8_trap_hud(store: StateStore, header_panel: Panel) -> Group:
     ]
     p5_panel = Panel(
         "\n".join(p5_lines),
-        title="[bold white]5. Executive Bottom Line & Action Playbook (Press 9/T for S4 • 8/G for S3 • 7/V for S2 • 6/S for S1 • 1–5 for Core • C to Copy)[/bold white]",
+        title="[bold white]5. Executive Bottom Line & Action Playbook (Press 0: Master • 1–9: Desks • Press C to Copy AI Data Packet)[/bold white]",
         border_style=border_col,
         box=box.ROUNDED,
     )
@@ -2624,34 +2624,34 @@ def _poll_keyboard_tab_switch(
             rlist, _, _ = select.select([sys.stdin], [], [], 0.0)
             while rlist:
                 ch = sys.stdin.read(1)
-                if ch in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
+                if ch in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9"):
                     new_tab = int(ch)
                     if store.active_tab != new_tab:
                         store.active_tab = new_tab
                         changed = True
-                elif ch == "0":
-                    if store.active_tab != 10:
-                        store.active_tab = 10
+                elif ch in ("m", "M"):
+                    if store.active_tab != 0:
+                        store.active_tab = 0
                         changed = True
                 elif ch in ("s", "S"):
+                    if store.active_tab != 5:
+                        store.active_tab = 5
+                        changed = True
+                elif ch in ("v", "V"):
                     if store.active_tab != 6:
                         store.active_tab = 6
                         changed = True
-                elif ch in ("v", "V"):
+                elif ch in ("g", "G"):
                     if store.active_tab != 7:
                         store.active_tab = 7
                         changed = True
-                elif ch in ("g", "G"):
+                elif ch in ("t", "T"):
                     if store.active_tab != 8:
                         store.active_tab = 8
                         changed = True
-                elif ch in ("t", "T"):
+                elif ch in ("e", "E"):
                     if store.active_tab != 9:
                         store.active_tab = 9
-                        changed = True
-                elif ch in ("e", "E"):
-                    if store.active_tab != 10:
-                        store.active_tab = 10
                         changed = True
                 elif ch in ("c", "C"):
                     if detector is not None:

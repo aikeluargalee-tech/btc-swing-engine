@@ -108,6 +108,7 @@ async def _poll_bybit_futures_fallback(
 async def poll_rest_metrics(config: EngineConfig, store: StateStore) -> None:
     """Periodically polls derivatives metrics (15s) and synchronizes kline buffers (60s)."""
     last_kline_sync = time.time()
+    last_macro_sync = time.time()
 
     async with aiohttp.ClientSession() as session:
         while True:
@@ -130,8 +131,18 @@ async def poll_rest_metrics(config: EngineConfig, store: StateStore) -> None:
                     except Exception:
                         pass
 
-                # Periodic Kline Sync (every 60s)
                 now = time.time()
+                # Periodic Macro & Intermarket Telemetry Sync (every 5 min)
+                if now - last_macro_sync >= 300.0:
+                    last_macro_sync = now
+                    try:
+                        from .macro_collector import fetch_macro_and_intermarket_snapshot
+                        daily_closes = [b.close for b in store.spot_klines_1d]
+                        store.macro_intermarket = await fetch_macro_and_intermarket_snapshot(session, daily_closes)
+                    except Exception as mexc:
+                        logger.debug("Periodic macro sync error: %s", mexc)
+
+                # Periodic Kline Sync (every 60s)
                 if now - last_kline_sync >= config.kline_sync_interval_sec:
                     last_kline_sync = now
                     (

@@ -1,6 +1,6 @@
-"""Raw Telemetry & Independent AI Audit Packet Exporter (Hotkey `C` on Tab [5]).
+"""Raw Telemetry & Independent AI Audit Packet Exporter (Hotkey `C` across Tab [0] Master & Desks [1]–[9]).
 
-Collects 100% of the live quantitative telemetry across Tabs [1], [2], [3], and [4]
+Collects 100% of the live quantitative telemetry across Supreme Master Tab [0] & Specialist Desks [1]–[9]
 into a structured, self-contained Markdown packet and copies it directly to the
 Windows Clipboard (`Ctrl+V` ready) as well as saving to disk (`Downloads` and `logs/`).
 """
@@ -43,7 +43,7 @@ def _compute_plain_world_clocks_and_session(now_utc: datetime) -> Tuple[str, str
 
 
 def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
-    """Builds a comprehensive, unbiased Raw Data Packet from Tabs [1]-[5] for external AI analysis."""
+    """Builds a comprehensive, unbiased Raw Data Packet across Supreme Master Tab [0] & Specialist Desks [1]–[9] for external AI analysis."""
     now_utc = datetime.now(timezone.utc)
     ts_str = now_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
     clocks_plain, active_session_str = _compute_plain_world_clocks_and_session(now_utc)
@@ -347,7 +347,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
         lines.extend([
             "",
             "### 6C. Panel 3 — Cross-Tab Agreement, Conflict Diagnostic & Flip Catalysts",
-            "* **Cross-Tab Confluence (Where the 4 Tabs Agree)**:",
+            "* **Cross-Tab Confluence (Where Specialist Desks Agree)**:",
         ])
         for pt in msev.confluence_points:
             lines.append(f"  - `{pt}`")
@@ -433,7 +433,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             "",
             "> [!NOTE]",
             "> **BENCHMARK & VOLATILITY RADAR ONLY — 0.0% CAPITAL ALLOCATION WEIGHT (QUARANTINED)**  ",
-            "> Zero-shot Time-Series Foundation Models (Kronos, Chronos-Bolt, TimesFM) serve strictly as public SaaS benchmarks. Alpha Core (Tabs 1–5 + S1) remains the sole capital allocator.",
+            "> Zero-shot Time-Series Foundation Models (Kronos, Chronos-Bolt, TimesFM) serve strictly as public SaaS benchmarks. Alpha Core (Supreme Master Tab [0] & Specialist Desks [1]–[9]) remains the sole capital allocator.",
             "",
             f"* **Hurst Fractal Exponent (H)**: `{vc.hurst_exponent:.3f}` (`{vc.hurst_regime}` • Mandelbrot Diffusion `t^{vc.hurst_exponent:.2f}`)",
             f"* **Garman-Klass Volatility (4H)**: `{vc.garman_klass_vol_4h * 100.0:.2f}%` | **Annualized Volatility**: `{vc.garman_klass_annualized_vol * 100.0:.1f}%` (8x statistical efficiency over close-to-close standard deviation)",
@@ -470,7 +470,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             "",
             f"* **The Martingale Variance Compression Trap**: Zero-shot TSFMs minimizing MSE on raw price series collapse to persistent random walks (P_t ≈ P_{{t-1}}), producing an artificially flat range of only ~0.2% to 0.4% over 72 hours.",
             f"* **VCR Metric**: `VCR_72h = {vc.vcr_72h:.2f}x` reveals that realized volatility expansion requires a `{vc.vcr_72h:.1f}x` wider envelope than naive AI estimates.",
-            f"* **Actionable Execution Rule**: Never trade naive zero-shot predictions. Rely strictly on order-flow absorption, liquidation magnets, and rough path invariance (Tabs [1]–[5] & [S1]).",
+            f"* **Actionable Execution Rule**: Never trade naive zero-shot predictions. Rely strictly on order-flow absorption, liquidation magnets, and rough path invariance (Supreme Master Tab [0] & Specialist Desks [1]–[9]).",
             "",
             "### 8D. Plain English Summary for Traders & Beginners (What This Means in Reality)",
             "",
@@ -479,7 +479,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             f"> 1. **Why the AI lines look flat (±0.2%)**: Generic AI models play it safe by guessing tomorrow's price will equal today's price ($P_t ≈ P_{{t-1}}$), because they can't predict unexpected news or liquidations.",
             f"> 2. **Where price will actually move**: Real Bitcoin does not stay flat. Over the next 72 hours, true volatility indicates BTC is expected to swing inside the **Green Volatility Cone** (`${vc.horizons[-1].gk_1sigma_lower:,.0f} – ${vc.horizons[-1].gk_1sigma_upper:,.0f}`, `±${vc.horizons[-1].gk_1sigma_spread_usd/2.0:,.0f}` / `±{vc.horizons[-1].gk_1sigma_spread_pct/2.0:.1f}%`).",
             f"> 3. **The Coiled Spring (VCR = {vc.vcr_72h:.2f}x)**: The market is holding **{vc.vcr_72h:.1f}x more expansion energy** than naive AI models realize. {'⚡ **ALERT: Severe compression — a violent breakout is imminent!**' if vc.coiled_spring_alert else 'A sharp breakout is far more likely than a quiet sideways crawl.'}",
-            "> 4. **Rule for your wallet**: **NEVER trade based on flat AI predictions.** Your money stays safe. Real trades are only triggered when institutional volume and order flow confirm on **Tabs [1]–[5] & [S1]**.",
+            "> 4. **Rule for your wallet**: **NEVER trade based on flat AI predictions.** Your money stays safe. Real trades are only triggered when institutional volume and order flow confirm on **Supreme Master Tab [0] & Specialist Desks [1]–[9]**.",
         ])
 
     gartley = store.gartley_evaluation
@@ -722,6 +722,10 @@ def copy_ai_packet_to_clipboard_and_disk(config: EngineConfig, store: StateStore
             (downloads_dir / "BTC_AI_DATA_PACKET_LATEST.md").write_text(packet_text, encoding="utf-8")
         except Exception:
             pass
+    try:
+        pathlib.Path("BTC_AI_DATA_PACKET_LATEST.md").write_text(packet_text, encoding="utf-8")
+    except Exception:
+        pass
 
     # 2. Copy to System Clipboard (Windows clip.exe / PowerShell, Android Termux, Linux, & SSH OSC-52)
     copied_ok = False

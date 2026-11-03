@@ -46,20 +46,22 @@ async def _run_engine(
     """Initializes historical backfill, starts concurrent WebSocket/REST streams, and runs the HUD."""
     console = Console(force_terminal=True)
     store = StateStore()
-    if tab_arg in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
+    if tab_arg in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9"):
         store.active_tab = int(tab_arg)
-    elif tab_arg in ("0", "10"):
-        store.active_tab = 10
-    elif tab_arg.lower() in ("s1", "s"):
+    elif tab_arg.lower() in ("m", "master"):
+        store.active_tab = 0
+    elif tab_arg.lower() in ("s1", "s", "mm", "mm_btc"):
+        store.active_tab = 5
+    elif tab_arg.lower() in ("s2", "v", "cone", "vol"):
         store.active_tab = 6
-    elif tab_arg.lower() in ("s2", "v"):
+    elif tab_arg.lower() in ("s3", "g", "gartley"):
         store.active_tab = 7
-    elif tab_arg.lower() in ("s3", "g"):
+    elif tab_arg.lower() in ("s4", "t", "trap", "sfp"):
         store.active_tab = 8
-    elif tab_arg.lower() in ("s4", "t"):
+    elif tab_arg.lower() in ("s5", "e", "exhaust", "td", "10"):
         store.active_tab = 9
-    elif tab_arg.lower() in ("s5", "e"):
-        store.active_tab = 10
+    else:
+        store.active_tab = 0
     detector = SignalDetector(config)
 
     console.print(
@@ -138,13 +140,13 @@ def parse_args() -> argparse.Namespace:
         "--tab",
         type=str,
         default="1",
-        choices=["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "10", "s1", "S1", "s2", "S2", "s3", "S3", "s4", "S4", "s5", "S5", "v", "V", "g", "G", "t", "T", "e", "E", "all"],
-        help="Initial active HUD tab (1=Swing Engine, 2=Protocol v1.3, 3=Macro Radar, 4=Regime Matrix A-J, 5=Master Conclusion, 6/s1=MM-BTC, 7/s2=72H Cone, 8/s3=Gartley, 9/s4=SFP Trap, 0/s5=Terminal Exhaustion, or 'all').",
+        choices=["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "m", "M", "s1", "S1", "s2", "S2", "s3", "S3", "s4", "S4", "s5", "S5", "s", "S", "v", "V", "g", "G", "t", "T", "e", "E", "all"],
+        help="Initial active HUD tab (0=Master Supreme Command Center, 1=Swing Engine, 2=Protocol v1.3, 3=Macro Radar, 4=Regime Matrix A-J, 5/s=MM-BTC, 6/v=72H Cone, 7/g=Gartley, 8/t=SFP Trap, 9/e=Terminal Exhaustion, or 'all').",
     )
     parser.add_argument(
         "--copy-packet",
         action="store_true",
-        help="Copy the full Raw Telemetry & AI Audit Packet (Tabs 1-4) to the Windows Clipboard during --dry-run.",
+        help="Copy the full Raw Telemetry & AI Audit Packet across all Desks [0]–[9] to clipboard and disk during --dry-run.",
     )
     parser.add_argument(
         "--debug",

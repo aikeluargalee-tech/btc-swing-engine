@@ -444,4 +444,13 @@ async def run_initial_warmup(config: EngineConfig, store: StateStore) -> None:
 
         # Seed UTC day CVD from today's 15m candles
         _seed_utc_day_cvd_from_klines(store)
+
+        # Warm up Macro & Intermarket Telemetry (Brent Crude, DXY, SPX, F&G, Tips, Depth)
+        try:
+            from .macro_collector import fetch_macro_and_intermarket_snapshot
+            daily_closes = [b.close for b in store.spot_klines_1d]
+            store.macro_intermarket = await fetch_macro_and_intermarket_snapshot(session, daily_closes)
+        except Exception as exc:
+            logger.debug("Initial macro warmup failed: %s", exc)
+
         store.warmup_complete = True

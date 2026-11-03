@@ -115,7 +115,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
         "",
         "### 3. Mandatory 5-Part Response Format",
         "Structure your audit into:",
-        "1. **Independent Cross-Tab Telemetry Audit** (Bullish Confluence vs. Hidden Friction/Risk Flags in Sections 1–5 and Section 7)",
+        "1. **Independent Cross-Tab Telemetry Audit** (Bullish Confluence vs. Hidden Friction/Risk Flags across Specialist Desks [1]–[9])",
         "2. **Critique of Python Engine Benchmark** (Where you **AGREE** vs. **DISAGREE / REFINE** Section 6)",
         "3. **Independent AI Traffic-Light Verdict & Conviction %** (`GREEN`, `BLUE`, `YELLOW`, or `RED`)",
         "4. **Reconciled Master Order of Battle** (**Track A: If Flat in Cash** with exact Tranche 1/2 `$` zones, `BTC`/`$` sizes, Hard Stop, `TP1`/`TP2` vs. **Track B: If Already Holding Spot BTC**)",

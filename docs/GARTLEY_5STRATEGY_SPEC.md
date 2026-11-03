@@ -10,13 +10,44 @@
 
 ---
 
-## 1. Executive Summary & Architecture
+## 1. Welcome to Satellite Tab [S3]: The Gartley 222 & 5-Strategy Confluence Radar
 
-The **Gartley 222 & 5-Strategy Spot Swing Desk (Tab [S3])** is a complete, production-grade port of the TradingView Pine Script (`btc_5strategy_plus_gartley_merged.pine`). It unites 5 classic trend and mean-reversion quantitative strategies with H.M. Gartley's 1935 Fibonacci harmonic pattern recognition across two complementary horizons:
+### 1.1. Introduction: Replacing Emotional Chaos with Mathematical Order
+In financial markets—especially 24/7 crypto—price action can easily look like chaos. Retail traders often find themselves staring at cluttered charts, second-guessing conflicting indicators, or getting lured into buying near market tops and panic-selling near market bottoms.
 
-1. **1D Daily Macro Trend**: Acts as the overarching structural regime gate (establishing whether Bitcoin is in a verified macro bull run, holding trend, or undergoing broad distribution).
-2. **4H Tactical Swing**: Evaluates localized exhaustion, channel breakouts, and Fibonacci reversal clusters to trigger high-probability entry and exit execution.
-3. **Dual Telegram Bot Ecosystem**: Operates both as a local real-time analytical desk in the `btc_swing_engine` terminal and as an autonomous cloud bot running on GitHub Actions that delivers rich dual-chart (4H + 1D) swipeable albums to `@Gartleyy_bot` and responds instantly to on-demand `/now` user requests via Google Apps Script.
+**Satellite Tab [S3] was engineered to replace that emotional chaos with mathematical order.**
+
+Tab [S3] is a specialized execution radar inside the Bitcoin Quantitative Swing Engine. It bridges two completely different, proven schools of market analysis into a single unified dashboard:
+- **Classic Quantitative Trend & Momentum Models (S1–S5):** 20-bar Donchian Channel breakouts, the legendary 200-day Simple Moving Average, 20/50 Exponential Moving Average crosses, 14-period Wilder RSI, and statistical $2\sigma$ Bollinger Bands.
+- **Harmonic Fibonacci Geometry (S6–S7):** The famous Gartley 222 reversal pattern (H.M. Gartley, 1935), which tracks the exact natural wave symmetry of institutional accumulation and distribution.
+
+### 1.2. Why a "Satellite" Tab?
+While the engine's core tabs (Tabs 1 through 5) act as your **wide-angle lens**—tracking institutional order flow, volume profiles, and macroeconomic tides—Satellite Tab [S3] acts as your **precision execution microscope**.
+
+It answers the single question every swing trader faces:
+> *"Now that price has reached a key support zone, is this exact moment mathematically ripe for a reversal?"*
+
+### 1.3. The Dual-Horizon Philosophy: Two Timeframes, One Truth
+To keep you on the right side of the market at all times, Tab [S3] evaluates every strategy across two distinct timeframes simultaneously:
+1. **The 1D Daily Macro Horizon (The Shield):**
+   Monitors the primary multi-month trend. As long as Bitcoin trades above its 200-day moving average, your capital is protected against buying into a macro bear market.
+2. **The 4H Tactical Horizon (The Spear):**
+   Monitors the intermediate swing cycle. It ignores intraday noise and only searches for high-probability turning points where multiple indicators converge at the same price with Harmonic Potential Reversal Zones (PRZ).
+
+### 1.4. Built for the Disciplined Spot Swing Trader
+Tab [S3] is custom-calibrated for an emotionless, patient spot trader:
+- **Zero Leverage, Zero Shorting:** Spot-only execution protects capital from liquidation wicks.
+- **No Subjective Guesswork:** A trade setup either meets strict mathematical criteria or it does not.
+- **Strict Confluence Law:** A pattern in isolation is never traded. Action is only triggered when classic momentum/trend indicators agree with harmonic geometry.
+- **Unified Telegram Integration:** Ported with 100% mathematical parity from your automated GitHub Actions bot (`@Gartleyy_bot`), ensuring that what you see live in your terminal matches the alerts sent directly to your phone.
+
+### 1.5. How to Read Tab [S3] in 5 Seconds
+Look at the **Multi-Timeframe Verdict** in the top ribbon or Section 4:
+- `CONFLUENCE BUY`: 4H tactical triggers have fired while 1D Macro Shield is intact. High probability bounce zone.
+- `GARTLEY BUY`: Harmonic 222 Bull pattern completed at PRZ D with confirming momentum.
+- `GARTLEY SELL`: Harmonic 222 Bear pattern completed at PRZ D. Signal to take profit and rotate capital into USDT.
+- `HOLD`: 1D Macro Trend remains bullish ($Close > 200\text{ SMA}$); 4H Tactical is waiting for the next confluence setup. Maintain core spot holding.
+- `NO TRADE`: Choppy market condition or conflicting signals. Sit on hands and preserve capital.
 
 ---
 

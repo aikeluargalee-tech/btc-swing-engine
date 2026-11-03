@@ -1861,6 +1861,20 @@ def _build_tab_s3_gartley_hud(store: StateStore, header_panel: Panel) -> Group:
             return "bold black on yellow"
         return "dim white"
 
+    # --- Quick Intro Card: Purpose, Philosophy & Confluence Methodology ---
+    intro_lines = [
+        "[bold cyan]▶ PURPOSE & SCOPE:[/bold cyan] Precision spot swing execution microscope bridging [bold white]5 Classic Quantitative Models (S1–S5)[/bold white] with [bold magenta]Harmonic Fibonacci Geometry (S6–S7 Gartley 222)[/bold magenta].",
+        "[bold cyan]▶ DUAL-HORIZON MANDATE:[/bold cyan] [bold white]1D Macro (The Shield)[/bold white] protects capital by filtering macro bear markets (> 200 SMA) • [bold yellow]4H Tactical (The Spear)[/bold yellow] pinpoints high-probability turning points where indicators converge with Harmonic PRZ.",
+        "[bold cyan]▶ SPOT RULES & CONFLUENCE:[/bold cyan] [bold green]Zero Leverage / Zero Shorting[/bold green] (no liquidation risk) • [bold yellow]Strict Confluence Law[/bold yellow] (never trade a pattern alone; wait for confirmation) • [bold white]Telegram Parity[/bold white] with [dim]@Gartleyy_bot[/dim] cloud scanner.",
+    ]
+    intro_panel = Panel(
+        "\n".join(intro_lines),
+        title="[bold cyan]WELCOME TO SATELLITE TAB [S3]: GARTLEY 222 & 5-STRATEGY CONFLUENCE RADAR (EXECUTION DESK)[/bold cyan]",
+        box=box.ROUNDED,
+        border_style="cyan",
+        padding=(0, 1),
+    )
+
     # --- Top Ribbon: 3 Quantitative Telemetry Badges ---
     ribbon_table = Table.grid(expand=True)
     ribbon_table.add_column(ratio=4)
@@ -1957,7 +1971,7 @@ def _build_tab_s3_gartley_hud(store: StateStore, header_panel: Panel) -> Group:
         box=box.ROUNDED,
     )
 
-    return Group(header_panel, ribbon_table, mid_row, p3_panel, p4_panel)
+    return Group(header_panel, intro_panel, ribbon_table, mid_row, p3_panel, p4_panel)
 
 
 # ============================================================================

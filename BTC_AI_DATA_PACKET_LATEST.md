@@ -1,5 +1,5 @@
 # BTC-USD LIVE QUANTITATIVE TELEMETRY PACKET & MASTER AI AUDITOR PROMPT
-**Snapshot Timestamp:** `2026-10-31 09:14:09 UTC` (`UTC 2026-10-31 09:14:09 • SGP (Asia) 17:14:09 SGT`)  
+**Snapshot Timestamp:** `2026-11-03 09:39:27 UTC` (`UTC 2026-11-03 09:39:27 • SGP (Asia) 17:39:27 SGT`)  
 **Active Global Market Session:** `LONDON / EU SESSION (EUROPEAN INSTITUTIONAL FLOW)`  
 **Mandate:** Strictly Long-Only Spot BTC Swing & Positional Trading (Zero Leverage, Zero Shorting)  
 **Reference Portfolio Equity:** `$100,000.00` (Standard Risk: `1.00%` | Counter-Trend Risk Cap: `0.50%` | Hard Single-Trade Notional Cap: `<= 50% Equity`)
@@ -61,21 +61,21 @@ Structure your audit into:
 
 | Metric | Live Value | Context / Benchmark |
 | :--- | :--- | :--- |
-| **Binance Spot Price (`BTCUSDT`)** | `$77,428.02` | Primary Spot Reference |
-| **Coinbase Spot Price (`BTC-USD`)** | `$77,265.22` | US Institutional Spot Reference |
-| **Perp Price (Binance USD-M)** | `$77,381.70` | Perpetual Futures Reference (`Binance USD-M`) |
-| **Coinbase Premium Index (CPI)** | `$-162.80` (`-0.2103%`) | Rolling Z-Score: `+0.36σ` |
-| **Open Interest (Strict BTC Coins)** | `97,116.46 BTC` | Notional: `$0` |
-| **Open Interest Delta (`15m / 1H / 4H / 24H`)** | `15m: +0.01%` • `1H: +0.07%` • `4H: +0.81%` | `24H dOI: +0.73%` |
+| **Binance Spot Price (`BTCUSDT`)** | `$77,030.01` | Primary Spot Reference |
+| **Coinbase Spot Price (`BTC-USD`)** | `$76,897.18` | US Institutional Spot Reference |
+| **Perp Price (Binance USD-M)** | `$77,007.65` | Perpetual Futures Reference (`Binance USD-M`) |
+| **Coinbase Premium Index (CPI)** | `$-132.83` (`-0.1724%`) | Rolling Z-Score: `+0.42σ` |
+| **Open Interest (Strict BTC Coins)** | `100,230.37 BTC` | Notional: `$0` |
+| **Open Interest Delta (`15m / 1H / 4H / 24H`)** | `15m: -0.09%` • `1H: +0.01%` • `4H: +0.42%` | `24H dOI: +0.57%` |
 | **OI Positioning Quadrant** | `NEUTRAL_CHURN` | Price vs. OI Classification |
 | **8H Perpetual Funding Rate** | `+0.0100%` | Neutral Cap: `+0.0120%` • Veto: `+0.0350%` |
-| **Annualized Perp Basis** | `+10.20% / yr` | Perp vs. Spot Annualized Carry |
-| **5m Taker Long/Short Ratio** | `1.306` | `5m Perp Delta: +15.94 BTC` |
-| **Daily VWAP (24H) / Weekly VWAP (7D)** | `Daily: $77,255.87` | `Weekly: $79,574.37` |
-| **1D 20 EMA / 1D 50 EMA** | `20D EMA: $80,701.76` | `50D EMA: $80,459.06` |
-| **24H Spot Volume vs. 20D MA** | `0.82x` | Breakout Expansion Threshold: `>= 1.35x` |
-| **4H Spot Buy/Sell Ratio & 7D Spot CVD** | `4H B/S Ratio: 1.84` | `7D Spot CVD: +3,742.8 BTC` |
-| **ATR Compression & 72H Base Width** | `ATR Comp: 9.4%` | `72H Range Width: 7.29%` |
+| **Annualized Perp Basis** | `+10.60% / yr` | Perp vs. Spot Annualized Carry |
+| **5m Taker Long/Short Ratio** | `0.977` | `5m Perp Delta: -7.31 BTC` |
+| **Daily VWAP (24H) / Weekly VWAP (7D)** | `Daily: $77,204.85` | `Weekly: $78,807.55` |
+| **1D 20 EMA / 1D 50 EMA** | `20D EMA: $79,845.07` | `50D EMA: $80,116.45` |
+| **24H Spot Volume vs. 20D MA** | `1.01x` | Breakout Expansion Threshold: `>= 1.35x` |
+| **4H Spot Buy/Sell Ratio & 7D Spot CVD** | `4H B/S Ratio: 1.04` | `7D Spot CVD: +4,303.1 BTC` |
+| **ATR Compression & 72H Base Width** | `ATR Comp: 50.6%` | `72H Range Width: 3.23%` |
 
 ---
 
@@ -85,57 +85,57 @@ Structure your audit into:
 
 | Profile Horizon | Range High | cVAH (Upper VA) | cPOC (Fair Value) | cVAL (Lower VA) | Primary LVN (<cVAL) | Support HVN Floor |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`30D Macro`** | `$87,220` (Low `$76,326`) | `$84,270` | **`$81,728`** | **`$79,912`** | `$79,186` | `$77,733` |
-| **`7D Tactical`** | `$81,971` (Low `$76,326`) | `$81,665` | **`$80,160`** | **`$78,937`** | `$78,843` | `$77,384` |
-| **`24H Session`** | `$78,110` (Low `$76,326`) | `$77,590` | **`$77,411`** | **`$76,906`** | `$76,341` | `$76,341` |
+| **`30D Macro`** | `$86,999` (Low `$76,326`) | `$84,020` | **`$81,707`** | **`$79,928`** | `$79,217` | `$77,794` |
+| **`7D Tactical`** | `$81,971` (Low `$76,326`) | `$80,160` | **`$77,996`** | **`$76,491`** | `$76,350` | `$76,350` |
+| **`24H Session`** | `$78,254` (Low `$76,389`) | `$77,586` | **`$76,840`** | **`$76,591`** | `$76,404` | `$76,404` |
 
-* **Active Structural Profile**: `30D Macro` | **Distance to cVAL**: `-3.11%` (`-6.79 ATR`) | **Value Area Position (`0%=cVAL, 100%=cVAH`)**: `-57.0%` (`Mid-Range Chop Flag: False`) | **1H ATR**: `$366` | **4H ATR**: `$942` | **Recent Reclaim Candle**: `False`
+* **Active Structural Profile**: `30D Macro` | **Distance to cVAL**: `-3.63%` (`-7.26 ATR`) | **Value Area Position (`0%=cVAL, 100%=cVAH`)**: `-70.8%` (`Mid-Range Chop Flag: False`) | **1H ATR**: `$399` | **4H ATR**: `$776` | **Recent Reclaim Candle**: `False`
 * • **SweepRetestFSM (Tab 1 Gate 4)**: `IDLE (Monitoring cVAL)`
-* • **3-EMA Industrial Trend System (Macro Multi-Week Horizon)**: Macro Trend Regime:`STRONG_BULL` (200 EMA `$74,807`, Slope `+30.3$/day`, ADX `20.4`) | 4H 50-EMA: `$79,864` (Pullback Zone: `False`) | Positioning Confluence: `2/3` | Setup Status: `BULL_TREND_HOLDING` | Suggested ATR Stop: `$75,148` (`0.75%` Risk)
+* • **3-EMA Industrial Trend System (Macro Multi-Week Horizon)**: Macro Trend Regime:`WEAK_BULL` (200 EMA `$74,829`, Slope `+21.3$/day`, ADX `23.0`) | 4H 50-EMA: `$78,695` (Pullback Zone: `True`) | Positioning Confluence: `3/3` | Setup Status: `LONG_WATCH` | Suggested ATR Stop: `$75,419` (`0.50%` Risk)
 
 ### 2B. Multi-Horizon Order Flow, Spot vs. Perp CVD & Passive Absorption
 
 | Horizon | Price Δ% | Spot CVD Delta (BTC) | Spot Z-Score | Perp CVD Delta (BTC) | Perp Z-Score | Spot-Perp Div Z | Passive Absorption Index |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`15m`** | `+0.09%` | `+6.71 BTC` (`+22.1%`) | `+0.51σ` | `+22.90 BTC` (`+7.6%`) | `+0.13σ` | `+0.38σ` | `0.00` |
-| **`1H`** | `+0.00%` | `+22.10 BTC` (`+13.4%`) | `+0.05σ` | `+136.34 BTC` (`+7.1%`) | `+0.19σ` | `-0.14σ` | `0.00` |
-| **`4H`** | `+0.20%` | `+259.21 BTC` (`+29.6%`) | `+2.05σ` | `+1,182.56 BTC` (`+15.3%`) | `+2.00σ` | `+0.05σ` | `0.00` |
-| **`24H`** | `-0.35%` | `+158.60 BTC` (`+1.3%`) | `+2.65σ` | `-302.03 BTC` (`-0.2%`) | `+2.13σ` | `+0.52σ` | `0.08` |
-| **`UTC Day (00:00)`** | `N/A` | `+422.50 BTC` | `N/A` | `+452.98 BTC` | `N/A` | `N/A` | `N/A` |
+| **`15m`** | `+0.16%` | `+28.43 BTC` (`+45.5%`) | `+1.32σ` | `+31.88 BTC` (`+3.1%`) | `-0.01σ` | `+1.34σ` | `0.00` |
+| **`1H`** | `+0.63%` | `+203.77 BTC` (`+37.2%`) | `+1.33σ` | `+449.82 BTC` (`+11.1%`) | `+1.00σ` | `+0.33σ` | `0.00` |
+| **`4H`** | `+0.49%` | `+31.42 BTC` (`+1.8%`) | `-0.06σ` | `+467.74 BTC` (`+2.9%`) | `+0.45σ` | `-0.51σ` | `0.00` |
+| **`24H`** | `-1.35%` | `-11.16 BTC` (`-0.1%`) | `-1.54σ` | `-341.88 BTC` (`-0.3%`) | `-1.13σ` | `-0.41σ` | `0.06` |
+| **`UTC Day (00:00)`** | `N/A` | `-1,061.74 BTC` | `N/A` | `-335.96 BTC` | `N/A` | `N/A` | `N/A` |
 
 ---
 
 ## SECTION 3: PROTOCOL v1.3, COINGLASS 6-PANEL (BTC) & LIQUIDATION MAGNETS (TAB [2] RAW METRICS)
 
 ### 3A. Daily Completed `[-2]` vs. Forming `[-1]` & ATR 14 Reference Bounds
-* **1D Completed Candle `[-2]` (Closed)**: Open `$77,991.89` • High `$78,804.01` • Low `$76,325.98` • Close `$77,368.77` (`-0.80%`)
-* **1D Forming Candle `[-1]` (Live)**: Open `$77,368.76` • High `$77,654.44` • Low `$77,114.01` • Close `$77,428.02` (`+0.08%`)
+* **1D Completed Candle `[-2]` (Closed)**: Open `$78,354.01` • High `$78,878.01` • Low `$76,705.00` • Close `$76,816.00` (`-1.96%`)
+* **1D Forming Candle `[-1]` (Live)**: Open `$76,816.01` • High `$77,314.01` • Low `$76,388.88` • Close `$77,030.01` (`+0.28%`)
 * **1D Support / Resistance**: Support `$76,326` • Resistance `$84,898` • **Daily Candlestick Bias (Single 1D Bar)**: `BEARISH` (Completed 1D Close < Open) • **4H Structure**: `RANGE / BASE CONSOLIDATION` (`4H Ready: True`)
-* **ATR 14 Volatility Bounds**: `1D ATR 14 = $2,154` (`-1xATR: $75,274` / `+1xATR: $79,582`) | `4H ATR 14 = $1,010` (`-1xATR: $76,418` / `+1xATR: $78,438`)
-* **Daily Liquidation Magnet & Range Pivot Protocol**: `1D 50 SMA = $81,957` • `30D Range Pivot = $80,612` • **Nearest Short-Liq Magnet Above**: `$85,322` (`[EST. SWING LIQ POOL]`) • **Nearest Long-Liq Magnet Below**: `$75,944` (`[EST. SWING LIQ POOL]`) • **Headline Filter**: `NONE_SIGNIFICANT` • **5-Factor Magnet Confluence**: `5/5`
+* **ATR 14 Volatility Bounds**: `1D ATR 14 = $1,933` (`-1xATR: $75,097` / `+1xATR: $78,963`) | `4H ATR 14 = $683` (`-1xATR: $76,347` / `+1xATR: $77,713`)
+* **Daily Liquidation Magnet & Range Pivot Protocol**: `1D 50 SMA = $81,958` • `30D Range Pivot = $80,612` • **Nearest Short-Liq Magnet Above**: `$85,322` (`[EST. SWING LIQ POOL]`) • **Nearest Long-Liq Magnet Below**: `$75,944` (`[EST. SWING LIQ POOL]`) • **Headline Filter**: `NONE_SIGNIFICANT` • **5-Factor Magnet Confluence**: `5/5`
 
 ### 3B. CoinGlass 6-Panel Audit in Strict `BTC` Coins (`1D` vs. `4H`)
 
 | Panel # & Metric | 1D Horizon | 4H Horizon | Direction / Audit |
 | :--- | :--- | :--- | :--- |
-| **`1. Volume SMA 9 (BTC)`** | `15,529 BTC (1D: 24,296)` | `4,138 BTC (4H: 1,131)` | `CONTRACTING (Below SMA9)` |
-| **`2. Aggregated Spot CVD`** | `+82 BTC [FLAT]` | `+259.2 BTC [RISING]` | `1D:FLAT | 4H:RISING` |
-| **`3. Aggregated Futures CVD`** | `-17,443 BTC [FALLING]` | `+1,182.6 BTC [RISING]` | `1D:FALLING | 4H:RISING` |
-| **`4. Open Interest (BTC)`** | `97,116.5 BTC (Coins)` | `4H:+0.81% | 1H:+0.07%` | `RISING (>90,000 BTC (Binance))` |
+| **`1. Volume SMA 9 (BTC)`** | `13,507 BTC (1D: 12,641)` | `2,102 BTC (4H: 2,083)` | `FLAT / IN-LINE` |
+| **`2. Aggregated Spot CVD`** | `+3,227 BTC [RISING]` | `+31.4 BTC [RISING]` | `1D:RISING | 4H:RISING` |
+| **`3. Aggregated Futures CVD`** | `+2,170 BTC [FLAT]` | `+467.7 BTC [RISING]` | `1D:FLAT | 4H:RISING` |
+| **`4. Open Interest (BTC)`** | `100,230.4 BTC (Coins)` | `4H:+0.42% | 1H:+0.01%` | `RISING (>90,000 BTC (Binance))` |
 | **`5. Funding Rates (8H)`** | `+0.0100% / 8h` | `+0.0300% / 24h` | `POSITIVE (Longs Pay)` |
-| **`6. ATR 14 (Volatility)`** | `$2,154 (2.78%)` | `$1,010 (1.30%)` | `-1xATR: $76,418 / $75,274` |
+| **`6. ATR 14 (Volatility)`** | `$1,933 (2.51%)` | `$683 (0.89%)` | `-1xATR: $76,347 / $75,097` |
 
 ### 3C. Section 8 Non-Trade Zones (`8A–8F`) & Section 11 Spot Sell Triggers (`1–4`)
 
 | Rule Code / Trigger | Status | Live Detail |
 | :--- | :--- | :--- |
-| **`NTZ 8A: Weekend + <=2% of $80k/$85k/$100k + OI>90,000 BTC (Binance)`** | `CLEAR` | Weekend | 3.21% from $80,000 (>2%) | OI 97,116 BTC (>90,000 BTC (Binance)) |
-| **`NTZ 8B: 72h Liquidation Cascade > $300M`** | `CLEAR` | No >$300M 72h cascade active (4H dOI: +0.81%) |
-| **`NTZ 8C: Positive Funding + Flat/Rising OI + Falling Price`** | `CLEAR` | Funding +0.0100% | 1H/4H dOI +0.07%/+0.81% | 1H/4H Price +0.00%/+0.20% |
-| **`NTZ 8D: FOMC / CPI High-Volatility Macro Window`** | `CLEAR` | Clear of FOMC/CPI release window (2026-10-31 UTC) |
+| **`NTZ 8A: Weekend + <=2% of $80k/$85k/$100k + OI>90,000 BTC (Binance)`** | `CLEAR` | Weekday | 3.71% from $80,000 (>2%) | OI 100,230 BTC (>90,000 BTC (Binance)) |
+| **`NTZ 8B: 72h Liquidation Cascade > $300M`** | `CLEAR` | No >$300M 72h cascade active (4H dOI: +0.42%) |
+| **`NTZ 8C: Positive Funding + Flat/Rising OI + Falling Price`** | `CLEAR` | Funding +0.0100% | 1H/4H dOI +0.01%/+0.42% | 1H/4H Price +0.63%/+0.49% |
+| **`NTZ 8D: FOMC / CPI High-Volatility Macro Window`** | `CLEAR` | Clear of FOMC/CPI release window (2026-11-03 UTC) |
 | **`NTZ 8E: Section 8E S2 Systemic Risk Assessment`** | `CLEAR` | S2 Systemic Risk Level: LOW (Clear when LOW/MED) |
 | **`NTZ 8F: Unverified Mandatory Check Safety Lock`** | `CLEAR` | All mandatory 8A–8E safety inputs verified |
-| **`Sell Trigger 1. 1D Close < Support + Rising OI + Falling CVD`** | `NOT CONFIRMED` | 1D Close $77,369 vs Sup $76,326 | 4H CVD RISING |
+| **`Sell Trigger 1. 1D Close < Support + Rising OI + Falling CVD`** | `NOT CONFIRMED` | 1D Close $76,816 vs Sup $76,326 | 4H CVD RISING |
 | **`Sell Trigger 2. Liq Cascade Fails 24h Structural Reclaim`** | `NOT CONFIRMED` | Cascade 24h status: CONFIRMED_CLEAR |
 | **`Sell Trigger 3. Large Spot ETF Outflows + Price Weakness`** | `NOT CONFIRMED` | ETF flow status: NOT_CONFIRMED |
 | **`Sell Trigger 4. Adverse Macro Catalyst + Technical Breakdown`** | `NOT CONFIRMED` | Catalyst breakdown status: NOT_CONFIRMED |
@@ -144,32 +144,32 @@ Structure your audit into:
 
 ## SECTION 4: MACRO QUANT, POWER-LAW & CYCLE RADAR (TAB [3] RAW METRICS)
 
-* **Rule 1 Gatekeeper (`1D 200 SMA` + 5D Slope)**: `1D 200 SMA = $73,161.83` | `5D Slope = +34.81 $/day` (`+0.238%`) | `Above 200D SMA: True` | `Gatekeeper Veto Active: False` (`PASS (Price >= 200D SMA & Slope Rising -> Macro Bull Trend)`)
-* **1D 21 EMA (Bull Market Support Band)**: `$80,763.88` (`Distance: -4.13%`)
-* **14D Wilder RSI (Daily)**: `34.70` (`COOL / ACCUMULATION (30-45)`)
-* **30D Composite POC**: `$81,727.60` (`Distance: -5.26%`)
-* **Genesis Power-Law Valuation (`[BIAS ONLY — NOT TIMING]`)**: Fair Value `$147,328` | Live Discount/Premium: `-47.40%` (`DEEP DISCOUNT [BIAS ONLY]`)
-* **Cycle High (ATH) & Drawdown**: Cycle High `$126,200` | Current Drawdown: `-38.65%` | Active Crash Rung: `-35% Rung 2 (Mid Correction) ($82,030)` (`Override Active: False`)
-* **4H Liquidation Wick Flush Detector**: `Detected = False` (`Max Lower Wick Ratio = 41.8%` — `STANDBY: Max recent 4H lower wick 41.8% (Need >=42% sweep + OI/Funding reset)`)
+* **Rule 1 Gatekeeper (`1D 200 SMA` + 5D Slope)**: `1D 200 SMA = $73,205.12` | `5D Slope = +18.86 $/day` (`+0.129%`) | `Above 200D SMA: True` | `Gatekeeper Veto Active: False` (`PASS (Price >= 200D SMA & Slope Rising -> Macro Bull Trend)`)
+* **1D 21 EMA (Bull Market Support Band)**: `$79,927.63` (`Distance: -3.63%`)
+* **14D Wilder RSI (Daily)**: `36.00` (`COOL / ACCUMULATION (30-45)`)
+* **30D Composite POC**: `$81,707.02` (`Distance: -5.72%`)
+* **Genesis Power-Law Valuation (`[BIAS ONLY — NOT TIMING]`)**: Fair Value `$147,716` | Live Discount/Premium: `-47.90%` (`DEEP DISCOUNT [BIAS ONLY]`)
+* **Cycle High (ATH) & Drawdown**: Cycle High `$126,200` | Current Drawdown: `-38.96%` | Active Crash Rung: `-35% Rung 2 (Mid Correction) ($82,030)` (`Override Active: True`)
+* **4H Liquidation Wick Flush Detector**: `Detected = True` (`Max Lower Wick Ratio = 58.9%` — `ACTIVE FLUSH: 4H lower wick 58.9% of range (Low $76,512) + 4H dOI +0.42% / Funding +0.0100%`)
 
 ### 4A. Cycle Drawdown Accumulation Rungs (`-25%` to `-65%`)
 
 | Rung | Target Price | Distance from Current | Tranche | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **`-25% Rung 1 (Bull Pullback)`** | `$94,650` | `-18.2%` | `15% Spot Tranche` | `HIT / ACTIVE` |
-| **`-35% Rung 2 (Mid Correction)`** | `$82,030` | `-5.6%` | `20% Spot Tranche` | `HIT / ACTIVE` |
-| **`-45% Rung 3 (Deep Value)`** | `$69,410` | `+11.6%` | `25% Spot Tranche` | `STANDBY` |
-| **`-55% Rung 4 (Capitulation)`** | `$56,790` | `+36.3%` | `25% Spot Tranche` | `STANDBY` |
-| **`-65% Rung 5 (Generational Floor)`** | `$44,170` | `+75.3%` | `15% Max Vault` | `STANDBY` |
+| **`-25% Rung 1 (Bull Pullback)`** | `$94,650` | `-18.6%` | `15% Spot Tranche` | `HIT / ACTIVE` |
+| **`-35% Rung 2 (Mid Correction)`** | `$82,030` | `-6.1%` | `20% Spot Tranche` | `HIT / ACTIVE` |
+| **`-45% Rung 3 (Deep Value)`** | `$69,410` | `+11.0%` | `25% Spot Tranche` | `STANDBY` |
+| **`-55% Rung 4 (Capitulation)`** | `$56,790` | `+35.6%` | `25% Spot Tranche` | `STANDBY` |
+| **`-65% Rung 5 (Generational Floor)`** | `$44,170` | `+74.4%` | `15% Max Vault` | `STANDBY` |
 
 ### 4B. Multi-Timeframe `1W / 1D / 4H` Liquidity Sniper Matrix
 
 | Timeframe | Structure | Close vs. Open % | Candle / Wick Signature | Flow & Momentum |
 | :--- | :--- | :--- | :--- | :--- |
-| **`1W Macro Candle`** | `BEARISH (LH / LL)` | `-3.40%` | `Close $77,428 (-3.40%) | Low Wick 20%` | `Delta +5,146 BTC (BUY)` |
-| **`1D Completed [-2]`** | `BEARISH (LH / LL)` | `-0.80%` | `Close $77,369 (-0.80%) | Low Wick 42%` | `Delta -1,449 BTC (SELL)` |
-| **`1D Forming [-1]`** | `BULLISH (HH / HL)` | `+0.08%` | `Close $77,428 (+0.08%) | Low Wick 47%` | `Delta +423 BTC (BUY)` |
-| **`4H Tactical Sniper`** | `BULLISH (HH / HL)` | `+0.09%` | `Close $77,428 (+0.09%) | Low Wick 34%` | `Delta +33 BTC (BUY)` |
+| **`1W Macro Candle`** | `CONSOLIDATION / INSIDE` | `-1.69%` | `Close $77,030 (-1.69%) | Low Wick 26%` | `Delta +460 BTC (BUY)` |
+| **`1D Completed [-2]`** | `BEARISH (LH / LL)` | `-1.96%` | `Close $76,816 (-1.96%) | Low Wick 5%` | `Delta +1,522 BTC (BUY)` |
+| **`1D Forming [-1]`** | `CONSOLIDATION / INSIDE` | `+0.28%` | `Close $77,030 (+0.28%) | Low Wick 46%` | `Delta -1,062 BTC (SELL)` |
+| **`4H Tactical Sniper`** | `BULLISH (HH / HL)` | `+0.26%` | `Close $77,030 (+0.26%) | Low Wick 59%` | `Delta +218 BTC (BUY)` |
 
 ---
 
@@ -177,16 +177,16 @@ Structure your audit into:
 
 | Config | Regime Title | Match % | Live Observed Telemetry | Protocol Mandate & Stop |
 | :--- | :--- | :--- | :--- | :--- |
-| **`Config A` ★ ACTIVE** | Healthy Bull (Genuine Spot-Led Expansion) | **`64%`** | `VWAP:MIXED | Vol:0.82x | Spot Ratio:1.84 | Fund:+0.0100%` | `Full Spot Long (1.0x)` • `Sizing: 1.0x (Sf = 0.85–1.0x) | Max Cap: 50% equity` • `Stop: 4H swing low -0.6% ($76,651)` |
-| **`Config B` ** | Leveraged Bull (Fragile Overextension / Trap) | **`48%`** | `1H Spot:+22 | Perp Z:+0.19 | 4H dOI:+0.81% | Basis:10.2%/yr` | `Trim / Stand Aside (0.0x)` • `Sizing: 0.0x (Strictly zero new buying)` • `Stop: Trail tight stop on 67% at 4H swing low ($77,114)` |
-| **`Config C` ** | Bullish Absorption (Institutional Base Defense) | **`58%`** | `4H Spot:+259 vs Perp:+1183 BTC | DivZ:+0.05 | AbsIdx:0.00` | `Build Spot (0.75x)` • `Sizing: 0.75x (Sf = 0.70–0.90x)` • `Stop: Sweep wick low -0.5% ($75,944)` |
-| **`Config D` ** | Masked Fragility (Stealth Distribution Top) | **`30%`** | `4H Spot:+259 BTC | CPI:-0.210% | VWAP:$77,256` | `Defensive Cash (100%)` • `Sizing: 0.0x (Cash: 75%–100% USDT)` • `Stop: Hard trailing stop on 50% at 24h low ($76,326)` |
-| **`Config E` ** | Liquidation Cascade (Forced Waterfall Deleveraging) | **`15%`** | `1H Chg:+0.00% | 1H/4H dOI:+0.07%/+0.81% | Basis:-46.3 USD` | `Wait for Phase 3 (0.0x)` • `Sizing: 0.0x during waterfall (Do NOT catch knife)` • `Stop: Below Phase 3 capitulation wick ($75,715)` |
-| **`Config F` ** | Re-Accumulation (Post-Cascade Clean Base) | **`61%`** | `ATR Comp:9% | Base Width:7.29% | 4H Spot:+259 BTC` | `Re-Accumulate (0.75x)` • `Sizing: 0.75x (Sf = 0.75–0.90x)` • `Stop: Base consolidation floor -0.5% ($75,944)` |
-| **`Config G` ** | Short Squeeze (Mechanical Liquidation Run) | **`0%`** | `1H Chg:+0.00% | 1H dOI:+0.07% | 1H Perp:+136 BTC` | `Harvest Gains (0.0x)` • `Sizing: 0.0x (Never buy at squeeze peak)` • `Stop: Pre-squeeze 1H low -0.4% ($76,954)` |
-| **`Config H` ** | Distribution Top (Topping Exhaustion Failure) | **`0%`** | `cVAH Test:NO | Bearish CVD Div:NO | Fund:+0.0100%` | `Defensive Cash (100%)` • `Sizing: 0.0x (Cash: 85%–100% USDT)` • `Stop: Move stop to Breakeven (BE) on remaining 30%` |
-| **`Config I` ** | Bear Trend (Bearish Trend Continuation) | **`35%`** | `<20D/50D EMA:NO | 7D Spot CVD:+3,743 BTC | Fund:+0.0100%` | `Strict Cash (100%)` • `Sizing: 0.0x (Target: 100% USDT Cash)` • `Inval: 1D close > 50D EMA ($80,459) with positive Spot CVD` |
-| **`Config J` ** | Bear Trap (Capitulation Absorption) | **`55%`** | `Fund:+0.0100% | 4H dOI:+0.81% | 4H Spot:+259 BTC` | `Reclaim Buy (1.0x)` • `Sizing: 0.90x–1.0x (Maximum +EV setup)` • `Stop: Capitulation sweep low -0.5% ($75,944)` |
+| **`Config A` ** | Healthy Bull (Genuine Spot-Led Expansion) | **`41%`** | `VWAP:MIXED | Vol:1.01x | Spot Ratio:1.04 | Fund:+0.0100%` | `Full Spot Long (1.0x)` • `Sizing: 1.0x (Sf = 0.85–1.0x) | Max Cap: 50% equity` • `Stop: 4H swing low -0.6% ($75,931)` |
+| **`Config B` ** | Leveraged Bull (Fragile Overextension / Trap) | **`28%`** | `1H Spot:+204 | Perp Z:+1.00 | 4H dOI:+0.42% | Basis:10.6%/yr` | `Trim / Stand Aside (0.0x)` • `Sizing: 0.0x (Strictly zero new buying)` • `Stop: Trail tight stop on 67% at 4H swing low ($76,389)` |
+| **`Config C` ** | Bullish Absorption (Institutional Base Defense) | **`56%`** | `4H Spot:+31 vs Perp:+468 BTC | DivZ:-0.51 | AbsIdx:0.00` | `Build Spot (0.75x)` • `Sizing: 0.75x (Sf = 0.70–0.90x)` • `Stop: Sweep wick low -0.5% ($76,007)` |
+| **`Config D` ** | Masked Fragility (Stealth Distribution Top) | **`40%`** | `4H Spot:+31 BTC | CPI:-0.172% | VWAP:$77,205` | `Defensive Cash (100%)` • `Sizing: 0.0x (Cash: 75%–100% USDT)` • `Stop: Hard trailing stop on 50% at 24h low ($76,389)` |
+| **`Config E` ** | Liquidation Cascade (Forced Waterfall Deleveraging) | **`5%`** | `1H Chg:+0.63% | 1H/4H dOI:+0.01%/+0.42% | Basis:-22.4 USD` | `Wait for Phase 3 (0.0x)` • `Sizing: 0.0x during waterfall (Do NOT catch knife)` • `Stop: Below Phase 3 capitulation wick ($75,778)` |
+| **`Config F` ★ ACTIVE** | Re-Accumulation (Post-Cascade Clean Base) | **`90%`** | `ATR Comp:51% | Base Width:3.23% | 4H Spot:+31 BTC` | `Re-Accumulate (0.75x)` • `Sizing: 0.75x (Sf = 0.75–0.90x)` • `Stop: Base consolidation floor -0.5% ($76,007)` |
+| **`Config G` ** | Short Squeeze (Mechanical Liquidation Run) | **`0%`** | `1H Chg:+0.63% | 1H dOI:+0.01% | 1H Perp:+450 BTC` | `Harvest Gains (0.0x)` • `Sizing: 0.0x (Never buy at squeeze peak)` • `Stop: Pre-squeeze 1H low -0.4% ($76,197)` |
+| **`Config H` ** | Distribution Top (Topping Exhaustion Failure) | **`20%`** | `cVAH Test:NO | Bearish CVD Div:NO | Fund:+0.0100%` | `Defensive Cash (100%)` • `Sizing: 0.0x (Cash: 85%–100% USDT)` • `Stop: Move stop to Breakeven (BE) on remaining 30%` |
+| **`Config I` ** | Bear Trend (Bearish Trend Continuation) | **`35%`** | `<20D/50D EMA:YES | 7D Spot CVD:+4,303 BTC | Fund:+0.0100%` | `Strict Cash (100%)` • `Sizing: 0.0x (Target: 100% USDT Cash)` • `Inval: 1D close > 50D EMA ($80,116) with positive Spot CVD` |
+| **`Config J` ** | Bear Trap (Capitulation Absorption) | **`55%`** | `Fund:+0.0100% | 4H dOI:+0.42% | 4H Spot:+31 BTC` | `Reclaim Buy (1.0x)` • `Sizing: 0.90x–1.0x (Maximum +EV setup)` • `Stop: Capitulation sweep low -0.5% ($76,007)` |
 
 ---
 
@@ -196,92 +196,92 @@ Structure your audit into:
 
 | Tab | Light | Score / State | Primary Driver | Executive Conclusion |
 | :--- | :--- | :--- | :--- | :--- |
-| **`[1] Swing Engine`** | `YELLOW` | `34/100 • STRONG_BULL` | `VA Pos: -57% [EDGE] | cVAL $79,912 | 3-EMA: STRONG_BULL` | `STAND ASIDE — BID $77,825` |
+| **`[1] Swing Engine`** | `YELLOW` | `40/100 • WEAK_BULL` | `VA Pos: -71% [EDGE] | cVAL $79,928 | 3-EMA: WEAK_BULL` | `STAND ASIDE — BID $77,893` |
 | **`[2] Protocol 1.3`** | `YELLOW` | `NTZ:NO • Sell:0/4` | `1D:BEARISH | S:$85,322 L:$75,944` | `BUY:NO (NOT READY) • DO NOTHING` |
-| **`[3] Macro Radar`** | `GREEN` | `75.0% (BULL >200D)` | `200D $73,162 | PowerLaw -47.4%` | `BULL EXPANSION (75–100% SPOT)` |
-| **`[4] Regime A–J`** | `GREEN` | `Config A (64% Match)` | `Healthy Bull (VWAP:MIXED | Vol:0.82x | Spot Ratio:1.84 | Fund:+0.0100%)` | `Full Spot Long (1.0x) | Stop $76,651` |
+| **`[3] Macro Radar`** | `GREEN` | `75.0% (BULL >200D)` | `200D $73,205 | PowerLaw -47.9%` | `BULL EXPANSION (75–100% SPOT)` |
+| **`[4] Regime A–J`** | `BLUE` | `Config F (90% Match)` | `Re-Accumulation (ATR Comp:51% | Base Width:3.23% | 4H Spot:+31 BTC)` | `Re-Accumulate (0.75x) | Stop $76,007` |
 
-* **4-Tab Scoreboard**: `2 GREEN • 0 BLUE • 2 YELLOW • 0 RED` | **Master Alignment Score**: `75.0%` (`MULTI-TAB BULLISH CONFLUENCE`)
-* **Tab [1] 4-Gate Confluence Breakdown**: `34.0/100` (`Location: 0.0/25` • `Flow: 20.0/35` • `Derivatives: 14.0/20` • `Trigger: 0.0/20`)
+* **4-Tab Scoreboard**: `1 GREEN • 1 BLUE • 2 YELLOW • 0 RED` | **Master Alignment Score**: `59.7%` (`CONSTRUCTIVE — AWAITING TRIGGER`)
+* **Tab [1] 4-Gate Confluence Breakdown**: `40.0/100` (`Location: 0.0/25` • `Flow: 26.0/35` • `Derivatives: 14.0/20` • `Trigger: 0.0/20`)
 
 ### 6B. Panel 2 — 4-Layer Institutional Decision Funnel & Conflict Resolver
 
 | Hierarchy Layer | Gate Status | Live Hierarchical Ruling |
 | :--- | :--- | :--- |
 | **`L1: Veto Gate (Tab 2+4)`** | `PASS` | `8A–8F CLEAR • 0/4 Sells • No Squeeze Veto` |
-| **`L2: Macro Risk (Tab 3)`** | `PASS` | `Bull >200D ($73,162, +Slope) -> 1.00% Risk` |
-| **`L3: Size & Mag (Tab 4+2)`** | `PASS` | `Config A (1.00x) | Mag S:$85,322 L:$75,944` |
-| **`L4: Entry Timing (Tab 1)`** | `STANDBY` | `Price $77,428 -> Wait for $77,825 Test` |
+| **`L2: Macro Risk (Tab 3)`** | `PASS` | `Bull >200D ($73,205, +Slope) -> 1.00% Risk` |
+| **`L3: Size & Mag (Tab 4+2)`** | `PASS` | `Config F (0.75x) | Mag S:$85,322 L:$75,944` |
+| **`L4: Entry Timing (Tab 1)`** | `STANDBY` | `Price $77,030 -> Wait for $77,893 Test` |
 
 ### 6C. Panel 3 — Cross-Tab Agreement, Conflict Diagnostic & Flip Catalysts
 * **Cross-Tab Confluence (Where the 4 Tabs Agree)**:
-  - `Spot Order Flow Alignment [Tabs 1, 2, 4]: 4H Spot CVD is positive (+259.2 BTC) with 4H Buy/Sell Ratio at 1.84 (>1.00 real spot demand).`
-  - `Derivatives Hygiene [Tabs 1, 2, 4]: Perp funding is uncrowded (+0.0100%) and Annualized Basis is +10.20%, eliminating long-crowding veto risk.`
-  - `Trend & EMA Alignment [Tabs 1, 3]: Daily 3-EMA is STRONG_BULL (200 EMA $74,807, ADX 20.4) with 4H 50-EMA support at $79,864 (Setup: BULL_TREND_HOLDING).`
-  - `Valuation & Structural Floor [Tab 3 + Tab 1]: BTC ($77,428) trades at a -47.4% discount to Power-Law Fair Value ($147,328) with 30D Support HVN at $77,733.`
+  - `Spot Order Flow Alignment [Tabs 1, 2, 4]: 4H Spot CVD is positive (+31.4 BTC) with 4H Buy/Sell Ratio at 1.04 (>1.00 real spot demand).`
+  - `Derivatives Hygiene [Tabs 1, 2, 4]: Perp funding is uncrowded (+0.0100%) and Annualized Basis is +10.60%, eliminating long-crowding veto risk.`
+  - `Trend & EMA Alignment [Tabs 1, 3]: Daily 3-EMA is WEAK_BULL (200 EMA $74,829, ADX 23.0) with 4H 50-EMA support at $78,695 (Setup: LONG_WATCH).`
+  - `Valuation & Structural Floor [Tab 3 + Tab 1]: BTC ($77,030) trades at a -47.9% discount to Power-Law Fair Value ($147,716) with 30D Support HVN at $77,794.`
 * **Cross-Tab Conflict Diagnostic & Hierarchical Resolution**:
-  - `Protocol/Regime Readiness [Tabs 2, 3, 4] vs. Candle Reclaim Trigger [Tab 1]: Tabs [2–4] authorize 1.00x spot accumulation (Config A), while Tab [1] awaits a 15m/1H reclaim close above $77,825 with +1H Spot Z-Score (+0.05). Resolution -> Stage limit bid at $77,825.`
+  - `Protocol/Regime Readiness [Tabs 2, 3, 4] vs. Candle Reclaim Trigger [Tab 1]: Tabs [2–4] authorize 0.75x spot accumulation (Config F), while Tab [1] awaits a 15m/1H reclaim close above $77,893 with +1H Spot Z-Score (+1.33). Resolution -> Stage limit bid at $77,893.`
 * **Catalysts That Flip the Master Conclusion (Upgrade / Downgrade)**:
-  - `To Trigger Full GREEN Execution: 15m/1H candle reclaim close >= $77,825 (or sweep of Long-Liq Magnet $75,944) with +1H Spot CVD.`
-  - `To Trigger RED Hard Exit: Daily close below 1D Support ($76,326) / Tab 1 Tactical Stop ($77,067) or Track B Macro Liquidation Floor ($75,944) with expanding Spot selling.`
+  - `To Trigger Full GREEN Execution: 15m/1H candle reclaim close >= $77,893 (or sweep of Long-Liq Magnet $75,944) with +1H Spot CVD.`
+  - `To Trigger RED Hard Exit: Daily close below 1D Support ($76,326) / Tab 1 Tactical Stop ($76,150) or Track B Macro Liquidation Floor ($75,944) with expanding Spot selling.`
 
 ### 6D. Panel 4 — Unified Master Order of Battle (Track A: In Cash vs. Track B: Holding Spot BTC)
-* **TRACK A (IF FLAT IN CASH)**: `WAIT FOR EDGE (0% NOW • 1.00% AT $77,825)`
-  - **Reconciled Bid Zone**: `$77,733 – $77,825 (Liq Floor: $75,944)`
-  - **Reconciled Size Math**: `1.00% [T3] × 1.00x [T4] -> 0.6425 BTC ($50,000 at 1.00% risk)`
-  - **Execution Rule**: `Stage bid at $77,825 for 0.6425 BTC ($50,000) on reclaim.`
+* **TRACK A (IF FLAT IN CASH)**: `WAIT FOR EDGE (0% NOW • 0.75% AT $77,893)`
+  - **Reconciled Bid Zone**: `$77,794 – $77,893 (Liq Floor: $75,944)`
+  - **Reconciled Size Math**: `1.00% [T3] × 0.75x [T4] -> 0.4302 BTC ($33,510 at 0.75% risk)`
+  - **Execution Rule**: `Stage bid at $77,893 for 0.4302 BTC ($33,510) on reclaim.`
 * **TRACK B (IF HOLDING SPOT BTC — MACRO HORIZON)**: `HOLD EXISTING SPOT LONG (PROTECT WITH STOP)`
-  - **Reconciled Hard Stop (Macro Floor)**: `$76,651` (`$76,651.33` exact | `Tab 1 Tactical: $77,067 • Tab 4 Macro Floor: $76,651 • 50D: $81,957`)
-  - **Profit Targets (1/2)**: `TP1 (40%): $80,764 (1D 21 EMA Mean Reversion) • TP2 (60%): $84,270 (30D cVAH Value Extreme)`
-  - **Management Rule**: `Hold core > $76,651; scale 40% @ $80,764 & 60% @ $84,270.`
-* **Tab [1] Tactical TradePlan (Intraday/Swing)**: Entry `$77,733–$77,825` | Tactical Stop `$77,067` (ATR/Swing Low) | `Tactical TP1 $80,160 (7D cPOC)` | `Tactical TP2 $84,270 (30D cVAH Extreme)`
+  - **Reconciled Hard Stop (Macro Floor)**: `$76,007` (`$76,006.94` exact | `Tab 1 Tactical: $76,150 • Tab 4 Macro Floor: $76,007 • 50D: $81,958`)
+  - **Profit Targets (1/2)**: `TP1 (40%): $79,928 (1D 21 EMA Mean Reversion) • TP2 (60%): $84,020 (30D cVAH Value Extreme)`
+  - **Management Rule**: `Hold core > $76,007; scale 40% @ $79,928 & 60% @ $84,020.`
+* **Tab [1] Tactical TradePlan (Intraday/Swing)**: Entry `$77,794–$77,893` | Tactical Stop `$76,150` (ATR/Swing Low) | `Tactical TP1 $81,707 (30D cPOC)` | `Tactical TP2 $84,020 (30D cVAH Extreme)`
 
 ### 6E. Panel 5 — Executive Bottom Line (Supreme Master Conclusion)
-* **Master Traffic Light & Headline**: `BLUE` — `BLUE LIGHT — CONSTRUCTIVE MULTI-TAB ACCUMULATION ZONE (STAGE 0.6425 BTC BID AT $77,825 SUPPORT)`
-* **Master Synthesis**: `Scoreboard: 2 Green • 0 Blue • 2 Yellow • 0 Red (Master Alignment: 75.0% — MULTI-TAB BULLISH CONFLUENCE). BTC ($77,428) is in Config A (Healthy Bull, 64% match) with 4H Spot CVD +259.2 BTC.`
-* **Conflict Ruling**: `Protocol/Regime Readiness [Tabs 2, 3, 4] vs. Candle Reclaim Trigger [Tab 1]: Tabs [2–4] authorize 1.00x spot accumulation (Config A), while Tab [1] awaits a 15m/1H reclaim close above $77,825 with +1H Spot Z-Score (+0.05). Resolution -> Stage limit bid at $77,825.`
-* **Final Command**: `[IF IN CASH]: WAIT FOR EDGE (0% NOW • 1.00% AT $77,825) -> Zone $77,733–$77,825 (0.6425 BTC / $50,000).  [IF HOLDING SPOT]: HOLD EXISTING SPOT LONG (PROTECT WITH STOP) | Stop $76,651 | TP1 $80,764 • TP2 $84,270.`
+* **Master Traffic Light & Headline**: `BLUE` — `BLUE LIGHT — CONSTRUCTIVE MULTI-TAB ACCUMULATION ZONE (STAGE 0.4302 BTC BID AT $77,893 SUPPORT)`
+* **Master Synthesis**: `Scoreboard: 1 Green • 1 Blue • 2 Yellow • 0 Red (Master Alignment: 59.7% — CONSTRUCTIVE — AWAITING TRIGGER). BTC ($77,030) is in Config F (Re-Accumulation, 90% match) with 4H Spot CVD +31.4 BTC.`
+* **Conflict Ruling**: `Protocol/Regime Readiness [Tabs 2, 3, 4] vs. Candle Reclaim Trigger [Tab 1]: Tabs [2–4] authorize 0.75x spot accumulation (Config F), while Tab [1] awaits a 15m/1H reclaim close above $77,893 with +1H Spot Z-Score (+1.33). Resolution -> Stage limit bid at $77,893.`
+* **Final Command**: `[IF IN CASH]: WAIT FOR EDGE (0% NOW • 0.75% AT $77,893) -> Zone $77,794–$77,893 (0.4302 BTC / $33,510).  [IF HOLDING SPOT]: HOLD EXISTING SPOT LONG (PROTECT WITH STOP) | Stop $76,007 | TP1 $79,928 • TP2 $84,020.`
 
 ---
 
 ## SECTION 7: MM-BTC — THE ROUGH PATH ARBITRATOR (TAB [S1] RAW RADAR)
 
-* **Chief Arbiter Recommendation**: `MAINTAIN 100% USDT` (Weight: `0.00x` • Consensus: `2/5 Models Agree` • Microstructure: `NEUTRAL MICROSTRUCTURE` / `NEUTRAL`)
-* **Walk-Forward Ridge Expected Return (Y_hat)**: `-0.12%` | **Sizing Mode**: `WALK-FORWARD RIDGE (DYNAMIC)` | **15m Micro Tripwire**: `VETO ACTIVE`
-* **Execution Bounds**: Zone `$76,267 – $77,815` • Invalidation `$75,563 (Structural window low)` • Target `$83,610 – $87,791`
+* **Chief Arbiter Recommendation**: `ACCUMULATE SPOT (0.33x ALLOCATION)` (Weight: `0.33x` • Consensus: `4/5 Models Agree` • Microstructure: `PASSIVE ABSORPTION` / `HEALTHY BUY FLOW`)
+* **Walk-Forward Ridge Expected Return (Y_hat)**: `+0.05%` | **Sizing Mode**: `WALK-FORWARD RIDGE (DYNAMIC)` | **15m Micro Tripwire**: `CLEAR`
+* **Execution Bounds**: Zone `$75,875 – $77,415` • Invalidation `$75,625 (Structural window low)` • Target `$80,882 – $84,926`
 
 ### 7A. Rough Path Signatures (Order N <= 2, Quadratic Variation Roughness & Levy Signed Areas)
 
 | Signature Term | Value | Operational Threshold / Boundary | Quantitative Interpretation |
 | :--- | :--- | :--- | :--- |
-| **Price Net Drift S^(P)** | `-1.4950` | Level 1 Coordinate Drift | Net price coordinate displacement over rolling 48H |
-| **Volume Net Drift S^(V)** | `-0.0370` | Level 1 Flow Drift | Net volume coordinate displacement over rolling 48H |
+| **Price Net Drift S^(P)** | `-0.3790` | Level 1 Coordinate Drift | Net price coordinate displacement over rolling 48H |
+| **Volume Net Drift S^(V)** | `+0.0210` | Level 1 Flow Drift | Net volume coordinate displacement over rolling 48H |
 | **Open Interest Drift S^(O)** | `+0.0000` | Level 1 Leverage Drift | Net open interest displacement over rolling 48H |
-| **Quadratic Path Roughness (R)** | `1.86` | Max Cap: `<= 4.50` (`Pass=True`) | Smooth/Persistent Trend |
-| **Time-Price Levy Area A_(t,P)** | `-0.3233` | Exhaustion Cap: `<= +0.15` | `COILING ACCUMULATION BREAKOUT` |
-| **Price-Flow Levy Area A_(P,V)** | `-0.0353` | Area Enclosed by Price vs. CVD | `RETAIL EXHAUSTION (THIN PUSH)` |
+| **Quadratic Path Roughness (R)** | `0.67` | Max Cap: `<= 4.50` (`Pass=True`) | Smooth/Persistent Trend |
+| **Time-Price Levy Area A_(t,P)** | `+0.0389` | Exhaustion Cap: `<= +0.15` | `BALANCED TRAJECTORY` |
+| **Price-Flow Levy Area A_(P,V)** | `-0.0106` | Area Enclosed by Price vs. CVD | `RETAIL EXHAUSTION (THIN PUSH)` |
 | **Price-OI Levy Area A_(P,O)** | `+0.0000` | Area Enclosed by Price vs. OI | `SQUEEZE PRIMED / OI RESET` |
-| **Arbiter Status & Verdict** | `CONFIRMED CLEAR` | Gate Status | `ACCUMULATE` |
+| **Arbiter Status & Verdict** | `CONFIRMED CLEAR` | Gate Status | `NEUTRAL / WAIT` |
 
 ### 7B. Orthogonal Mathematical Lenses (A–E)
 
 | Lens | Model Name | Primary Metric | Secondary Metric | Diagnostic State |
 | :--- | :--- | :--- | :--- | :--- |
-| **Lens A** | Constant-Velocity Kalman Filter | Latent Price: `$78,066.82` (`-0.82%`) | Velocity: `-26.30 $/hr` | State: `ACCELERATING DOWN` • Bias: `BEARISH` |
-| **Lens B** | Rolling 128-Bar Hurst Exponent | Hurst Exponent H: `0.598` | Regime: `PERSISTENT TREND` | Implication: `FAVOR BREAKOUT EXPANSIONS` |
-| **Lens C** | Fixed-Width Window FracDiff | Optimal Order d*: `0.25` | ADF p-value: `0.0462` (t=-2.89) | 12-Bar Momentum: `-0.6500` • Memory: `STRUCTURAL BREAKDOWN` • Bias: `BEARISH` |
-| **Lens D** | Hilbert Transform Analytic Signal | Cycle Period: `72.0h` | Phase Angle: `0.1°` | Phase State: `CYCLE TROUGH` • Bias: `CYCLE ACCUMULATION` (Cleaned 31 outliers) |
-| **Lens E** | 48H Order Flow & OI Dynamics | 48H Net CVD: `-1,800.4 BTC` | 48H OI Delta: `+0.00%` | 1H 200 SMA: `$80,085` (Above: `False`) |
+| **Lens A** | Constant-Velocity Kalman Filter | Latent Price: `$76,936.90` (`+0.12%`) | Velocity: `-19.90 $/hr` | State: `ACCELERATING DOWN` • Bias: `BEARISH` |
+| **Lens B** | Rolling 128-Bar Hurst Exponent | Hurst Exponent H: `0.878` | Regime: `PERSISTENT TREND` | Implication: `FAVOR BREAKOUT EXPANSIONS` |
+| **Lens C** | Fixed-Width Window FracDiff | Optimal Order d*: `0.35` | ADF p-value: `0.0135` (t=-3.33) | 12-Bar Momentum: `+0.7200` • Memory: `STRUCTURAL EXPANSION` • Bias: `BULLISH` |
+| **Lens D** | Hilbert Transform Analytic Signal | Cycle Period: `72.0h` | Phase Angle: `0.0°` | Phase State: `CYCLE TROUGH` • Bias: `CYCLE ACCUMULATION` (Cleaned 30 outliers) |
+| **Lens E** | 48H Order Flow & OI Dynamics | 48H Net CVD: `+450.9 BTC` | 48H OI Delta: `+0.00%` | 1H 200 SMA: `$78,921` (Above: `False`) |
 
 ### 7C. 3-Gate Institutional Arbitration & Micro Tripwire
 
 | Gate # | Gate Name | Status | Quantitative Detail |
 | :--- | :--- | :--- | :--- |
-| **Gate 1** | Structural Invariance Gate | `PASS` | Roughness R=1.86 (<=4.50), Area(t,P)=-0.323 (<=+0.15) |
-| **Gate 2** | Dynamic Invariance Gate | `FAIL` | Agreeing Models: 2/5 (Hurst, Kalman, FracDiff, Hilbert, Flow) |
-| **Gate 3** | Walk-Forward Ridge & Sizing | `Y_hat = -0.12%` | Mode: WALK-FORWARD RIDGE (DYNAMIC) • Weight: 0.00x |
-| **Tripwire** | 15m Micro Order Flow Tripwire | `TRIPPED (VETO)` | Real-time 15m volume & CVD delta check |
-| **Conflict** | Consensus Conflict Summary | Conflict: `⚡ 15m Micro Tripwire Active: Intraday liquidation sweep detected. Price ($77,428) below 200-hour SMA ($80,085): allocation hard-capped at 0.50x.` | Action Holder: `EXIT 100% USDT / HARVEST` |
+| **Gate 1** | Structural Invariance Gate | `PASS` | Roughness R=0.67 (<=4.50), Area(t,P)=+0.039 (<=+0.15) |
+| **Gate 2** | Dynamic Invariance Gate | `PASS` | Agreeing Models: 4/5 (Hurst, Kalman, FracDiff, Hilbert, Flow) |
+| **Gate 3** | Walk-Forward Ridge & Sizing | `Y_hat = +0.05%` | Mode: WALK-FORWARD RIDGE (DYNAMIC) • Weight: 0.33x |
+| **Tripwire** | 15m Micro Order Flow Tripwire | `CLEAR` | Real-time 15m volume & CVD delta check |
+| **Conflict** | Consensus Conflict Summary | Conflict: `Price ($77,030) below 200-hour SMA ($78,921): allocation hard-capped at 0.50x.` | Action Holder: `HOLD CORE SPOT (TARGET $80,882 – $84,926)` |
 
 ---
 
@@ -291,34 +291,34 @@ Structure your audit into:
 > **BENCHMARK & VOLATILITY RADAR ONLY — 0.0% CAPITAL ALLOCATION WEIGHT (QUARANTINED)**  
 > Zero-shot Time-Series Foundation Models (Kronos, Chronos-Bolt, TimesFM) serve strictly as public SaaS benchmarks. Alpha Core (Tabs 1–5 + S1) remains the sole capital allocator.
 
-* **Hurst Fractal Exponent (H)**: `0.598` (`SUPER-DIFFUSIVE EXPANSION (H = 0.60 > 0.50)` • Mandelbrot Diffusion `t^0.60`)
-* **Garman-Klass Volatility (4H)**: `0.89%` | **Annualized Volatility**: `41.9%` (8x statistical efficiency over close-to-close standard deviation)
-* **Variance Compression Ratio (VCR_72h)**: `5.83x` (`SEVERE AI COMPRESSION / COILED SPRING` • Coiled Spring Alert: `ACTIVE`)
-* **Damped Kalman Drift Center (mu)**: `-0.00136` per 4H bar (`lambda=0.9` exponential decay)
-* **Forward Liquidity Confluence**: GK 1σ cone encompasses 30D cVAL ($79,912) • GK 2σ sweep reaches Support HVN floor ($77,733). TSFM models predict tight cluster ($77,158–$78,151), ignoring external order flow and liquidation shelves.
+* **Hurst Fractal Exponent (H)**: `0.750` (`SUPER-DIFFUSIVE EXPANSION (H = 0.75 > 0.50)` • Mandelbrot Diffusion `t^0.75`)
+* **Garman-Klass Volatility (4H)**: `0.53%` | **Annualized Volatility**: `24.8%` (8x statistical efficiency over close-to-close standard deviation)
+* **Variance Compression Ratio (VCR_72h)**: `5.38x` (`SEVERE AI COMPRESSION / COILED SPRING` • Coiled Spring Alert: `ACTIVE`)
+* **Damped Kalman Drift Center (mu)**: `-0.00103` per 4H bar (`lambda=0.9` exponential decay)
+* **Forward Liquidity Confluence**: GK 1σ cone encompasses 30D cVAL ($79,928) • GK 2σ sweep reaches Support HVN floor ($77,794). TSFM models predict tight cluster ($76,761–$77,749), ignoring external order flow and liquidation shelves.
 * **Quantitative Takeaway**: ZERO CAPITAL WEIGHT [BENCHMARK ONLY]: Time-Series Foundation Models suffer from Martingale Variance Compression (Pt ≈ Pt-1) on non-stationary 4H BTC returns, predicting flat ±0.2% drift. The Mandelbrot t^H Garman-Klass Volatility Cone captures true fat-tailed path diffusion. Trading execution strictly quarantined to Tabs [1]-[5] & [S1].
 
 ### 8A. 72-Hour Forward Volatility Cone Fan Table (Mandelbrot t^H Quantile Fan vs TSFM Mean)
 
 | Horizon | Damped Drift Center | GK 1σ Band (68% Conf) | GK 1σ Spread ($ / %) | GK 2σ Band (95% Conf) | TSFM Mean Close | TSFM Disp % |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`+4h (Bar +1)`** | `$77,333` | `$76,641 – $78,025` | `±$692` (`+0.90%`) | `$75,949 – $78,718` | `$77,496` | `0.36%` |
-| **`+24h (Bar +6)`** | `$76,984` | `$74,973 – $78,996` | `±$2,012` (`+2.62%`) | `$72,961 – $81,008` | `$77,488` | `0.23%` |
-| **`+48h (Bar +12)`** | `$76,749` | `$73,713 – $79,784` | `±$3,035` (`+3.96%`) | `$70,678 – $82,819` | `$77,598` | `0.58%` |
-| **`+72h (Bar +18)`** | `$76,623` | `$72,761 – $80,485` | `±$3,862` (`+5.04%`) | `$68,899 – $84,347` | `$77,664` | `1.28%` |
+| **`+4h (Bar +1)`** | `$76,958` | `$76,550 – $77,367` | `±$408` (`+0.53%`) | `$76,142 – $77,775` | `$77,098` | `0.36%` |
+| **`+24h (Bar +6)`** | `$76,694` | `$75,135 – $78,254` | `±$1,559` (`+2.04%`) | `$73,575 – $79,813` | `$77,090` | `0.23%` |
+| **`+48h (Bar +12)`** | `$76,516` | `$73,899 – $79,133` | `±$2,617` (`+3.42%`) | `$71,283 – $81,749` | `$77,199` | `0.58%` |
+| **`+72h (Bar +18)`** | `$76,421` | `$72,879 – $79,963` | `±$3,542` (`+4.63%`) | `$69,337 – $83,506` | `$77,264` | `1.28%` |
 
 ### 8B. Quarantined Time-Series Foundation Models (TSFM Baseline Audit)
 
 | Model Name | Architecture & Training Domain | Direction & 72h Close | Predicted 72h Range | 72h Range Spread ($ / %) | Operational Quarantine Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`Kronos-base`** | Decoder-only BSQ Candlestick Transformer (Financial K-lines (OHLCV + Vol across 45+ exchanges)) | `UP +0.13%` (`$78,151`) | `$76,827 – $78,151` | `$1,324` (`1.71%`) | `BENCHMARK-ONLY (0.0% CAPITAL WEIGHT)` |
-| **`Chronos-Bolt-small`** | T5 Patch Quantile Encoder-Decoder (General Time-Series (Traffic, Energy, Retail Sales)) | `UP +0.22%` (`$77,682`) | `$77,419 – $77,731` | `$312` (`0.40%`) | `BENCHMARK-ONLY (0.0% CAPITAL WEIGHT)` |
-| **`TimesFM 2.5`** | Decoder-only 200M Patched Transformer (100B+ Real-World General Time Points (Search, Retail)) | `DOWN -0.15%` (`$77,158`) | `$77,156 – $77,440` | `$284` (`0.37%`) | `BENCHMARK-ONLY (0.0% CAPITAL WEIGHT)` |
+| **`Kronos-base`** | Decoder-only BSQ Candlestick Transformer (Financial K-lines (OHLCV + Vol across 45+ exchanges)) | `UP +0.13%` (`$77,749`) | `$76,432 – $77,749` | `$1,317` (`1.71%`) | `BENCHMARK-ONLY (0.0% CAPITAL WEIGHT)` |
+| **`Chronos-Bolt-small`** | T5 Patch Quantile Encoder-Decoder (General Time-Series (Traffic, Energy, Retail Sales)) | `UP +0.22%` (`$77,283`) | `$77,021 – $77,331` | `$310` (`0.40%`) | `BENCHMARK-ONLY (0.0% CAPITAL WEIGHT)` |
+| **`TimesFM 2.5`** | Decoder-only 200M Patched Transformer (100B+ Real-World General Time Points (Search, Retail)) | `DOWN -0.15%` (`$76,761`) | `$76,760 – $77,042` | `$283` (`0.37%`) | `BENCHMARK-ONLY (0.0% CAPITAL WEIGHT)` |
 
 ### 8C. Quantitative Variance Compression Analysis & Educational Value
 
 * **The Martingale Variance Compression Trap**: Zero-shot TSFMs minimizing MSE on raw price series collapse to persistent random walks (P_t ≈ P_{t-1}), producing an artificially flat range of only ~0.2% to 0.4% over 72 hours.
-* **VCR Metric**: `VCR_72h = 5.83x` reveals that realized volatility expansion requires a `5.8x` wider envelope than naive AI estimates.
+* **VCR Metric**: `VCR_72h = 5.38x` reveals that realized volatility expansion requires a `5.4x` wider envelope than naive AI estimates.
 * **Actionable Execution Rule**: Never trade naive zero-shot predictions. Rely strictly on order-flow absorption, liquidation magnets, and rough path invariance (Tabs [1]–[5] & [S1]).
 
 ### 8D. Plain English Summary for Traders & Beginners (What This Means in Reality)
@@ -326,8 +326,8 @@ Structure your audit into:
 > [!TIP]
 > **PLAIN ENGLISH TRANSLATION FOR TRADERS:**
 > 1. **Why the AI lines look flat (±0.2%)**: Generic AI models play it safe by guessing tomorrow's price will equal today's price ($P_t ≈ P_{t-1}$), because they can't predict unexpected news or liquidations.
-> 2. **Where price will actually move**: Real Bitcoin does not stay flat. Over the next 72 hours, true volatility indicates BTC is expected to swing inside the **Green Volatility Cone** (`$72,761 – $80,485`, `±$3,862` / `±5.0%`).
-> 3. **The Coiled Spring (VCR = 5.83x)**: The market is holding **5.8x more expansion energy** than naive AI models realize. ⚡ **ALERT: Severe compression — a violent breakout is imminent!**
+> 2. **Where price will actually move**: Real Bitcoin does not stay flat. Over the next 72 hours, true volatility indicates BTC is expected to swing inside the **Green Volatility Cone** (`$72,879 – $79,963`, `±$3,542` / `±4.6%`).
+> 3. **The Coiled Spring (VCR = 5.38x)**: The market is holding **5.4x more expansion energy** than naive AI models realize. ⚡ **ALERT: Severe compression — a violent breakout is imminent!**
 > 4. **Rule for your wallet**: **NEVER trade based on flat AI predictions.** Your money stays safe. Real trades are only triggered when institutional volume and order flow confirm on **Tabs [1]–[5] & [S1]**.
 
 ---
@@ -335,40 +335,45 @@ Structure your audit into:
 ## SECTION 9: TAB [S3] GARTLEY 222 & 5-STRATEGY CONFLUENCE RADAR
 
 > [!NOTE]
-> **SPOT SWING CONFLUENCE RADAR (NON-LEVERAGED) — TRADINGVIEW PINE SCRIPT PARITY**  
-> Ported faithfully from TradingView Pine Script: `btc_5strategy_plus_gartley_merged.pine`. Combines 1D Macro Trend state machine with 4H Tactical Swing triggers, Fibonacci harmonic PRZs, and live Telegram alert delivery (`@Gartleyy_bot`).
+> **WELCOME TO SATELLITE TAB [S3]: GARTLEY 222 & 5-STRATEGY CONFLUENCE RADAR**  
+> **1. Purpose & Core Methodology:** Precision spot swing execution radar. Bridges two distinct schools of analysis into a single unified engine: **5 Classic Trend & Momentum Models (S1–S5: Donchian, 200 SMA, 20/50 EMA, 14 RSI, 2σ Bollinger Bands)** and **Harmonic Fibonacci Geometry (S6–S7: Gartley 222 L-H-L-H-L and H-L-H-L-H)**.  
+> **2. Dual-Horizon Philosophy (The Shield & The Spear):**  
+> • **1D Daily Macro (The Shield):** Monitors primary multi-month trend. As long as Bitcoin trades above its 200-day moving average, capital is protected against buying into a macro bear market.  
+> • **4H Tactical (The Spear):** Monitors the intermediate swing cycle, ignoring intraday noise to search exclusively for high-probability turning points where multiple indicators converge with Harmonic Potential Reversal Zones (PRZ).  
+> **3. Built for Disciplined Spot Swing Traders:** Zero leverage, zero shorting (eliminates liquidation wipes), no subjective guesswork (strict mathematical criteria), and 100% mathematical parity with the automated GitHub Actions cloud bot (`@Gartleyy_bot`).  
+> **4. 5-Second Verdict Ladder:** `GARTLEY SELL` > `CONFLUENCE BUY` > `HOLD` > `NO TRADE`.
 
-* **Live Spot Price**: `$77,428.02` | **Overall Multi-Timeframe Verdict**: `💎 FULL HOLD (1D Trend + 4H Swing)`
-* **Plain English Takeaway**: Both 1D Macro Trend and 4H Tactical Swing are in confirmed HOLD status above the 200 SMA ($73,178). Maintain existing spot swing allocations. No new risk deployment required.
+* **Live Spot Price**: `$77,030.01` | **Overall Multi-Timeframe Verdict**: `HOLD (1D Trend Strong, 4H Waiting for Trigger)`
+* **Plain English Takeaway**: 1D Macro Trend remains bullish/HOLD (Spot > SMA200 $73,205), while 4H Tactical Swing is currently waiting for a fresh confluence trigger (NO TRADE). Maintain core spot position.
 * **Standalone Bot Repository**: `aikeluargalee-tech/btc-spot-verdict-bot` (GitHub Actions workflow every 4H UTC)
 * **Telegram Delivery**: Bot: `@Gartleyy_bot` | Chat ID: `1273979711` | Schedule: `0 0,4,8,12,16,20 * * * (Every 4H UTC)`
 * **Webhook Bridge**: `https://script.google.com/macros/s/AKfycbx0M21chsQ_k-a5SWbM6KbZmzlN81I32DZBO520ylh9iriUtlS-WUlkxsXlkjdR7hUE/exec` (Google Apps Script /now trigger)
 
 ### 9A. 1D Daily Macro Trend State Machine (S1–S7)
 
-**1D Daily Trend Verdict**: `HOLD` (Close: `$77,428.02`)
+**1D Daily Trend Verdict**: `HOLD` (Close: `$77,030.01`)
 
 | Strategy | Indicator / Model | Signal / Level | State / Action | Role & Context |
 | :--- | :--- | :--- | :--- | :--- |
 | **S1: Breakout 20** | 20-bar Donchian High/Low | 20-bar Channel | `FLAT` | Macro Channel Trend Following |
-| **S2: Trend SMA200** | 200-day Simple Moving Average | `$73,178.3` | `HOLD` | Institutional Macro Gatekeeper |
-| **S3: EMA 20/50** | 20 EMA vs 50 EMA | EMA20: `$80,701.8` / EMA50: `$80,459.0` | `HOLD` | Dynamic Trend Cross |
-| **S4: 14 RSI** | 14-period Wilder RSI | `34.7` (Oversold 30 / Reclaim 50) | `FLAT` | Momentum Mean-Reversion |
+| **S2: Trend SMA200** | 200-day Simple Moving Average | `$73,204.9` | `HOLD` | Institutional Macro Gatekeeper |
+| **S3: EMA 20/50** | 20 EMA vs 50 EMA | EMA20: `$79,845.1` / EMA50: `$80,116.5` | `FLAT` | Dynamic Trend Cross |
+| **S4: 14 RSI** | 14-period Wilder RSI | `36.0` (Oversold 30 / Reclaim 50) | `FLAT` | Momentum Mean-Reversion |
 | **S5: Bollinger Bands** | 20 SMA ± 2-Sigma Envelope | 2-Sigma Lower Band Sweep | `HOLD` | Volatility Exhaustion Bounce |
 | **S6: Gartley Bull** | Harmonic 222 Bullish (L-H-L-H-L) | PRZ D: `NONE` | `FLAT` | Fibonacci Precision Reversal |
 | **S7: Gartley Bear** | Harmonic 222 Bearish (H-L-H-L-H) | PRZ D: `NONE` | `FLAT` | Harmonic Profit Taking / USDT Hedge |
 
 ### 9B. 4H Tactical Swing Execution State Machine (S1–S7)
 
-**4H Tactical Swing Verdict**: `HOLD` (Close: `$77,428.02`)
+**4H Tactical Swing Verdict**: `NO TRADE` (Close: `$77,030.01`)
 
 | Strategy | Indicator / Model | Signal / Level | State / Action | Role & Context |
 | :--- | :--- | :--- | :--- | :--- |
 | **S1: Breakout 20** | 20-bar Donchian High/Low | 20-bar Channel | `FLAT` | Swing Channel Breakout |
-| **S2: Trend SMA200** | 200-period Simple Moving Average | `$82,487.0` | `FLAT` | Intermediate Cycle Filter |
-| **S3: EMA 20/50** | 20 EMA vs 50 EMA | EMA20: `$78,678.2` / EMA50: `$79,860.9` | `FLAT` | Tactical Trend Alignment |
-| **S4: 14 RSI** | 14-period Wilder RSI | `37.4` (Oversold 30 / Reclaim 50) | `FLAT` | Swing Dip Exhaustion |
-| **S5: Bollinger Bands** | 20 SMA ± 2-Sigma Envelope | 2-Sigma Lower Band Sweep | `HOLD` | Tactical Mean Reversion |
+| **S2: Trend SMA200** | 200-period Simple Moving Average | `$81,957.3` | `FLAT` | Intermediate Cycle Filter |
+| **S3: EMA 20/50** | 20 EMA vs 50 EMA | EMA20: `$77,673.9` / EMA50: `$78,693.7` | `FLAT` | Tactical Trend Alignment |
+| **S4: 14 RSI** | 14-period Wilder RSI | `38.6` (Oversold 30 / Reclaim 50) | `FLAT` | Swing Dip Exhaustion |
+| **S5: Bollinger Bands** | 20 SMA ± 2-Sigma Envelope | 2-Sigma Lower Band Sweep | `FLAT` | Tactical Mean Reversion |
 | **S6: Gartley Bull** | Harmonic 222 Bullish (L-H-L-H-L) | PRZ D: `NONE` | `FLAT` | Tactical Long Entry |
 | **S7: Gartley Bear** | Harmonic 222 Bearish (H-L-H-L-H) | PRZ D: `NONE` | `FLAT` | Tactical Exit to USDT |
 
@@ -384,7 +389,7 @@ Structure your audit into:
 ### 9D. Pine Script Verdict Priority Ladder & Action Rule
 
 * **Hierarchy**: `GARTLEY SELL TO USDT` > `CONFLUENCE + GARTLEY BUY` > `GARTLEY BUY` > `EXIT PRESSURE` > `CONFLICT` > `EXIT WARNING` > `CONFLUENCE BUY` > `ENTRY WATCH` > `HOLD` > `NO TRADE`.
-* **Current Active Alignment**: Overall: **`💎 FULL HOLD (1D Trend + 4H Swing)`**.
+* **Current Active Alignment**: Overall: **`HOLD (1D Trend Strong, 4H Waiting for Trigger)`**.
 * **Capital Allocation**: Non-leveraged spot execution. Pairs harmoniously with Alpha Core Tabs [1]–[5], Rough Path Tab [S1], and Volatility Cone Tab [S2].
 
 ---
@@ -395,14 +400,14 @@ Structure your audit into:
 > **THE LIQUIDITY SWEEP & SFP RECLAIM ARBITRATION LAW**  
 > Classical geometric chart patterns (Head & Shoulders, Double Bottoms/Tops, Wedges, Flags) fail ~50%–60% of the time in Bitcoin due to perpetual swap leverage and deliberate algorithmic stop-hunting. Tab [S4] weaponizes retail predictability by identifying when pattern boundaries are swept and absorbed by passive institutional bids.
 
-* **Live Spot Reference**: `$77,428.02` | **Active Trap State**: `STATE 1: BOUNDARY BREACH & SWEEP`
-* **Primary Tactical Signal**: `SWEEP IN PROGRESS (30D Macro Value Area Low (cVAL) @ $79,912)`
-* **Asia Session Range**: Asia High: `$77,654.4` (Swept: `False`) | Asia Low: `$77,114.0` (Swept: `False`)
-* **Active Displacement Voids**: `3 active FVGs tracked within 5%`
+* **Live Spot Reference**: `$77,030.01` | **Active Trap State**: `STATE 1: BOUNDARY BREACH & SWEEP`
+* **Primary Tactical Signal**: `SWEEP IN PROGRESS (30D Macro Value Area Low (cVAL) @ $79,928)`
+* **Asia Session Range**: Asia High: `$77,314.0` (Swept: `False`) | Asia Low: `$76,388.9` (Swept: `False`)
+* **Active Displacement Voids**: `1 active FVGs tracked within 5%`
 * **Passive Absorption Flag**: `ACTIVE (Limit Bids/Offers Absorbing Takers)`
-* **Open Interest Velocity**: 15m dOI: `+0.008%` | 1H dOI: `+0.069%` (Surge Flag: `FALSE`)
-* **Rolling Volume Delta**: 1m CVD: `+0.00 BTC` | 5m CVD: `+15.94 BTC` | 15m CVD: `+6.71 BTC`
-* **Absorption Elasticity Ratio**: `67.0x` (|CVD| / |ΔP%|)
+* **Open Interest Velocity**: 15m dOI: `-0.090%` | 1H dOI: `+0.008%` (Surge Flag: `FALSE`)
+* **Rolling Volume Delta**: 1m CVD: `+0.00 BTC` | 5m CVD: `-7.31 BTC` | 15m CVD: `+28.43 BTC`
+* **Absorption Elasticity Ratio**: `168.7x` (|CVD| / |ΔP%|)
 * **Quantitative Takeaway**: OBSERVE SWEEP WICK EXTREME — Armed for SFP reclaim trigger.
 * **Plain English Summary**: Price is currently sweeping beyond a classical pattern boundary. Do not front-run; wait for 15m candle close back inside to confirm SFP reclaim.
 
@@ -410,19 +415,17 @@ Structure your audit into:
 
 | Pattern Name | Type | Boundary Level | Sweep Wick Extreme | Distance ($ / %) | Distance (ATR) | Status | Trap Bias | Liquidity Tier |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`Asia Session High (00:00-08:00 UTC)`** | `ASIA_SESSION_HIGH` | `$77,654.4` | `$77,537.0` | `-0.29%` | `-0.62x` | `COMPRESSION` | `BEARISH (BULL TRAP)` | SESSION OPEN RESTING STOPS |
-| **`Asia Session Low (00:00-08:00 UTC)`** | `ASIA_SESSION_LOW` | `$77,114.0` | `$77,262.7` | `+0.41%` | `+0.86x` | `COMPRESSION` | `BULLISH (BEAR TRAP)` | SESSION OPEN RESTING STOPS |
-| **`1H Double Top Equal Highs`** | `DOUBLE_TOP` | `$77,537.0` | `$77,537.0` | `-0.14%` | `-0.30x` | `COMPRESSION` | `BEARISH (BULL TRAP)` | HIGH DENSITY SHORT SQUEEZE POOL |
-| **`30D Macro Value Area Low (cVAL)`** | `RANGE_SUPPORT_EXTREME` | `$79,911.9` | `$76,722.0` | `-3.11%` | `-6.79x` | `SWEEPING` | `BULLISH (BEAR TRAP)` | INSTITUTIONAL LIQUIDITY SHELF |
-| **`30D Macro Value Area High (cVAH)`** | `RANGE_RESISTANCE_EXTREME` | `$84,269.5` | `$77,654.4` | `-8.12%` | `-18.70x` | `COMPRESSION` | `BEARISH (BULL TRAP)` | INSTITUTIONAL LIQUIDITY CEILING |
+| **`Asia Session High (00:00-08:00 UTC)`** | `ASIA_SESSION_HIGH` | `$77,314.0` | `$77,050.7` | `-0.37%` | `-0.71x` | `COMPRESSION` | `BEARISH (BULL TRAP)` | SESSION OPEN RESTING STOPS |
+| **`Asia Session Low (00:00-08:00 UTC)`** | `ASIA_SESSION_LOW` | `$76,388.9` | `$76,512.0` | `+0.84%` | `+1.61x` | `COMPRESSION` | `BULLISH (BEAR TRAP)` | SESSION OPEN RESTING STOPS |
+| **`1H Double Bottom Equal Lows`** | `DOUBLE_BOTTOM` | `$76,388.9` | `$76,388.9` | `+0.84%` | `+1.61x` | `COMPRESSION` | `BULLISH (BEAR TRAP)` | HIGH DENSITY STOP CLUSTER |
+| **`30D Macro Value Area Low (cVAL)`** | `RANGE_SUPPORT_EXTREME` | `$79,928.2` | `$76,388.9` | `-3.63%` | `-7.26x` | `SWEEPING` | `BULLISH (BEAR TRAP)` | INSTITUTIONAL LIQUIDITY SHELF |
+| **`30D Macro Value Area High (cVAH)`** | `RANGE_RESISTANCE_EXTREME` | `$84,019.5` | `$77,314.0` | `-8.32%` | `-17.51x` | `COMPRESSION` | `BEARISH (BULL TRAP)` | INSTITUTIONAL LIQUIDITY CEILING |
 
 ### 10D. Active Fair Value Gaps (15m/1H FVGs) & Consequent Encroachment (50% CE) Registry
 
 | ID | TF | Direction | Imbalance Bounds ($) | 50% CE ($) | Gap Size (%) | Distance to CE | Mitigation Status |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `#8` | `1H` | **`BULLISH`** | `$77,014.0 – $77,271.2` | **`$77,142.6`** | `+0.33%` | `+0.37%` | `PARTIALLY_MITIGATED` |
-| `#5` | `1H` | **`BEARISH`** | `$78,241.3 – $78,418.0` | **`$78,329.6`** | `+0.23%` | `-1.15%` | `UNMITIGATED` |
-| `#1` | `1H` | **`BEARISH`** | `$79,811.2 – $80,778.0` | **`$80,294.6`** | `+1.20%` | `-3.57%` | `UNMITIGATED` |
+| `#5` | `15m` | **`BULLISH`** | `$76,666.0 – $76,784.0` | **`$76,725.0`** | `+0.15%` | `+0.40%` | `UNMITIGATED` |
 
 ### 10C. Anti-Sycophancy Rulebook for Classical Patterns (How to Avoid Retail Liquidity Traps)
 
@@ -438,10 +441,10 @@ Structure your audit into:
 > **THE DETERMINISTIC MOMENTUM EXHAUSTION LAW**  
 > Replaces subjective, non-falsifiable Elliott Wave counts (Wave 5 tops and Wave C bottoms) with deterministic Tom DeMark (TD) 9-count setups, multi-horizon Cumulative Volume Delta (CVD) divergences, and Open Interest / Funding climax stress.
 
-* **Live Spot Reference**: `$77,428.02` | **Composite Exhaustion Score**: **`25.0/100`**
+* **Live Spot Reference**: `$77,030.01` | **Composite Exhaustion Score**: **`25.0/100`**
 * **Exhaustion Regime**: **`MOMENTUM HEALTHY (Trend Intact)`**
 * **Primary Tactical Signal**: **`MOMENTUM HEALTHY (Score: 25/100 • Trend Expanding)`**
-* **Open Interest Velocity**: 1H dOI: `+0.069%` (Climax Flag: `False`)
+* **Open Interest Velocity**: 1H dOI: `+0.008%` (Climax Flag: `False`)
 * **Funding Rate Stress**: Live 8H Funding: `+0.0100%` (Funding Climax Flag: `False`)
 * **Quantitative Takeaway**: TREND INTACT — Let winning swing positions run toward value boundaries.
 * **Plain English Summary**: Price and volume delta are expanding in harmony without terminal divergence.
@@ -450,16 +453,15 @@ Structure your audit into:
 
 | Horizon | Setup Count | Direction / Polarity | Status | Perfected (Bar 8/9 Extreme) | Invalidation Anchor ($) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **1H Tactical** | `3/9` | `BEARISH_EXHAUSTION (Price Up / Top Setup)` | `COUNTING (3/9)` | **`False`** | `$77,537.0` |
-| **4H Trend** | `1/9` | `BEARISH_EXHAUSTION (Price Up / Top Setup)` | `COUNTING (1/9)` | **`False`** | `$77,537.0` |
+| **1H Tactical** | `1/9` | `BEARISH_EXHAUSTION (Price Up / Top Setup)` | `COUNTING (1/9)` | **`False`** | `$77,050.7` |
+| **4H Trend** | `6/9` | `BULLISH_EXHAUSTION (Price Down / Bottom Setup)` | `COUNTING (6/9)` | **`False`** | `$76,388.9` |
 
 ### 11B. Multi-Horizon CVD Divergence & Absorption Matrix
 
 | Horizon | Divergence Classification | Price Extrema | Delta Extrema | Spot Delta (BTC) | Perp Delta (BTC) | Conviction / Significance |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`15m`** | `REGULAR_BEARISH (Wave 5 Top Exhaustion)` | `Higher High ($77,537 vs $77,518)` | `Delta Deceleration (+10.2 vs +113.3 BTC)` | `+6.7` | `+15.9` | **`CRITICAL DIVERGENCE`** |
-| **`15m`** | `REGULAR_BULLISH (Wave C Bottom Absorption)` | `Lower Low ($77,263 vs $77,291)` | `Delta Absorption (+0.8 vs +10.5 BTC)` | `+6.7` | `+15.9` | **`CRITICAL DIVERGENCE`** |
-| **`1H`** | `REGULAR_BEARISH (Wave 5 Top Exhaustion)` | `Higher High ($77,537 vs $77,518)` | `Delta Deceleration (+25.9 vs +173.9 BTC)` | `+22.1` | `+136.3` | **`CRITICAL DIVERGENCE`** |
+| **`15m`** | `REGULAR_BEARISH (Wave 5 Top Exhaustion)` | `Higher High ($76,979 vs $76,840)` | `Delta Deceleration (+16.9 vs +17.7 BTC)` | `+28.4` | `-7.3` | **`CRITICAL DIVERGENCE`** |
+| **`1H`** | `REGULAR_BULLISH (Wave C Bottom Absorption)` | `Lower Low ($76,389 vs $76,542)` | `Delta Absorption (-116.0 vs -414.3 BTC)` | `+203.8` | `+449.8` | **`CRITICAL DIVERGENCE`** |
 
 ### 11D. Quantitative Anti-Sycophancy Rulebook (Why EWT Fails vs. Deterministic Sequential)
 
@@ -476,89 +478,89 @@ Structure your audit into:
 
 | Metric | Preferred Lookback | Value | Source / Benchmark | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **BTC Spot Price** | Current | `$77,428.02` | Binance BTCUSDT | `LIVE TICK` |
-| **24h % Change** | Last 24 hours | `0.08%` | Binance Spot 1D | `CALCULATED` |
-| **7d % Change** | Last 7 days | `-4.28%` | Binance Spot 1D | `CALCULATED` |
-| **Daily SMA50** | 50 daily closes | `$81,957.19` | 1D Spot Klines | `CALCULATED` |
-| **Daily SMA200** | 200 daily closes | `$73,178.32` | 1D Spot Klines | `CALCULATED` |
-| **SMA200 Slope** | 10–20 daily closes | `1.08% / 15d (51.99$/day)` | Landscape Rule | `RISING (Macro Bull)` |
-| **Weekly SMA200** | 200 weekly closes | `$81,694.15` | 1W Spot Klines (60w available avg) | `CALCULATED` |
+| **BTC Spot Price** | Current | `$77,030.01` | Binance BTCUSDT | `LIVE TICK` |
+| **24h % Change** | Last 24 hours | `0.28%` | Binance Spot 1D | `CALCULATED` |
+| **7d % Change** | Last 7 days | `-4.80%` | Binance Spot 1D | `CALCULATED` |
+| **Daily SMA50** | 50 daily closes | `$81,958.07` | 1D Spot Klines | `CALCULATED` |
+| **Daily SMA200** | 200 daily closes | `$73,204.91` | 1D Spot Klines | `CALCULATED` |
+| **SMA200 Slope** | 10–20 daily closes | `0.82% / 15d (39.68$/day)` | Landscape Rule | `RISING (Macro Bull)` |
+| **Weekly SMA200** | 200 weekly closes | `$81,072.28` | 1W Spot Klines (60w available avg) | `CALCULATED` |
 | **30–45d Range High** | Last 45 calendar days | `$87,395.67` | 1D Spot Highs | `ACTIVE RESISTANCE` |
-| **30–45d Range Low** | Last 45 calendar days | `$76,000.00` | 1D Spot Lows | `ACTIVE SUPPORT` |
-| **Daily ATR(14)** | 14 daily bars | `$1,961.68` | Wilder TR(14) | `VOLATILITY YARDSTICK` |
-| **Daily VWAP** | Current UTC day (00:00 to now) | `$77,378.73` | Hourly Weighted Vol | `DEVELOPING` |
-| **Weekly VWAP** | Current week (Mon 00:00 to now) | `$79,456.39` | Hourly Weighted Vol | `DEVELOPING` |
-| **20D EMA** | 20 daily bars | `$80,701.76` | 1D Spot Closes | `FAST PULLBACK FILTER` |
-| **50D EMA** | 50 daily bars | `$80,459.04` | 1D Spot Closes | `SWING PULLBACK ZONE` |
-| **200D MA** | 200 daily bars | `EMA: $74,417.02 | SMA: $73,178.32` | 1D Spot Closes | `MACRO REGIME GATE` |
+| **30–45d Range Low** | Last 45 calendar days | `$76,325.98` | 1D Spot Lows | `ACTIVE SUPPORT` |
+| **Daily ATR(14)** | 14 daily bars | `$1,882.07` | Wilder TR(14) | `VOLATILITY YARDSTICK` |
+| **Daily VWAP** | Current UTC day (00:00 to now) | `$76,838.49` | Hourly Weighted Vol | `DEVELOPING` |
+| **Weekly VWAP** | Current week (Mon 00:00 to now) | `$77,471.39` | Hourly Weighted Vol | `DEVELOPING` |
+| **20D EMA** | 20 daily bars | `$79,845.07` | 1D Spot Closes | `FAST PULLBACK FILTER` |
+| **50D EMA** | 50 daily bars | `$80,116.48` | 1D Spot Closes | `SWING PULLBACK ZONE` |
+| **200D MA** | 200 daily bars | `EMA: $74,554.95 | SMA: $73,204.91` | 1D Spot Closes | `MACRO REGIME GATE` |
 | **Horizontal Pivots** | Structural Support / Resistance | `Sup: $76,325.98 | Res: $84,898.00` | Protocol v1.3 | `KEY BOUNDS` |
 
 ### 12B. Volume Profile Metrics (Prior Day, Prior Week, Developing)
 
 | Metric | Preferred Lookback | Value | Specification | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **Prior Day POC** | Completed Prior UTC Day (00:00–24:00) | `$76,966.14` | Point of Control (Max Volume) | `FIXED BENCHMARK` |
-| **Prior Day VAH** | Completed Prior UTC Day (00:00–24:00) | `$77,998.65` | 70% Value Area High | `FIXED BENCHMARK` |
-| **Prior Day VAL** | Completed Prior UTC Day (00:00–24:00) | `$76,800.94` | 70% Value Area Low | `FIXED BENCHMARK` |
-| **Prior Day High / Low**| Completed Prior UTC Day (00:00–24:00) | `H: $78,804.01 | L: $76,325.98` | Session Extremes | `FIXED BENCHMARK` |
-| **Prior Day Volume** | Completed Prior UTC Day (00:00–24:00) | `24,295.90 BTC` | Binance Spot Taker+Maker | `FIXED BENCHMARK` |
-| **Prior Week POC** | Completed Week (Mon 00:00 - Mon 00:00) | `$81,740.02` | 168h Composite Profile POC | `WEEKLY PIVOT` |
-| **Prior Week VAH** | Completed Week (Mon 00:00 - Mon 00:00) | `$83,585.13` | 70% Value Area High | `WEEKLY PIVOT` |
-| **Prior Week VAL** | Completed Week (Mon 00:00 - Mon 00:00) | `$80,888.44` | 70% Value Area Low | `WEEKLY PIVOT` |
-| **Developing POC** | Current Incomplete UTC Day | `$77,404.49` | Developing Volume Mode | `DEVELOPING` |
-| **Top 3 HVN Nodes** | 30D Macro Composite Profile | `$80,184, $80,820, $81,637` | High Volume Nodes | `STRONG SUPPORT/RES` |
-| **Top 3 LVN Nodes** | 30D Macro Composite Profile | `$77,915, $79,186` | Low Volume Nodes | `SLIPPAGE ZONES` |
-| **Location vs Prior Day**| Spot relative to Prior Day VA | `INSIDE VALUE (52.4%)` | CME Auction Rule | `AUCTION STATE` |
-| **Location vs Prior Week**| Spot relative to Prior Week VA | `BELOW VAL (-4.28%)` | CME Auction Rule | `MACRO AUCTION` |
+| **Prior Day POC** | Completed Prior UTC Day (00:00–24:00) | `$77,990.70` | Point of Control (Max Volume) | `FIXED BENCHMARK` |
+| **Prior Day VAH** | Completed Prior UTC Day (00:00–24:00) | `$78,642.60` | 70% Value Area High | `FIXED BENCHMARK` |
+| **Prior Day VAL** | Completed Prior UTC Day (00:00–24:00) | `$77,375.01` | 70% Value Area Low | `FIXED BENCHMARK` |
+| **Prior Day High / Low**| Completed Prior UTC Day (00:00–24:00) | `H: $78,878.01 | L: $76,705.00` | Session Extremes | `FIXED BENCHMARK` |
+| **Prior Day Volume** | Completed Prior UTC Day (00:00–24:00) | `12,640.70 BTC` | Binance Spot Taker+Maker | `FIXED BENCHMARK` |
+| **Prior Week POC** | Completed Week (Mon 00:00 - Mon 00:00) | `$80,030.52` | 168h Composite Profile POC | `WEEKLY PIVOT` |
+| **Prior Week VAH** | Completed Week (Mon 00:00 - Mon 00:00) | `$81,724.03` | 70% Value Area High | `WEEKLY PIVOT` |
+| **Prior Week VAL** | Completed Week (Mon 00:00 - Mon 00:00) | `$78,054.77` | 70% Value Area Low | `WEEKLY PIVOT` |
+| **Developing POC** | Current Incomplete UTC Day | `$76,816.75` | Developing Volume Mode | `DEVELOPING` |
+| **Top 3 HVN Nodes** | 30D Macro Composite Profile | `$80,195, $80,818, $81,707` | High Volume Nodes | `STRONG SUPPORT/RES` |
+| **Top 3 LVN Nodes** | 30D Macro Composite Profile | `$79,217, $84,998` | Low Volume Nodes | `SLIPPAGE ZONES` |
+| **Location vs Prior Day**| Spot relative to Prior Day VA | `BELOW VAL (-0.45%)` | CME Auction Rule | `AUCTION STATE` |
+| **Location vs Prior Week**| Spot relative to Prior Week VA | `BELOW VAL (-1.31%)` | CME Auction Rule | `MACRO AUCTION` |
 
 ### 12C. Derivatives & Positioning Metrics
 
 | Metric | Preferred Lookback | Value | Source / Benchmark | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **Open Interest (BTC)** | Current | `97,116.50 BTC` | Binance USD-M | `LIVE COINS` |
-| **Open Interest (USD)** | Current | `$7,519,538,304.33` | Binance USD-M | `NOTIONAL VALUE` |
-| **OI 1h % Change** | Last 1 hour | `0.07%` | Regime Radar Window | `STABLE / CHURN` |
-| **OI 24h % Change** | Last 24 hours | `0.73%` | 24h Positioning Drift | `STEADY DRIFT` |
-| **OI 3D % Change** | Last 3 days (72h) | `0.73%` | Regime Radar Window | `RANGE CHURN` |
+| **Open Interest (BTC)** | Current | `100,230.40 BTC` | Binance USD-M | `LIVE COINS` |
+| **Open Interest (USD)** | Current | `$7,720,748,714.30` | Binance USD-M | `NOTIONAL VALUE` |
+| **OI 1h % Change** | Last 1 hour | `0.01%` | Regime Radar Window | `STABLE / CHURN` |
+| **OI 24h % Change** | Last 24 hours | `0.57%` | 24h Positioning Drift | `STEADY DRIFT` |
+| **OI 3D % Change** | Last 3 days (72h) | `0.57%` | Regime Radar Window | `RANGE CHURN` |
 | **Funding Rate (8h)** | Current 8h Perp Rate | `0.01% / 8h` | Binance USD-M | `HEALTHY / NEUTRAL` |
-| **Futures Basis (Ann.)**| Current Annualized Carry | `10.20% / yr` | Perp vs. Spot Carry | `HEALTHY CARRY` |
-| **Spot CVD (24h)** | Last 24 hours (12–48h Magnet) | `158.60 BTC (ACCUMULATION / NET BUY)` | Binance Spot Net Taker | `CVD DELTA` |
-| **Perp CVD (24h)** | Last 24 hours (12–48h Magnet) | `-302.00 BTC (AGGRESSIVE SHORT)` | Binance USD-M Net Taker | `LEVERAGE FLOW` |
+| **Futures Basis (Ann.)**| Current Annualized Carry | `10.60% / yr` | Perp vs. Spot Carry | `HEALTHY CARRY` |
+| **Spot CVD (24h)** | Last 24 hours (12–48h Magnet) | `-11.20 BTC (DISTRIBUTION / NET SELL)` | Binance Spot Net Taker | `CVD DELTA` |
+| **Perp CVD (24h)** | Last 24 hours (12–48h Magnet) | `-341.90 BTC (AGGRESSIVE SHORT)` | Binance USD-M Net Taker | `LEVERAGE FLOW` |
 | **Short-Liq Magnet** | 1-Month Liquidation Pool Above | `$85,322.49` | [EST. SWING LIQ POOL] | `UPSIDE TARGET` |
 | **Long-Liq Magnet** | 1-Month Liquidation Pool Below | `$75,944.35` | [EST. SWING LIQ POOL] | `DOWNSIDE TARGET` |
-| **Order-Book Depth (+/-1%)**| Current Snapshot | `1.58 (Bids / Asks)` | Spot L2 (5000 lvls, ~±1.3% span) | `BID SUPPORT DOMINANT` |
-| **Order-Book Depth (+/-2%)**| Current Snapshot | `2.10 (Bids / Asks)` | Spot L2 (5000 lvls, ~±1.3% span) | `BID SUPPORT DOMINANT` |
-| **Coinbase Premium** | Current Snapshot | `-0.21% (0.36σ)` | US Institutional Demand | `COINBASE VS BINANCE` |
+| **Order-Book Depth (+/-1%)**| Current Snapshot | `1.27 (Bids / Asks)` | Spot L2 (5000 lvls, ~±1.3% span) | `BID SUPPORT DOMINANT` |
+| **Order-Book Depth (+/-2%)**| Current Snapshot | `2.23 (Bids / Asks)` | Spot L2 (5000 lvls, ~±1.3% span) | `BID SUPPORT DOMINANT` |
+| **Coinbase Premium** | Current Snapshot | `-0.17% (0.42σ)` | US Institutional Demand | `COINBASE VS BINANCE` |
 
 ### 12D. ETF Flows & Demand Proxies
 
 | Metric | Preferred Lookback | Value | Specification | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **Spot ETF Daily Net Flow**| Most recent completed day | `$-643,200,000.00` | US Spot BTC ETFs | `CONFIRMED` |
-| **Spot ETF 3-Day Cum.** | Last 3 completed days | `$-488,700,000.00` | US Spot BTC ETFs | `CONFIRMED` |
+| **Spot ETF Daily Net Flow**| Most recent completed day | `$-398,600,000.00` | US Spot BTC ETFs | `CONFIRMED` |
+| **Spot ETF 3-Day Cum.** | Last 3 completed days | `$-1,024,600,000.00` | US Spot BTC ETFs | `CONFIRMED` |
 | **Passive Absorption Ratio**| 4H Taker vs Price Delta | `0.00` | Limit Absorption Index | `SPOT ABSORPTION (ACCUMULATION)` |
 
 ### 12E. Macro & Intermarket Asset Metrics
 
 | Metric | Preferred Lookback | Value | Source / Benchmark | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **Brent Crude Oil** | Current + 5–10d Range | `$113.43 ($105.95 - $118.00)` | Yahoo Finance (`BZ=F`) | `LIVE QUOTE` |
-| **US 10Y Real Yield (TIPS)**| Current + 5–10d Direction | `2.60%` | US Treasury real yield curve (10 YR) | `CONFIRMED` |
-| **US 10Y Breakeven Infl.**| Current + Recent Change | `2.33%` | Treasury Yield Spread (Nominal - TIPS) | `CONFIRMED` |
-| **US 10Y Treasury Yield** | Current + 5d Change | `4.93% (-0.06% over 5d)` | Yahoo Finance (`^TNX`) | `LIVE YIELD` |
-| **US Dollar Index (DXY)**| Current + 5–10d Direction | `101.96 (NEUTRAL / FLAT (-0.08 over 5d))` | Yahoo Finance (`DX-Y.NYB`) | `LIVE INDEX` |
-| **S&P 500 Performance** | 1-Session & 5-Session % | `$7,580.07 (1d: -1.82% | 5d: -1.26%)` | Yahoo Finance (`^GSPC`) | `LIVE BENCHMARK` |
-| **Nasdaq Performance** | 1-Session & 5-Session % | `$25,437.00 (1d: -2.86% | 5d: -2.80%)` | Yahoo Finance (`^IXIC`) | `LIVE BENCHMARK` |
-| **CBOE VIX Volatility** | 1-Session & 5-Session Change | `19.42 (1d: 2.22 | 5d: 1.03)` | Yahoo Finance (`^VIX`) | `BENIGN / NORMAL` |
-| **BTC–S&P 500 Corr (20d)**| ~20 Trading Days | `0.42` | Rolling Pearson Correlation | `POSITIVE CORR` |
+| **Brent Crude Oil** | Current + 5–10d Range | `$106.68 ($103.29 - $118.00)` | Yahoo Finance (`BZ=F`) | `LIVE QUOTE` |
+| **US 10Y Real Yield (TIPS)**| Current + 5–10d Direction | `2.62%` | US Treasury real yield curve (10 YR) | `CONFIRMED` |
+| **US 10Y Breakeven Infl.**| Current + Recent Change | `2.27%` | Treasury Yield Spread (Nominal - TIPS) | `CONFIRMED` |
+| **US 10Y Treasury Yield** | Current + 5d Change | `4.89% (-0.10% over 5d)` | Yahoo Finance (`^TNX`) | `LIVE YIELD` |
+| **US Dollar Index (DXY)**| Current + 5–10d Direction | `101.77 (FALLING (-0.42 over 5d))` | Yahoo Finance (`DX-Y.NYB`) | `LIVE INDEX` |
+| **S&P 500 Performance** | 1-Session & 5-Session % | `$7,541.40 (1d: -0.51% | 5d: -2.35%)` | Yahoo Finance (`^GSPC`) | `LIVE BENCHMARK` |
+| **Nasdaq Performance** | 1-Session & 5-Session % | `$25,164.36 (1d: -1.07% | 5d: -4.96%)` | Yahoo Finance (`^IXIC`) | `LIVE BENCHMARK` |
+| **CBOE VIX Volatility** | 1-Session & 5-Session Change | `21.44 (1d: 0.29 | 5d: 4.53)` | Yahoo Finance (`^VIX`) | `ELEVATED RISK` |
+| **BTC–S&P 500 Corr (20d)**| ~20 Trading Days | `0.57` | Rolling Pearson Correlation | `POSITIVE CORR` |
 | **BTC–S&P 500 Corr (60d)**| ~60 Trading Days | `-0.04` | Rolling Pearson Correlation | `DECOUPLED` |
 
 ### 12F. Sentiment & Risk Context
 
 | Metric | Preferred Lookback | Value | Source / Benchmark | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **Crypto Fear & Greed** | Current | `30 / 100 (Fear)` | Alternative.me API | `LIVE SENTIMENT` |
-| **BTC Dominance %** | Current | `59.80%` | CoinGecko Global API | `MARKET CAP DOMINANCE` |
+| **Crypto Fear & Greed** | Current | `26 / 100 (Fear)` | Alternative.me API | `LIVE SENTIMENT` |
+| **BTC Dominance %** | Current | `59.90%` | CoinGecko Global API | `MARKET CAP DOMINANCE` |
 | **Material Headlines (6–48h)**| Last 6–48 hours | `[NATIVE AI CONTEXT] Handled natively by LLM` | Disruption Scanner | `NATIVE AI CONTEXT` |
 | **USDT Health Markers** | Current Peg / Reserves | `[NATIVE AI CONTEXT] Handled natively by LLM` | Stablecoin Disruption Rule | `NATIVE AI CONTEXT` |
 | **Upcoming 14D Catalysts**| Next 14 calendar days | `[NATIVE AI CONTEXT] Handled natively by LLM` | Macro Catalyst Radar | `NATIVE AI CONTEXT` |
@@ -567,7 +569,7 @@ Structure your audit into:
 
 | Metric | Preferred Lookback | Value | Specification | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **Daily RSI(14)** | 14 Daily Closes | `33.20` | Wilder's RSI(14) | `OVERSOLD` |
+| **Daily RSI(14)** | 14 Daily Closes | `26.80` | Wilder's RSI(14) | `OVERSOLD` |
 | **Log-Spread Raw** | Current Close vs. SMA50 | `-0.06` | $\ln(P) - \ln(\text{SMA}_{50})$ | `DISCOUNT TO 50D MEAN` |
-| **Log-Spread 50D StdDev**| 50 Daily Closes | `0.05` | $\sigma_{50}$ of Log-Spread | `VOLATILITY BASELINE` |
-| **Log-Spread Z-Score** | 50-Day Window | `-1.06σ` | $(\ln(P) - \ln(\text{SMA}_{50})) / \sigma_{50}$ | `STANDARD SPREAD` |
+| **Log-Spread 50D StdDev**| 50 Daily Closes | `0.06` | $\sigma_{50}$ of Log-Spread | `VOLATILITY BASELINE` |
+| **Log-Spread Z-Score** | 50-Day Window | `-1.07σ` | $(\ln(P) - \ln(\text{SMA}_{50})) / \sigma_{50}$ | `STANDARD SPREAD` |

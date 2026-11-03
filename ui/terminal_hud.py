@@ -1292,7 +1292,7 @@ def _build_tab4_regime_matrix_hud(store: StateStore, header_panel: Panel) -> Gro
     ]
     bottom_panel = Panel(
         "\n".join(p5_lines),
-        title="[bold white]5. Executive Bottom Line (Config A–J Quick Glance — Press 1/2/3/4/5 to Switch Tabs)[/bold white]",
+        title="[bold white]5. Executive Bottom Line (Config A–J Quick Glance — Press 0: Master • 1–9: Desks)[/bold white]",
         border_style=border_style,
         box=box.ROUNDED,
     )
@@ -1333,8 +1333,8 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
         return Group(
             header_panel,
             Panel(
-                "Warming up 4-Tab Master Synthesis Engine...",
-                title="Tab [5]: Master Conclusion",
+                "Warming up 10-Desk Master Synthesis Engine...",
+                title="Tab [0]: Master Conclusion",
                 box=box.ROUNDED,
             ),
         )
@@ -1547,7 +1547,7 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
         )
     else:
         copy_btn_badge = (
-            "[bold black on yellow] [PRESS 'C' KEY: COPY RAW TELEMETRY PACKET (TABS 1–4) TO CLIPBOARD FOR GEMINI ARGON AI SECOND OPINION] [/bold black on yellow]"
+            "[bold black on yellow] [PRESS 'C' KEY: COPY 10-DESK TELEMETRY PACKET TO CLIPBOARD FOR GEMINI ARGON AI AUDITOR] [/bold black on yellow]"
         )
 
     p5_lines = [
@@ -1558,7 +1558,7 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
     ]
     bottom_panel = Panel(
         "\n".join(p5_lines),
-        title="[bold white]5. Executive Bottom Line — Supreme Master Conclusion (Press 1/2/3/4/5 to Switch Tabs • Press C to Copy AI Data Packet)[/bold white]",
+        title="[bold white]5. Executive Bottom Line — Supreme Master Conclusion (Press 0: Master • 1–9: Desks • Press C to Copy AI Data Packet)[/bold white]",
         border_style=border_style,
         box=box.ROUNDED,
     )

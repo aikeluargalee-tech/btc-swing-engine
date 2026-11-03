@@ -21,6 +21,9 @@ It combines **Auction Market Theory (Multi-Horizon Volume Profiles)**, **Multi-E
 | **Tab `[S4]`** | `T` / `9` | **Pattern Invalidation & SFP Trap Radar** | Exploits failed classical patterns (H&S Necklines, Double Bottoms/Tops, Range Extremes), 3-State Trap FSM, CVD Absorption Elasticity, ΔOI Velocity, and Asymmetric SFP Reclaims (R:R >= 1:3). |
 | **Tab `[S5]`** | `E` / `0` | **Terminal Exhaustion & Delta Divergence Radar** | Replaces subjective Elliott Wave counts with deterministic Tom DeMark TD-9 / TD-13 Setups, Multi-Horizon CVD Divergences (Spot vs. Perp), and Open Interest / Funding Climax Stress ($R:R \ge 1:2.5$). |
 
+> [!TIP]
+> **Unified Operator Experience:** Every desk across Tabs `[1]`–`[5]` and `[S1]`–`[S5]` features a standardized, compact **Beginner Context & Execution Mandate** banner (`▶ PURPOSE & SCOPE`, `▶ CORE MODELS & FEEDS`, `▶ EXECUTION MANDATE`) placed directly at the top of the HUD to anchor operator decision-making within seconds without terminal overflow.
+
 ---
 
 ## Detailed Documentation & Specifications

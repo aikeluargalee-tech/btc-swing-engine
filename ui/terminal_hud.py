@@ -446,6 +446,20 @@ def _build_tab1_swing_hud(store: StateStore, header_panel: Panel) -> Group:
 
     gate_str = _gate_badge(sig.gate_state) if sig else "[dim]WARMING UP[/dim]"
 
+    # --- Introduction Card: Beginner Context & Methodology ---
+    intro_lines = [
+        "[bold cyan]▶ PURPOSE & SCOPE:[/bold cyan] Microstructure & order flow execution desk tracking real-time delta imbalances, CVD absorption, and volume distribution.",
+        "[bold cyan]▶ CORE MODELS & FEEDS:[/bold cyan] Binance Spot/Perp + Coinbase feeds • Multi-Horizon CVD Delta • 3-Layer Composite Volume Profiles (cVAH/cPOC/cVAL).",
+        "[bold cyan]▶ EXECUTION MANDATE:[/bold cyan] [bold green]Never fight aggressive delta spikes[/bold green]; wait for institutional volume absorption at key POC/VA edges before entry.",
+    ]
+    intro_panel = Panel(
+        "\n".join(intro_lines),
+        title="[bold cyan]WELCOME TO TAB [1]: TACTICAL SWING EXECUTION & ORDER FLOW DESK[/bold cyan]",
+        box=box.ROUNDED,
+        border_style="cyan",
+        padding=(0, 1),
+    )
+
     # --- Panel 1: Spot Prices, Basis & Derivatives State ---
     p1_table = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold cyan", pad_edge=False)
     p1_table.add_column("Metric", style="white", no_wrap=True)
@@ -638,7 +652,7 @@ def _build_tab1_swing_hud(store: StateStore, header_panel: Panel) -> Group:
     )
     bottom_panel = _build_tab1_plain_english_panel(sig, flow, deriv, macro_ev)
 
-    return Group(header_panel, top_row, flow_panel, signal_panel, bottom_panel)
+    return Group(header_panel, intro_panel, top_row, flow_panel, signal_panel, bottom_panel)
 
 
 # ============================================================================
@@ -653,6 +667,20 @@ def _build_tab2_protocol_hud(store: StateStore, header_panel: Panel) -> Group:
             header_panel,
             Panel("Warming up Protocol v1.3 1D/4H candles...", title="Protocol v1.3", box=box.ROUNDED),
         )
+
+    # --- Introduction Card: Beginner Context & Methodology ---
+    intro_lines = [
+        "[bold cyan]▶ PURPOSE & SCOPE:[/bold cyan] Capital preservation desk verifying Protocol v1.3 adherence, exchange connectivity health, and liquidation pools.",
+        "[bold cyan]▶ CORE MODELS & FEEDS:[/bold cyan] 1D Completed vs Forming ATR 14 Bounds • CoinGlass 6-Panel Liquidation Heatmap • No-Trade Zone (NTZ) Filter.",
+        "[bold cyan]▶ EXECUTION MANDATE:[/bold cyan] [bold yellow]Strict Capital Defense[/bold yellow]: If price enters the No-Trade Zone or exchange latency spikes > 500ms, all spot entries are halted.",
+    ]
+    intro_panel = Panel(
+        "\n".join(intro_lines),
+        title="[bold cyan]WELCOME TO TAB [2]: BTC SPOT SWING PROTOCOL v1.3 & CAPITAL PRESERVATION DESK[/bold cyan]",
+        box=box.ROUNDED,
+        border_style="cyan",
+        padding=(0, 1),
+    )
 
     # --- Panel 1: Market Structure & ATR 14 Invalidation (1D Completed vs Forming, 4H Timing) ---
     p1_table = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold cyan", pad_edge=False)
@@ -833,7 +861,7 @@ def _build_tab2_protocol_hud(store: StateStore, header_panel: Panel) -> Group:
         box=box.ROUNDED,
     )
 
-    return Group(header_panel, top_row, ntz_panel, decision_panel, bottom_panel)
+    return Group(header_panel, intro_panel, top_row, ntz_panel, decision_panel, bottom_panel)
 
 
 # ============================================================================
@@ -848,6 +876,20 @@ def _build_tab3_macro_hud(store: StateStore, header_panel: Panel) -> Group:
             header_panel,
             Panel("Warming up 255x 1D and 1W Macro Radar candles...", title="Macro Quant & Cycle Radar", box=box.ROUNDED),
         )
+
+    # --- Introduction Card: Beginner Context & Methodology ---
+    intro_lines = [
+        "[bold cyan]▶ PURPOSE & SCOPE:[/bold cyan] Global intermarket macro desk tracking multi-cycle tides, external liquidity, dollar strength, and power-law corridors.",
+        "[bold cyan]▶ CORE MODELS & FEEDS:[/bold cyan] 1D 200 SMA Gatekeeper • DXY Dollar Index • S&P 500 / Nasdaq • Brent Crude • 20-day Rolling SPX Correlations • Power-Law Corridor.",
+        "[bold cyan]▶ EXECUTION MANDATE:[/bold cyan] [bold green]Macro Gatekeeper Law[/bold green]: Spot > 200 SMA authorizes macro swing longs. Rapid DXY surges or equity selloffs enforce capital defense.",
+    ]
+    intro_panel = Panel(
+        "\n".join(intro_lines),
+        title="[bold cyan]WELCOME TO TAB [3]: MACRO QUANT, INTERMARKET BETAS & CYCLE RADAR[/bold cyan]",
+        box=box.ROUNDED,
+        border_style="cyan",
+        padding=(0, 1),
+    )
 
     # --- Panel 1: Quant Radar — The Gatekeeper ---
     p1_table = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold cyan", pad_edge=False)
@@ -1029,7 +1071,7 @@ def _build_tab3_macro_hud(store: StateStore, header_panel: Panel) -> Group:
         box=box.ROUNDED,
     )
 
-    return Group(header_panel, top_row, sniper_panel, arb_panel, bottom_panel)
+    return Group(header_panel, intro_panel, top_row, sniper_panel, arb_panel, bottom_panel)
 
 
 # ============================================================================
@@ -1047,6 +1089,20 @@ def _build_tab4_regime_matrix_hud(store: StateStore, header_panel: Panel) -> Gro
 
     active_cfg = next((c for c in rmev.configs if c.code == rmev.active_config_code), rmev.configs[0])
     runner_cfg = next((c for c in rmev.configs if c.code == rmev.runner_up_config_code), rmev.configs[0])
+
+    # --- Introduction Card: Beginner Context & Methodology ---
+    intro_lines = [
+        "[bold cyan]▶ PURPOSE & SCOPE:[/bold cyan] Microstructure regime radar categorizing live market physics into 10 deterministic Configurations (A through J).",
+        "[bold cyan]▶ CORE MODELS & FEEDS:[/bold cyan] Daily/Weekly VWAP • 4-Tier Volatility (Ultra-Low to High Vol) • Order Book Depth Imbalance • CVD Slope.",
+        "[bold cyan]▶ EXECUTION MANDATE:[/bold cyan] [bold yellow]Regime Dictates Strategy[/bold yellow]: Trending regimes authorize breakout continuation; Chop/Mean-Reversion regimes require strict range fading.",
+    ]
+    intro_panel = Panel(
+        "\n".join(intro_lines),
+        title="[bold cyan]WELCOME TO TAB [4]: QUANTITATIVE MICROSTRUCTURE REGIME MATRIX (CONFIGS A–J)[/bold cyan]",
+        box=box.ROUNDED,
+        border_style="cyan",
+        padding=(0, 1),
+    )
 
     # --- Panel 1: Live Microstructure & VWAP Telemetry (Config A-J Inputs) ---
     p1_table = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold cyan", pad_edge=False)
@@ -1241,7 +1297,7 @@ def _build_tab4_regime_matrix_hud(store: StateStore, header_panel: Panel) -> Gro
         box=box.ROUNDED,
     )
 
-    return Group(header_panel, top_row, matrix_panel, playbook_panel, bottom_panel)
+    return Group(header_panel, intro_panel, top_row, matrix_panel, playbook_panel, bottom_panel)
 
 
 # ============================================================================
@@ -1282,6 +1338,20 @@ def _build_tab5_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
                 box=box.ROUNDED,
             ),
         )
+
+    # --- Introduction Card: Beginner Context & Methodology ---
+    intro_lines = [
+        "[bold cyan]▶ PURPOSE & SCOPE:[/bold cyan] Supreme command center harmonizing Tabs 1–4 into an institutional capital allocation verdict.",
+        "[bold cyan]▶ CORE MODELS & FEEDS:[/bold cyan] Confluence Scoring Engine (0–100) • 4-Tab Arbiter Consensus • Dual-Track Allocation (Track A: Cash / Track B: In-Position).",
+        "[bold cyan]▶ EXECUTION MANDATE:[/bold cyan] [bold green]The Supreme Signal Light[/bold green]: GREEN (Full Aggression), BLUE (Accumulate Support), AMBER (Caution / Tight Stops), RED (Risk-Off Liquidation).",
+    ]
+    intro_panel = Panel(
+        "\n".join(intro_lines),
+        title="[bold cyan]WELCOME TO TAB [5]: MASTER SYNTHESIS & SUPREME ORDER OF BATTLE DESK[/bold cyan]",
+        box=box.ROUNDED,
+        border_style="cyan",
+        padding=(0, 1),
+    )
 
     # --- Panel 1: 4-Tab Executive Verdict Rollup Matrix ---
     p1_table = Table(
@@ -1493,7 +1563,7 @@ def _build_tab5_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
         box=box.ROUNDED,
     )
 
-    return Group(header_panel, top_row, mid_row, bottom_panel)
+    return Group(header_panel, intro_panel, top_row, mid_row, bottom_panel)
 
 
 # ============================================================================
@@ -1512,6 +1582,20 @@ def _build_tab_s1_mm_btc_hud(store: StateStore, header_panel: Panel) -> Group:
                 box=box.ROUNDED,
             ),
         )
+
+    # --- Introduction Card: Beginner Context & Methodology ---
+    intro_lines = [
+        "[bold cyan]▶ PURPOSE & SCOPE:[/bold cyan] Advanced quantitative physics desk tracking non-linear price paths, lead-lag order flow dynamics, and fractional memory.",
+        "[bold cyan]▶ CORE MODELS & FEEDS:[/bold cyan] Level 1/2 Rough Path Signatures (Lévy Areas) • Kalman Velocity Filter • Hurst Exponent • Dynamic Fractional Diff • Hilbert Phase.",
+        "[bold cyan]▶ EXECUTION MANDATE:[/bold cyan] [bold yellow]Roughness Arbiter Law[/bold yellow]: If trajectory roughness R > 4.5, execution is vetoed due to toxic chop. 5 independent sensory lenses must agree.",
+    ]
+    intro_panel = Panel(
+        "\n".join(intro_lines),
+        title="[bold cyan]WELCOME TO SATELLITE TAB [S1]: MM-BTC ROUGH PATH SIGNATURES & 5 SENSORY LENSES[/bold cyan]",
+        box=box.ROUNDED,
+        border_style="cyan",
+        padding=(0, 1),
+    )
 
     # --- Panel 1: 5 Independent Sensory Lenses (A-E) ---
     p1_table = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold cyan", pad_edge=False)
@@ -1679,7 +1763,7 @@ def _build_tab_s1_mm_btc_hud(store: StateStore, header_panel: Panel) -> Group:
         box=box.ROUNDED,
     )
 
-    return Group(header_panel, top_row, mid_row, bottom_panel)
+    return Group(header_panel, intro_panel, top_row, mid_row, bottom_panel)
 
 
 # ============================================================================
@@ -1698,6 +1782,20 @@ def _build_tab_s2_volatility_cone_hud(store: StateStore, header_panel: Panel) ->
                 box=box.ROUNDED,
             ),
         )
+
+    # --- Introduction Card: Beginner Context & Methodology ---
+    intro_lines = [
+        "[bold cyan]▶ PURPOSE & SCOPE:[/bold cyan] Forward probability dispersion radar forecasting Bitcoin's 72-hour price cone alongside quarantined AI benchmarks.",
+        "[bold cyan]▶ CORE MODELS & FEEDS:[/bold cyan] Garman-Klass Extreme-Value Volatility • Mandelbrot t^H Fractional Scaling • 1σ/2σ/3σ Volatility Envelopes • Kronos TSFM.",
+        "[bold cyan]▶ EXECUTION MANDATE:[/bold cyan] [bold red]Quarantine Law[/bold red]: Zero-shot AI forecasts receive 0.0% capital weight. Only probabilistic cone boundaries (statistical overextension at ±2σ/3σ) are traded.",
+    ]
+    intro_panel = Panel(
+        "\n".join(intro_lines),
+        title="[bold cyan]WELCOME TO SATELLITE TAB [S2]: 72-HOUR FORWARD VOLATILITY CONE & AI BENCHMARK DESK[/bold cyan]",
+        box=box.ROUNDED,
+        border_style="cyan",
+        padding=(0, 1),
+    )
 
     # --- Top Ribbon: 3 Quantitative Telemetry Badges ---
     ribbon_table = Table.grid(expand=True)
@@ -1827,7 +1925,7 @@ def _build_tab_s2_volatility_cone_hud(store: StateStore, header_panel: Panel) ->
         box=box.ROUNDED,
     )
 
-    return Group(header_panel, ribbon_table, mid_row, p3_panel, p4_panel)
+    return Group(header_panel, intro_panel, ribbon_table, mid_row, p3_panel, p4_panel)
 
 
 # ============================================================================
@@ -1991,6 +2089,20 @@ def _build_tab_s4_trap_hud(store: StateStore, header_panel: Panel) -> Group:
             ),
         )
 
+    # --- Introduction Card: Beginner Context & Methodology ---
+    intro_lines = [
+        "[bold cyan]▶ PURPOSE & SCOPE:[/bold cyan] Liquidity sweep & counter-retail trap radar detecting stop hunts, failed breakouts, and institutional absorption.",
+        "[bold cyan]▶ CORE MODELS & FEEDS:[/bold cyan] 1H/4H Fractal Pivot Sweeps • Swing Failure Pattern (SFP) State Machine • Microstructure CVD Absorption • Equal Highs/Lows (EQH/EQL).",
+        "[bold cyan]▶ EXECUTION MANDATE:[/bold cyan] [bold yellow]Wait for the Reclaim[/bold yellow]: Never enter during the sweep wick. Only enter when price sweeps liquidity, delta confirms passive absorption, and candle closes back inside range.",
+    ]
+    intro_panel = Panel(
+        "\n".join(intro_lines),
+        title="[bold cyan]WELCOME TO SATELLITE TAB [S4]: PATTERN INVALIDATION, LIQUIDITY SWEEP & SFP TRAP RADAR[/bold cyan]",
+        box=box.ROUNDED,
+        border_style="cyan",
+        padding=(0, 1),
+    )
+
     # --- Top Ribbon: 3 Quantitative Telemetry Badges ---
     ribbon_table = Table.grid(expand=True)
     ribbon_table.add_column(ratio=4)
@@ -2146,7 +2258,7 @@ def _build_tab_s4_trap_hud(store: StateStore, header_panel: Panel) -> Group:
         box=box.ROUNDED,
     )
 
-    return Group(header_panel, ribbon_table, mid_row_1, mid_row_2, p4_diag_panel, p5_panel)
+    return Group(header_panel, intro_panel, ribbon_table, mid_row_1, mid_row_2, p4_diag_panel, p5_panel)
 
 
 
@@ -2183,6 +2295,20 @@ def _build_tab_s5_exhaustion_hud(store: StateStore, header_panel: Panel) -> Grou
         score_badge = f"[bold black on green] EXHAUSTION SCORE: {score:.1f}/100 [/bold black on green]"
         regime_style = "bold green"
         border_col = "cyan"
+
+    # --- Introduction Card: Beginner Context & Methodology ---
+    intro_lines = [
+        "[bold cyan]▶ PURPOSE & SCOPE:[/bold cyan] Terminal momentum exhaustion scanner detecting fatigue tops and capitulation bottoms before trend pivots.",
+        "[bold cyan]▶ CORE MODELS & FEEDS:[/bold cyan] Tom DeMark TD Sequential (Setup 9 & Countdown 13 across 15m/1H/4H/1D) • Multi-Horizon CVD Divergences.",
+        "[bold cyan]▶ EXECUTION MANDATE:[/bold cyan] [bold red]Anti-Sycophancy Reversal Law[/bold red]: A TD Countdown 13 combined with multi-timeframe CVD divergence warns of terminal exhaustion; tighten trailing stops.",
+    ]
+    intro_panel = Panel(
+        "\n".join(intro_lines),
+        title="[bold cyan]WELCOME TO SATELLITE TAB [S5]: TERMINAL EXHAUSTION & DELTA DIVERGENCE RADAR[/bold cyan]",
+        box=box.ROUNDED,
+        border_style="cyan",
+        padding=(0, 1),
+    )
 
     # --- Ribbon Cards ---
     card_score = Table.grid(expand=True)
@@ -2329,7 +2455,7 @@ def _build_tab_s5_exhaustion_hud(store: StateStore, header_panel: Panel) -> Grou
         box=box.ROUNDED,
     )
 
-    return Group(header_panel, ribbon_table, mid_row, p3_panel, p4_panel)
+    return Group(header_panel, intro_panel, ribbon_table, mid_row, p3_panel, p4_panel)
 
 
 

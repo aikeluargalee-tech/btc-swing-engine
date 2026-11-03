@@ -421,13 +421,13 @@ class TestBTCAnalyticsEngine(unittest.TestCase):
         self.assertIn("10:30:00 EDT", clocks_str)
         self.assertIn("LONDON / NY OVERLAP", session_label)
 
-        # Verify Tab [5] Master Synthesis & Supreme Order of Battle Evaluation + Renderable
+        # Verify Tab [0] Master Synthesis & Supreme Order of Battle Evaluation + Renderable
         from ui.terminal_hud import build_dashboard_renderable
 
         msev = store.master_synthesis_evaluation
         self.assertIsNotNone(msev)
         assert msev is not None
-        self.assertEqual(len(msev.tab_rows), 4)
+        self.assertEqual(len(msev.tab_rows), 9)
         self.assertEqual(len(msev.hierarchy_rows), 4)
         self.assertGreaterEqual(msev.master_alignment_score, 0.0)
         self.assertLessEqual(msev.master_alignment_score, 100.0)
@@ -436,10 +436,12 @@ class TestBTCAnalyticsEngine(unittest.TestCase):
         self.assertGreater(msev.holder_tp2_usd, msev.holder_tp1_usd)
         self.assertIn(msev.master_traffic_light, ("GREEN", "BLUE", "YELLOW", "RED"))
 
+        renderable_tab0 = build_dashboard_renderable(TEST_CONFIG, store, tab_override=0)
+        self.assertIsNotNone(renderable_tab0)
         renderable_tab5 = build_dashboard_renderable(TEST_CONFIG, store, tab_override=5)
         self.assertIsNotNone(renderable_tab5)
 
-        # Verify Raw AI Telemetry Packet Builder (Hotkey 'C' on Tab [5])
+        # Verify Raw AI Telemetry Packet Builder (Hotkey 'C' on Tab [0])
         from analytics.ai_packet_exporter import build_ai_telemetry_packet
 
         ai_packet = build_ai_telemetry_packet(TEST_CONFIG, store)
@@ -449,7 +451,7 @@ class TestBTCAnalyticsEngine(unittest.TestCase):
         self.assertIn("SECTION 4: MACRO QUANT, POWER-LAW & CYCLE RADAR", ai_packet)
         self.assertIn("SECTION 5: QUANTITATIVE MICROSTRUCTURE MATRIX A–J SCORES", ai_packet)
         self.assertIn("SECTION 6: PYTHON ENGINE BENCHMARK VERDICT", ai_packet)
-        self.assertIn("6A. Panel 1 — 4-Tab Executive Verdict Rollup Matrix", ai_packet)
+        self.assertIn("6A. Panel 1 — 9-Desk Executive Verdict Rollup Matrix", ai_packet)
         self.assertIn("6B. Panel 2 — 4-Layer Institutional Decision Funnel", ai_packet)
         self.assertIn("6C. Panel 3 — Cross-Tab Agreement, Conflict Diagnostic & Flip Catalysts", ai_packet)
         self.assertIn("6D. Panel 4 — Unified Master Order of Battle", ai_packet)

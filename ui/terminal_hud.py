@@ -137,6 +137,11 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
     perp_ws_dot = "[green]ON[/green]" if store.perp_ws_connected else "[yellow]SYNC[/yellow]"
     cb_ws_dot = "[green]ON[/green]" if store.coinbase_ws_connected else "[yellow]SYNC[/yellow]"
 
+    t0 = (
+        "[bold white on blue] [0: MASTER] [/bold white on blue]"
+        if active_tab == 0
+        else "[dim white][0: MASTER][/dim white]"
+    )
     t1 = (
         "[bold black on cyan] [1: SWING] [/bold black on cyan]"
         if active_tab == 1
@@ -158,34 +163,29 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         else "[dim white][4: REGIME][/dim white]"
     )
     t5 = (
-        "[bold white on blue] [5: MASTER] [/bold white on blue]"
+        "[bold black on white] [5: MM-BTC] [/bold black on white]"
         if active_tab == 5
-        else "[dim white][5: MASTER][/dim white]"
+        else "[dim white][5: MM-BTC][/dim white]"
     )
-    ts1 = (
-        "[bold black on white] [S1: MM-BTC] [/bold black on white]"
+    t6 = (
+        "[bold black on bright_yellow] [6: 72H CONE] [/bold black on bright_yellow]"
         if active_tab == 6
-        else "[dim white][S1: MM-BTC][/dim white]"
+        else "[dim white][6: 72H CONE][/dim white]"
     )
-    ts2 = (
-        "[bold black on bright_yellow] [S2: 72H CONE] [/bold black on bright_yellow]"
+    t7 = (
+        "[bold black on magenta] [7: GARTLEY] [/bold black on magenta]"
         if active_tab == 7
-        else "[dim white][S2: 72H CONE][/dim white]"
+        else "[dim white][7: GARTLEY][/dim white]"
     )
-    ts3 = (
-        "[bold black on magenta] [S3: GARTLEY] [/bold black on magenta]"
+    t8 = (
+        "[bold black on bright_cyan] [8: SFP TRAP] [/bold black on bright_cyan]"
         if active_tab == 8
-        else "[dim white][S3: GARTLEY][/dim white]"
+        else "[dim white][8: SFP TRAP][/dim white]"
     )
-    ts4 = (
-        "[bold black on bright_cyan] [S4: SFP TRAP] [/bold black on bright_cyan]"
+    t9 = (
+        "[bold black on bright_yellow] [9: EXHAUST] [/bold black on bright_yellow]"
         if active_tab == 9
-        else "[dim white][S4: SFP TRAP][/dim white]"
-    )
-    ts5 = (
-        "[bold black on bright_yellow] [S5: EXHAUST] [/bold black on bright_yellow]"
-        if active_tab == 10
-        else "[dim white][S5: EXHAUST][/dim white]"
+        else "[dim white][9: EXHAUST][/dim white]"
     )
 
     regime_str = _regime_badge(sig.regime) if sig else "[dim]WARMING UP[/dim]"
@@ -197,13 +197,13 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
     nav_grid.add_column(justify="right", no_wrap=True)
     nav_grid.add_row(
         f"[bold white]BTC-USD[/bold white] | Spot: [bold cyan]${spot_px:,.2f}[/bold cyan] | Regime: {regime_str} ({score_str}) | Feeds: Spot {spot_ws_dot} • Perp {perp_ws_dot} • CB {cb_ws_dot}",
-        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: 1-5 Core • 6-0 Spec • C: Copy[/dim]",
+        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: 0 Master • 1-9 Specialists • C: Copy[/dim]",
     )
 
     tab_grid = Table.grid(expand=True)
     tab_grid.add_column(justify="left", no_wrap=True)
     tab_grid.add_row(
-        f"{t1}•{t2}•{t3}•{t4}•{t5}   |   {ts1}•{ts2}•{ts3}•{ts4}•{ts5}"
+        f"{t0}   |   {t1}•{t2}•{t3}•{t4}•{t5}•{t6}•{t7}•{t8}•{t9}"
     )
     nav_panel = Panel(Group(nav_grid, tab_grid), border_style="bright_blue", box=box.ROUNDED, padding=(0, 1))
 
@@ -1326,7 +1326,7 @@ def _layer_status_badge(status: str) -> str:
     return "[bold white on red]  VETO   [/bold white on red]"
 
 
-def _build_tab5_master_synthesis_hud(store: StateStore, header_panel: Panel) -> Group:
+def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> Group:
     """Renders Tab [5]: Master Synthesis & Supreme Order of Battle across Tabs [1]-[4]."""
     msev = store.master_synthesis_evaluation
     if msev is None:
@@ -1341,13 +1341,13 @@ def _build_tab5_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
 
     # --- Introduction Card: Beginner Context & Methodology ---
     intro_lines = [
-        "[bold cyan]▶ PURPOSE & SCOPE:[/bold cyan] Supreme command center harmonizing Tabs 1–4 into an institutional capital allocation verdict.",
-        "[bold cyan]▶ CORE MODELS & FEEDS:[/bold cyan] Confluence Scoring Engine (0–100) • 4-Tab Arbiter Consensus • Dual-Track Allocation (Track A: Cash / Track B: In-Position).",
+        "[bold cyan]▶ PURPOSE & SCOPE:[/bold cyan] Supreme command center harmonizing all 9 specialist desks (Tabs 1–9) into an institutional capital allocation verdict.",
+        "[bold cyan]▶ CORE MODELS & FEEDS:[/bold cyan] 9-Desk Rollup Matrix • Confluence Scoring Engine (0–100) • 4-Layer Hierarchy Gatekeeper • Dual-Track Allocation.",
         "[bold cyan]▶ EXECUTION MANDATE:[/bold cyan] [bold green]The Supreme Signal Light[/bold green]: GREEN (Full Aggression), BLUE (Accumulate Support), AMBER (Caution / Tight Stops), RED (Risk-Off Liquidation).",
     ]
     intro_panel = Panel(
         "\n".join(intro_lines),
-        title="[bold cyan]WELCOME TO TAB [5]: MASTER SYNTHESIS & SUPREME ORDER OF BATTLE DESK[/bold cyan]",
+        title="[bold cyan]WELCOME TO TAB [0]: MASTER SYNTHESIS & SUPREME COMMAND CENTER[/bold cyan]",
         box=box.ROUNDED,
         border_style="cyan",
         padding=(0, 1),
@@ -1570,7 +1570,7 @@ def _build_tab5_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
 # SPECIAL TAB [S1]: MULTI-MODEL BTC QUANT RADAR (MM-BTC)
 # ============================================================================
 
-def _build_tab_s1_mm_btc_hud(store: StateStore, header_panel: Panel) -> Group:
+def _build_tab5_mm_btc_hud(store: StateStore, header_panel: Panel) -> Group:
     """Renders Special Tab [S1]: Multi-Model BTC Strategy (Rough Path Signatures + 5 Sensory Lenses)."""
     mm = store.mm_btc_evaluation
     if mm is None:
@@ -1591,7 +1591,7 @@ def _build_tab_s1_mm_btc_hud(store: StateStore, header_panel: Panel) -> Group:
     ]
     intro_panel = Panel(
         "\n".join(intro_lines),
-        title="[bold cyan]WELCOME TO SATELLITE TAB [S1]: MM-BTC ROUGH PATH SIGNATURES & 5 SENSORY LENSES[/bold cyan]",
+        title="[bold cyan]WELCOME TO TAB [5]: MM-BTC ROUGH PATH SIGNATURES & 5 SENSORY LENSES[/bold cyan]",
         box=box.ROUNDED,
         border_style="cyan",
         padding=(0, 1),
@@ -1770,7 +1770,7 @@ def _build_tab_s1_mm_btc_hud(store: StateStore, header_panel: Panel) -> Group:
 # SPECIAL TAB [S2]: 72-HOUR FORWARD VOLATILITY CONE & AI BENCHMARK RADAR
 # ============================================================================
 
-def _build_tab_s2_volatility_cone_hud(store: StateStore, header_panel: Panel) -> Group:
+def _build_tab6_volatility_cone_hud(store: StateStore, header_panel: Panel) -> Group:
     """Renders Special Tab [S2]: 72-Hour Forward Volatility Cone & Quarantined TSFM Benchmark Radar."""
     vc = store.volatility_cone_evaluation
     if vc is None:
@@ -1791,7 +1791,7 @@ def _build_tab_s2_volatility_cone_hud(store: StateStore, header_panel: Panel) ->
     ]
     intro_panel = Panel(
         "\n".join(intro_lines),
-        title="[bold cyan]WELCOME TO SATELLITE TAB [S2]: 72-HOUR FORWARD VOLATILITY CONE & AI BENCHMARK DESK[/bold cyan]",
+        title="[bold cyan]WELCOME TO TAB [6]: 72-HOUR FORWARD VOLATILITY CONE & AI BENCHMARK DESK[/bold cyan]",
         box=box.ROUNDED,
         border_style="cyan",
         padding=(0, 1),
@@ -1932,7 +1932,7 @@ def _build_tab_s2_volatility_cone_hud(store: StateStore, header_panel: Panel) ->
 # SPECIAL TAB [S3]: GARTLEY 222 & 5-STRATEGY CONFLUENCE RADAR
 # ============================================================================
 
-def _build_tab_s3_gartley_hud(store: StateStore, header_panel: Panel) -> Group:
+def _build_tab7_gartley_hud(store: StateStore, header_panel: Panel) -> Group:
     """Renders Special Tab [S3]: Gartley 222 Harmonics & 5-Strategy Confluence Radar Desk."""
     gartley = store.gartley_evaluation
     if gartley is None:
@@ -1967,7 +1967,7 @@ def _build_tab_s3_gartley_hud(store: StateStore, header_panel: Panel) -> Group:
     ]
     intro_panel = Panel(
         "\n".join(intro_lines),
-        title="[bold cyan]WELCOME TO SATELLITE TAB [S3]: GARTLEY 222 & 5-STRATEGY CONFLUENCE RADAR (EXECUTION DESK)[/bold cyan]",
+        title="[bold cyan]WELCOME TO TAB [7]: GARTLEY 222 & 5-STRATEGY CONFLUENCE RADAR (EXECUTION DESK)[/bold cyan]",
         box=box.ROUNDED,
         border_style="cyan",
         padding=(0, 1),
@@ -2076,7 +2076,7 @@ def _build_tab_s3_gartley_hud(store: StateStore, header_panel: Panel) -> Group:
 # SPECIAL TAB [S4]: PATTERN INVALIDATION, LIQUIDITY SWEEP & SFP TRAP RADAR
 # ============================================================================
 
-def _build_tab_s4_trap_hud(store: StateStore, header_panel: Panel) -> Group:
+def _build_tab8_trap_hud(store: StateStore, header_panel: Panel) -> Group:
     """Renders Special Tab [S4]: Pattern Invalidation, Liquidity Sweep & SFP Trap Desk."""
     trap = store.trap_evaluation
     if trap is None:
@@ -2097,7 +2097,7 @@ def _build_tab_s4_trap_hud(store: StateStore, header_panel: Panel) -> Group:
     ]
     intro_panel = Panel(
         "\n".join(intro_lines),
-        title="[bold cyan]WELCOME TO SATELLITE TAB [S4]: PATTERN INVALIDATION, LIQUIDITY SWEEP & SFP TRAP RADAR[/bold cyan]",
+        title="[bold cyan]WELCOME TO TAB [8]: PATTERN INVALIDATION, LIQUIDITY SWEEP & SFP TRAP RADAR[/bold cyan]",
         box=box.ROUNDED,
         border_style="cyan",
         padding=(0, 1),
@@ -2267,7 +2267,7 @@ def _build_tab_s4_trap_hud(store: StateStore, header_panel: Panel) -> Group:
 # TAB [S5]: TERMINAL EXHAUSTION & DELTA DIVERGENCE RADAR HUD
 # ============================================================================
 
-def _build_tab_s5_exhaustion_hud(store: StateStore, header_panel: Panel) -> Group:
+def _build_tab9_exhaustion_hud(store: StateStore, header_panel: Panel) -> Group:
     """Builds the 5-panel layout for Special Tab [S5]: Terminal Exhaustion & Delta Divergence Radar."""
     ex = store.exhaustion_evaluation
     if ex is None:
@@ -2304,7 +2304,7 @@ def _build_tab_s5_exhaustion_hud(store: StateStore, header_panel: Panel) -> Grou
     ]
     intro_panel = Panel(
         "\n".join(intro_lines),
-        title="[bold cyan]WELCOME TO SATELLITE TAB [S5]: TERMINAL EXHAUSTION & DELTA DIVERGENCE RADAR[/bold cyan]",
+        title="[bold cyan]WELCOME TO TAB [9]: TERMINAL EXHAUSTION & DELTA DIVERGENCE RADAR[/bold cyan]",
         box=box.ROUNDED,
         border_style="cyan",
         padding=(0, 1),
@@ -2470,9 +2470,39 @@ def build_dashboard_renderable(
     tab_override: Optional[int] = None,
 ) -> Group:
     """Builds the active tab's 5-panel Rich renderable for the live terminal HUD."""
-    active_tab = tab_override if tab_override in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10) else store.active_tab
+    valid_tabs = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+    if tab_override is not None:
+        if isinstance(tab_override, int) and tab_override in valid_tabs:
+            active_tab = tab_override
+        elif isinstance(tab_override, int) and tab_override == 10:
+            active_tab = 9
+        elif str(tab_override).lower() in ("0", "master", "m"):
+            active_tab = 0
+        elif str(tab_override).lower() in ("s1", "s", "mm", "mm_btc"):
+            active_tab = 5
+        elif str(tab_override).lower() in ("s2", "v", "cone", "vol"):
+            active_tab = 6
+        elif str(tab_override).lower() in ("s3", "g", "gartley"):
+            active_tab = 7
+        elif str(tab_override).lower() in ("s4", "t", "trap", "sfp"):
+            active_tab = 8
+        elif str(tab_override).lower() in ("s5", "e", "exhaust", "td"):
+            active_tab = 9
+        else:
+            try:
+                val = int(tab_override)
+                active_tab = val if val in valid_tabs else 0
+            except ValueError:
+                active_tab = 0
+    else:
+        active_tab = store.active_tab if store.active_tab in valid_tabs else 0
+
     header_panel = _build_header_panel(store, active_tab)
 
+    if active_tab == 0:
+        return _build_tab0_master_synthesis_hud(store, header_panel)
+    if active_tab == 1:
+        return _build_tab1_swing_hud(store, header_panel)
     if active_tab == 2:
         return _build_tab2_protocol_hud(store, header_panel)
     if active_tab == 3:
@@ -2480,18 +2510,16 @@ def build_dashboard_renderable(
     if active_tab == 4:
         return _build_tab4_regime_matrix_hud(store, header_panel)
     if active_tab == 5:
-        return _build_tab5_master_synthesis_hud(store, header_panel)
+        return _build_tab5_mm_btc_hud(store, header_panel)
     if active_tab == 6:
-        return _build_tab_s1_mm_btc_hud(store, header_panel)
+        return _build_tab6_volatility_cone_hud(store, header_panel)
     if active_tab == 7:
-        return _build_tab_s2_volatility_cone_hud(store, header_panel)
+        return _build_tab7_gartley_hud(store, header_panel)
     if active_tab == 8:
-        return _build_tab_s3_gartley_hud(store, header_panel)
+        return _build_tab8_trap_hud(store, header_panel)
     if active_tab == 9:
-        return _build_tab_s4_trap_hud(store, header_panel)
-    if active_tab == 10:
-        return _build_tab_s5_exhaustion_hud(store, header_panel)
-    return _build_tab1_swing_hud(store, header_panel)
+        return _build_tab9_exhaustion_hud(store, header_panel)
+    return _build_tab0_master_synthesis_hud(store, header_panel)
 
 
 def print_dry_run_report(
@@ -2502,39 +2530,42 @@ def print_dry_run_report(
     """Prints a clean, self-contained verification readout for `--tab 1|2|3|4|5|6|7|8|9|10|s1|s2|s3|s4|s5|all`."""
     console = Console(width=175, force_terminal=True)
     if tab_arg.lower() == "all":
-        for t in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10):
-            if t <= 5:
-                title = f"TAB [{t}]"
-            elif t == 6:
-                title = "TAB [S1: MM-BTC QUANT RADAR]"
-            elif t == 7:
-                title = "TAB [S2: 72-HOUR VOLATILITY CONE & AI BENCHMARK]"
-            elif t == 8:
-                title = "TAB [S3: GARTLEY 222 & 5-STRATEGY CONFLUENCE]"
-            elif t == 9:
-                title = "TAB [S4: PATTERN INVALIDATION & SFP TRAP RADAR]"
-            else:
-                title = "TAB [S5: TERMINAL EXHAUSTION & DELTA DIVERGENCE RADAR]"
+        tab_titles = {
+            0: "TAB [0: MASTER SYNTHESIS & SUPREME COMMAND CENTER]",
+            1: "TAB [1: TACTICAL SWING & ORDER FLOW DESK]",
+            2: "TAB [2: PROTOCOL v1.3 & LIQUIDATION MAGNETS]",
+            3: "TAB [3: MACRO QUANT & CYCLE RADAR]",
+            4: "TAB [4: REGIME MATRIX CONFIGS A–J]",
+            5: "TAB [5: MM-BTC ROUGH PATH SIGNATURES]",
+            6: "TAB [6: 72H FORWARD VOLATILITY CONE]",
+            7: "TAB [7: GARTLEY 222 & CONFLUENCE RADAR]",
+            8: "TAB [8: PATTERN INVALIDATION & SFP TRAP RADAR]",
+            9: "TAB [9: TERMINAL EXHAUSTION RADAR]",
+        }
+        for t in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9):
+            title = tab_titles.get(t, f"TAB [{t}]")
             console.print(f"\n[bold cyan]=== VERIFICATION SNAPSHOT: {title} ===[/bold cyan]")
             console.print(build_dashboard_renderable(config, store, tab_override=t))
     else:
         tab_lower = tab_arg.strip().lower()
-        if tab_lower in ("s1", "s", "6"):
+        if tab_lower in ("0", "master", "m"):
+            t_num = 0
+        elif tab_lower in ("5", "s1", "s", "mm", "mm_btc"):
+            t_num = 5
+        elif tab_lower in ("6", "s2", "v", "cone", "vol"):
             t_num = 6
-        elif tab_lower in ("s2", "v", "7"):
+        elif tab_lower in ("7", "s3", "g", "gartley"):
             t_num = 7
-        elif tab_lower in ("s3", "g", "8"):
+        elif tab_lower in ("8", "s4", "t", "trap", "sfp"):
             t_num = 8
-        elif tab_lower in ("s4", "t", "9"):
+        elif tab_lower in ("9", "s5", "e", "exhaust", "td", "10"):
             t_num = 9
-        elif tab_lower in ("s5", "e", "0", "10"):
-            t_num = 10
         else:
             try:
                 t_num = int(tab_arg)
             except ValueError:
-                t_num = 1
-        store.active_tab = t_num if t_num in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10) else 1
+                t_num = 0
+        store.active_tab = t_num if t_num in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9) else 0
         console.print(build_dashboard_renderable(config, store, tab_override=store.active_tab))
 
 
@@ -2549,34 +2580,34 @@ def _poll_keyboard_tab_switch(
         try:
             while msvcrt.kbhit():
                 ch = msvcrt.getwch()
-                if ch in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
+                if ch in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9"):
                     new_tab = int(ch)
                     if store.active_tab != new_tab:
                         store.active_tab = new_tab
                         changed = True
-                elif ch == "0":
-                    if store.active_tab != 10:
-                        store.active_tab = 10
+                elif ch in ("m", "M"):
+                    if store.active_tab != 0:
+                        store.active_tab = 0
                         changed = True
                 elif ch in ("s", "S"):
+                    if store.active_tab != 5:
+                        store.active_tab = 5
+                        changed = True
+                elif ch in ("v", "V"):
                     if store.active_tab != 6:
                         store.active_tab = 6
                         changed = True
-                elif ch in ("v", "V"):
+                elif ch in ("g", "G"):
                     if store.active_tab != 7:
                         store.active_tab = 7
                         changed = True
-                elif ch in ("g", "G"):
+                elif ch in ("t", "T"):
                     if store.active_tab != 8:
                         store.active_tab = 8
                         changed = True
-                elif ch in ("t", "T"):
+                elif ch in ("e", "E"):
                     if store.active_tab != 9:
                         store.active_tab = 9
-                        changed = True
-                elif ch in ("e", "E"):
-                    if store.active_tab != 10:
-                        store.active_tab = 10
                         changed = True
                 elif ch in ("c", "C"):
                     if detector is not None:

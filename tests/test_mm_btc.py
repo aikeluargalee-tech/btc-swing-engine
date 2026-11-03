@@ -119,7 +119,7 @@ class TestMMBTCEngine(unittest.TestCase):
         detector = SignalDetector(self.config)
         detector.evaluate(self.store)
 
-        renderable = build_dashboard_renderable(self.config, self.store, tab_override=6)
+        renderable = build_dashboard_renderable(self.config, self.store, tab_override=5)
         self.assertIsNotNone(renderable)
 
     def test_ai_packet_exporter_includes_section_7(self) -> None:

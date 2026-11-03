@@ -44,7 +44,7 @@ async def execute_engine(
         macro_snap = await fetch_macro_and_intermarket_snapshot(session, daily_closes)
     store.macro_intermarket = macro_snap
 
-    print("[3/4] Evaluating 10-Desk Quantitative Brain (Tabs 1-5 & Satellites S1-S5)...")
+    print("[3/4] Evaluating 10-Desk Quantitative Brain (Tab 0 Master & Specialist Desks 1–9)...")
     detector = SignalDetector(config)
     sig = detector.evaluate(store)
 
@@ -98,7 +98,7 @@ async def execute_engine(
     print(f"  Bitcoin Spot Price  : ${spot_price:,.2f}")
     print(f"  Market Regime       : {regime}")
     print(f"  Tab 1 Confluence    : {score:.1f}/100 | Gate: {gate}")
-    print(f"  Tab 5 Verdict       : [{traffic_light}] LIGHT — {msev.master_headline if msev else 'READY'}")
+    print(f"  Tab 0 Master Verdict: [{traffic_light}] LIGHT — {msev.master_headline if msev else 'READY'}")
     print(f"  Track A (In Cash)   : {track_a}")
     print(f"  Track B (Holding)   : {track_b}")
     print("  " + "-" * 76)

@@ -1,6 +1,6 @@
 """Tab [5] Master Synthesis & Supreme Order of Battle Evaluator.
 
-Synthesizes the live outputs of all 4 specialist tabs:
+Synthesizes the live outputs of all 9 specialist desks (Tabs [1]–[9]):
 - Tab [1]: Tactical Swing Execution Engine (`SignalEvaluation`)
 - Tab [2]: BTC Spot Swing Protocol v1.3 & Liquidation Magnet (`ProtocolV13Evaluation`)
 - Tab [3]: Macro Quant & Cycle Radar (`MacroRadarEvaluation`)
@@ -63,7 +63,7 @@ class MasterSynthesisEvaluator:
         flow: FlowSnapshot,
         deriv: DerivativesSnapshot,
     ) -> MasterSynthesisEvaluation:
-        """Synthesizes Tabs [1]–[4] into a single authoritative Master Conclusion."""
+        """Synthesizes Tabs [1]–[9] into a single authoritative Supreme Master Conclusion."""
         now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         price = sig.current_price
         tp = sig.trade_plan
@@ -214,7 +214,158 @@ class MasterSynthesisEvaluator:
             tab_conclusion=t4_conc,
         )
 
-        tab_rows = [t1_row, t2_row, t3_row, t4_row]
+        # --- Tab [5] MM-BTC Rough Path Arbitrator Verdict ---
+        mm_ev = store.mm_btc_evaluation
+        if mm_ev is not None:
+            if "CLEAR" in mm_ev.signature.arbiter_gate_status and mm_ev.agreeing_models_count >= 3:
+                t5_light = "GREEN"
+            elif "VETO" in mm_ev.signature.arbiter_gate_status or mm_ev.signature.roughness > 4.5:
+                t5_light = "RED"
+            elif mm_ev.agreeing_models_count >= 2:
+                t5_light = "BLUE"
+            else:
+                t5_light = "YELLOW"
+            t5_driver = f"R={mm_ev.signature.roughness:.2f} | Consensus: {mm_ev.agreeing_models_count}/5"
+            t5_conc = f"{mm_ev.action_plan_cash} ({mm_ev.final_weight:.2f}x)"
+            t5_status = f"{mm_ev.microstructure_pattern} • H={mm_ev.hurst.hurst:.2f}"
+        else:
+            t5_light = "YELLOW"
+            t5_driver = "Scanning path signatures..."
+            t5_conc = "WARMING UP"
+            t5_status = "INITIALIZING"
+
+        t5_row = TabVerdictRow(
+            tab_num=5,
+            tab_name="[5] MM-BTC",
+            traffic_light=t5_light,
+            score_or_status=t5_status,
+            primary_driver=t5_driver,
+            tab_conclusion=t5_conc,
+        )
+
+        # --- Tab [6] 72H Forward Volatility Cone Verdict ---
+        vc_ev = store.volatility_cone_evaluation
+        if vc_ev is not None:
+            if vc_ev.coiled_spring_alert:
+                t6_light = "YELLOW"
+                t6_conc = "COILED SPRING (BREAKOUT IMMINENT)"
+            elif "COMPRESSION" in vc_ev.vcr_status:
+                t6_light = "BLUE"
+                t6_conc = "COMPRESSING VOL (ACCUMULATION)"
+            else:
+                t6_light = "GREEN"
+                t6_conc = "IN-CONE VOLATILITY DISPERSION"
+            t6_driver = f"GK Vol: {vc_ev.garman_klass_annualized_vol * 100:.1f}% | H={vc_ev.hurst_exponent:.2f}"
+            t6_status = f"VCR: {vc_ev.vcr_72h:.2f} • {vc_ev.vcr_status}"
+        else:
+            t6_light = "YELLOW"
+            t6_driver = "Computing Garman-Klass volatility..."
+            t6_conc = "WARMING UP"
+            t6_status = "INITIALIZING"
+
+        t6_row = TabVerdictRow(
+            tab_num=6,
+            tab_name="[6] 72H Cone",
+            traffic_light=t6_light,
+            score_or_status=t6_status,
+            primary_driver=t6_driver,
+            tab_conclusion=t6_conc,
+        )
+
+        # --- Tab [7] Gartley 222 & Confluence Radar Verdict ---
+        gy_ev = store.gartley_evaluation
+        if gy_ev is not None:
+            if "BUY" in gy_ev.overall_verdict or "CONFLUENCE" in gy_ev.overall_verdict:
+                t7_light = "GREEN"
+            elif "SELL" in gy_ev.overall_verdict or "USDT" in gy_ev.overall_verdict:
+                t7_light = "RED"
+            elif "HOLD" in gy_ev.overall_verdict:
+                t7_light = "BLUE"
+            else:
+                t7_light = "YELLOW"
+            t7_driver = f"1D:{gy_ev.res_1d.verdict} | 4H:{gy_ev.res_4h.verdict}"
+            t7_conc = gy_ev.overall_verdict
+            t7_status = f"Spot: ${gy_ev.close_price:,.0f} • Parity: ON"
+        else:
+            t7_light = "YELLOW"
+            t7_driver = "Scanning harmonic pivots..."
+            t7_conc = "WARMING UP"
+            t7_status = "INITIALIZING"
+
+        t7_row = TabVerdictRow(
+            tab_num=7,
+            tab_name="[7] Gartley 222",
+            traffic_light=t7_light,
+            score_or_status=t7_status,
+            primary_driver=t7_driver,
+            tab_conclusion=t7_conc,
+        )
+
+        # --- Tab [8] Pattern Invalidation & SFP Trap Radar Verdict ---
+        tp_ev = store.trap_evaluation
+        if tp_ev is not None:
+            if "BEAR TRAP" in tp_ev.active_trap_signal:
+                t8_light = "GREEN"
+                t8_conc = "BEAR TRAP RECLAIM"
+            elif "BULL TRAP" in tp_ev.active_trap_signal:
+                t8_light = "RED"
+                t8_conc = "BULL TRAP BREAKOUT FAILURE"
+            elif "SWEEP" in tp_ev.active_trap_signal:
+                t8_light = "YELLOW"
+                t8_conc = "LIQUIDITY SWEEP IN PROGRESS"
+            else:
+                t8_light = "GREEN"
+                t8_conc = "NO ACTIVE TRAP (STRUCTURE CLEAN)"
+            t8_driver = f"Trap: {tp_ev.active_trap_signal} | Abs: {'YES' if tp_ev.passive_absorption_flag else 'NO'}"
+            t8_status = f"{tp_ev.active_trap_state.value}"
+        else:
+            t8_light = "YELLOW"
+            t8_driver = "Scanning fractal pivots..."
+            t8_conc = "WARMING UP"
+            t8_status = "INITIALIZING"
+
+        t8_row = TabVerdictRow(
+            tab_num=8,
+            tab_name="[8] SFP Trap",
+            traffic_light=t8_light,
+            score_or_status=t8_status,
+            primary_driver=t8_driver,
+            tab_conclusion=t8_conc,
+        )
+
+        # --- Tab [9] Terminal Exhaustion & Delta Divergence Radar Verdict ---
+        ex_ev = store.exhaustion_evaluation
+        if ex_ev is not None:
+            if ex_ev.exhaustion_score >= 80.0:
+                t9_light = "RED"
+                t9_conc = f"TERMINAL EXHAUSTION ({ex_ev.exhaustion_score:.1f}/100)"
+            elif ex_ev.exhaustion_score >= 60.0:
+                t9_light = "YELLOW"
+                t9_conc = f"ELEVATED FATIGUE ({ex_ev.exhaustion_score:.1f}/100)"
+            elif ex_ev.exhaustion_score >= 35.0:
+                t9_light = "BLUE"
+                t9_conc = f"MODERATE MOMENTUM ({ex_ev.exhaustion_score:.1f}/100)"
+            else:
+                t9_light = "GREEN"
+                t9_conc = "MOMENTUM HEALTHY (NO DIVERGENCE)"
+            t9_driver = f"Score: {ex_ev.exhaustion_score:.1f} | TD 1H:{ex_ev.td_1h.setup_count}/9 4H:{ex_ev.td_4h.setup_count}/9"
+            t9_status = f"{ex_ev.active_exhaustion_signal}"
+        else:
+            t9_light = "YELLOW"
+            t9_driver = "Scanning TD setups..."
+            t9_conc = "WARMING UP"
+            t9_status = "INITIALIZING"
+
+        t9_row = TabVerdictRow(
+            tab_num=9,
+            tab_name="[9] Exhaustion",
+            traffic_light=t9_light,
+            score_or_status=t9_status,
+            primary_driver=t9_driver,
+            tab_conclusion=t9_conc,
+        )
+
+        tab_rows = [t1_row, t2_row, t3_row, t4_row, t5_row, t6_row, t7_row, t8_row, t9_row]
         lights = [r.traffic_light for r in tab_rows]
         g_cnt = lights.count("GREEN")
         b_cnt = lights.count("BLUE")

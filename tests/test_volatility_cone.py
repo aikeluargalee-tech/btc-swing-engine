@@ -123,7 +123,7 @@ class TestVolatilityConeEngine(unittest.TestCase):
         # Evaluate engine
         self.engine.evaluate(self.store, bars_1h)
 
-        renderable = build_dashboard_renderable(self.config, self.store, tab_override=7)
+        renderable = build_dashboard_renderable(self.config, self.store, tab_override=6)
         self.assertIsNotNone(renderable)
 
     def test_ai_packet_exporter_includes_section_8(self) -> None:
@@ -140,7 +140,7 @@ class TestVolatilityConeEngine(unittest.TestCase):
         self.engine.evaluate(self.store, bars_1h, self.store.macro_profile)
 
         packet = build_ai_telemetry_packet(self.config, self.store)
-        self.assertIn("## SECTION 8: 72-HOUR FORWARD VOLATILITY CONE & AI BENCHMARK RADAR (TAB [S2])", packet)
+        self.assertIn("## SECTION 8: 72-HOUR FORWARD VOLATILITY CONE & AI BENCHMARK RADAR (TAB [6])", packet)
         self.assertIn("### 8A. 72-Hour Forward Volatility Cone Fan Table", packet)
         self.assertIn("### 8B. Quarantined Time-Series Foundation Models", packet)
         self.assertIn("### 8C. Quantitative Variance Compression Analysis", packet)

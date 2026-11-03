@@ -143,7 +143,7 @@ class TestTrapRadarEngine(unittest.TestCase):
         flow = FlowSnapshot()
         self.engine.evaluate(self.store, bars_1h, bars_15m, deriv, flow)
 
-        renderable = build_dashboard_renderable(self.config, self.store, tab_override=9)
+        renderable = build_dashboard_renderable(self.config, self.store, tab_override=8)
         self.assertIsNotNone(renderable)
 
     def test_ai_packet_exporter_includes_section_10(self) -> None:
@@ -159,7 +159,7 @@ class TestTrapRadarEngine(unittest.TestCase):
         self.engine.evaluate(self.store, bars_1h, bars_15m, deriv, flow)
 
         packet = build_ai_telemetry_packet(self.config, self.store)
-        self.assertIn("## SECTION 10: TAB [S4] PATTERN INVALIDATION, LIQUIDITY SWEEP & SFP TRAP RADAR", packet)
+        self.assertIn("## SECTION 10: TAB [8] PATTERN INVALIDATION, LIQUIDITY SWEEP & SFP TRAP RADAR", packet)
         self.assertIn("### 10A. Active Classical Pattern Boundaries & Liquidity Proximity Registry", packet)
         self.assertIn("### 10C. Anti-Sycophancy Rulebook for Classical Patterns", packet)
 

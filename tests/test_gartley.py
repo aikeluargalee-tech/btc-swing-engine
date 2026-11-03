@@ -126,7 +126,7 @@ class TestGartley5StrategyEngine(unittest.TestCase):
         self.store.binance_spot_price = bars_1h[-1].close
 
         self.engine.evaluate(self.store)
-        renderable = build_dashboard_renderable(self.config, self.store, tab_override=8)
+        renderable = build_dashboard_renderable(self.config, self.store, tab_override=7)
         self.assertIsNotNone(renderable)
 
     def test_ai_packet_exporter_includes_section_9(self) -> None:
@@ -140,7 +140,7 @@ class TestGartley5StrategyEngine(unittest.TestCase):
         self.engine.evaluate(self.store)
         packet = build_ai_telemetry_packet(self.config, self.store)
 
-        self.assertIn("## SECTION 9: TAB [S3] GARTLEY 222 & 5-STRATEGY CONFLUENCE RADAR", packet)
+        self.assertIn("## SECTION 9: TAB [7] GARTLEY 222 & 5-STRATEGY CONFLUENCE RADAR", packet)
         self.assertIn("### 9A. 1D Daily Macro Trend State Machine", packet)
         self.assertIn("### 9B. 4H Tactical Swing Execution State Machine", packet)
         self.assertIn("### 9C. Harmonic Pattern Geometry & Fibonacci Verification", packet)

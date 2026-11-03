@@ -169,7 +169,7 @@ class TestExhaustionRadarEngine(unittest.TestCase):
 
         self.engine.evaluate(self.store, bars_1h, bars_4h, bars_15m, deriv, flow)
 
-        renderable = build_dashboard_renderable(self.config, self.store, tab_override=10)
+        renderable = build_dashboard_renderable(self.config, self.store, tab_override=9)
         self.assertIsNotNone(renderable)
 
     def test_ai_packet_exporter_includes_section_11(self) -> None:
@@ -192,7 +192,7 @@ class TestExhaustionRadarEngine(unittest.TestCase):
         self.engine.evaluate(self.store, bars_1h, bars_4h, bars_15m, deriv, flow)
 
         packet = build_ai_telemetry_packet(self.config, self.store)
-        self.assertIn("SECTION 11: TAB [S5] TERMINAL EXHAUSTION & DELTA DIVERGENCE RADAR", packet)
+        self.assertIn("SECTION 11: TAB [9] TERMINAL EXHAUSTION & DELTA DIVERGENCE RADAR", packet)
         self.assertIn("11A. Tom DeMark (TD) Sequential Setup Audit", packet)
         self.assertIn("11B. Multi-Horizon CVD Divergence", packet)
 

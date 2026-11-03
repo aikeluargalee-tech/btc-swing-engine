@@ -44,7 +44,7 @@ class StateStore:
         self.perp_klines_15m: Deque[KlineBar] = deque(maxlen=400)
 
         # --- Active HUD Tab State (1 = Swing Engine, 2 = Protocol v1.3, 3 = Macro & Cycle Radar) ---
-        self.active_tab: int = 1
+        self.active_tab: int = 0
 
         # --- Live Tick & Session Accumulators ---
         self.binance_spot_price: float = 0.0

@@ -3460,20 +3460,12 @@ def _build_tab_footprint_hud(store: StateStore, header_panel: Panel) -> Group:
     )
     verdict_panel = Panel(v_grid, border_style=v_border, box=box.ROUNDED, padding=(0, 1))
 
-    scorecard_panel = Panel(
-        scorecard_table,
-        title="[bold bright_yellow]3-VARIANT PARALLEL FORWARD TEST SCORECARD (CONTINUOUS LIVE TELEMETRY)[/bold bright_yellow]",
-        border_style="yellow",
-        box=box.ROUNDED,
-        padding=(0, 1),
-    )
-
     content_grid = Table.grid(expand=True)
     content_grid.add_column(justify="left", no_wrap=False, ratio=1)
     content_grid.add_column(justify="left", no_wrap=False, ratio=1)
     content_grid.add_row(left_panel, right_panel)
 
-    return Group(header_panel, verdict_panel, scorecard_panel, content_grid)
+    return Group(header_panel, verdict_panel, content_grid)
 
 
 # ============================================================================

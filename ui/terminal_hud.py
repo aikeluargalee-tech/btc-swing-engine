@@ -4809,10 +4809,12 @@ def build_dashboard_renderable(
     tab_override: Optional[int] = None,
 ) -> Group:
     """Builds the active tab's 5-panel Rich renderable for the live terminal HUD."""
-    valid_tabs = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)
+    valid_tabs = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14)
     if tab_override is not None:
         if isinstance(tab_override, int) and tab_override in valid_tabs:
             active_tab = tab_override
+        elif str(tab_override).lower() in ("b", "pattern", "patterns", "chart", "14"):
+            active_tab = 14
         elif str(tab_override).lower() in ("l", "master", "m", "10"):
             active_tab = 10
         elif str(tab_override).lower() in ("w", "waterfall", "wf", "12"):
@@ -4903,8 +4905,9 @@ def print_dry_run_report(
             9: "TAB [9: TERMINAL EXHAUSTION RADAR]",
             10: "TAB [L: MASTER SYNTHESIS & SUPREME COMMAND CENTER]",
             13: "TAB [P: PRICE ACTION & STRUCTURE PROTOCOL (SLSP v1.0 + 3-EMA + SENSORS)]",
+            14: "TAB [B: CLASSIC CHART PATTERN RADAR & CANDLESTICK GEOMETRY]",
         }
-        for t in (0, 12, 11, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13):
+        for t in (0, 12, 11, 14, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13):
             title = tab_titles.get(t, f"TAB [{t}]")
             console.print(f"\n[bold cyan]=== VERIFICATION SNAPSHOT: {title} ===[/bold cyan]")
             console.print(build_dashboard_renderable(config, store, tab_override=t))
@@ -4928,6 +4931,8 @@ def print_dry_run_report(
             t_num = 8
         elif tab_lower in ("9", "s5", "e", "exhaust", "td"):
             t_num = 9
+        elif tab_lower in ("b", "pattern", "patterns", "chart", "14"):
+            t_num = 14
         elif tab_lower in ("p", "structure", "slsp", "pa", "13"):
             t_num = 13
         else:
@@ -4935,7 +4940,7 @@ def print_dry_run_report(
                 t_num = int(tab_arg)
             except ValueError:
                 t_num = 0
-        store.active_tab = t_num if t_num in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13) else 0
+        store.active_tab = t_num if t_num in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14) else 0
         console.print(build_dashboard_renderable(config, store, tab_override=store.active_tab))
 
 

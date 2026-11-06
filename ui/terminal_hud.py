@@ -166,6 +166,11 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         else "[dim white][L: MASTER][/dim white]"
     )
     tC = "[bold white on dark_red] [C: AI PACKET] [/bold white on dark_red]"
+    tH = (
+        "[bold white on dark_green] [H: GUIDE] [/bold white on dark_green]"
+        if getattr(store, "show_help", False)
+        else "[dim white][H: GUIDE][/dim white]"
+    )
 
     subdesk_names = {
         1: "1: TACTICAL SWING",
@@ -192,13 +197,13 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
     nav_grid.add_column(justify="right", no_wrap=True)
     nav_grid.add_row(
         f"[bold white]BTC-USD[/bold white] | Spot: [bold cyan]${spot_px:,.2f}[/bold cyan] | Regime: {regime_str} ({score_str}) | Feeds: Spot {spot_ws_dot} • Perp {perp_ws_dot} • CB {cb_ws_dot}",
-        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: P Structure • F Footprint • W Waterfall • 0 Screener • L Master • C Copy • 1-9 Sub-Desks[/dim]",
+        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: P Structure • F Footprint • W Waterfall • 0 Screener • L Master • C Copy • H Guide • 1-9 Desks[/dim]",
     )
 
     tab_grid = Table.grid(expand=True)
     tab_grid.add_column(justify="left", no_wrap=True)
     tab_grid.add_row(
-        f"{tP}  {tF}  {tW}  {t0}  {tL}  │  {tC}{subdesk_info}"
+        f"{tP}  {tF}  {tW}  {t0}  {tL}  │  {tC}  {tH}{subdesk_info}"
     )
     nav_panel = Panel(Group(nav_grid, tab_grid), border_style="bright_blue", box=box.ROUNDED, padding=(0, 1))
 
@@ -662,7 +667,7 @@ def _build_tab1_swing_hud(store: StateStore, header_panel: Panel) -> Group:
     )
     bottom_panel = _build_tab1_plain_english_panel(sig, flow, deriv, macro_ev)
 
-    return Group(header_panel, intro_panel, top_row, flow_panel, signal_panel, bottom_panel)
+    return Group(header_panel, top_row, flow_panel, signal_panel, bottom_panel)
 
 
 # ============================================================================
@@ -871,7 +876,7 @@ def _build_tab2_protocol_hud(store: StateStore, header_panel: Panel) -> Group:
         box=box.ROUNDED,
     )
 
-    return Group(header_panel, intro_panel, top_row, ntz_panel, decision_panel, bottom_panel)
+    return Group(header_panel, top_row, ntz_panel, decision_panel, bottom_panel)
 
 
 # ============================================================================
@@ -1081,7 +1086,7 @@ def _build_tab3_macro_hud(store: StateStore, header_panel: Panel) -> Group:
         box=box.ROUNDED,
     )
 
-    return Group(header_panel, intro_panel, top_row, sniper_panel, arb_panel, bottom_panel)
+    return Group(header_panel, top_row, sniper_panel, arb_panel, bottom_panel)
 
 
 # ============================================================================
@@ -1307,7 +1312,7 @@ def _build_tab4_regime_matrix_hud(store: StateStore, header_panel: Panel) -> Gro
         box=box.ROUNDED,
     )
 
-    return Group(header_panel, intro_panel, top_row, matrix_panel, playbook_panel, bottom_panel)
+    return Group(header_panel, top_row, matrix_panel, playbook_panel, bottom_panel)
 
 
 # ============================================================================
@@ -1442,7 +1447,7 @@ def _build_tab0_spot_swing_hud(store: StateStore, header_panel: Panel) -> Group:
             box=box.ROUNDED,
             border_style="yellow",
         )
-        return Group(header_panel, intro_panel, ribbon_table, status_panel)
+        return Group(header_panel, ribbon_table, status_panel)
 
     # --- Panel 1: 1D Macro Regime Gate & Step 2 Range Confirmation ---
     p1 = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold cyan", pad_edge=False)
@@ -1585,7 +1590,7 @@ def _build_tab0_spot_swing_hud(store: StateStore, header_panel: Panel) -> Group:
     mid_row.add_column(ratio=5)
     mid_row.add_column(ratio=5)
     mid_row.add_row(
-        Panel(p1, title=f"[bold cyan]1. 1D Macro Regime Gate & Range Confirmation ({'APPROVED' if macro.macro_approved else 'FROZEN'})[/bold cyan]", box=box.ROUNDED),
+        Panel(p1, title=f"[bold cyan]1. 1D Macro Regime Gate — BTC SPOT SWING SCREENING ({'APPROVED' if macro.macro_approved else 'FROZEN'})[/bold cyan]", box=box.ROUNDED),
         Panel(p2, title="[bold yellow]2. Liquidation Magnet Positioning Audit & Weekly Anchors (4H Sweep / Reclaim)[/bold yellow]", box=box.ROUNDED),
     )
 
@@ -1682,7 +1687,7 @@ def _build_tab0_spot_swing_hud(store: StateStore, header_panel: Panel) -> Group:
         p4_lines.append("  [bold white]Recent Alerts :[/bold white] [dim]none yet[/dim]")
     p4_panel = Panel("\n".join(p4_lines), title=bottom_title, border_style="cyan", box=box.ROUNDED)
 
-    return Group(header_panel, intro_panel, ribbon_table, mid_row, p3_panel, p4_panel)
+    return Group(header_panel, ribbon_table, mid_row, p3_panel, p4_panel)
 
 
 def store_equity_label(ev: Any) -> str:
@@ -1960,7 +1965,7 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
         box=box.ROUNDED,
     )
 
-    return Group(header_panel, intro_panel, top_row, mid_row, bottom_panel)
+    return Group(header_panel, top_row, mid_row, bottom_panel)
 
 
 # ============================================================================
@@ -2160,7 +2165,7 @@ def _build_tab5_mm_btc_hud(store: StateStore, header_panel: Panel) -> Group:
         box=box.ROUNDED,
     )
 
-    return Group(header_panel, intro_panel, top_row, mid_row, bottom_panel)
+    return Group(header_panel, top_row, mid_row, bottom_panel)
 
 
 # ============================================================================
@@ -2322,7 +2327,7 @@ def _build_tab6_volatility_cone_hud(store: StateStore, header_panel: Panel) -> G
         box=box.ROUNDED,
     )
 
-    return Group(header_panel, intro_panel, ribbon_table, mid_row, p3_panel, p4_panel)
+    return Group(header_panel, ribbon_table, mid_row, p3_panel, p4_panel)
 
 
 # ============================================================================
@@ -2466,7 +2471,7 @@ def _build_tab7_gartley_hud(store: StateStore, header_panel: Panel) -> Group:
         box=box.ROUNDED,
     )
 
-    return Group(header_panel, intro_panel, ribbon_table, mid_row, p3_panel, p4_panel)
+    return Group(header_panel, ribbon_table, mid_row, p3_panel, p4_panel)
 
 
 # ============================================================================
@@ -2655,7 +2660,7 @@ def _build_tab8_trap_hud(store: StateStore, header_panel: Panel) -> Group:
         box=box.ROUNDED,
     )
 
-    return Group(header_panel, intro_panel, ribbon_table, mid_row_1, mid_row_2, p4_diag_panel, p5_panel)
+    return Group(header_panel, ribbon_table, mid_row_1, mid_row_2, p4_diag_panel, p5_panel)
 
 
 
@@ -2852,7 +2857,7 @@ def _build_tab9_exhaustion_hud(store: StateStore, header_panel: Panel) -> Group:
         box=box.ROUNDED,
     )
 
-    return Group(header_panel, intro_panel, ribbon_table, mid_row, p3_panel, p4_panel)
+    return Group(header_panel, ribbon_table, mid_row, p3_panel, p4_panel)
 
 
 # ============================================================================
@@ -4551,6 +4556,124 @@ def _build_tab13_slsp_price_action_hud(store: StateStore, header_panel: Panel) -
 
 
 
+def _build_help_overlay(store: StateStore, header_panel: Panel) -> Group:
+    """Renders the comprehensive interactive Beginner Quant Field Manual & Active Desk Guide."""
+    active_tab = store.active_tab
+
+    desk_info_map = {
+        13: (
+            "DESK [P: STRUCTURE] — 4-Pillar Daily & 4H Price Action & Structure Protocol",
+            [
+                "[bold bright_yellow]1. File A: SLSP v1.0 (Structure & Level Swing Protocol):[/bold bright_yellow] Identifies daily key support and resistance shelves (1–5★ based on touch frequency). Enforces a mandatory >= 1.5R obstacle-free clearance zone to avoid buying directly into overhead ceilings.",
+                "[bold bright_cyan]2. File B: Industrial 3-EMA Strategy:[/bold bright_cyan] Uses the Daily 200 EMA slope (+0.05% bull filter) as macro trend anchor and requires a clean pullback into the 4H 21–50 EMA dynamic value zone.",
+                "[bold bright_magenta]3. Project 8: Liquidation Flush Detector:[/bold bright_magenta] Classifies cascade lifecycle (Quiet, Early Shock, Full Cascade, Stabilized), tracks liquidated dollar volume, and measures distance to the $75k–$78k demand zone floor.",
+                "[bold bright_red]4. Project 7: Tell-Tale 5.0x Volume Climax:[/bold bright_red] First-shock early warning sensor detecting abnormal 5.0x volume sell-offs. Enforces an Anti-Knife-Catch hard lockout to prevent buying during cascading panics.",
+                "[bold bright_green]5. Beginner Directive:[/bold bright_green] Stay 100% in cash until all 4 pillars align and Panel [5] arms TRIGGER_FIRED.",
+            ]
+        ),
+        11: (
+            "DESK [F: FOOTPRINT] — 15m Tape Footprint, Delta Absorption & Auction Ladder",
+            [
+                "[bold bright_cyan]1. 15m Bid-Ask Footprint Ladder:[/bold bright_cyan] Displays live executed transaction volume at the bid vs. ask for every individual price level on Bitcoin.",
+                "[bold bright_yellow]2. Delta Absorption at Value Edges:[/bold bright_yellow] Detects when aggressive market sellers dump heavy contracts into passive institutional limit buy orders without pushing price lower (trapped sellers).",
+                "[bold bright_green]3. Delta Flip Confirmation:[/bold bright_green] Signals when buyers take active control of the 15m auction candle (shifting from negative net delta to positive net delta).",
+                "[bold bright_white]4. 30D Composite Volume Profile:[/bold bright_white] Pinpoints Value Area High (cVAH), Point of Control (cPOC), and Value Area Low (cVAL).",
+                "[bold bright_green]5. Beginner Directive:[/bold bright_green] Never buy while 15m delta is aggressive red; wait for seller absorption and a positive delta flip at support.",
+            ]
+        ),
+        12: (
+            "DESK [W: WATERFALL] — 5-Pillar Decision Waterfall & Derivatives Depth",
+            [
+                "[bold bright_white]1. Pillar 1 (Macro Permission):[/bold bright_white] Daily 200 SMA slope filter and systemic Non-Trade Zone (NTZ 8A–8F) macro news shield.",
+                "[bold bright_cyan]2. Pillar 2 (Structural Map & Asymmetry):[/bold bright_cyan] 30D volume profile value boundaries and CoinGlass liquidation magnets (requires >= 3.0R payoff).",
+                "[bold bright_yellow]3. Pillar 3 (Cross-Venue Flow Truth):[/bold bright_yellow] 4H Spot vs. Perp Cumulative Volume Delta (CVD) divergence and Coinbase Basis Premium (CPI).",
+                "[bold bright_magenta]4. Pillar 4 (Leverage Fuel):[/bold bright_magenta] 4H Open Interest (dOI) contraction/expansion and 8H funding rate crowding.",
+                "[bold bright_green]5. Pillar 5 (Sniper Trigger):[/bold bright_green] Lower-wick absorption and positive delta flip. Higher gates strictly veto lower gates.",
+            ]
+        ),
+        0: (
+            "DESK [0: SPOT SWING] — Daily Macro Squeeze & 1:3 RRR Screener",
+            [
+                "[bold bright_cyan]1. 1D Macro Regime Gate:[/bold bright_cyan] Daily close above 50-day / 200-day moving averages confirms macro swing permission.",
+                "[bold bright_yellow]2. Weekly Liquidity Anchors:[/bold bright_yellow] Previous Week High (PWH) and Previous Week Low (PWL) liquidity sweep & reclaim engine.",
+                "[bold bright_magenta]3. Liquidation Magnet Targeting:[/bold bright_magenta] Targets dense counter-liquidity pools for 1:3 reward-to-risk setups.",
+                "[bold bright_green]4. Triple-Barrier Risk Management:[/bold bright_green] Strict stop loss, profit targets, and 10-day time stop discipline.",
+            ]
+        ),
+        10: (
+            "DESK [L: MASTER COMMAND] — Supreme 9-Desk Rollup & Capital Allocation Verdict",
+            [
+                "[bold bright_cyan]1. 9-Desk Rollup Matrix:[/bold bright_cyan] Harmonizes signals across all specialist quant algorithms into one synchronized dashboard.",
+                "[bold bright_yellow]2. 4-Layer Decision Funnel:[/bold bright_yellow] L1 Hard Veto -> L2 Macro Risk -> L3 Position Sizing -> L4 Tactical Entry Timing.",
+                "[bold bright_green]3. The Supreme Signal Lights:[/bold bright_green]",
+                "   • [bold green]GREEN (Full Aggression):[/bold green] High multi-desk confluence (100% target position size).",
+                "   • [bold cyan]BLUE (Accumulate Support):[/bold cyan] Constructive absorption; stage bids at key support shelves (50–75% size).",
+                "   • [bold yellow]AMBER (Caution):[/bold yellow] Reversal risk or overhead resistance; tighten trailing stops.",
+                "   • [bold red]RED (Risk-Off Defense):[/bold red] Hard veto active; 100% Cash / USDT capital protection.",
+            ]
+        ),
+    }
+
+    title, bullets = desk_info_map.get(
+        active_tab,
+        (
+            f"SPECIALIST DESK [{active_tab}] QUANTITATIVE RADAR",
+            [
+                f"[bold cyan]Desk {active_tab}:[/bold cyan] Deep-dive specialist quantitative research desk feeding into Desk [L] Master Rollup and Section 13 AI Packet.",
+                "[bold yellow]Navigation:[/bold yellow] Press 'P' for Structure, 'F' for Footprint, 'W' for Waterfall, '0' for Screener, or 'L' for Master Command.",
+            ],
+        ),
+    )
+
+    desk_table = Table.grid(expand=True)
+    desk_table.add_column()
+    for b in bullets:
+        desk_table.add_row(f"  {b}")
+
+    desk_panel = Panel(
+        desk_table,
+        title=f"[bold bright_yellow]📖 ACTIVE DESK OVERVIEW: {title}[/bold bright_yellow]",
+        border_style="bright_yellow",
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+
+    laws_table = Table.grid(expand=True)
+    laws_table.add_column()
+    laws_table.add_row("  [bold green]1. Capital Preservation First (Zero Leverage Law):[/bold green] Spot BTC only. Maximum 0.75% equity risk ($750 max risk on $100k account). Zero shorting, zero liquidation risk.")
+    laws_table.add_row("  [bold yellow]2. The Anti-FOMO Patience Law:[/bold yellow] If the executive verdict says 'STAY IN CASH', do not buy. Professional quants wait for price to reach structural support.")
+    laws_table.add_row("  [bold cyan]3. The 4-Pillar Confluence Law:[/bold cyan] Never buy on a single indicator. Wait for Level Shelf (P1) + 3-EMA Band (P2) + Liq Stabilization (P3) + Tell-Tale Clear (P4).")
+    laws_table.add_row("  [bold magenta]4. Fast Exit on Invalidation:[/bold magenta] If price closes below daily support or hits stop loss, exit immediately with zero hesitation.")
+
+    laws_panel = Panel(
+        laws_table,
+        title="[bold bright_green]🛡️ THE 4 GOLDEN LAWS FOR BEGINNERS (INSTITUTIONAL QUANT PRINCIPLES)[/bold bright_green]",
+        border_style="bright_green",
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+
+    nav_table = Table.grid(expand=True)
+    nav_table.add_column()
+    nav_table.add_row("  • [bold white][P] Structure Protocol:[/bold white] Primary 4-Pillar daily/4H swing execution cockpit (SLSP, 3-EMA, Liq Flush, Tell-Tale).")
+    nav_table.add_row("  • [bold white][F] Footprint Tape:[/bold white] 15m live bid-ask auction ladder, delta absorption wicks, and 30D volume profiles.")
+    nav_table.add_row("  • [bold white][W] Waterfall:[/bold white] 5-Pillar Decision Waterfall, CoinGlass liquidation pools, and orderbook magnets.")
+    nav_table.add_row("  • [bold white][0] Spot Screener:[/bold white] Macro daily squeeze screener and 1:3 RRR swing candidate scanner.")
+    nav_table.add_row("  • [bold white][L] Master Rollup:[/bold white] Supreme command center synthesizing all specialist quant models.")
+    nav_table.add_row("  • [bold white][C] Copy AI Packet:[/bold white] One-touch export of all 13 quantitative sections directly to clipboard and disk.")
+    nav_table.add_row("  • [bold white][H] Toggle Guide:[/bold white] Press 'H' or any desk hotkey (P, F, W, 0, L) at any time to dismiss and return to live trading.")
+
+    nav_panel = Panel(
+        nav_table,
+        title="[bold bright_cyan]⌨️ COCKPIT QUICK-ACTION CHEAT SHEET[/bold bright_cyan]",
+        border_style="bright_cyan",
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+
+    return Group(header_panel, desk_panel, laws_panel, nav_panel)
+
+
 def build_dashboard_renderable(
     config: EngineConfig,
     store: StateStore,
@@ -4591,6 +4714,9 @@ def build_dashboard_renderable(
         active_tab = store.active_tab if store.active_tab in valid_tabs else 0
 
     header_panel = _build_header_panel(store, active_tab)
+
+    if getattr(store, "show_help", False):
+        return _build_help_overlay(store, header_panel)
 
     if active_tab == 13:
         return _build_tab13_slsp_price_action_hud(store, header_panel)
@@ -4695,6 +4821,7 @@ def _poll_keyboard_tab_switch(
                 ch = msvcrt.getwch()
                 if ch in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9"):
                     new_tab = int(ch)
+                    store.show_help = False
                     if store.active_tab != new_tab:
                         store.active_tab = new_tab
                         changed = True
@@ -4742,6 +4869,12 @@ def _poll_keyboard_tab_switch(
                     if store.active_tab != 13:
                         store.active_tab = 13
                         changed = True
+                elif ch in ("h", "H", "?"):
+                    store.show_help = not getattr(store, "show_help", False)
+                    changed = True
+                elif ch in ("h", "H", "?"):
+                    store.show_help = not getattr(store, "show_help", False)
+                    changed = True
                 elif ch in ("c", "C"):
                     if detector is not None:
                         detector.evaluate(store)
@@ -4759,6 +4892,7 @@ def _poll_keyboard_tab_switch(
                 ch = sys.stdin.read(1)
                 if ch in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9"):
                     new_tab = int(ch)
+                    store.show_help = False
                     if store.active_tab != new_tab:
                         store.active_tab = new_tab
                         changed = True

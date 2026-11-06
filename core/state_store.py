@@ -50,6 +50,7 @@ class StateStore:
 
         # --- Active HUD Tab State (0 = Spot Swing Screener, 1-9 = Specialist Desks, 10 = Master [L]) ---
         self.active_tab: int = 0
+        self.show_help: bool = False
 
         # --- Live Tick & Session Accumulators ---
         self.binance_spot_price: float = 0.0

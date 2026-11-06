@@ -1873,6 +1873,24 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             "* **Status**: Engine initializing higher-timeframe swing pivots, 4H rejection candles, and liquidation sensor streams.",
         ])
 
+    # --- SECTION 14: TAB [B] CLASSIC CHART PATTERNS & CANDLESTICK GEOMETRY ---
+    pat = getattr(store, "pattern_evaluation", None)
+    top_p = pat.top_pattern if pat else None
+    lines.extend([
+        "",
+        "---",
+        "",
+        "## SECTION 14: TAB [B] CLASSIC CHART PATTERNS & CANDLESTICK GEOMETRY (4H MACRO & 1H BREAKOUT)",
+        "",
+        f"* **Top Geometric Pattern**: `{top_p.pattern if top_p else 'None'}` ({f'{top_p.confidence:.0%}' if top_p else '0%'})",
+        f"* **Pattern Bias**: `{pat.active_bias if pat else 'Neutral'}` | **Trigger State**: `{pat.trigger_status if pat else 'STANDBY'}`",
+        f"* **Neckline Breakout Price**: `{f'${pat.neckline_trigger:,.2f}' if pat and pat.neckline_trigger else 'N/A'}`",
+        f"* **Invalidation Floor/Roof**: `{f'${pat.invalidation_level:,.2f}' if pat and pat.invalidation_level else 'N/A'}`",
+        f"* **Multi-Timeframe Aligned**: `{'YES (4H + 1H CONFLUENCE)' if pat and pat.multi_timeframe_aligned else 'NO (1H ONLY)'}`",
+        f"* **Tactical Playbook**: {pat.tactical_playbook if pat else 'Awaiting geometric setup.'}",
+        "* **Interactive Chart**: `chart.html` (TradingView Lightweight Chart auto-synced)",
+    ])
+
     return "\n".join(lines) + "\n"
 
 
@@ -1939,7 +1957,22 @@ def copy_ai_packet_to_clipboard_and_disk(config: EngineConfig, store: StateStore
 
             bar_poc_p = store.footprint_engine.active_bar.poc_price or f_ev.current_price
 
+        pat_ev = getattr(store, "pattern_evaluation", None)
+        pat_radar_json = {}
+        if pat_ev is not None and pat_ev.top_pattern is not None:
+            top_p = pat_ev.top_pattern
+            pat_radar_json = {
+                "top_pattern": top_p.pattern,
+                "bias": top_p.bias,
+                "confidence": round(top_p.confidence, 2),
+                "neckline": round(top_p.neckline, 2) if top_p.neckline else None,
+                "floor_or_roof": round(top_p.floor_or_roof, 2) if top_p.floor_or_roof else None,
+                "trigger_status": pat_ev.trigger_status,
+                "tactical_playbook": pat_ev.tactical_playbook,
+                "multi_timeframe_aligned": pat_ev.multi_timeframe_aligned,
+            }
         footprint_metrics = {
+            "pattern_radar": pat_radar_json,
 
             "order_flow": {
 

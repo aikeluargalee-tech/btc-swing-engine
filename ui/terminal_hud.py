@@ -145,6 +145,11 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         if active_tab == 13
         else "[dim white][P: STRUCTURE][/dim white]"
     )
+    tB = (
+        "[bold black on bright_cyan] [B: PATTERNS] [/bold black on bright_cyan]"
+        if active_tab == 14
+        else "[dim white][B: PATTERNS][/dim white]"
+    )
     tF = (
         "[bold black on bright_cyan] [F: FOOTPRINT] [/bold black on bright_cyan]"
         if active_tab == 11
@@ -182,6 +187,7 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         7: "7: GARTLEY HARMONICS",
         8: "8: SFP LIQ TRAP",
         9: "9: TD EXHAUSTION",
+        14: "14: PATTERNS & CHART",
     }
     if active_tab in subdesk_names:
         subdesk_info = f"  │  [bold black on bright_yellow] [DEEP DIVE {subdesk_names[active_tab]}] [/bold black on bright_yellow]"
@@ -197,13 +203,13 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
     nav_grid.add_column(justify="right", no_wrap=True)
     nav_grid.add_row(
         f"[bold white]BTC-USD[/bold white] | Spot: [bold cyan]${spot_px:,.2f}[/bold cyan] | Regime: {regime_str} ({score_str}) | Feeds: Spot {spot_ws_dot} • Perp {perp_ws_dot} • CB {cb_ws_dot}",
-        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: P Structure • F Footprint • W Waterfall • 0 Screener • L Master • C Copy • H Guide • 1-9 Desks[/dim]",
+        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: P Structure • B Patterns • F Footprint • W Waterfall • 0 Screener • L Master • C Copy • H Guide • 1-9 Desks[/dim]",
     )
 
     tab_grid = Table.grid(expand=True)
     tab_grid.add_column(justify="left", no_wrap=True)
     tab_grid.add_row(
-        f"{tP}  {tF}  {tW}  {t0}  {tL}  │  {tC}  {tH}{subdesk_info}"
+        f"{tP}  {tB}  {tF}  {tW}  {t0}  {tL}  │  {tC}  {tH}{subdesk_info}"
     )
     nav_panel = Panel(Group(nav_grid, tab_grid), border_style="bright_blue", box=box.ROUNDED, padding=(0, 1))
 
@@ -4561,6 +4567,16 @@ def _build_help_overlay(store: StateStore, header_panel: Panel) -> Group:
     active_tab = store.active_tab
 
     desk_info_map = {
+        14: (
+            "DESK [B: PATTERNS] — Classic Chart Patterns, Geometric Necklines & Candlestick Chart",
+            [
+                "[bold bright_cyan]1. Multi-Timeframe Pattern Engine:[/bold bright_cyan] Scans 4H and 1H Bitcoin candles for high-probability classic patterns: Double Bottom/Top, Inverse Head & Shoulders, Wedges, and Triangles.",
+                "[bold bright_yellow]2. Geometric Neckline Triggers:[/bold bright_yellow] Calculates the exact breakout neckline and invalidation floor/roof. Requires a 1H candle close beyond the neckline to confirm execution.",
+                "[bold bright_magenta]3. Live Candlestick Visualizer:[/bold bright_magenta] Renders an ASCII candlestick chart in the terminal with colored wicks, dashed neckline lines, and swing pivot markers (▲ low / ▼ high).",
+                "[bold bright_green]4. Interactive TradingView Chart:[/bold bright_green] Auto-generates `chart.html` in the root folder so you can explore candles and price lines in full interactive WebGL in any browser.",
+                "[bold bright_white]5. Beginner Directive:[/bold bright_white] Never front-run a pattern. Wait for the 1H candle to close confirmed beyond the neckline with absorption before entering.",
+            ]
+        ),
         13: (
             "DESK [P: STRUCTURE] — 4-Pillar Daily & 4H Price Action & Structure Protocol",
             [
@@ -4674,6 +4690,119 @@ def _build_help_overlay(store: StateStore, header_panel: Panel) -> Group:
     return Group(header_panel, desk_panel, laws_panel, nav_panel)
 
 
+
+def _build_tab14_pattern_chart_hud(store: StateStore, header_panel: Panel) -> Group:
+    """Renders Tab [14: B]: Classic Chart Pattern Radar & Candlestick Geometry."""
+    pat = getattr(store, "pattern_evaluation", None)
+    sig = store.latest_signal
+    spot_px = store.binance_spot_price or (sig.current_price if sig else 0.0)
+    top_p = pat.top_pattern if pat else None
+
+    if pat is None:
+        return Group(
+            header_panel,
+            Panel(
+                "Warming up Tab [14: B]: Classic Chart Pattern Radar & Candlestick Geometry...\n"
+                "Scanning 4H/1H Double Bottoms, Head & Shoulders, Wedges, and Triangles...",
+                title="[bold bright_cyan]DESK [B]: CLASSIC CHART PATTERN & CANDLESTICK GEOMETRY[/bold bright_cyan]",
+                box=box.ROUNDED,
+                border_style="bright_cyan",
+            ),
+        )
+
+    # 1. Verdict & Status Banner
+    if top_p:
+        bias_style = "bold bright_green" if top_p.bias == "Bullish" else ("bold bright_red" if top_p.bias == "Bearish" else "bold yellow")
+        badge_style = "black on green" if top_p.bias == "Bullish" else ("white on red" if top_p.bias == "Bearish" else "black on yellow")
+        status_style = "bold bright_green" if pat.trigger_status == "CONFIRMED_BREAKOUT" else ("bold bright_red" if pat.trigger_status == "INVALIDATED" else "bold yellow")
+
+        nl_str = f"${top_p.neckline:,.2f}" if top_p.neckline else "N/A"
+        fl_str = f"${top_p.floor_or_roof:,.2f}" if top_p.floor_or_roof else "N/A"
+        mtf_str = "[bold bright_green]✓ 4H+1H MTF ALIGNED[/bold bright_green]" if pat.multi_timeframe_aligned else "[dim]1H Tactical[/dim]"
+
+        banner_text = (
+            f"[bold {badge_style}] {top_p.pattern.upper()} ({top_p.confidence:.0%}) [/bold {badge_style}]  │  "
+            f"Bias: [{bias_style}]{top_p.bias.upper()}[/{bias_style}]  │  "
+            f"Trigger State: [{status_style}]{pat.trigger_status}[/{status_style}]  │  "
+            f"Neckline: [bold magenta]{nl_str}[/bold magenta]  │  "
+            f"Floor/Roof: [bold cyan]{fl_str}[/bold cyan]  │  "
+            f"{mtf_str}\n"
+            f"[bold bright_white]Tactical Playbook:[/bold bright_white] {pat.tactical_playbook}"
+        )
+        border_col = "green" if top_p.bias == "Bullish" else ("red" if top_p.bias == "Bearish" else "yellow")
+    else:
+        banner_text = (
+            "[bold white on bright_black] STANDBY — NO CONFIRMED GEOMETRIC PATTERNS [/bold white on bright_black]\n"
+            f"BTC (${spot_px:,.2f}) structure is {pat.structure_trend}. No classic geometric patterns meeting strict tolerance thresholds.\n"
+            "[bold yellow]Next Move:[/bold yellow] Sit in cash. Wait for clean swing boundary consolidation."
+        )
+        border_col = "bright_black"
+
+    verdict_panel = Panel(
+        banner_text,
+        title="[bold bright_cyan]DESK [B]: GEOMETRIC PATTERN VERDICT & TACTICAL PLAYBOOK[/bold bright_cyan]",
+        box=box.ROUNDED,
+        border_style=border_col,
+        padding=(0, 1),
+    )
+
+    # 2. Middle Grid: Pattern Candidates Table (Left) + Geometry Details (Right)
+    cand_table = Table(box=box.SIMPLE_HEAD, expand=True, padding=(0, 1))
+    cand_table.add_column("Pattern", style="bold white", no_wrap=True, ratio=4)
+    cand_table.add_column("Bias", style="cyan", no_wrap=True, ratio=2)
+    cand_table.add_column("TF", style="dim", no_wrap=True, ratio=1)
+    cand_table.add_column("Conf.", style="bold yellow", no_wrap=True, ratio=2)
+    cand_table.add_column("Key Neckline", style="bold magenta", no_wrap=True, ratio=3)
+
+    if pat.candidates:
+        for c in pat.candidates[:5]:
+            c_bias_col = "green" if c.bias == "Bullish" else ("red" if c.bias == "Bearish" else "yellow")
+            nl_desc = f"${c.neckline:,.0f}" if c.neckline else "Converging"
+            cand_table.add_row(
+                c.pattern,
+                f"[{c_bias_col}]{c.bias}[/{c_bias_col}]",
+                c.timeframe.upper(),
+                f"{c.confidence:.0%}",
+                nl_desc,
+            )
+    else:
+        cand_table.add_row("No Candidates", "Neutral", "—", "—", "—")
+
+    cand_panel = Panel(cand_table, title="[bold white]Detected Pattern Candidates (4H & 1H)[/bold white]", box=box.ROUNDED, border_style="cyan")
+
+    geo_lines = [
+        f"• [bold white]Structure Trend:[/bold white] {pat.structure_trend}",
+        f"• [bold white]Active Spot Reference:[/bold white] [bold cyan]${spot_px:,.2f}[/bold cyan]",
+    ]
+    if top_p:
+        geo_lines.append(f"• [bold white]Leading Pattern:[/bold white] [bold magenta]{top_p.pattern}[/bold magenta] ({top_p.timeframe.upper()})")
+        if top_p.high_slope is not None and top_p.low_slope is not None:
+            geo_lines.append(f"• [bold white]High Slope:[/bold white] {top_p.high_slope:.4f} │ [bold white]Low Slope:[/bold white] {top_p.low_slope:.4f}")
+        if top_p.details and "bars" in top_p.details:
+            geo_lines.append(f"• [bold white]Pattern Base Width:[/bold white] {top_p.details['bars']} bars separation")
+        geo_lines.append(f"• [bold white]Multi-Timeframe Status:[/bold white] {'Aligned with 4H trend' if pat.multi_timeframe_aligned else 'Isolated 1H formation'}")
+    else:
+        geo_lines.append("• [dim]Awaiting pivot alignment...[/dim]")
+
+    geo_lines.append("• [bold bright_yellow]Interactive Web Chart:[/bold bright_yellow] [underline]chart.html[/underline] (auto-updated with dashed necklines)")
+
+    geo_panel = Panel("\n".join(geo_lines), title="[bold white]Geometric Parameters & Web Chart Link[/bold white]", box=box.ROUNDED, border_style="bright_blue")
+
+    mid_grid = Table.grid(expand=True)
+    mid_grid.add_column(justify="left", no_wrap=False, ratio=1)
+    mid_grid.add_column(justify="left", no_wrap=False, ratio=1)
+    mid_grid.add_row(cand_panel, geo_panel)
+
+    # 3. Candlestick Chart Panel (Native Terminal ASCII)
+    from analytics.pattern_detector import render_candlestick_ascii, detect_swings, klines_to_ohlcv_list
+    bars_1h = list(store.spot_klines_1h)
+    ohlcv_1h = klines_to_ohlcv_list(bars_1h)
+    swings_1h = detect_swings(ohlcv_1h, left=5, right=5) if len(ohlcv_1h) >= 20 else []
+    chart_panel = render_candlestick_ascii(ohlcv_1h, swings_1h, top_p, width=120, height=12)
+
+    return Group(header_panel, verdict_panel, mid_grid, chart_panel)
+
+
 def build_dashboard_renderable(
     config: EngineConfig,
     store: StateStore,
@@ -4718,6 +4847,8 @@ def build_dashboard_renderable(
     if getattr(store, "show_help", False):
         return _build_help_overlay(store, header_panel)
 
+    if active_tab == 14:
+        return _build_tab14_pattern_chart_hud(store, header_panel)
     if active_tab == 13:
         return _build_tab13_slsp_price_action_hud(store, header_panel)
     if active_tab == 12:
@@ -4857,6 +4988,11 @@ def _poll_keyboard_tab_switch(
                     if store.active_tab != 13:
                         store.active_tab = 13
                         changed = True
+                elif ch in ("b", "B"):
+                    store.show_help = False
+                    if store.active_tab != 14:
+                        store.active_tab = 14
+                        changed = True
                 elif ch in ("f", "F"):
                     if store.active_tab != 11:
                         store.active_tab = 11
@@ -4903,6 +5039,11 @@ def _poll_keyboard_tab_switch(
                 elif ch in ("w", "W"):
                     if store.active_tab != 12:
                         store.active_tab = 12
+                        changed = True
+                elif ch in ("b", "B"):
+                    store.show_help = False
+                    if store.active_tab != 14:
+                        store.active_tab = 14
                         changed = True
                 elif ch in ("f", "F"):
                     if store.active_tab != 11:

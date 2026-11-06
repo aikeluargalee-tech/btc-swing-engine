@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="refresh" content="30">
+  <title>BTC/USDT Pattern & Structure Chart</title>
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background-color: #0b0e14;
+      color: #e0e6ed;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    header {
+      background-color: #121824;
+      padding: 12px 24px;
+      border-bottom: 1px solid #1f293d;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .title-group { display: flex; align-items: center; gap: 14px; }
+    .title { font-size: 18px; font-weight: 700; color: #00e5ff; letter-spacing: 0.5px; }
+    .badge {
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background-color: #ffd600;
+      color: #000;
+    }
+    .metrics { display: flex; gap: 24px; font-size: 13px; }
+    .metric-item span { color: #8899a6; font-size: 11px; display: block; }
+    .metric-item b { font-size: 15px; font-weight: 600; color: #fff; }
+    .chart-container { flex: 1; position: relative; width: 100%; }
+    #chart { width: 100%; height: 100%; }
+    .conclusion-bar {
+      background-color: #121824;
+      border-top: 1px solid #1f293d;
+      padding: 10px 24px;
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .highlight { color: #ffd600; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title-group">
+      <div class="title">BTC Swing Engine &bull; Geometric Pattern Chart</div>
+      <div class="badge">NO PATTERN</div>
+    </div>
+    <div class="metrics">
+      <div class="metric-item"><span>SPOT PRICE</span><b style="color: #00e676;">$80,690.00</b></div>
+      <div class="metric-item"><span>UPDATED (UTC)</span><b>2023-11-16 23:13 UTC</b></div>
+      <div class="metric-item"><span>STRUCTURE</span><b style="color: #ffd600;">Ranging</b></div>
+      <div class="metric-item"><span>TRIGGER</span><b style="color: #00e5ff;">STANDBY</b></div>
+    </div>
+  </header>
+  <div class="chart-container">
+    <div id="chart"></div>
+  </div>
+  <div class="conclusion-bar">
+    <div><b>Tactical Playbook:</b> <span class="highlight">Observe price action; waiting for confirmed geometric pattern formation.</span></div>
+    <div style="color: #8899a6; font-size: 11px;">Auto-refreshes every 30s &bull; Binance Spot 1H/4H</div>
+  </div>
+  <script>
+    const chart = LightweightCharts.createChart(document.getElementById('chart'), {
+      layout: {
+        background: { color: '#0b0e14' },
+        textColor: '#8899a6',
+      },
+      grid: {
+        vertLines: { color: '#161d2b' },
+        horzLines: { color: '#161d2b' },
+      },
+      crosshair: {
+        mode: LightweightCharts.CrosshairMode.Normal,
+      },
+      rightPriceScale: {
+        borderColor: '#1f293d',
+      },
+      timeScale: {
+        borderColor: '#1f293d',
+        timeVisible: true,
+        secondsVisible: false,
+      },
+    });
+
+    const candleSeries = chart.addCandlestickSeries({
+      upColor: '#00e676',
+      downColor: '#ef5350',
+      borderUpColor: '#00e676',
+      borderDownColor: '#ef5350',
+      wickUpColor: '#00e676',
+      wickDownColor: '#ef5350',
+    });
+
+    const candleData = [{"time": 1700000000, "open": 80000.0, "high": 80500.0, "low": 79800.0, "close": 80200.0}, {"time": 1700003600, "open": 80010.0, "high": 80510.0, "low": 79810.0, "close": 80210.0}, {"time": 1700007200, "open": 80020.0, "high": 80520.0, "low": 79820.0, "close": 80220.0}, {"time": 1700010800, "open": 80030.0, "high": 80530.0, "low": 79830.0, "close": 80230.0}, {"time": 1700014400, "open": 80040.0, "high": 80540.0, "low": 79840.0, "close": 80240.0}, {"time": 1700018000, "open": 80050.0, "high": 80550.0, "low": 79850.0, "close": 80250.0}, {"time": 1700021600, "open": 80060.0, "high": 80560.0, "low": 79860.0, "close": 80260.0}, {"time": 1700025200, "open": 80070.0, "high": 80570.0, "low": 79870.0, "close": 80270.0}, {"time": 1700028800, "open": 80080.0, "high": 80580.0, "low": 79880.0, "close": 80280.0}, {"time": 1700032400, "open": 80090.0, "high": 80590.0, "low": 79890.0, "close": 80290.0}, {"time": 1700036000, "open": 80100.0, "high": 80600.0, "low": 79900.0, "close": 80300.0}, {"time": 1700039600, "open": 80110.0, "high": 80610.0, "low": 79910.0, "close": 80310.0}, {"time": 1700043200, "open": 80120.0, "high": 80620.0, "low": 79920.0, "close": 80320.0}, {"time": 1700046800, "open": 80130.0, "high": 80630.0, "low": 79930.0, "close": 80330.0}, {"time": 1700050400, "open": 80140.0, "high": 80640.0, "low": 79940.0, "close": 80340.0}, {"time": 1700054000, "open": 80150.0, "high": 80650.0, "low": 79950.0, "close": 80350.0}, {"time": 1700057600, "open": 80160.0, "high": 80660.0, "low": 79960.0, "close": 80360.0}, {"time": 1700061200, "open": 80170.0, "high": 80670.0, "low": 79970.0, "close": 80370.0}, {"time": 1700064800, "open": 80180.0, "high": 80680.0, "low": 79980.0, "close": 80380.0}, {"time": 1700068400, "open": 80190.0, "high": 80690.0, "low": 79990.0, "close": 80390.0}, {"time": 1700072000, "open": 80200.0, "high": 80700.0, "low": 80000.0, "close": 80400.0}, {"time": 1700075600, "open": 80210.0, "high": 80710.0, "low": 80010.0, "close": 80410.0}, {"time": 1700079200, "open": 80220.0, "high": 80720.0, "low": 80020.0, "close": 80420.0}, {"time": 1700082800, "open": 80230.0, "high": 80730.0, "low": 80030.0, "close": 80430.0}, {"time": 1700086400, "open": 80240.0, "high": 80740.0, "low": 80040.0, "close": 80440.0}, {"time": 1700090000, "open": 80250.0, "high": 80750.0, "low": 80050.0, "close": 80450.0}, {"time": 1700093600, "open": 80260.0, "high": 80760.0, "low": 80060.0, "close": 80460.0}, {"time": 1700097200, "open": 80270.0, "high": 80770.0, "low": 80070.0, "close": 80470.0}, {"time": 1700100800, "open": 80280.0, "high": 80780.0, "low": 80080.0, "close": 80480.0}, {"time": 1700104400, "open": 80290.0, "high": 80790.0, "low": 80090.0, "close": 80490.0}, {"time": 1700108000, "open": 80300.0, "high": 80800.0, "low": 80100.0, "close": 80500.0}, {"time": 1700111600, "open": 80310.0, "high": 80810.0, "low": 80110.0, "close": 80510.0}, {"time": 1700115200, "open": 80320.0, "high": 80820.0, "low": 80120.0, "close": 80520.0}, {"time": 1700118800, "open": 80330.0, "high": 80830.0, "low": 80130.0, "close": 80530.0}, {"time": 1700122400, "open": 80340.0, "high": 80840.0, "low": 80140.0, "close": 80540.0}, {"time": 1700126000, "open": 80350.0, "high": 80850.0, "low": 80150.0, "close": 80550.0}, {"time": 1700129600, "open": 80360.0, "high": 80860.0, "low": 80160.0, "close": 80560.0}, {"time": 1700133200, "open": 80370.0, "high": 80870.0, "low": 80170.0, "close": 80570.0}, {"time": 1700136800, "open": 80380.0, "high": 80880.0, "low": 80180.0, "close": 80580.0}, {"time": 1700140400, "open": 80390.0, "high": 80890.0, "low": 80190.0, "close": 80590.0}, {"time": 1700144000, "open": 80400.0, "high": 80900.0, "low": 80200.0, "close": 80600.0}, {"time": 1700147600, "open": 80410.0, "high": 80910.0, "low": 80210.0, "close": 80610.0}, {"time": 1700151200, "open": 80420.0, "high": 80920.0, "low": 80220.0, "close": 80620.0}, {"time": 1700154800, "open": 80430.0, "high": 80930.0, "low": 80230.0, "close": 80630.0}, {"time": 1700158400, "open": 80440.0, "high": 80940.0, "low": 80240.0, "close": 80640.0}, {"time": 1700162000, "open": 80450.0, "high": 80950.0, "low": 80250.0, "close": 80650.0}, {"time": 1700165600, "open": 80460.0, "high": 80960.0, "low": 80260.0, "close": 80660.0}, {"time": 1700169200, "open": 80470.0, "high": 80970.0, "low": 80270.0, "close": 80670.0}, {"time": 1700172800, "open": 80480.0, "high": 80980.0, "low": 80280.0, "close": 80680.0}, {"time": 1700176400, "open": 80490.0, "high": 80990.0, "low": 80290.0, "close": 80690.0}];
+    candleSeries.setData(candleData);
+
+    const priceLines = [];
+    priceLines.forEach(pl => {
+      candleSeries.createPriceLine({
+        price: pl.price,
+        color: pl.color,
+        lineWidth: 2,
+        lineStyle: LightweightCharts.LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: pl.title,
+      });
+    });
+
+    const markers = [];
+    if (markers.length > 0) {
+      candleSeries.setMarkers(markers);
+    }
+
+    chart.timeScale().fitContent();
+
+    window.addEventListener('resize', () => {
+      chart.applyOptions({
+        width: document.getElementById('chart').clientWidth,
+        height: document.getElementById('chart').clientHeight,
+      });
+    });
+  </script>
+</body>
+</html>

@@ -55,6 +55,8 @@ async def _run_engine(
         store.active_tab = int(tab_arg)
     elif tab_arg.lower() in ("p", "structure", "slsp", "pa", "13"):
         store.active_tab = 13  # Desk [P: STRUCTURE PROTOCOL]
+    elif tab_arg.lower() in ("b", "pattern", "patterns", "chart", "14"):
+        store.active_tab = 14  # Desk [B: PATTERNS & CANDLESTICK GEOMETRY]
     elif tab_arg.lower() in ("f", "footprint", "fp", "11"):
         store.active_tab = 11  # Desk [F: FOOTPRINT SWING]
     elif tab_arg.lower() in ("w", "waterfall", "wf", "12"):
@@ -155,7 +157,7 @@ def parse_args() -> argparse.Namespace:
         "--tab",
         type=str,
         default="0",
-        choices=["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "m", "M", "l", "L", "f", "F", "footprint", "11", "w", "W", "waterfall", "12", "s0", "S0", "s1", "S1", "s2", "S2", "s3", "S3", "s4", "S4", "s5", "S5", "s", "S", "v", "V", "g", "G", "t", "T", "e", "E", "p", "P", "13", "structure", "slsp", "all"],
+        choices=["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "m", "M", "l", "L", "f", "F", "footprint", "11", "w", "W", "waterfall", "12", "s0", "S0", "s1", "S1", "s2", "S2", "s3", "S3", "s4", "S4", "s5", "S5", "s", "S", "v", "V", "g", "G", "t", "T", "e", "E", "p", "P", "13", "structure", "slsp", "b", "B", "14", "pattern", "patterns", "chart", "all"],
         help="Initial active HUD tab (0=BTC Spot Swing Screener, W=Waterfall, F=Footprint, L/m=Master, 1=Swing Engine, 2=Protocol v1.3, 3=Macro Radar, 4=Regime Matrix A-J, 5/s=MM-BTC, 6/v=72H Cone, 7/g=Gartley, 8/t=SFP Trap, 9/e=Terminal Exhaustion, P/13=Structure & SLSP, or 'all').",
     )
     parser.add_argument(

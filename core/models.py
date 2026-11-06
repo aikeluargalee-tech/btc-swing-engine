@@ -4692,3 +4692,37 @@ class SLSPEvaluation:
     confluence_score: int = 0  # 0 to 100
     plain_english_summary: str = ""
     decision_log: List[str] = field(default_factory=list)
+
+
+@dataclass
+class PatternCandidate:
+    """Individual detected classic chart pattern candidate."""
+
+    pattern: str = ""
+    bias: str = "Neutral"  # "Bullish", "Bearish", "Neutral"
+    confidence: float = 0.0  # 0.0 to 1.0
+    timeframe: str = "1h"  # "1h" or "4h"
+    neckline: Optional[float] = None
+    floor_or_roof: Optional[float] = None
+    details: Dict[str, Any] = field(default_factory=dict)
+    high_slope: Optional[float] = None
+    low_slope: Optional[float] = None
+
+
+@dataclass
+class PatternEvaluation:
+    """Complete evaluation state for Classic Chart Pattern & Candlestick Geometry."""
+
+    timestamp_utc: str = ""
+    spot_price: float = 0.0
+    structure_trend: str = "Ranging"  # "Bullish structure", "Bearish structure", "Ranging"
+    top_pattern: Optional[PatternCandidate] = None
+    candidates: List[PatternCandidate] = field(default_factory=list)
+    multi_timeframe_aligned: bool = False
+    active_bias: str = "Neutral"
+    neckline_trigger: Optional[float] = None
+    invalidation_level: Optional[float] = None
+    trigger_status: str = "STANDBY"  # "CONFIRMED_BREAKOUT", "PENDING_BREAKOUT", "INVALIDATED", "CONSOLIDATING", "STANDBY"
+    tactical_playbook: str = ""
+    html_chart_path: str = ""
+

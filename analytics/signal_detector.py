@@ -37,6 +37,7 @@ from .sweep_retest_fsm import (
     SweepInstance,
     SweepRetestFSM,
 )
+from .pattern_detector import PatternEngine
 from .slsp_engine import SLSPEngine
 from .trap_engine import TrapEngine
 from .exhaustion_engine import ExhaustionEngine
@@ -59,6 +60,7 @@ class SignalDetector:
         self.trap_engine = TrapEngine(config)
         self.exhaustion_engine = ExhaustionEngine(config)
         self.ema_strategy_engine = EMAStrategyEngine(config)
+        self.pattern_engine = PatternEngine(config)
         self.slsp_engine = SLSPEngine(config, read_only=True)
         # Side-effect free by default (no state writes / alerts). Only the live HUD opts in via set_read_only(False).
         self.spot_swing_engine = SpotSwingEngine(config, read_only=True)
@@ -365,6 +367,16 @@ class SignalDetector:
             )
         except Exception:
             logging.getLogger("slsp").exception("Tab [13] SLSP evaluation failed")
+
+        # 2g. Evaluate Geometric Chart Patterns & Candlestick Structure
+        try:
+            self.pattern_engine.evaluate(
+                store=store,
+                spot_1h=spot_1h,
+                spot_4h=bars_4h,
+            )
+        except Exception:
+            logging.getLogger("pattern").exception("Pattern geometry evaluation failed")
 
         c_vah = active_vp.c_vah
         c_poc = active_vp.c_poc

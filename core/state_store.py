@@ -20,6 +20,7 @@ from .models import (
     MacroRadarEvaluation,
     MasterSynthesisEvaluation,
     MMBTCEvaluation,
+    PatternEvaluation,
     ProtocolV13Evaluation,
     RegimeMatrixEvaluation,
     SignalEvaluation,
@@ -106,6 +107,7 @@ class StateStore:
         self.exhaustion_evaluation: Optional[ExhaustionRadarEvaluation] = None
         self.spot_swing_evaluation: Optional[SpotSwingEvaluation] = None
         self.slsp_evaluation: Optional[SLSPEvaluation] = None
+        self.pattern_evaluation: Optional[PatternEvaluation] = None
         self.liquidation_report: Optional[LiquidationDetectorReport] = None
         self.footprint_engine: FootprintEngine = FootprintEngine()
         self.footprint_evaluation: Optional[FootprintEvaluation] = None

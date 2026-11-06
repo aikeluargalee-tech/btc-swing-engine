@@ -42,13 +42,26 @@ async def _run_engine(
     duration: float = 15.0,
     tab_arg: str = "1",
     copy_packet: bool = False,
+    reset_forward_test: bool = False,
 ) -> None:
     """Initializes historical backfill, starts concurrent WebSocket/REST streams, and runs the HUD."""
     console = Console(force_terminal=True)
     store = StateStore()
+    if reset_forward_test and hasattr(store, "footprint_engine") and hasattr(store.footprint_engine, "forward_tracker"):
+        store.footprint_engine.forward_tracker.reset_state()
+        console.print("[bold yellow]>>> [RESET] Cleared 3-Variant Forward Test Scorecard & Ledger back to Zero.[/bold yellow]")
+
     if tab_arg in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9"):
         store.active_tab = int(tab_arg)
-    elif tab_arg.lower() in ("m", "master"):
+    elif tab_arg.lower() in ("p", "structure", "slsp", "pa", "13"):
+        store.active_tab = 13  # Desk [P: STRUCTURE PROTOCOL]
+    elif tab_arg.lower() in ("f", "footprint", "fp", "11"):
+        store.active_tab = 11  # Desk [F: FOOTPRINT SWING]
+    elif tab_arg.lower() in ("w", "waterfall", "wf", "12"):
+        store.active_tab = 12  # Tab [W: 5-PILLAR DECISION WATERFALL]
+    elif tab_arg.lower() in ("m", "master", "l", "10"):
+        store.active_tab = 10  # Tab [L]: Master Supreme Command Center
+    elif tab_arg.lower() in ("s0", "spot", "swing", "screener"):
         store.active_tab = 0
     elif tab_arg.lower() in ("s1", "s", "mm", "mm_btc"):
         store.active_tab = 5
@@ -58,11 +71,13 @@ async def _run_engine(
         store.active_tab = 7
     elif tab_arg.lower() in ("s4", "t", "trap", "sfp"):
         store.active_tab = 8
-    elif tab_arg.lower() in ("s5", "e", "exhaust", "td", "10"):
+    elif tab_arg.lower() in ("s5", "e", "exhaust", "td"):
         store.active_tab = 9
     else:
         store.active_tab = 0
     detector = SignalDetector(config)
+    # Tab [0] persists trade state and fires alerts only in the live HUD; --dry-run stays side-effect free.
+    detector.spot_swing_engine.set_read_only(dry_run)
 
     console.print(
         "[bold cyan][1/3] Running Zero-Cold-Start Historical Backfill "
@@ -111,7 +126,7 @@ async def _run_engine(
                 "[bold green][3/3] Launching Unified Live Terminal HUD "
                 "(Press [bold cyan]1[/bold cyan]=Swing Engine, [bold yellow]2[/bold yellow]=Protocol v1.3, "
                 "[bold magenta]3[/bold magenta]=Macro Radar, [bold green]4[/bold green]=Regime Matrix A–J, "
-                "[bold blue]5[/bold blue]=Master Conclusion, [bold white]S/6[/bold white]=MM-BTC Quant Radar, "
+                "[bold white]0[/bold white]=Spot Swing Screener, [bold white]S/6[/bold white]=MM-BTC Quant Radar, "
                 "[bold bright_yellow]V/7[/bold bright_yellow]=72H Volatility Cone, [bold yellow]C[/bold yellow]=Copy AI Data Packet)...[/bold green]"
             )
             await run_terminal_hud(config, store, detector)
@@ -133,20 +148,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--duration",
         type=float,
-        default=15.0,
+        default=05.0,
         help="Duration in seconds for --dry-run live stream verification (default: 15).",
     )
     parser.add_argument(
         "--tab",
         type=str,
-        default="1",
-        choices=["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "m", "M", "s1", "S1", "s2", "S2", "s3", "S3", "s4", "S4", "s5", "S5", "s", "S", "v", "V", "g", "G", "t", "T", "e", "E", "all"],
-        help="Initial active HUD tab (0=Master Supreme Command Center, 1=Swing Engine, 2=Protocol v1.3, 3=Macro Radar, 4=Regime Matrix A-J, 5/s=MM-BTC, 6/v=72H Cone, 7/g=Gartley, 8/t=SFP Trap, 9/e=Terminal Exhaustion, or 'all').",
+        default="0",
+        choices=["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "m", "M", "l", "L", "f", "F", "footprint", "11", "w", "W", "waterfall", "12", "s0", "S0", "s1", "S1", "s2", "S2", "s3", "S3", "s4", "S4", "s5", "S5", "s", "S", "v", "V", "g", "G", "t", "T", "e", "E", "p", "P", "13", "structure", "slsp", "all"],
+        help="Initial active HUD tab (0=BTC Spot Swing Screener, W=Waterfall, F=Footprint, L/m=Master, 1=Swing Engine, 2=Protocol v1.3, 3=Macro Radar, 4=Regime Matrix A-J, 5/s=MM-BTC, 6/v=72H Cone, 7/g=Gartley, 8/t=SFP Trap, 9/e=Terminal Exhaustion, P/13=Structure & SLSP, or 'all').",
     )
     parser.add_argument(
         "--copy-packet",
         action="store_true",
         help="Copy the full Raw Telemetry & AI Audit Packet across all Desks [0]–[9] to clipboard and disk during --dry-run.",
+    )
+    parser.add_argument(
+        "--reset-forward-test",
+        action="store_true",
+        help="Reset the 3-variant forward test scorecard and start 72H session fresh from zero.",
     )
     parser.add_argument(
         "--debug",
@@ -172,6 +192,7 @@ def main() -> None:
                 duration=args.duration,
                 tab_arg=args.tab,
                 copy_packet=args.copy_packet,
+                reset_forward_test=args.reset_forward_test,
             )
         )
     except KeyboardInterrupt:

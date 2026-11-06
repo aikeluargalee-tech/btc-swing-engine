@@ -46,6 +46,7 @@ async def execute_engine(
 
     print("[3/4] Evaluating 10-Desk Quantitative Brain (Tab 0 Master & Specialist Desks 1–9)...")
     detector = SignalDetector(config)
+    detector.spot_swing_engine.set_read_only(True)  # cloud snapshot: no state writes, no alerts
     sig = detector.evaluate(store)
 
     print("[4/4] Compiling Consolidated Protocol Metrics Dossier & Exporting AI Packet...")

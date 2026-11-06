@@ -22,3 +22,6 @@ sweep_fsm_state.json.tmp
 Thumbs.db
 .vscode/
 .idea/
+spot_swing_state.json
+btc_metrics_latest.json
+BTC_AI_DATA_PACKET_LATEST.md

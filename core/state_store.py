@@ -13,14 +13,18 @@ from .models import (
     EMAStrategySnapshot,
     ExhaustionRadarEvaluation,
     FlowSnapshot,
+    FootprintEvaluation,
     Gartley5StrategyEvaluation,
     KlineBar,
+    LiquidationDetectorReport,
     MacroRadarEvaluation,
     MasterSynthesisEvaluation,
     MMBTCEvaluation,
     ProtocolV13Evaluation,
     RegimeMatrixEvaluation,
     SignalEvaluation,
+    SLSPEvaluation,
+    SpotSwingEvaluation,
     TrapRadarEvaluation,
     VolatilityConeEvaluation,
     VolumeProfileResult,
@@ -31,6 +35,7 @@ class StateStore:
     """Centralized state container for klines, real-time WS ticks, OI history, and signals."""
 
     def __init__(self) -> None:
+        from analytics.footprint_engine import FootprintEngine
         self._lock = asyncio.Lock()
 
         # --- Historical + Developing Kline Ring Buffers ---
@@ -43,7 +48,7 @@ class StateStore:
         self.spot_klines_15m: Deque[KlineBar] = deque(maxlen=400)
         self.perp_klines_15m: Deque[KlineBar] = deque(maxlen=400)
 
-        # --- Active HUD Tab State (1 = Swing Engine, 2 = Protocol v1.3, 3 = Macro & Cycle Radar) ---
+        # --- Active HUD Tab State (0 = Spot Swing Screener, 1-9 = Specialist Desks, 10 = Master [L]) ---
         self.active_tab: int = 0
 
         # --- Live Tick & Session Accumulators ---
@@ -98,6 +103,11 @@ class StateStore:
         self.gartley_evaluation: Optional[Gartley5StrategyEvaluation] = None
         self.trap_evaluation: Optional[TrapRadarEvaluation] = None
         self.exhaustion_evaluation: Optional[ExhaustionRadarEvaluation] = None
+        self.spot_swing_evaluation: Optional[SpotSwingEvaluation] = None
+        self.slsp_evaluation: Optional[SLSPEvaluation] = None
+        self.liquidation_report: Optional[LiquidationDetectorReport] = None
+        self.footprint_engine: FootprintEngine = FootprintEngine()
+        self.footprint_evaluation: Optional[FootprintEvaluation] = None
         self.ema_strategy: Optional[EMAStrategySnapshot] = None
         self.macro_intermarket: Any = None
         self.protocol_dossier: Optional[Dict[str, Any]] = None
@@ -140,6 +150,7 @@ class StateStore:
         self.binance_spot_price = price
         self.spot_trade_count += 1
         self.last_spot_tick_ts = time.time()
+        self.footprint_engine.ingest_trade(price, qty, is_buyer_maker, ts_ms)
 
         # is_buyer_maker == True -> Seller was the aggressive Taker
         delta = -qty if is_buyer_maker else qty

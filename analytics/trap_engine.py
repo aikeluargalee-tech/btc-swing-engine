@@ -30,6 +30,7 @@ from core.models import (
 )
 from core.state_store import StateStore
 from .volume_profile import compute_atr
+from .liquidation_reader import read_latest_liquidation_report
 
 
 class TrapEngine:
@@ -363,7 +364,12 @@ class TrapEngine:
             dist_val_atr = (current_price - val_lvl) / atr_1h
             status_val = "COMPRESSION"
             if sweep_val < val_lvl:
-                status_val = "SFP RECLAIMED" if current_price >= val_lvl else "SWEEPING"
+                if current_price >= val_lvl:
+                    status_val = "SFP RECLAIMED"
+                elif abs(dist_val_atr) <= 1.5:
+                    status_val = "SWEEPING"
+                else:
+                    status_val = "BELOW BOUNDARY"
 
             boundaries.append(
                 PatternBoundaryItem(
@@ -386,7 +392,12 @@ class TrapEngine:
             dist_vah_atr = (current_price - vah_lvl) / atr_1h
             status_vah = "COMPRESSION"
             if sweep_vah > vah_lvl:
-                status_vah = "SFP REJECTED" if current_price <= vah_lvl else "SWEEPING"
+                if current_price <= vah_lvl:
+                    status_vah = "SFP REJECTED"
+                elif abs(dist_vah_atr) <= 1.5:
+                    status_vah = "SWEEPING"
+                else:
+                    status_vah = "ABOVE BOUNDARY"
 
             boundaries.append(
                 PatternBoundaryItem(
@@ -416,6 +427,9 @@ class TrapEngine:
         """Runs the 3-State Trap FSM, calculates CVD absorption elasticity, and generates asymmetric SFP trade plans."""
         if not bars_1h:
             return None
+
+        liq_path = getattr(self.config, "liquidation_report_path", None)
+        liq_report = read_latest_liquidation_report(liq_path)
 
         current_price = store.binance_spot_price or bars_1h[-1].close
         atr_1h = max(compute_atr(bars_1h[-30:], period=self.config.atr_period), 1.0)
@@ -498,7 +512,7 @@ class TrapEngine:
                 if swept and reclaimed:
                     bear_trap_boundary = p
                     break
-                elif swept and not reclaimed:
+                elif swept and not reclaimed and abs(p.distance_atr) <= 1.5:
                     active_state = TrapState.STATE_1_BOUNDARY_SWEEP
                     trap_signal = f"SWEEP IN PROGRESS ({p.pattern_name} @ ${p.boundary_level:,.0f})"
                 elif abs(p.distance_atr) <= 0.75 and oi_surge_flag:
@@ -511,6 +525,9 @@ class TrapEngine:
                 if swept and rejected:
                     bull_trap_boundary = p
                     break
+                elif swept and not rejected and abs(p.distance_atr) <= 1.5 and active_state == TrapState.NEUTRAL_OBSERVATION:
+                    active_state = TrapState.STATE_1_BOUNDARY_SWEEP
+                    trap_signal = f"SWEEP IN PROGRESS ({p.pattern_name} @ ${p.boundary_level:,.0f})"
 
         # 5. Resolve Trigger & Construct Asymmetric Trade Plan
         poc_target = active_vp.c_poc if active_vp else (current_price + 2.0 * atr_1h)
@@ -543,7 +560,17 @@ class TrapEngine:
                 f"to flush stops down to ${bear_trap_boundary.sweep_wick_extreme:,.0f}, but passive spot limit bids absorbed the move. "
                 f"Price has reclaimed support. Target TP1 cPOC (${poc_target:,.0f}) with R:R of {rr:.2f}R.{fvg_entry_note}"
             )
-            takeaway = "ACCUMULATE SPOT LONG — Trap late breakout shorts with tight stop below sweep wick."
+            if liq_report and liq_report.is_available:
+                if liq_report.post_flush_price_structure and (
+                    liq_report.post_flush_price_structure.stabilisation_confirmed
+                    or liq_report.post_flush_price_structure.higher_low_formed
+                ):
+                    summary += f" Companion Liquidation Detector confirms post-flush stabilization ({liq_report.directional_classification}, 24H Q={liq_report.liquidation_multiple_24h:.2f}x)."
+                    takeaway = "ACCUMULATE SPOT LONG — Post-flush stabilization confirmed; trap late breakout shorts with tight stop below sweep wick."
+                else:
+                    takeaway = "ACCUMULATE SPOT LONG — Trap late breakout shorts with tight stop below sweep wick."
+            else:
+                takeaway = "ACCUMULATE SPOT LONG — Trap late breakout shorts with tight stop below sweep wick."
 
         elif bull_trap_boundary is not None and (passive_absorption or flow.w_1h.spot_delta_btc <= 0):
             active_state = TrapState.STATE_2_SFP_RECLAIM_TRIGGERED
@@ -603,6 +630,7 @@ class TrapEngine:
             trade_plan=trade_plan,
             plain_english_summary=summary,
             quantitative_takeaway=takeaway,
+            liquidation_report=liq_report,
         )
 
         store.trap_evaluation = evaluation

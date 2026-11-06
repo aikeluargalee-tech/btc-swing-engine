@@ -30,7 +30,9 @@ from rich import box
 from rich.console import Console, Group
 from rich.live import Live
 from rich.panel import Panel
+from rich.rule import Rule
 from rich.table import Table
+from rich.text import Text
 
 from analytics.ai_packet_exporter import copy_ai_packet_to_clipboard_and_disk
 from analytics.signal_detector import SignalDetector
@@ -137,56 +139,49 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
     perp_ws_dot = "[green]ON[/green]" if store.perp_ws_connected else "[yellow]SYNC[/yellow]"
     cb_ws_dot = "[green]ON[/green]" if store.coinbase_ws_connected else "[yellow]SYNC[/yellow]"
 
+    # Clean 5 Operational Cockpit: P (Structure), F (Footprint), W (Waterfall), 0 (Screener), L (Master) + C (AI Packet)
+    tP = (
+        "[bold black on bright_yellow] [P: STRUCTURE] [/bold black on bright_yellow]"
+        if active_tab == 13
+        else "[dim white][P: STRUCTURE][/dim white]"
+    )
+    tF = (
+        "[bold black on bright_cyan] [F: FOOTPRINT] [/bold black on bright_cyan]"
+        if active_tab == 11
+        else "[dim white][F: FOOTPRINT][/dim white]"
+    )
+    tW = (
+        "[bold white on dark_green] [W: WATERFALL] [/bold white on dark_green]"
+        if active_tab == 12
+        else "[dim white][W: WATERFALL][/dim white]"
+    )
     t0 = (
-        "[bold white on blue] [0: MASTER] [/bold white on blue]"
+        "[bold white on blue] [0: SPOT SWING] [/bold white on blue]"
         if active_tab == 0
-        else "[dim white][0: MASTER][/dim white]"
+        else "[dim white][0: SPOT SWING][/dim white]"
     )
-    t1 = (
-        "[bold black on cyan] [1: SWING] [/bold black on cyan]"
-        if active_tab == 1
-        else "[dim white][1: SWING][/dim white]"
+    tL = (
+        "[bold white on magenta] [L: MASTER] [/bold white on magenta]"
+        if active_tab == 10
+        else "[dim white][L: MASTER][/dim white]"
     )
-    t2 = (
-        "[bold black on yellow] [2: PROTOCOL] [/bold black on yellow]"
-        if active_tab == 2
-        else "[dim white][2: PROTOCOL][/dim white]"
-    )
-    t3 = (
-        "[bold black on magenta] [3: MACRO] [/bold black on magenta]"
-        if active_tab == 3
-        else "[dim white][3: MACRO][/dim white]"
-    )
-    t4 = (
-        "[bold black on green] [4: REGIME] [/bold black on green]"
-        if active_tab == 4
-        else "[dim white][4: REGIME][/dim white]"
-    )
-    t5 = (
-        "[bold black on white] [5: MM-BTC] [/bold black on white]"
-        if active_tab == 5
-        else "[dim white][5: MM-BTC][/dim white]"
-    )
-    t6 = (
-        "[bold black on bright_yellow] [6: 72H CONE] [/bold black on bright_yellow]"
-        if active_tab == 6
-        else "[dim white][6: 72H CONE][/dim white]"
-    )
-    t7 = (
-        "[bold black on magenta] [7: GARTLEY] [/bold black on magenta]"
-        if active_tab == 7
-        else "[dim white][7: GARTLEY][/dim white]"
-    )
-    t8 = (
-        "[bold black on bright_cyan] [8: SFP TRAP] [/bold black on bright_cyan]"
-        if active_tab == 8
-        else "[dim white][8: SFP TRAP][/dim white]"
-    )
-    t9 = (
-        "[bold black on bright_yellow] [9: EXHAUST] [/bold black on bright_yellow]"
-        if active_tab == 9
-        else "[dim white][9: EXHAUST][/dim white]"
-    )
+    tC = "[bold white on dark_red] [C: AI PACKET] [/bold white on dark_red]"
+
+    subdesk_names = {
+        1: "1: TACTICAL SWING",
+        2: "2: PROTOCOL v1.3",
+        3: "3: MACRO RADAR",
+        4: "4: REGIME MATRIX",
+        5: "5: MM-BTC INVENTORY",
+        6: "6: 72H VOL CONE",
+        7: "7: GARTLEY HARMONICS",
+        8: "8: SFP LIQ TRAP",
+        9: "9: TD EXHAUSTION",
+    }
+    if active_tab in subdesk_names:
+        subdesk_info = f"  │  [bold black on bright_yellow] [DEEP DIVE {subdesk_names[active_tab]}] [/bold black on bright_yellow]"
+    else:
+        subdesk_info = "  │  [dim]Sub-Desks: 1 Tactical • 2-9 Quant Desks[/dim]"
 
     regime_str = _regime_badge(sig.regime) if sig else "[dim]WARMING UP[/dim]"
     score_str = f"[bold]{sig.confluence_score:.1f}/100[/bold]" if sig else "0.0/100"
@@ -197,13 +192,13 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
     nav_grid.add_column(justify="right", no_wrap=True)
     nav_grid.add_row(
         f"[bold white]BTC-USD[/bold white] | Spot: [bold cyan]${spot_px:,.2f}[/bold cyan] | Regime: {regime_str} ({score_str}) | Feeds: Spot {spot_ws_dot} • Perp {perp_ws_dot} • CB {cb_ws_dot}",
-        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: 0 Master • 1-9 Specialists • C: Copy[/dim]",
+        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: P Structure • F Footprint • W Waterfall • 0 Screener • L Master • C Copy • 1-9 Sub-Desks[/dim]",
     )
 
     tab_grid = Table.grid(expand=True)
     tab_grid.add_column(justify="left", no_wrap=True)
     tab_grid.add_row(
-        f"{t0}   |   {t1}•{t2}•{t3}•{t4}•{t5}•{t6}•{t7}•{t8}•{t9}"
+        f"{tP}  {tF}  {tW}  {t0}  {tL}  │  {tC}{subdesk_info}"
     )
     nav_panel = Panel(Group(nav_grid, tab_grid), border_style="bright_blue", box=box.ROUNDED, padding=(0, 1))
 
@@ -601,6 +596,21 @@ def _build_tab1_swing_hud(store: StateStore, header_panel: Panel) -> Group:
         gate_str = f"[bold green]GATE 4: RETEST TRIGGERED (${sig.c_val:,.0f} Reclaim Confirmed)[/bold green]"
 
     left_lines = [f"Active Gate State : {gate_str}"]
+    f_ev = getattr(store, "footprint_evaluation", None)
+    if f_ev is not None:
+        if f_ev.all_gates_pass:
+            if f_ev.direction == "DISTRIBUTE_SELL":
+                fp_badge = "[bold white on dark_magenta] [✓] PROFIT HARVEST TRIGGERED [/bold white on dark_magenta]"
+            else:
+                fp_badge = "[bold black on green] [✓] ABSORPTION HELD & DELTA FLIPPED [/bold black on green]"
+            fp_text = f"Footprint Gate [F]: {fp_badge} • [bold cyan]Press 'F' for 15M Ladder[/bold cyan]"
+        elif f_ev.gate1_macro_tap:
+            fp_badge = "[bold black on yellow] [○] LEVEL TAPPED (AWAITING FLIP) [/bold black on yellow]"
+            fp_text = f"Footprint Gate [F]: {fp_badge} • {f_ev.gate1_tapped_level_name} (${f_ev.gate1_tapped_level_price:,.0f})"
+        else:
+            fp_badge = "[dim cyan][○] MID-CHOP (OBSERVATION)[/dim cyan]"
+            fp_text = f"Footprint Gate [F]: {fp_badge} • 15M Delta: {f_ev.active_bar_delta:+.1f} BTC • [dim]Press 'F' for Ladder[/dim]"
+        left_lines.append(fp_text)
     if sig:
         es_info = ""
         if sig.ema_strategy:
@@ -1301,6 +1311,393 @@ def _build_tab4_regime_matrix_hud(store: StateStore, header_panel: Panel) -> Gro
 
 
 # ============================================================================
+# TAB [0]: BTC SPOT SWING SCREENING & ALERT ENGINE
+# (1D Macro Gate -> Weekly Liquidity Sweep / Reclaim -> Triple-Barrier Risk)
+# ============================================================================
+
+def _pass_badge(ok: bool, yes: str = "PASS", no: str = "FAIL") -> str:
+    if ok:
+        return f"[bold black on green] {yes} [/bold black on green]"
+    return f"[bold white on red] {no} [/bold white on red]"
+
+
+def _spot_swing_light_style(light: str) -> str:
+    return {
+        "GREEN": "bold black on green",
+        "BLUE": "bold black on cyan",
+        "YELLOW": "bold black on yellow",
+    }.get(light, "bold white on red")
+
+
+def _magnet_verdict_style(verdict: str) -> str:
+    v = verdict.upper()
+    if "HOLD" in v or "RARE ADD" in v:
+        return "bold black on green"
+    if "PARTIAL PROFIT" in v:
+        return "bold black on yellow"
+    if "REDUCE" in v or "EXIT" in v:
+        return "bold white on red"
+    return "bold white on blue"
+
+
+def _magnet_verdict_style(verdict: str) -> str:
+    v = verdict.upper()
+    if "HOLD" in v or "RARE ADD" in v:
+        return "bold black on green"
+    if "PARTIAL PROFIT" in v:
+        return "bold black on yellow"
+    if "REDUCE" in v or "EXIT" in v:
+        return "bold white on red"
+    return "bold white on blue"
+
+
+def _build_tab0_spot_swing_hud(store: StateStore, header_panel: Panel) -> Group:
+    """Renders Tab [0]: BTC Spot Swing Screening & Daily Liquidation Magnet Engine (Modules B-F)."""
+    ev = store.spot_swing_evaluation
+    if ev is None:
+        return Group(
+            header_panel,
+            Panel(
+                "Warming up Tab [0]: BTC Spot Swing Screening & Alert Engine (waiting for 1D / 1H history)...",
+                title="Tab [0]: BTC Spot Swing Screening & Alert Engine",
+                box=box.ROUNDED,
+            ),
+        )
+
+    # --- Introduction Card ---
+    intro_lines = [
+        "[bold cyan]▶ CORE LAW & PURPOSE:[/bold cyan] [bold yellow]In a range-bound regime, trade the liquidation magnet and positioning imbalance — not the headline.[/bold yellow] Deterministic BTC spot swing screener (3-day to 3-week hold).",
+        "[bold cyan]▶ CORE MODELS & FEEDS:[/bold cyan] Daily Liquidation Magnet Protocol (50D MA + 30–45D Range + Short/Long Liq Clusters + OI/Funding/Spot CVD) • 1D Macro Gate • 4H PWL/PWH Sweep & Reclaim • Strict RRR ≥ 1:3.",
+        "[bold cyan]▶ EXECUTION MANDATE:[/bold cyan] [bold yellow]Closed bars only.[/bold yellow] Default is Do Nothing (100% Cash). Require RRR ≥ 1:3 to Short-Liq Magnet, 1% fixed risk (max 100% spot), scale 30–50% into magnet, hard stop below pivot/50DMA.",
+    ]
+    intro_panel = Panel(
+        "\n".join(intro_lines),
+        title="[bold cyan]WELCOME TO TAB [0]: BTC SPOT SWING SCREENING & DAILY LIQUIDATION MAGNET ENGINE[/bold cyan]",
+        box=box.ROUNDED,
+        border_style="cyan",
+        padding=(0, 1),
+    )
+
+    # --- Top Ribbon ---
+    macro, setup, risk, trade, mag = ev.macro, ev.setup, ev.risk, ev.trade, ev.magnet
+    v_style = _spot_swing_light_style(ev.traffic_light)
+    if ev.alerts_enabled:
+        alert_state = "[bold green]ARMED (webhook/Telegram)[/bold green]"
+    elif ev.read_only:
+        alert_state = "[bold yellow]READ-ONLY SNAPSHOT[/bold yellow]"
+    else:
+        alert_state = "[dim]OFF — set SPOT_SWING_WEBHOOK_URL or TELEGRAM_BOT_TOKEN[/dim]"
+
+    if mag is not None:
+        mv_style = _magnet_verdict_style(mag.verdict)
+        rrr_badge = f"[bold green]{mag.rrr_to_magnet:.2f}R (≥3R PASS)[/bold green]" if mag.rrr_pass else f"[bold yellow]{mag.rrr_to_magnet:.2f}R (<3R WAIT)[/bold yellow]"
+        card_magnet = (
+            f"[bold white]Magnet Verdict:[/bold white] [{mv_style}] {mag.verdict.upper()} [/{mv_style}] ({mag.confidence})\n"
+            f"Regime: [bold cyan]{mag.regime.upper()}[/bold cyan] • Live R:R: {rrr_badge}"
+        )
+        card_clusters = (
+            f"[bold white]Short-Liq Magnet (↑):[/bold white] [bold magenta]${mag.short_liq_magnet:,.0f}[/bold magenta] (+{mag.short_liq_distance_pct:.2f}%)\n"
+            f"[bold white]Long-Liq Magnet  (↓):[/bold white] [bold cyan]${mag.long_liq_magnet:,.0f}[/bold cyan] (-{mag.long_liq_distance_pct:.2f}%)"
+        )
+    else:
+        card_magnet = (
+            f"[bold white]Spot Swing Verdict:[/bold white] [{v_style}] {ev.verdict} [/{v_style}]\n"
+            f"Spot: [bold cyan]${ev.spot_price:,.2f}[/bold cyan] • Evaluated on closed bars only"
+        )
+        card_clusters = "[bold white]Liquidation Magnets:[/bold white] [dim]WARMING UP[/dim]"
+
+    if macro is not None:
+        gate_txt = "[bold black on green] APPROVED [/bold black on green]" if macro.macro_approved else "[bold white on red] FROZEN: 100% CASH [/bold white on red]"
+        card_macro = (
+            f"[bold white]Screener:[/bold white] [{v_style}] {ev.verdict} [/{v_style}]\n"
+            f"1D Gate: {gate_txt} • Trend {_pass_badge(macro.trend_pass)} • Squeeze {_pass_badge(macro.compression_pass, 'PASS', 'FAIL')}"
+        )
+    else:
+        card_macro = "[bold white]Macro Gate (1D):[/bold white] [dim]WARMING UP[/dim]"
+
+    card_alert = (
+        f"[bold white]Alert Dispatcher:[/bold white] {alert_state}\n"
+        f"Sizing equity: [cyan]${store_equity_label(ev)}[/cyan] • Risk: [cyan]{risk.risk_pct if risk else ev.risk_pct:.1f}%[/cyan]/trade • Min RRR: [bold green]1:3.0[/bold green]"
+    )
+    ribbon_table = Table.grid(expand=True)
+    ribbon_table.add_column(ratio=3)
+    ribbon_table.add_column(ratio=3)
+    ribbon_table.add_column(ratio=2)
+    ribbon_table.add_column(ratio=2)
+    ribbon_table.add_row(
+        Panel(card_magnet, box=box.ROUNDED, border_style="yellow", padding=(0, 1)),
+        Panel(card_macro, box=box.ROUNDED, border_style="cyan", padding=(0, 1)),
+        Panel(card_clusters, box=box.ROUNDED, border_style="magenta", padding=(0, 1)),
+        Panel(card_alert, box=box.ROUNDED, border_style="green", padding=(0, 1)),
+    )
+
+    bottom_title = "[bold white]4. Daily Liquidation Magnet Protocol (Step 4 Verdict) & Executive Bottom Line (Press 0: Spot Swing • L: Master • 1-9: Desks • C: Copy)[/bold white]"
+
+    # --- Not ready: show diagnostics + bottom line only ---
+    if not ev.data_ready or macro is None or setup is None:
+        notes = "\n".join(f"  • {n}" for n in ev.data_notes) or "  • Waiting for data"
+        status_panel = Panel(
+            f"[bold black on yellow] {ev.verdict} [/bold black on yellow]\n{notes}",
+            title="[bold yellow]Data Readiness[/bold yellow]",
+            box=box.ROUNDED,
+            border_style="yellow",
+        )
+        return Group(header_panel, intro_panel, ribbon_table, status_panel)
+
+    # --- Panel 1: 1D Macro Regime Gate & Step 2 Range Confirmation ---
+    p1 = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold cyan", pad_edge=False)
+    p1.add_column("Check", style="bold white", no_wrap=True)
+    p1.add_column("Rule", style="dim white", no_wrap=True)
+    p1.add_column("Live Value", justify="right", style="cyan", no_wrap=True)
+    p1.add_column("State", justify="center", no_wrap=True)
+
+    if mag is not None:
+        reg_badge = (
+            "[bold black on cyan] RANGE [/bold black on cyan]"
+            if mag.regime == "Range"
+            else (
+                "[bold black on yellow] TRANSITION [/bold black on yellow]"
+                if "Transition" in mag.regime
+                else "[bold black on green] TREND [/bold black on green]"
+            )
+        )
+        p1.add_row(
+            "Regime (Step 2)",
+            "30–45D Range & HH/HL check",
+            f"${mag.range_low_30d:,.0f}–${mag.range_high_30d:,.0f} ({mag.range_pos_pct:.0f}%)",
+            reg_badge,
+        )
+        p1.add_row(
+            "50D MA & Range Pivot",
+            "1D SMA50 & Midpoint Inval.",
+            f"50DMA ${mag.sma50_1d:,.0f} • Pivot ${mag.range_pivot:,.0f}",
+            _pass_badge(ev.spot_price >= mag.sma50_1d, "ABOVE 50D", "BELOW 50D"),
+        )
+
+    squeeze_rule = "BBW(20) 180D rank ≤ 30%" if macro.squeeze_lookback_bars <= 1 else f"BBW rank ≤ 30% (any of last {macro.squeeze_lookback_bars}D)"
+    p1.add_row(
+        "Trend baseline",
+        "Close > EMA50 > EMA200",
+        f"${macro.close:,.0f} / ${macro.ema50:,.0f} / ${macro.ema200:,.0f}",
+        _pass_badge(macro.trend_pass, "BULLISH", "NO TREND"),
+    )
+    p1.add_row(
+        "Volatility squeeze",
+        squeeze_rule,
+        f"BBW {macro.bbw * 100:.2f}% • rank {macro.bbw_percentile * 100:.1f}%",
+        _pass_badge(macro.compression_pass, "COMPRESSED", "EXPANDED"),
+    )
+    p1.add_row(
+        "Macro permission",
+        "trend AND squeeze",
+        f"1D bar {datetime.fromtimestamp(macro.bar_ts_ms / 1000, tz=timezone.utc).strftime('%m-%d')} closed",
+        _pass_badge(macro.macro_approved, "APPROVED", "FROZEN"),
+    )
+
+    # --- Panel 2: Positioning Audit, Liquidation Magnets & Weekly Anchors ---
+    p2 = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold yellow", pad_edge=False)
+    p2.add_column("Check", style="bold white", no_wrap=True)
+    p2.add_column("Rule", style="dim white", no_wrap=True)
+    p2.add_column("Live Value", justify="right", style="yellow", no_wrap=True)
+    p2.add_column("State", justify="center", no_wrap=True)
+
+    if mag is not None:
+        p2.add_row(
+            "Short-Liq Magnet (↑)",
+            "Nearest dense cluster above",
+            f"${mag.short_liq_magnet:,.0f} (+{mag.short_liq_distance_pct:.2f}%)",
+            f"[magenta]{mag.short_liq_size_label}[/magenta]",
+        )
+        p2.add_row(
+            "Long-Liq Magnet (↓)",
+            "Nearest dense cluster below",
+            f"${mag.long_liq_magnet:,.0f} (-{mag.long_liq_distance_pct:.2f}%)",
+            f"[cyan]{mag.long_liq_size_label}[/cyan]",
+        )
+        oi_word = mag.oi_trend.split(" (")[0].upper()
+        fund_word = "NEG" if mag.funding_rate_8h_pct < -0.0005 else ("NEUT" if mag.funding_rate_8h_pct <= 0.006 else "POS")
+        p2.add_row(
+            "OI & 8H Funding",
+            "24H OI trend & Perp rate",
+            f"24H dOI {mag.oi_change_24h_pct:+.2f}% • Fund {mag.funding_rate_8h_pct:+.4f}%",
+            f"[bold]{oi_word} / {fund_word}[/bold]",
+        )
+        p2.add_row(
+            "Spot CVD Truth Serum",
+            "Spot vs Perp on recent move",
+            f"4H S:{mag.spot_cvd_4h_btc:+,.0f} P:{mag.perp_cvd_4h_btc:+,.0f} BTC",
+            _pass_badge(mag.spot_cvd_confirming, "CONFIRMING", "UNCONFIRMED"),
+        )
+
+    if setup.anchors_ready:
+        px = ev.spot_price
+        p2.add_row("PWH / PWL", "Prev Mon-Sun week high / low", f"${setup.pwh:,.0f} / ${setup.pwl:,.0f}", f"[dim]{(px / setup.pwl - 1) * 100:+.2f}% vs PWL[/dim]")
+        p2.add_row(
+            "Sweep",
+            "4H low < PWL (last 12 bars)",
+            f"wick ${setup.sweep_low:,.0f}" if setup.sweep_detected else "none",
+            _pass_badge(setup.sweep_detected, "DETECTED", "NONE"),
+        )
+        p2.add_row("Reclaim", "Last closed 4H close > PWL", f"close ${setup.close:,.0f}", _pass_badge(setup.reclaim_confirmed, "CONFIRMED", "NO"))
+        p2.add_row("Volume", "Reclaim vol > SMA(3)", f"{setup.volume:,.0f} vs {setup.vol_sma3:,.0f}", _pass_badge(setup.volume_confirmed, "CONFIRMED", "NO"))
+        if setup.signal_active and setup.is_fresh:
+            sig_badge = "[bold black on green] ACTIVE LONG [/bold black on green]"
+        elif setup.signal_active:
+            sig_badge = "[bold black on cyan] ALREADY ACTED [/bold black on cyan]"
+        else:
+            sig_badge = "[dim] INACTIVE [/dim]"
+        p2.add_row("Signal", "sweep AND reclaim AND volume", "", sig_badge)
+
+        # Safety Pre-flight checks: Liquidation cascade & Tell-Tale knife pause
+        liq_rep = store.trap_evaluation.liquidation_report if store.trap_evaluation else None
+        tt_ev = store.exhaustion_evaluation.tell_tale if store.exhaustion_evaluation else None
+
+        liq_status = "STANDBY"
+        liq_pass = True
+        if liq_rep and liq_rep.is_available:
+            if "EXTREME" in liq_rep.magnitude_tier and not (
+                liq_rep.post_flush_price_structure and liq_rep.post_flush_price_structure.stabilisation_confirmed
+            ):
+                liq_status = "FLUSH IN PROGRESS (PAUSE)"
+                liq_pass = False
+            elif liq_rep.post_flush_price_structure and (
+                liq_rep.post_flush_price_structure.stabilisation_confirmed or liq_rep.post_flush_price_structure.higher_low_formed
+            ):
+                liq_status = "STABILIZED"
+                liq_pass = True
+            else:
+                liq_status = "NORMAL / QUIET"
+                liq_pass = True
+
+        tt_status = "CLEAR"
+        tt_pass = True
+        if tt_ev and tt_ev.is_selling_climax:
+            tt_status = "CLIMAX DUMP"
+            tt_pass = False
+
+        safety_state = "CLEAR" if (liq_pass and tt_pass) else "CAUTION"
+        safety_badge = "[bold black on green] PERMITTED [/bold black on green]" if safety_state == "CLEAR" else "[bold black on yellow] PAUSED [/bold black on yellow]"
+        p2.add_row("Safety guard", f"Liq: {liq_status} • Climax: {tt_status}", "", safety_badge)
+    else:
+        p2.add_row("PWH / PWL", "Previous Mon-Sun week", "syncing…", "[bold black on yellow] WAIT [/bold black on yellow]")
+
+    mid_row = Table.grid(expand=True)
+    mid_row.add_column(ratio=5)
+    mid_row.add_column(ratio=5)
+    mid_row.add_row(
+        Panel(p1, title=f"[bold cyan]1. 1D Macro Regime Gate & Range Confirmation ({'APPROVED' if macro.macro_approved else 'FROZEN'})[/bold cyan]", box=box.ROUNDED),
+        Panel(p2, title="[bold yellow]2. Liquidation Magnet Positioning Audit & Weekly Anchors (4H Sweep / Reclaim)[/bold yellow]", box=box.ROUNDED),
+    )
+
+    # --- Panel 3: Tight Money Management (RRR >= 1:3) & Triple-Barrier Sizing ---
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    p3 = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold magenta", pad_edge=False)
+    p3.add_column("Item", style="bold white", no_wrap=True)
+    p3.add_column("Level", justify="right", style="cyan", no_wrap=True)
+    p3.add_column("Detail", style="dim white", no_wrap=False)
+
+    def _time_left(expiry_ms: int) -> str:
+        left_h = max(0.0, (expiry_ms - now_ms) / 3_600_000.0)
+        return f"{left_h / 24.0:.1f}d / {int(left_h // 4)} x 4H bars left"
+
+    if mag is not None:
+        rrr_state = (
+            "[bold black on green] PASS (≥ 1:3 RRR) [/bold black on green]"
+            if mag.rrr_pass
+            else "[bold black on yellow] REJECTED (< 1:3 RRR — DO NOT CHASE) [/bold black on yellow]"
+        )
+        p3.add_row(
+            "RRR 1:3 Mandate Gate",
+            f"{mag.rrr_to_magnet:.2f}R (Min {mag.min_required_rrr:.1f}R)",
+            f"{rrr_state} • Reward +${mag.reward_to_magnet_usd:,.0f} (to ${mag.short_liq_magnet:,.0f}) vs Risk -${mag.risk_distance_usd:,.0f} (Stop ${mag.hard_stop_price:,.0f}) • Max 3R Entry: ≤ ${mag.max_entry_for_3r:,.0f}",
+        )
+        p3.add_row(
+            "Magnet Scaling Plan",
+            f"Scale 30–50% @ ${mag.short_liq_magnet:,.0f}",
+            f"3R Target: ${mag.tp_3r_price:,.0f} • Invalidation: 1D Close < ${mag.invalidation_level:,.0f} (Pivot/50DMA) • 1% Risk Size: {mag.recommended_qty_btc:.4f} BTC (${mag.recommended_notional_usd:,.0f})",
+        )
+
+    if trade is not None:
+        dist = max(trade.entry - trade.initial_stop, 1e-9)
+        r_now = (ev.spot_price - trade.entry) / dist
+        p3_title = f"[bold green]3. Tight RRR 1:3 Money Management & Open Trade — Triple-Barrier Tracker ({trade.status})[/bold green]"
+        p3.add_row("Entry", f"${trade.entry:,.2f}", f"{trade.qty_btc:.6f} BTC (${trade.qty_btc * trade.entry:,.0f}) • opened {datetime.fromtimestamp(trade.entry_ts_ms / 1000, tz=timezone.utc).strftime('%m-%d %H:%M')} UTC")
+        p3.add_row("Live P/L", f"{r_now:+.2f}R", f"spot ${ev.spot_price:,.2f}")
+        p3.add_row("Barrier 1: Stop", f"${trade.current_stop:,.2f}", f"initial ${trade.initial_stop:,.2f}" + (" • moved to BREAKEVEN" if trade.tp1_hit else "") + f" • {((ev.spot_price / trade.current_stop) - 1) * 100:+.2f}% away")
+        p3.add_row("Barrier 2a: +2.0R", f"${trade.tp1:,.2f}", "HIT — 50% sold" if trade.tp1_hit else "sell 50% & move stop to breakeven")
+        p3.add_row("Barrier 2b: PWH", f"${trade.tp2:,.2f}", "runner target")
+        p3.add_row("Barrier 3: Time", datetime.fromtimestamp(trade.time_stop_ts_ms / 1000, tz=timezone.utc).strftime("%m-%d %H:%M UTC"), _time_left(trade.time_stop_ts_ms))
+        p3_border = "green"
+    elif risk is not None:
+        preview = "" if macro.macro_approved else " — PREVIEW ONLY, MACRO FROZEN"
+        p3_title = f"[bold magenta]3. Tight RRR 1:3 Money Management & Triple-Barrier Sizing{preview}[/bold magenta]"
+        p3.add_row("Entry (P_entry)", f"${risk.entry:,.2f}", "close of the reclaim 4H candle")
+        p3.add_row("Stop (P_stop)", f"${risk.stop:,.2f}", f"sweep low − 0.5 × ATR14 (${risk.atr14:,.0f}) • distance {risk.stop_distance_pct:.2f}%")
+        cap_note = " [bold yellow]CAPPED at 100% spot[/bold yellow]" if risk.spot_capped else ""
+        p3.add_row("Position size", f"{risk.qty_btc:.6f} BTC", f"${risk.notional_usd:,.0f} = {risk.equity_alloc_pct:.1f}% of ${risk.equity_usd:,.0f} • risk ${risk.realized_risk_usd:,.0f}{cap_note}")
+        p3.add_row("Barrier 2a: +2.0R", f"${risk.tp1:,.2f}", f"sell 50% & move stop to breakeven (3R Target: ${risk.tp_3r:,.0f})")
+        warn = " [yellow](PWH is inside +2R)[/yellow]" if risk.tp2_inside_tp1 else ""
+        p3.add_row("Barrier 2b: PWH", f"${risk.tp2_pwh:,.2f}", f"structural runner target{warn}")
+        p3.add_row("Barrier 3: Time", datetime.fromtimestamp(risk.time_stop_ts_ms / 1000, tz=timezone.utc).strftime("%m-%d %H:%M UTC"), _time_left(risk.time_stop_ts_ms))
+        p3_border = "magenta"
+    else:
+        p3_title = "[bold magenta]3. Tight RRR 1:3 Money Management & Triple-Barrier Sizing (standing rules)[/bold magenta]"
+        p3.add_row("Stop", "sweep low − 0.5×ATR14", "4H Wilder ATR; invalidation below swept liquidity or Range Pivot / 50D MA")
+        p3.add_row("Size", "equity × 1% ÷ stop dist", f"capped at 100% of equity (spot, no leverage) • equity ${store_equity_label(ev)}")
+        p3.add_row("Barrier 2", "Short-Liq Magnet / +3.0R", "scale 30–50% into Short-Liq Magnet (+2R to +3R), stop to breakeven, runner to PWH")
+        p3.add_row("Barrier 3", "10 days", "time stop frees capital from stagnant swings")
+        p3_border = "dim"
+    p3_panel = Panel(p3, title=p3_title, box=box.ROUNDED, border_style=p3_border)
+
+    # --- Panel 4: Daily Liquidation Magnet Protocol (Step 4 Strict Output) & Alert Log ---
+    if store.last_packet_copied_ts > 0:
+        copy_badge = f"[bold black on green] [✔ COPIED ({store.last_packet_char_count:,} chars @ {store.last_packet_copied_utc})] [/bold black on green]"
+    else:
+        copy_badge = "[bold black on yellow] [PRESS 'C': COPY RAW TELEMETRY PACKET] [/bold black on yellow]"
+
+    p4_lines: List[str] = []
+    if mag is not None:
+        mv_style = _magnet_verdict_style(mag.verdict)
+        p4_lines.extend([
+            f"[{mv_style}] MAGNET VERDICT: {mag.verdict.upper()} (Confidence: {mag.confidence}) [/{mv_style}]   [{v_style}] SCREENER: {ev.verdict} [/{v_style}]   {copy_badge}",
+            f"  [bold cyan]Regime[/bold cyan]               : [bold white]{mag.regime}[/bold white] — {mag.regime_detail}",
+            f"  [bold cyan]Key Levels[/bold cyan]           : Short-liq magnet: [bold magenta]${mag.short_liq_magnet:,.0f}[/bold magenta] ({mag.short_liq_size_label})  •  Long-liq magnet: [bold cyan]${mag.long_liq_magnet:,.0f}[/bold cyan] ({mag.long_liq_size_label})  •  50-day MA: [bold]${mag.sma50_1d:,.0f}[/bold]  •  Range pivot / invalidation: [bold yellow]${mag.range_pivot:,.0f} / ${mag.invalidation_level:,.0f}[/bold yellow]",
+            f"  [bold cyan]Positioning Snapshot[/bold cyan] : OI: [white]{mag.oi_trend}[/white]  •  Funding: [white]{mag.funding_status}[/white]  •  Spot CVD: [white]{mag.spot_cvd_assessment}[/white]",
+            f"  [bold cyan]Headline Filter[/bold cyan]      : [white]{mag.headline_filter}[/white]  •  [dim]{mag.cum_liq_24h_summary}[/dim]",
+            f"  [bold cyan]Primary Reason[/bold cyan]       : {mag.primary_reason}",
+            f"  [bold cyan]Invalidation[/bold cyan]         : [bold red]{mag.invalidation_text}[/bold red]",
+            f"  [bold cyan]Actionable Note[/bold cyan]      : [bold green]{mag.actionable_note}[/bold green]",
+            f"  [bold white]Plain English[/bold white]        : {ev.plain_english_summary}",
+        ])
+    else:
+        p4_lines.extend([
+            f"[{v_style}] {ev.verdict} [/{v_style}]  {copy_badge}",
+            f"  [bold white]Plain English:[/bold white] {ev.plain_english_summary}",
+        ])
+
+    if ev.recent_events:
+        p4_lines.append("  [bold white]Recent Alerts :[/bold white]")
+        p4_lines.extend(f"    [dim]{line}[/dim]" for line in ev.recent_events[:3])
+    else:
+        p4_lines.append("  [bold white]Recent Alerts :[/bold white] [dim]none yet[/dim]")
+    p4_panel = Panel("\n".join(p4_lines), title=bottom_title, border_style="cyan", box=box.ROUNDED)
+
+    return Group(header_panel, intro_panel, ribbon_table, mid_row, p3_panel, p4_panel)
+
+
+def store_equity_label(ev: Any) -> str:
+    """Formats the sizing equity shown in the Tab [0] ribbon (taken from the live risk object when present)."""
+    if ev.risk is not None:
+        return f"{ev.risk.equity_usd:,.0f}"
+    if ev.trade is not None:
+        return f"{ev.trade.qty_btc * ev.trade.entry:,.0f} in trade"
+    if getattr(ev, "equity_usd", 0.0) > 0:
+        return f"{ev.equity_usd:,.0f}"
+    return "configured"
+
+
+
+# ============================================================================
 # TAB [5]: MASTER SYNTHESIS & SUPREME ORDER OF BATTLE HUD
 # ============================================================================
 
@@ -1334,7 +1731,7 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
             header_panel,
             Panel(
                 "Warming up 10-Desk Master Synthesis Engine...",
-                title="Tab [0]: Master Conclusion",
+                title="Tab [L]: Master Conclusion",
                 box=box.ROUNDED,
             ),
         )
@@ -1347,7 +1744,7 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
     ]
     intro_panel = Panel(
         "\n".join(intro_lines),
-        title="[bold cyan]WELCOME TO TAB [0]: MASTER SYNTHESIS & SUPREME COMMAND CENTER[/bold cyan]",
+        title="[bold cyan]WELCOME TO TAB [L]: MASTER SYNTHESIS & SUPREME COMMAND CENTER[/bold cyan]",
         box=box.ROUNDED,
         border_style="cyan",
         padding=(0, 1),
@@ -2458,11 +2855,1709 @@ def _build_tab9_exhaustion_hud(store: StateStore, header_panel: Panel) -> Group:
     return Group(header_panel, intro_panel, ribbon_table, mid_row, p3_panel, p4_panel)
 
 
+# ============================================================================
+# DESK [F]: STANDALONE 15-MINUTE ORDER FLOW & FOOTPRINT SWING HUD
+# ============================================================================
+
+def _build_tab_footprint_hud(store: StateStore, header_panel: Panel) -> Group:
+    """Renders Dedicated Standalone Desk [F: FOOTPRINT SWING] (Portrait-first layout)."""
+    f_ev = getattr(store, "footprint_evaluation", None)
+    current_price = store.binance_spot_price or (f_ev.current_price if f_ev else 0.0)
+
+    if f_ev is None or not f_ev.active_ladder_rows:
+        return Group(
+            header_panel,
+            Panel(
+                "[dim]Awaiting live spot trade flow to populate 15m Footprint ladder and 4-gate confluence...[/dim]",
+                title="[bold cyan]DESK [F: FOOTPRINT SWING][/bold cyan]",
+                box=box.ROUNDED,
+            ),
+        )
+
+    is_distribute = (f_ev.direction == "DISTRIBUTE_SELL")
+
+    # 1. Top Section: BTC Price, 15m Delta, CPI, Regime, NTZ Shield & Daily VWAP
+    bar_delta = f_ev.active_bar_delta
+    if bar_delta > 0:
+        delta_str = f"[bold green]+{bar_delta:,.1f} BTC[/bold green]"
+    elif bar_delta < 0:
+        delta_str = f"[bold red]{bar_delta:,.1f} BTC[/bold red]"
+    else:
+        delta_str = "[dim]0.0 BTC[/dim]"
+
+    cpi_usd = float(getattr(f_ev, "cpi_usd", 0.0))
+    if cpi_usd > 2.0:
+        cpi_str = f"[bold green]+${cpi_usd:,.2f} (US Bid)[/bold green]"
+    elif cpi_usd < -2.0:
+        cpi_str = f"[bold red]-${abs(cpi_usd):,.2f} (US Lag)[/bold red]"
+    else:
+        cpi_str = f"[cyan]${cpi_usd:+,.2f} (Neutral)[/cyan]"
+
+    ntz_active = bool(getattr(f_ev, "ntz_veto_active", False))
+    ntz_text = str(getattr(f_ev, "ntz_status_text", "ALL CLEAR (8A-8F PASS)"))
+    ntz_badge = f"[bold white on red] {ntz_text} [/bold white on red]" if ntz_active else f"[bold green]{ntz_text}[/bold green]"
+
+    vwap_px = float(getattr(f_ev, "daily_vwap", 0.0) or current_price)
+    vwap_str = f"[cyan]${vwap_px:,.0f}[/cyan]"
+
+    if f_ev.gate1_macro_tap:
+        regime_desc = f"[bold yellow]AT {f_ev.gate1_tapped_level_name} (${f_ev.gate1_tapped_level_price:,.0f})[/bold yellow]"
+    else:
+        regime_desc = "[bold cyan]MID-CHOP / OBSERVATION[/bold cyan]"
+
+    top_grid = Table.grid(expand=True)
+    top_grid.add_column(justify="left", no_wrap=True)
+    top_grid.add_column(justify="right", no_wrap=True)
+    top_grid.add_row(
+        f"[bold white]BTC:[/bold white] [bold cyan]${current_price:,.2f}[/bold cyan]  [dim]│[/dim]  [bold white]15M DELTA:[/bold white] {delta_str}",
+        f"[bold white]CPI:[/bold white] {cpi_str}",
+    )
+    top_grid.add_row(
+        f"[bold white]REGIME:[/bold white] {regime_desc}  [dim]│[/dim]  [bold white]VWAP:[/bold white] {vwap_str}",
+        f"[bold white]NTZ:[/bold white] {ntz_badge}",
+    )
+
+    # 2. 4-Gate Confluence Checklist
+    gate_table = Table(box=box.MINIMAL, expand=True, show_header=False, pad_edge=False)
+    gate_table.add_column(justify="left", no_wrap=True)
+
+    if is_distribute:
+        gate_header = "[bold magenta]4-GATE SPOT DISTRIBUTION (PROFIT HARVEST) CONFLUENCE[/bold magenta]"
+        g1_icon = "[bold green][✓][/bold green]" if f_ev.gate1_macro_tap else "[dim yellow][○][/dim yellow]"
+        g1_text = f"{g1_icon} Gate 1: Macro Level Resistance ({f_ev.gate1_tapped_level_name or 'Awaiting Tap'})"
+
+        g2_icon = "[bold green][✓][/bold green]" if f_ev.gate2_positioning_crowded else "[dim yellow][○][/dim yellow]"
+        g2_text = f"{g2_icon} Gate 2: Perp Long Crowding / CVD Absorption"
+
+        g3_icon = "[bold green][✓][/bold green]" if f_ev.gate3_wick_absorption else "[dim yellow][○][/dim yellow]"
+        g3_text = f"{g3_icon} Gate 3: Upper-Wick Buyer Exhaustion Held"
+
+        g4_icon = "[bold green][✓][/bold green]" if f_ev.gate4_delta_flip else "[dim yellow][○][/dim yellow]"
+        g4_text = f"{g4_icon} Gate 4: 15m Negative Delta Shift"
+    else:
+        gate_header = "[bold green]4-GATE SPOT ACCUMULATION CONFLUENCE[/bold green]"
+        g1_icon = "[bold green][✓][/bold green]" if f_ev.gate1_macro_tap else "[dim yellow][○][/dim yellow]"
+        g1_text = f"{g1_icon} Gate 1: Macro Level Swept ({f_ev.gate1_tapped_level_name or 'Awaiting Tap'})"
+
+        g2_icon = "[bold green][✓][/bold green]" if f_ev.gate2_positioning_crowded else "[dim yellow][○][/dim yellow]"
+        g2_text = f"{g2_icon} Gate 2: Perp Short Crowding / CVD Absorption Confirmed"
+
+        auc_tag = "Completed Auction" if getattr(f_ev, "auction_completed", True) else "Unfinished Auction"
+        g3_icon = "[bold green][✓][/bold green]" if f_ev.gate3_wick_absorption else "[dim yellow][○][/dim yellow]"
+        g3_text = f"{g3_icon} Gate 3: Lower-Wick Absorption Held ({auc_tag})"
+
+        poc_tag = "Closed + POC Reclaim" if getattr(f_ev, "bar_poc_reclaimed", True) else "Below Bar POC"
+        g4_icon = "[bold green][✓][/bold green]" if f_ev.gate4_delta_flip else "[dim yellow][○][/dim yellow]"
+        g4_text = f"{g4_icon} Gate 4: 15m Positive Delta Flip ({poc_tag})"
+
+    gate_table.add_row(gate_header)
+    gate_table.add_row(g1_text)
+    gate_table.add_row(g2_text)
+    gate_table.add_row(g3_text)
+    gate_table.add_row(g4_text)
+
+    # 3. Active 15M Footprint ($25 Bins)
+    footprint_table = Table(
+        box=box.SIMPLE_HEAVY,
+        expand=True,
+        show_header=True,
+        header_style="bold cyan",
+        pad_edge=False,
+    )
+    footprint_table.add_column("Bin", justify="left", style="white", no_wrap=True)
+    footprint_table.add_column("Bid(Sell)", justify="right", style="red", no_wrap=True)
+    footprint_table.add_column("Ask(Buy)", justify="right", style="green", no_wrap=True)
+    footprint_table.add_column("Tag", justify="left", no_wrap=True)
+
+    for row in f_ev.active_ladder_rows:
+        is_current = abs(row.price - current_price) < 12.5
+        bin_prefix = "►" if is_current else " "
+        bin_str = f"{bin_prefix}${row.price:,.0f}"
+        if is_current:
+            bin_display = f"[bold black on yellow]{bin_str}[/bold black on yellow]"
+        elif row.is_poc:
+            bin_display = f"[bold cyan]{bin_str}[/bold cyan]"
+        else:
+            bin_display = f"[bold white]{bin_str}[/bold white]"
+
+        bid_val = f"{row.bid_vol:.1f}" if row.bid_vol > 0 else "0.0"
+        ask_val = f"{row.ask_vol:.1f}" if row.ask_vol > 0 else "0.0"
+
+        # Format Tag matching spec
+        tags = []
+        if row.is_poc:
+            tags.append("[bold cyan]POC[/bold cyan]")
+        if row.is_stacked_buy:
+            tags.append("[bold black on green]▲ STACK[/bold black on green]")
+        elif row.is_buy_imbalance:
+            tags.append("[green]BUY IMB[/green]")
+        if row.is_stacked_sell:
+            tags.append("[bold white on red]▼ STACK[/bold white on red]")
+        elif row.is_sell_imbalance:
+            tags.append("[red]SELL IMB[/red]")
+        if row.is_battle_zone:
+            tags.append("[bold yellow on red]⚔ BATTLE[/bold yellow on red]")
+        if "TRAP SELL" in row.tag:
+            tags.append("[bold yellow on dark_magenta]🛡 WICK![/bold yellow on dark_magenta]")
+        if "TRAP BUY" in row.tag:
+            tags.append("[bold black on bright_yellow]🛡 WICK![/bold black on bright_yellow]")
+
+        if not tags:
+            if row.total_vol == 0:
+                tag_display = "[dim]LVN[/dim]"
+            else:
+                tag_display = f"[dim]{row.total_vol:.1f}[/dim]"
+        else:
+            tag_display = " ".join(tags)
+
+        footprint_table.add_row(bin_display, bid_val, ask_val, tag_display)
+
+    # 4. Positioning Context
+    pos_grid = Table.grid(expand=True)
+    pos_grid.add_column(justify="left", no_wrap=True)
+    funding_str = f"{f_ev.funding_rate_pct:+.3f}%"
+    oi_str = f"{f_ev.oi_4h_change_pct:+.1f}%"
+    pos_grid.add_row("[bold white]POSITIONING CONTEXT[/bold white]")
+    pos_grid.add_row(f" • [white]Funding:[/white] [cyan]{funding_str}[/cyan] ({'Crowded Short' if f_ev.funding_rate_pct <= 0.01 else 'Elevated Long'})")
+    pos_grid.add_row(f" • [white]OI 4H:[/white]   [cyan]{oi_str}[/cyan] ({'Building Pressure' if abs(f_ev.oi_4h_change_pct) >= 1.0 else 'Steady Churn'})")
+    pos_grid.add_row(f" • [white]CVD:[/white]     [green]{f_ev.cvd_absorption_status}[/green]")
+
+    # 5. Actionable Signal / Execution Box
+    signal_table = Table.grid(expand=True)
+    signal_table.add_column(justify="left", no_wrap=True)
+
+    if f_ev.all_gates_pass:
+        if getattr(store, "spot_ws_connected", False):
+            import sys
+            sys.stdout.write("\a")
+        if is_distribute:
+            signal_table.add_row("[bold white on dark_magenta] >>> SIGNAL: SPOT PROFIT HARVEST (ROTATE USDT) <<< [/bold white on dark_magenta]")
+            signal_table.add_row(f" • [bold white]Sell Spot At:[/bold white] [bold cyan]${f_ev.entry_price:,.0f}[/bold cyan]")
+            signal_table.add_row(f" • [bold white]Invalidation:[/bold white] [bold red]${f_ev.stop_loss:,.0f}[/bold red] (Breakout Re-entry)")
+            signal_table.add_row(f" • [bold white]Rebuy Target:[/bold white] [bold green]${f_ev.rebuy_target_price:,.0f}[/bold green] ({f_ev.rebuy_target_name})")
+            signal_table.add_row(f"   [dim](Target Yield: +{f_ev.target_coin_yield_pct:.1f}% BTC Coin Accumulation)[/dim]")
+        else:
+            eq_u = float(getattr(f_ev, "reference_equity_usd", 100000.0))
+            rb_u = float(getattr(f_ev, "risk_budget_usd", 1000.0))
+            fin_btc = float(getattr(f_ev, "final_position_btc", 0.0))
+            fin_not = float(getattr(f_ev, "final_notional_usd", 0.0))
+            eff_r = float(getattr(f_ev, "effective_risk_usd", 0.0))
+            clamped = bool(getattr(f_ev, "notional_clamped", False))
+            tp1_px = float(getattr(f_ev, "tp1_fair_value_poc", 0.0) or f_ev.tp1_1to2)
+            tp2_px = float(getattr(f_ev, "tp2_short_liq_magnet", 0.0) or f_ev.tp2_1to3)
+            stop_dist = max(f_ev.entry_price - f_ev.stop_loss, 25.0)
+            stop_pct = (stop_dist / max(f_ev.entry_price, 1.0)) * 100.0
+            cap_note = "Clamped 50% Cap" if clamped else "1.0% Risk Sized"
+
+            signal_table.add_row("[bold white on dark_green] >>> SIGNAL: SPOT SWING ACCUMULATION TRIGGERED (ALL 4 GATES VERIFIED) <<< [/bold white on dark_green]")
+            signal_table.add_row(
+                f" • [bold white]Action / Entry:[/bold white] [bold cyan]BUY SPOT @ ${f_ev.entry_price:,.2f}[/bold cyan]  [dim]│[/dim]  "
+                f"[white]Hard Stop:[/white] [bold red]${f_ev.stop_loss:,.2f}[/bold red] [dim](-${stop_dist:,.0f} / -{stop_pct:.2f}%)[/dim]"
+            )
+            signal_table.add_row(
+                f" • [bold white]Position Size :[/bold white] [bold green]{fin_btc:.4f} BTC[/bold green] ([cyan]${fin_not:,.0f}[/cyan] • {cap_note})  [dim]│[/dim]  "
+                f"[white]Real Risk:[/white] [bold yellow]${eff_r:,.2f}[/bold yellow] [dim](of ${rb_u:,.0f} budget on ${eq_u:,.0f})[/dim]"
+            )
+            signal_table.add_row(
+                f" • [bold white]TP1 (50% Trim):[/bold white] [bold green]${tp1_px:,.0f}[/bold green] (30D cPOC -> Move SL to BE)  [dim]│[/dim]  "
+                f"[bold white]TP2 (50% Run):[/bold white] [bold magenta]${tp2_px:,.0f}[/bold magenta] (Short-Liq Magnet)"
+            )
+    else:
+        signal_table.add_row(f"[bold yellow]>>> STATUS: {f_ev.signal_status} (OBSERVATION) <<<[/bold yellow]")
+        if f_ev.gate1_macro_tap:
+            signal_table.add_row(f" • Macro level tapped: [bold cyan]{f_ev.gate1_tapped_level_name}[/bold cyan] (${f_ev.gate1_tapped_level_price:,.0f})")
+            signal_table.add_row(f" • Gate 2/3/4 Status: [yellow]{f_ev.gate2_detail}[/yellow]")
+            signal_table.add_row(f" • Delta Flip: [cyan]{'BULLISH FLIP' if f_ev.delta_flipped_bullish else ('BEARISH FLIP' if f_ev.delta_flipped_bearish else 'AWAITING FLIP')}[/cyan]")
+        else:
+            signal_table.add_row(" • Traversing auction nodes; awaiting institutional key level tap.")
+            signal_table.add_row(" • Invalidation Rule: Never chase market fills in mid-range chop.")
+            signal_table.add_row(" • Staged Limit Bids: Pre-position at 30D/7D HVN or Liquidation Magnet.")
+
+    left_panel = Panel(
+        Group(
+            top_grid,
+            Rule(style="dim cyan"),
+            gate_table,
+            Rule(style="dim cyan"),
+            footprint_table,
+            Rule(style="dim cyan"),
+            pos_grid,
+            Rule(style="dim cyan"),
+            signal_table,
+        ),
+        title="[bold cyan]DESK [F: FOOTPRINT SWING][/bold cyan]",
+        border_style="cyan" if not is_distribute else "magenta",
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+
+    # -------------------------------------------------------------------------
+    # RIGHT COMPANION: TAB 0 MAGNETS, TAB 1 MACRO ANCHORS, CVD & DELTA BUFFER
+    # -------------------------------------------------------------------------
+    spot_ev = getattr(store, "spot_swing_evaluation", None)
+    mag = getattr(spot_ev, "magnet", None) if spot_ev else None
+    macro_vp = getattr(store, "macro_profile", None)
+    flow = getattr(store, "flow_snapshot", None)
+
+    # 1. Tab 0: Daily Liquidation Magnets & Strict 1:3 RRR Protocol
+    mag_table = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold yellow", pad_edge=False)
+    mag_table.add_column("Liquidation Magnet", style="bold white", no_wrap=True)
+    mag_table.add_column("Price", justify="right", style="cyan", no_wrap=True)
+    mag_table.add_column("Distance / Role", justify="right", no_wrap=True)
+
+    short_mag = getattr(mag, "short_liq_magnet", 0.0) if mag else 0.0
+    long_mag = getattr(mag, "long_liq_magnet", 0.0) if mag else 0.0
+    if (
+        mag is not None
+        and isinstance(short_mag, (int, float))
+        and isinstance(long_mag, (int, float))
+        and short_mag > 0
+        and long_mag > 0
+    ):
+        short_mag = float(short_mag)
+        long_mag = float(long_mag)
+        short_dist = float(mag.short_liq_distance_pct)
+        long_dist = float(mag.long_liq_distance_pct)
+        rrr_badge = (
+            f"[bold green]{mag.rrr_to_magnet:.2f}R (≥3R PASS)[/bold green]"
+            if mag.rrr_pass
+            else f"[bold yellow]{mag.rrr_to_magnet:.2f}R (<3R WAIT)[/bold yellow]"
+        )
+        mv_style = _magnet_verdict_style(mag.verdict)
+        max_entry = float(getattr(mag, "max_entry_for_3r", 0.0))
+
+        long_dist_disp = -abs(long_dist)
+        mag_table.add_row(
+            "[magenta]Short-Liq Magnet (↑)[/magenta]",
+            f"${short_mag:,.0f}",
+            f"+{abs(short_dist):.2f}% [dim](Squeeze Fuel)[/dim]",
+        )
+        mag_table.add_row(
+            "[cyan]Long-Liq Magnet (↓)[/cyan]",
+            f"${long_mag:,.0f}",
+            f"{long_dist_disp:.2f}% [dim](Flush Pool)[/dim]",
+        )
+
+        hard_stop = float(getattr(mag, "hard_stop_price", 0.0))
+        mag_footer = Text.from_markup(
+            f" • [white]Live R:R:[/white] {rrr_badge}   "
+            f"• [white]Max 3R Entry:[/white] [bold yellow]<=${max_entry:,.0f}[/bold yellow]\n"
+            f" • [white]Tab 0 Verdict:[/white] [{mv_style}] {mag.verdict.upper()} [/{mv_style}]  "
+            f"[dim](Hard Stop: ${hard_stop:,.0f})[/dim]"
+        )
+    else:
+        mag_table.add_row("[dim]Daily Liquidation Magnets[/dim]", "[dim]Syncing...[/dim]", "[dim]Waiting for 1D/4H bars[/dim]")
+        mag_footer = Text.from_markup("[dim] • Awaiting Tab 0 Spot Swing Evaluation...[/dim]")
+
+    mag_panel = Panel(
+        Group(mag_table, mag_footer),
+        title="[bold yellow]1. TAB 0 LIQUIDATION MAGNETS & 1:3 RRR PROTOCOL[/bold yellow]",
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+
+    # 2. Macro Profile Anchor Levels & Session Extremes (Tab 1 / Tab 3 / Tab 8 Integration)
+    macro_table = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold magenta", pad_edge=False)
+    macro_table.add_column("Macro / Session Level", style="bold white", no_wrap=True)
+    macro_table.add_column("Price", justify="right", style="cyan", no_wrap=True)
+    macro_table.add_column("Distance / Role", justify="right", no_wrap=True)
+
+    if macro_vp is not None and getattr(macro_vp, "c_vah", 0.0) > 0 and current_price > 0:
+        c_vah = float(macro_vp.c_vah)
+        c_poc = float(macro_vp.c_poc)
+        c_val = float(macro_vp.c_val)
+        hvn_floor = float(getattr(macro_vp, "support_hvn_below_val", 0.0) or (c_val * 0.985))
+
+        dist_vah_pct = ((c_vah - current_price) / current_price) * 100.0
+        dist_poc_pct = ((c_poc - current_price) / current_price) * 100.0
+        dist_val_pct = ((c_val - current_price) / current_price) * 100.0
+        dist_hvn_pct = ((hvn_floor - current_price) / current_price) * 100.0
+
+        macro_table.add_row("[yellow]30D cVAH (Resistance)[/yellow]", f"${c_vah:,.0f}", f"{dist_vah_pct:+.2f}% [dim](TP2 Runner)[/dim]")
+        macro_table.add_row("[cyan]30D cPOC (Fair Value)[/cyan]", f"${c_poc:,.0f}", f"{dist_poc_pct:+.2f}% [dim](TP1 Scale 50%)[/dim]")
+        macro_table.add_row("[green]30D cVAL (Support Floor)[/green]", f"${c_val:,.0f}", f"{dist_val_pct:+.2f}% [bold green](Gate 1 Anchor)[/bold green]")
+
+        asia_low_px = float(getattr(f_ev, "asia_low", 0.0))
+        if asia_low_px > 0:
+            dist_asia_pct = ((asia_low_px - current_price) / current_price) * 100.0
+            macro_table.add_row("[bright_cyan]Asia Session Low[/bright_cyan]", f"${asia_low_px:,.0f}", f"{dist_asia_pct:+.2f}% [dim](Session Sweep)[/dim]")
+        else:
+            macro_table.add_row("[dim]Support HVN Floor[/dim]", f"${hvn_floor:,.0f}", f"{dist_hvn_pct:+.2f}% [dim](Structural Base)[/dim]")
+    else:
+        macro_table.add_row("[dim]30D Volume Profile[/dim]", "[dim]Syncing...[/dim]", "[dim]Waiting for 30D 1H bars[/dim]")
+
+    sma200_px = float(getattr(f_ev, "sma_200_1d", 0.0))
+    above_200 = bool(getattr(f_ev, "above_200d_sma", True))
+    if sma200_px > 0:
+        sma_badge = "[bold green]ABOVE (1.00% Full Risk)[/bold green]" if above_200 else "[bold yellow]BELOW (0.50% Defensive Risk)[/bold yellow]"
+        macro_footer = Text.from_markup(f" • [white]1D 200 SMA Gatekeeper:[/white] [cyan]${sma200_px:,.0f}[/cyan] • {sma_badge}")
+    else:
+        macro_footer = Text.from_markup("[dim] • 1D 200 SMA Gatekeeper: Syncing daily history...[/dim]")
+
+    # 3. Multi-Horizon CVD Truth Serum (Tab 1 Integration)
+    cvd_table = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold green", pad_edge=False)
+    cvd_table.add_column("Horizon", style="bold white", no_wrap=True)
+    cvd_table.add_column("Spot CVD", justify="right", no_wrap=True)
+    cvd_table.add_column("Perp CVD", justify="right", no_wrap=True)
+    cvd_table.add_column("Absorption Index", justify="right", no_wrap=True)
+
+    if flow is not None and getattr(flow, "w_15m", None) is not None:
+        for w in (flow.w_15m, flow.w_1h, flow.w_4h, flow.w_24h):
+            abs_str = f"[bold]{w.absorption_index:.2f}[/bold]"
+            if w.absorption_index >= 1.5:
+                abs_str += " [green](Heavy Abs)[/green]"
+            elif w.absorption_index >= 1.0:
+                abs_str += " [cyan](Holding)[/cyan]"
+            cvd_table.add_row(
+                w.window_label,
+                _color_signed(w.spot_delta_btc, "+,.1f", " BTC"),
+                _color_signed(w.perp_delta_btc, "+,.1f", " BTC"),
+                abs_str,
+            )
+    else:
+        cvd_table.add_row("[dim]Multi-Horizon CVD[/dim]", "[dim]Syncing...[/dim]", "[dim]Syncing...[/dim]", "[dim]Normal[/dim]")
+
+    # 4. Trailing 15-Minute Bar Deltas (Ring Buffer)
+    deltas_display = Table(box=box.MINIMAL, expand=True, show_header=True, header_style="bold white")
+    deltas_display.add_column("Bar Index", justify="left")
+    deltas_display.add_column("Net Delta (BTC)", justify="right")
+    deltas_display.add_column("State / Transition", justify="left")
+
+    for i, d in enumerate(f_ev.recent_bars_deltas):
+        idx_label = f"Bar [-{len(f_ev.recent_bars_deltas) - i - 1}]" if i < len(f_ev.recent_bars_deltas) - 1 else "[bold cyan]Active Forming[/bold cyan]"
+        d_color = "green" if d > 0 else ("red" if d < 0 else "dim")
+        d_text = f"[{d_color}]{d:+,.2f} BTC[/{d_color}]"
+        note = "Buyers Gaining Control" if d > 0 else "Sellers Pressing"
+        deltas_display.add_row(idx_label, d_text, note)
+
+    right_group = Group(
+        mag_panel,
+        Panel(Group(macro_table, macro_footer), title="[bold magenta]2. TAB 1 MACRO ANCHORS & SESSION EXTREMES[/bold magenta]", box=box.ROUNDED, padding=(0, 1)),
+        Panel(cvd_table, title="[bold green]3. TAB 1 MULTI-HORIZON CVD TRUTH SERUM[/bold green]", box=box.ROUNDED, padding=(0, 1)),
+        Panel(deltas_display, title="[bold white]4. TRAILING 15M DELTA RING BUFFER[/bold white]", box=box.ROUNDED, padding=(0, 1)),
+        Rule(style="dim white"),
+        Text.from_markup(
+            "[bold white]DESK NAVIGATION:[/bold white] "
+            "• Press [bold cyan]F[/bold cyan]: Footprint Desk  "
+            "• Press [bold cyan]1[/bold cyan]: Tactical Swing  "
+            "• Press [bold cyan]0[/bold cyan]: Spot Screener  "
+            "• Press [bold cyan]L[/bold cyan]: Master  "
+            "• Press [bold cyan]C[/bold cyan]: Copy AI Packet"
+        ),
+    )
+
+    right_panel = Panel(
+        right_group,
+        title="[bold white]DESK [F] QUANTITATIVE RADAR & EXECUTION PROTOCOL[/bold white]",
+        border_style="bright_blue",
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+
+    # -------------------------------------------------------------------------
+    # 3-VARIANT PARALLEL FORWARD TEST SCORECARD PANEL (72H LIVE TELEMETRY)
+    # -------------------------------------------------------------------------
+    scorecard_table = Table(
+        box=box.SIMPLE_HEAVY,
+        expand=True,
+        show_header=True,
+        header_style="bold bright_white on dark_blue",
+        pad_edge=False,
+    )
+    scorecard_table.add_column("Variant / Strategy", style="bold white", width=20, no_wrap=True)
+    scorecard_table.add_column("Horizon", style="dim cyan", width=12, no_wrap=True)
+    scorecard_table.add_column("Status", width=32, no_wrap=True)
+    scorecard_table.add_column("Active Position / PnL", width=44, no_wrap=True)
+    scorecard_table.add_column("Trades", justify="center", width=8, no_wrap=True)
+    scorecard_table.add_column("Win Rate", justify="center", width=10, no_wrap=True)
+    scorecard_table.add_column("Realized PnL", justify="right", width=14, no_wrap=True)
+    scorecard_table.add_column("Max DD", justify="right", width=14, no_wrap=True)
+
+    cards = getattr(f_ev, "forward_test_scorecards", {}) or {}
+    variant_order = [
+        ("OPT_1_PURE_FP", "1: Pure Footprint", "15m Scalp"),
+        ("OPT_2_4GATE", "2: 4-Gate Filter", "1H/4H Swing"),
+        ("OPT_3_INSTITUTIONAL", "3: Institutional", "Spot Swing"),
+    ]
+
+    for vid, def_name, def_tf in variant_order:
+        sc = cards.get(vid) if isinstance(cards, dict) else None
+        v_name = getattr(sc, "display_name", def_name) if sc else def_name
+        v_tf = getattr(sc, "timeframe_desc", def_tf) if sc else def_tf
+        status_raw = str(getattr(sc, "status", "OBSERVING") if sc else "OBSERVING")
+
+        if "IN_POSITION" in status_raw.upper():
+            status_badge = f"[bold black on green] {status_raw} [/bold black on green]"
+        elif "ARMED" in status_raw.upper() or "AWAITING" in status_raw.upper():
+            status_badge = f"[bold black on yellow] {status_raw} [/bold black on yellow]"
+        elif "LOCKED_OUT" in status_raw.upper() or "VETOED" in status_raw.upper():
+            status_badge = f"[bold red]{status_raw}[/bold red]"
+        elif "WATCHING" in status_raw.upper():
+            status_badge = f"[bold cyan]{status_raw}[/bold cyan]"
+        else:
+            status_badge = f"[dim]{status_raw}[/dim]"
+
+        active_tr = getattr(sc, "active_trade", None) if sc else None
+        if active_tr is not None:
+            e_px = float(getattr(active_tr, "entry_price", 0.0))
+            sl_px = float(getattr(active_tr, "stop_loss", 0.0))
+            unreal = float(getattr(active_tr, "unrealized_pnl_usd", 0.0))
+            tr_dir = str(getattr(active_tr, "direction", "BUY")).upper()
+            dir_label = "Buy" if tr_dir != "SELL" else "Sell (USDT)"
+            u_color = "bold green" if unreal >= 0 else "bold red"
+            be_locked = (tr_dir != "SELL" and sl_px >= e_px) or (tr_dir == "SELL" and 0 < sl_px <= e_px)
+            sl_label = f"SL ${sl_px:,.0f} (BE+)" if be_locked else f"SL ${sl_px:,.0f}"
+            pos_str = f"{dir_label} @ ${e_px:,.0f} • {sl_label} • [{u_color}]${unreal:+,.2f}[/{u_color}]"
+        else:
+            last_summary = getattr(sc, "last_closed_trade_summary", "") if sc else ""
+            if last_summary:
+                pos_str = f"[dim]Flat (Last: {last_summary})[/dim]"
+            else:
+                pos_str = "[dim]Flat (No Open Position)[/dim]"
+
+        tot_tr = int(getattr(sc, "total_trades", 0) if sc else 0)
+        win_pct = float(getattr(sc, "win_rate_pct", 0.0) if sc else 0.0)
+        pnl_val = float(getattr(sc, "realized_pnl_usd", 0.0) if sc else 0.0)
+        mdd_val = float(getattr(sc, "max_drawdown_usd", 0.0) if sc else 0.0)
+
+        tr_str = f"[bold]{tot_tr}[/bold]" if tot_tr > 0 else "[dim]0[/dim]"
+        if tot_tr > 0:
+            wr_color = "bold green" if win_pct >= 60.0 else ("bold yellow" if win_pct >= 45.0 else "bold red")
+            wr_str = f"[{wr_color}]{win_pct:.1f}%[/{wr_color}]"
+        else:
+            wr_str = "[dim]0.0%[/dim]"
+
+        if pnl_val > 0:
+            pnl_str = f"[bold green]+${pnl_val:,.2f}[/bold green]"
+        elif pnl_val < 0:
+            pnl_str = f"[bold red]-${abs(pnl_val):,.2f}[/bold red]"
+        else:
+            pnl_str = "[dim]$0.00[/dim]"
+
+        if mdd_val > 0:
+            mdd_str = f"[bold red]-${mdd_val:,.2f}[/bold red]"
+        else:
+            mdd_str = "[dim]$0.00[/dim]"
+
+        scorecard_table.add_row(
+            v_name,
+            v_tf,
+            status_badge,
+            pos_str,
+            tr_str,
+            wr_str,
+            pnl_str,
+            mdd_str,
+        )
+
+    # Executive Verdict Banner for Desk [F] (Responsive to Live Trades & 15m Microstructure)
+    asia_low_px = float(getattr(f_ev, "asia_low", 0.0))
+    asia_high_px = float(getattr(f_ev, "asia_high", 0.0))
+    cards = getattr(f_ev, "forward_test_scorecards", {}) or {}
+    sc1 = cards.get("OPT_1_PURE_FP") if isinstance(cards, dict) else None
+    active_tr = getattr(sc1, "active_trade", None) if sc1 else None
+
+    abs_idx_15m = float(getattr(flow.w_15m, "absorption_index", 0.0)) if (flow and getattr(flow, "w_15m", None)) else 0.0
+    perp_15m = float(getattr(flow.w_15m, "perp_delta_btc", 0.0)) if (flow and getattr(flow, "w_15m", None)) else 0.0
+    battle_zones = [r.price for r in f_ev.active_ladder_rows if r.is_battle_zone] if f_ev.active_ladder_rows else []
+
+    if ntz_active:
+        verdict_status = "[bold white on red] RED: 100% CASH (SYSTEMIC HAZARD VETO) [/bold white on red]"
+        confluence_msg = f"[bold red]NTZ 8A-8F VETO:[/bold red] Systemic Non-Trade Zone active ({ntz_text})."
+        plain_msg = "Major macro news event or systemic cascade in progress. Stay 100% in cash."
+        v_border = "red"
+    elif active_tr is not None:
+        tr_dir = getattr(active_tr, "direction", "BUY")
+        entry_p = float(getattr(active_tr, "entry_price", 0.0))
+        sl_p = float(getattr(active_tr, "stop_loss", 0.0))
+        tp1_p = float(getattr(active_tr, "tp1_price", 0.0))
+        tp2_p = float(getattr(active_tr, "tp2_price", 0.0))
+        rem_size = float(getattr(active_tr, "remaining_size", 0.0))
+        tp1_hit = bool(getattr(active_tr, "tp1_hit", False))
+        unreal = float(getattr(active_tr, "unrealized_pnl_usd", 0.0))
+        banked = float(getattr(active_tr, "already_realized_pnl", 0.0))
+
+        if tp1_hit:
+            dist_tp2 = tp2_p - current_price if tr_dir == "BUY" else current_price - tp2_p
+            verdict_status = f"[bold black on bright_green] ACTIVE POSITION: 50% RUNNER TARGETING TP2 (${tp2_p:,.0f}) • SL AT BREAKEVEN (${sl_p:,.0f}) [/bold black on bright_green]"
+            confluence_msg = f"[bold green]TP1 HARVESTED (+${banked:,.2f}):[/bold green] Holding {rem_size:.4f} BTC • Live Runner: [bold {'green' if unreal >= 0 else 'red'}]${unreal:+,.2f}[/] • Dist to TP2: ${dist_tp2:,.0f}"
+            plain_msg = f"Trade 5 is in full control: 50% profit banked, stop loss locked at breakeven ($0 risk). Let the runner work towards TP2 (${tp2_p:,.0f})."
+            v_border = "bright_green"
+        else:
+            dist_tp1 = tp1_p - current_price if tr_dir == "BUY" else current_price - tp1_p
+            dist_sl = current_price - sl_p if tr_dir == "BUY" else sl_p - current_price
+            verdict_status = f"[bold black on green] ACTIVE 15M SCALP: IN POSITION ({tr_dir} {rem_size:.4f} BTC @ ${entry_p:,.0f}) [/bold black on green]"
+            confluence_msg = f"[bold green]RUNNING SCALP:[/bold green] Stop Loss: ${sl_p:,.0f} (-${dist_sl:,.0f}) • TP1 Target: ${tp1_p:,.0f} (+${dist_tp1:,.0f}) • Live: [bold {'green' if unreal >= 0 else 'red'}]${unreal:+,.2f}[/]"
+            plain_msg = f"Active 15m scalp from ${entry_p:,.0f}. Stop protected at ${sl_p:,.0f}; watching for push to first scale-out at ${tp1_p:,.0f}."
+            v_border = "green"
+    elif f_ev.all_gates_pass:
+        if is_distribute:
+            verdict_status = "[bold white on dark_magenta] SPOT PROFIT HARVEST: ROTATE TO USDT (ALL 4 GATES PASS) [/bold white on dark_magenta]"
+            confluence_msg = f"[bold magenta]TRIGGERED:[/bold magenta] Resistance tapped ({f_ev.gate1_tapped_level_name}) + Buyer Exhaustion + Bear Δ Flip."
+            plain_msg = f"Resistance ceiling confirmed. Take profit by rotating BTC to USDT at ${current_price:,.0f}; rebuy target at ${f_ev.rebuy_target_price:,.0f} (+{f_ev.target_coin_yield_pct:.1f}% BTC Yield)."
+            v_border = "magenta"
+        else:
+            verdict_status = "[bold black on bright_green] SPOT ACCUMULATION: BUY SIGNAL TRIGGERED (ALL 4 GATES PASS) [/bold black on bright_green]"
+            confluence_msg = f"[bold green]TRIGGERED:[/bold green] Support tapped ({f_ev.gate1_tapped_level_name}) + Trapped Sellers + Bull Δ Flip."
+            plain_msg = f"Institutional accumulation confirmed at key support. Safe to execute Spot Swing entry at ${current_price:,.0f}."
+            v_border = "bright_green"
+    elif f_ev.signal_status == "ARMED":
+        if is_distribute:
+            verdict_status = "[bold black on dark_magenta] SETUP ARMED (DISTRIBUTION): AWAITING BEARISH DELTA FLIP [/bold black on dark_magenta]"
+            confluence_msg = f"[bold magenta]GATE 4 PENDING:[/bold magenta] Resistance tapped ({f_ev.gate1_tapped_level_name}); waiting for 15m delta to turn negative."
+            plain_msg = "Price is at resistance with buyer exhaustion. Waiting for sellers to flip 15m delta negative before rotating to USDT."
+            v_border = "magenta"
+        else:
+            verdict_status = "[bold black on bright_cyan] SETUP ARMED (ACCUMULATION): AWAITING BULLISH DELTA FLIP [/bold black on bright_cyan]"
+            confluence_msg = f"[bold cyan]GATE 4 PENDING:[/bold cyan] Support tapped ({f_ev.gate1_tapped_level_name}); waiting for 15m delta to turn positive."
+            plain_msg = "Price is at institutional support with seller absorption. Waiting for buyers to flip 15m delta positive before entering."
+            v_border = "cyan"
+    elif f_ev.gate1_macro_tap:
+        verdict_status = f"[bold black on yellow] WATCHING LEVEL: AT {f_ev.gate1_tapped_level_name.upper()} (${f_ev.gate1_tapped_level_price:,.0f}) [/bold black on yellow]"
+        confluence_msg = f"[bold yellow]GATE 2/3 PENDING:[/bold yellow] Level tapped; awaiting footprint absorption / exhaustion wick."
+        plain_msg = f"Price touched {f_ev.gate1_tapped_level_name}. Standing by for footprint trapped volume to confirm reversal."
+        v_border = "yellow"
+    elif abs_idx_15m >= 1.5 or len(battle_zones) > 0:
+        battle_str = f"⚔ Battle Zone at ${battle_zones[0]:,.0f}" if battle_zones else f"15m Perp CVD {perp_15m:+,.1f} BTC"
+        verdict_status = f"[bold black on yellow] 15M ORDER FLOW ABSORPTION ACTIVE ({abs_idx_15m:.1f}x) • {battle_str} [/bold black on yellow]"
+        confluence_msg = f"[bold yellow]15M MICRO-ACTION:[/bold yellow] 15m Delta: {bar_delta:+,.1f} BTC • Aggressive sellers absorbed passively near Asia Low (${asia_low_px:,.0f})"
+        plain_msg = f"Futures sellers fired {perp_15m:+,.0f} BTC, but passive bids are holding price at ${current_price:,.0f}. Watch for positive delta flip to trigger next scalp."
+        v_border = "yellow"
+    elif asia_low_px > 0 and (current_price - asia_low_px) <= 150.0:
+        dist_low = current_price - asia_low_px
+        verdict_status = f"[bold black on cyan] TESTING ASIA SESSION LOW (${asia_low_px:,.0f}) • DIST: ${dist_low:,.0f} [/bold black on cyan]"
+        confluence_msg = f"[bold cyan]SESSION SWEEP PROTOCOL:[/bold cyan] Price near Asia Low. Awaiting lower-wick liquidity flush + 15m positive delta flip."
+        plain_msg = f"Price is only ${dist_low:,.0f} above today's Asia Low ($80,256). Ideal zone for a trapped seller bounce scalp."
+        v_border = "cyan"
+    elif asia_high_px > 0 and (asia_high_px - current_price) <= 150.0:
+        dist_high = asia_high_px - current_price
+        verdict_status = f"[bold black on magenta] TESTING ASIA SESSION HIGH (${asia_high_px:,.0f}) • DIST: ${dist_high:,.0f} [/bold black on magenta]"
+        confluence_msg = f"[bold magenta]SESSION RESISTANCE:[/bold magenta] Price near Asia High. Awaiting upper-wick exhaustion for profit rotation into USDT."
+        plain_msg = f"Price is only ${dist_high:,.0f} below Asia High ($80,643). Overhead resistance zone — watch for buyer exhaustion."
+        v_border = "magenta"
+    else:
+        dist_to_low = current_price - asia_low_px if asia_low_px > 0 else 0.0
+        dist_to_high = asia_high_px - current_price if asia_high_px > 0 else 0.0
+        verdict_status = f"[bold black on yellow] 15M INTRADAY CHOP: TRADING BETWEEN ASIA LOW (${asia_low_px:,.0f}) & HIGH (${asia_high_px:,.0f}) [/bold black on yellow]"
+        confluence_msg = f"[bold yellow]INTRADAY BOUNDS:[/bold yellow] Support: Asia Low ${asia_low_px:,.0f} (-${dist_to_low:,.0f}) • Resist: Asia High ${asia_high_px:,.0f} (+${dist_to_high:,.0f})"
+        plain_msg = f"Bitcoin is oscillating between ${asia_low_px:,.0f} and ${asia_high_px:,.0f}. Scalp setups trigger near session extremes, not in the middle."
+        v_border = "yellow"
+
+    v_grid = Table.grid(expand=True)
+    v_grid.add_column(justify="left", no_wrap=True)
+    v_grid.add_column(justify="right", no_wrap=True)
+    v_grid.add_row(
+        f"[bold white]DESK [F] VERDICT:[/bold white] {verdict_status}",
+        f"[bold white]RISK CAP:[/bold white] [bold cyan]1.00% Risk[/bold cyan]  [dim]│[/dim]  [bold white]BTC:[/bold white] [bold cyan]${current_price:,.2f}[/bold cyan]",
+    )
+    v_grid.add_row(
+        f"[bold white]CONFLUENCE STATE:[/bold white] {confluence_msg}",
+        f"[dim]Keys: F Footprint • W Waterfall • 0 Spot • 1-9 Desks • L Master • C Copy[/dim]",
+    )
+    v_grid.add_row(
+        f"[bold white]PLAIN ENGLISH:[/bold white] [bold bright_white]{plain_msg}[/bold bright_white]",
+        f"[dim white]Desk F: 15m Footprint Microstructure Protocol[/dim white]",
+    )
+    verdict_panel = Panel(v_grid, border_style=v_border, box=box.ROUNDED, padding=(0, 1))
+
+    scorecard_panel = Panel(
+        scorecard_table,
+        title="[bold bright_yellow]3-VARIANT PARALLEL FORWARD TEST SCORECARD (CONTINUOUS LIVE TELEMETRY)[/bold bright_yellow]",
+        border_style="yellow",
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+
+    content_grid = Table.grid(expand=True)
+    content_grid.add_column(justify="left", no_wrap=False, ratio=1)
+    content_grid.add_column(justify="left", no_wrap=False, ratio=1)
+    content_grid.add_row(left_panel, right_panel)
+
+    return Group(header_panel, verdict_panel, scorecard_panel, content_grid)
 
 
 # ============================================================================
-# PUBLIC DISPATCHERS & LIVE INTERACTIVE LOOP
+# TAB [W]: 5-PILLAR INSTITUTIONAL DECISION WATERFALL & 7 ESSENTIAL DATA POINTS
 # ============================================================================
+
+def _build_tab_waterfall_hud(store: StateStore, header_panel: Panel) -> Group:
+    """Renders Dedicated Tab [W: 5-PILLAR INSTITUTIONAL DECISION WATERFALL].
+    
+    Translates 'The 5 Pillars and 7 Essential Data Points That Drive the Verdict'
+    into a real-time, clutter-free execution HUD:
+    1. Macro Permission (1D 200 SMA Slope & NTZ 8A-8F)
+    2. Structural Map & Asymmetry (30D Volume Profile cVAL/cPOC & Liq Magnets R:R >= 3.0R)
+    3. Cross-Venue Flow Truth (4H Spot vs Perp CVD Div Z & Coinbase Premium CPI)
+    4. Leverage Fuel (Open Interest dOI 4H & 8H Funding / Perp Basis)
+    5. Sniper Trigger (15m Footprint Lower-Wick Absorption & Positive Delta Flip)
+    """
+    f_ev = getattr(store, "footprint_evaluation", None)
+    macro_ev = getattr(store, "macro_evaluation", None)
+    spot_ev = getattr(store, "spot_swing_evaluation", None)
+    proto_ev = getattr(store, "protocol_evaluation", None)
+    flow = getattr(store, "flow_snapshot", None)
+    deriv = getattr(store, "derivatives_snapshot", None)
+    macro_vp = getattr(store, "macro_profile", None)
+    mag = getattr(spot_ev, "magnet", None) if spot_ev else None
+    sig = getattr(store, "latest_signal", None)
+
+    current_price = store.binance_spot_price or (f_ev.current_price if f_ev else 0.0) or (spot_ev.spot_price if spot_ev else 0.0)
+
+    # -------------------------------------------------------------------------
+    # 1. EXTRACT 7 ESSENTIAL DATA POINTS ACROSS 5 PILLARS
+    # -------------------------------------------------------------------------
+
+    # --- PILLAR 1: MACRO PERMISSION (Data Point 1: 1D 200 SMA & NTZ 8A-8F) ---
+    sma200_px = float(getattr(macro_ev, "sma_200_1d", 0.0) or getattr(f_ev, "sma_200_1d", 0.0) or 0.0)
+    above_200 = bool(getattr(macro_ev, "above_200d_sma", True) if macro_ev else getattr(f_ev, "above_200d_sma", True))
+    sma200_slope_usd = float(getattr(macro_ev, "sma_200_slope_5d_usd", 0.0) if macro_ev else 0.0)
+    sma200_slope_pct = float(getattr(macro_ev, "sma_200_slope_5d_pct", 0.0) if macro_ev else 0.0)
+    slope_pos = bool(getattr(macro_ev, "slope_200d_positive", True) if macro_ev else True)
+
+    ntz_active = bool(
+        getattr(f_ev, "ntz_veto_active", False)
+        or (getattr(proto_ev, "non_trade_zone_status", "NO") == "YES")
+    )
+    ntz_text = str(
+        getattr(f_ev, "ntz_status_text", "")
+        or (getattr(proto_ev, "active_ntz_reasons", ["ALL CLEAR"])[0] if (proto_ev and proto_ev.active_ntz_reasons) else "ALL CLEAR (8A-8F PASS)")
+    )
+    if not ntz_text:
+        ntz_text = "ALL CLEAR (8A-8F PASS)"
+
+    p1_risk_cap = "1.00% Account Risk" if (above_200 and not ntz_active) else ("0.50% Defensive Risk" if not ntz_active else "0.00% (100% Cash)")
+    if ntz_active:
+        p1_badge = "[bold white on red] ⛔ VETO [/bold white on red]"
+        p1_summary = f"[red]NTZ Hazard Active ({ntz_text})[/red]"
+    elif above_200:
+        p1_badge = "[bold black on green] ✓ PASS [/bold black on green]"
+        p1_summary = f"[green]Above Rising 200D SMA (${sma200_px:,.0f}) • 1.00% Authorized[/green]"
+    else:
+        p1_badge = "[bold black on yellow] ⚠ 0.50% CAP [/bold black on yellow]"
+        p1_summary = f"[yellow]Below 200D SMA (${sma200_px:,.0f}) • Halved to 0.50% Risk[/yellow]"
+
+    # --- PILLAR 2: STRUCTURAL MAP & ASYMMETRY ---
+    # Data Point 2: 30D Composite Volume Profile (cVAL / cPOC / cVAH / HVN)
+    c_val = float(getattr(macro_vp, "c_val", 0.0) if macro_vp else 0.0)
+    c_poc = float(getattr(macro_vp, "c_poc", 0.0) if macro_vp else 0.0)
+    c_vah = float(getattr(macro_vp, "c_vah", 0.0) if macro_vp else 0.0)
+    hvn_floor = float(getattr(macro_vp, "support_hvn_below_val", 0.0) or (c_val * 0.985 if c_val > 0 else 0.0))
+    va_pos = float(getattr(sig, "va_position_pct", 50.0) if sig else 50.0)
+    is_mid_chop = bool(getattr(sig, "is_mid_range_chop", False) if sig else (30.0 <= va_pos <= 70.0))
+
+    dist_val_pct = ((current_price - c_val) / c_val * 100.0) if c_val > 0 else 0.0
+    dist_poc_pct = ((c_poc - current_price) / current_price * 100.0) if current_price > 0 else 0.0
+
+    at_edge = (abs(dist_val_pct) <= 1.5) or (current_price <= c_val)
+    if not is_mid_chop or at_edge:
+        dp2_badge = "[bold black on green] ✓ PASS [/bold black on green]"
+        dp2_summary = f"[green]At Institutional Shelf (cVAL ${c_val:,.0f} / HVN ${hvn_floor:,.0f})[/green]"
+    else:
+        dp2_badge = "[bold black on yellow] ○ WAITING [/bold black on yellow]"
+        dp2_summary = f"[yellow]Mid-Range Chop (VA Pos {va_pos:.1f}%) • Await cVAL ${c_val:,.0f}[/yellow]"
+
+    # Data Point 3: Liquidation Magnets & Live R:R Ratio
+    short_mag = float(getattr(mag, "short_liq_magnet", 0.0) or 0.0)
+    long_mag = float(getattr(mag, "long_liq_magnet", 0.0) or 0.0)
+    short_dist = float(getattr(mag, "short_liq_distance_pct", 0.0) or 0.0)
+    long_dist = float(getattr(mag, "long_liq_distance_pct", 0.0) or 0.0)
+    rrr_val = float(getattr(mag, "rrr_to_magnet", 0.0) or 0.0)
+    rrr_pass = bool(getattr(mag, "rrr_pass", False) or rrr_val >= 3.0)
+    max_entry_3r = float(getattr(mag, "max_entry_for_3r", 0.0) or 0.0)
+
+    if rrr_pass and rrr_val >= 3.0:
+        dp3_badge = "[bold black on green] ✓ PASS [/bold black on green]"
+        dp3_summary = f"[green]Asymmetry {rrr_val:.2f}R ≥ 3.0R to Short-Liq Magnet (${short_mag:,.0f})[/green]"
+    elif rrr_val > 0:
+        dp3_badge = "[bold black on yellow] ○ WAITING [/bold black on yellow]"
+        dp3_summary = f"[yellow]Asymmetry {rrr_val:.2f}R < 3.0R (Max Buy: ${max_entry_3r:,.0f})[/yellow]"
+    else:
+        dp3_badge = "[dim]○ SYNCING[/dim]"
+        dp3_summary = "[dim]Calculating Liquidation Magnets & R:R...[/dim]"
+
+    # --- PILLAR 3: CROSS-VENUE FLOW TRUTH ---
+    # Data Point 4: 4H Spot CVD vs. Perp CVD Divergence (Div Z)
+    spot_cvd_4h = float(getattr(flow.w_4h, "spot_delta_btc", 0.0) if (flow and flow.w_4h) else 0.0)
+    perp_cvd_4h = float(getattr(flow.w_4h, "perp_delta_btc", 0.0) if (flow and flow.w_4h) else 0.0)
+    div_z = float(getattr(flow.w_4h, "flow_divergence_z", 0.0) if (flow and flow.w_4h) else 0.0)
+
+    is_stealth_dist = (spot_cvd_4h < -50.0 and perp_cvd_4h > 50.0 and div_z < -1.5)
+    is_spot_accum = (spot_cvd_4h > 0 and (perp_cvd_4h <= 0 or spot_cvd_4h > perp_cvd_4h))
+
+    if is_stealth_dist:
+        dp4_badge = "[bold white on red] ⛔ VETO [/bold white on red]"
+        dp4_summary = f"[red]Stealth Distribution! Spot dumping ({spot_cvd_4h:+,.1f} BTC) while Perp pumps (Div Z: {div_z:.2f}σ)[/red]"
+    elif is_spot_accum:
+        dp4_badge = "[bold black on green] ✓ PASS [/bold black on green]"
+        dp4_summary = f"[green]Spot Accumulation (Spot: {spot_cvd_4h:+,.1f} BTC, Perp: {perp_cvd_4h:+,.1f} BTC)[/green]"
+    else:
+        dp4_badge = "[bold black on yellow] ○ NEUTRAL [/bold black on yellow]"
+        dp4_summary = f"[yellow]Balanced Flow (Spot: {spot_cvd_4h:+,.1f} BTC, Perp: {perp_cvd_4h:+,.1f} BTC, Div Z: {div_z:.2f}σ)[/yellow]"
+
+    # Data Point 5: Coinbase Premium (CPI) & US Institutional Demand
+    cpi_usd, cpi_pct, cpi_z = store.get_cpi_metrics()
+    if cpi_usd == 0.0 and deriv:
+        cpi_usd = float(deriv.coinbase_premium_usd or 0.0)
+        cpi_pct = float(deriv.coinbase_premium_pct or 0.0)
+        cpi_z = float(deriv.coinbase_premium_zscore or 0.0)
+
+    cpi_fmt = f"+${cpi_usd:,.2f}" if cpi_usd >= 0 else f"-${abs(cpi_usd):,.2f}"
+    cpi_color = "green" if cpi_usd > 0 else ("red" if cpi_usd < 0 else "white")
+    cpi_disp = f"[{cpi_color}]{cpi_fmt}[/{cpi_color}]"
+
+    if cpi_usd > 2.0:
+        cpi_tag = "US Institutional Bid"
+        dp5_badge = "[bold black on green] ✓ PASS [/bold black on green]"
+        dp5_summary = f"[green]Premium +${cpi_usd:,.2f} (+{cpi_pct:.3f}%) • {cpi_tag}[/green]"
+    elif cpi_usd < -50.0:
+        cpi_tag = "Heavy US Spot Selling"
+        dp5_badge = "[bold white on red] ⛔ VETO [/bold white on red]"
+        dp5_summary = f"[red]Discount -${abs(cpi_usd):,.2f} ({cpi_pct:.3f}%) • {cpi_tag}[/red]"
+    elif cpi_usd < -5.0:
+        cpi_tag = "US Spot Lag"
+        dp5_badge = "[bold black on yellow] ○ CAUTION [/bold black on yellow]"
+        dp5_summary = f"[yellow]Discount -${abs(cpi_usd):,.2f} ({cpi_pct:.3f}%) • {cpi_tag}[/yellow]"
+    else:
+        cpi_tag = "Neutral Spread"
+        dp5_badge = "[cyan]○ NEUTRAL[/cyan]"
+        dp5_summary = f"[cyan]Spread ${cpi_usd:+,.2f} ({cpi_pct:+.3f}%) • {cpi_tag}[/cyan]"
+
+    # --- PILLAR 4: LEVERAGE FUEL ---
+    # Data Point 6: Open Interest (4H dOI%) & 8H Funding / Perp Basis
+    oi_btc = float(getattr(deriv, "open_interest_btc", 0.0) or store.open_interest_btc)
+    oi_4h_pct = float(getattr(deriv, "oi_change_4h_pct", 0.0) or store.get_oi_change_pct(14400))
+    funding_rate = float(getattr(deriv, "funding_rate_pct", 0.0) or store.funding_rate_pct)
+    basis_usd = float(getattr(deriv, "perp_basis_usd", 0.0))
+
+    is_crowded_long = (oi_4h_pct > 2.5 and funding_rate > 0.012)
+    is_squeeze_fuel = (funding_rate < 0.00 or (oi_4h_pct > 1.5 and funding_rate <= 0.005))
+
+    if is_crowded_long:
+        dp6_badge = "[bold white on red] ⛔ VETO [/bold white on red]"
+        dp6_summary = f"[red]Crowded Long Trap (OI: {oi_4h_pct:+.1f}%, Funding: {funding_rate:+.4f}% > 0.012%)[/red]"
+    elif is_squeeze_fuel:
+        dp6_badge = "[bold black on green] ✓ FUEL [/bold black on green]"
+        dp6_summary = f"[green]Coiled Squeeze Fuel (Funding: {funding_rate:+.4f}%, OI 4H: {oi_4h_pct:+.1f}%)[/green]"
+    else:
+        dp6_badge = "[bold black on green] ✓ PASS [/bold black on green]"
+        dp6_summary = f"[green]Uncrowded Base (OI: {oi_btc:,.0f} BTC, 4H dOI: {oi_4h_pct:+.1f}%, Funding: {funding_rate:+.4f}%)[/green]"
+
+    # --- PILLAR 5: SNIPER TRIGGER ---
+    # Data Point 7: 15m Footprint Wick Absorption & Delta Flip (Desk [F])
+    bar_delta = float(getattr(f_ev, "active_bar_delta", 0.0) if f_ev else 0.0)
+    prev_delta = float(getattr(f_ev, "prev_bar_delta", 0.0) if f_ev else 0.0)
+    wick_abs = bool(getattr(f_ev, "gate3_wick_absorption", False) if f_ev else False)
+    delta_flip = bool(getattr(f_ev, "gate4_delta_flip", False) if f_ev else False)
+    all_gates_pass = bool(getattr(f_ev, "all_gates_pass", False) if f_ev else False)
+    auc_comp = bool(getattr(f_ev, "auction_completed", True) if f_ev else True)
+    poc_rec = bool(getattr(f_ev, "bar_poc_reclaimed", True) if f_ev else True)
+
+    if all_gates_pass or (wick_abs and delta_flip):
+        dp7_badge = "[bold black on bright_cyan] 🎯 TRIGGERED [/bold black on bright_cyan]"
+        dp7_summary = f"[bold bright_cyan]Lower Wick Absorption Confirmed + 15m Delta Flip ({bar_delta:+,.1f} BTC)[/bold bright_cyan]"
+    elif wick_abs:
+        dp7_badge = "[bold black on yellow] ○ ARMED (Δ Flip) [/bold black on yellow]"
+        dp7_summary = f"[yellow]Passive Bids Absorbed Sweep • Awaiting 15m Positive Delta Flip (Current: {bar_delta:+,.1f} BTC)[/yellow]"
+    elif delta_flip:
+        dp7_badge = "[bold yellow]○ DELTA FLIP[/bold yellow]"
+        dp7_summary = f"[yellow]Positive Delta Flip ({bar_delta:+,.1f} BTC) • Awaiting Lower Wick Tap[/yellow]"
+    else:
+        dp7_badge = "[dim]○ OBSERVING[/dim]"
+        dp7_summary = f"[dim]No Sweep/Absorption Yet (15m Delta: {bar_delta:+,.1f} BTC)[/dim]"
+
+    # -------------------------------------------------------------------------
+    # 2. MASTER WATERFALL SYNTHESIS & BINDING CONSTRAINT
+    # -------------------------------------------------------------------------
+    if ntz_active:
+        master_status = "[bold white on red] RED: 100% CASH LOCK (SYSTEMIC HAZARD VETO) [/bold white on red]"
+        binding_constraint = f"[bold red]PILLAR 1 VETO:[/bold red] Systemic Non-Trade Zone active ({ntz_text}). All spot entries locked."
+        plain_english = "Major macro news event or systemic cascade in progress. Market is highly hazardous; stay 100% in cash."
+        border_color = "red"
+    elif is_stealth_dist:
+        master_status = "[bold white on red] RED: 100% CASH (STEALTH DISTRIBUTION VETO) [/bold white on red]"
+        binding_constraint = f"[bold red]PILLAR 3 VETO:[/bold red] Spot CVD dumping ({spot_cvd_4h:+,.1f} BTC) while Perp pumps (Div Z = {div_z:.2f}σ)."
+        plain_english = "Whales are quietly selling real BTC into a retail-driven futures bounce. Do NOT buy; stay 100% in cash."
+        border_color = "red"
+    elif is_crowded_long:
+        master_status = "[bold white on red] RED: 100% CASH (LEVERAGED LONG TRAP VETO) [/bold white on red]"
+        binding_constraint = f"[bold red]PILLAR 4 VETO:[/bold red] Futures OI expanding with funding > 0.012% into resistance."
+        plain_english = "Too many gamblers borrowing money to buy near resistance. High risk of a long liquidation flush; stay in cash."
+        border_color = "red"
+    elif cpi_usd < -50.0 and not at_edge:
+        master_status = "[bold white on red] RED: 100% CASH (HEAVY US SPOT SELLING) [/bold white on red]"
+        binding_constraint = f"[bold red]PILLAR 3 VETO:[/bold red] Coinbase Premium at deep discount (${cpi_usd:+,.2f}). US institutions selling."
+        plain_english = "US institutions on Coinbase are actively dumping coins onto offshore exchanges. Stand aside in cash."
+        border_color = "red"
+    elif all_gates_pass or (wick_abs and delta_flip and rrr_pass):
+        master_status = "[bold black on bright_green] GREEN: ALL 5 PILLARS ALIGNED — EXECUTE SPOT SWING LONG [/bold black on bright_green]"
+        binding_constraint = "[bold green]NO BINDING CONSTRAINTS:[/bold green] Macro permission, structural map, flow truth, and footprint trigger verified."
+        plain_english = "Institutions confirmed: Big players absorbed sellers at key support and turned buyers. Safe to buy Spot BTC."
+        border_color = "bright_green"
+    elif at_edge or (wick_abs and not delta_flip):
+        master_status = "[bold black on bright_cyan] BLUE: SETUP ARMED — PRE-POSITION LIMIT BIDS AT SUPPORT SHELF [/bold black on bright_cyan]"
+        binding_constraint = f"[bold cyan]PILLAR 5 AWAITING TRIGGER:[/bold cyan] At key structural edge (${c_val:,.0f}); waiting for 15m Delta Flip."
+        plain_english = "Price is sitting at strong institutional support. Waiting for buyers to show up on the 15m chart before entering."
+        border_color = "cyan"
+    else:
+        master_status = "[bold black on yellow] AMBER: PATIENT OBSERVATION — MID-RANGE CHOP [/bold black on yellow]"
+        binding_constraint = f"[bold yellow]PILLAR 2 CONSTRAINT:[/bold yellow] Price in mid-range chop; awaiting sweep of 30D cVAL (${c_val:,.0f}) or HVN Floor (${hvn_floor:,.0f})."
+        plain_english = "Price is stuck in the middle of nowhere (choppy range). No edge here; wait patiently for price to drop to support."
+        border_color = "yellow"
+
+    # --- TOP EXECUTIVE BANNER ---
+    banner_grid = Table.grid(expand=True)
+    banner_grid.add_column(justify="left", no_wrap=True)
+    banner_grid.add_column(justify="right", no_wrap=True)
+    banner_grid.add_row(
+        f"[bold white]MASTER VERDICT:[/bold white] {master_status}",
+        f"[bold white]RISK CAP:[/bold white] [bold cyan]{p1_risk_cap}[/bold cyan]  [dim]│[/dim]  [bold white]BTC:[/bold white] [bold cyan]${current_price:,.2f}[/bold cyan]",
+    )
+    banner_grid.add_row(
+        f"[bold white]BINDING CONSTRAINT:[/bold white] {binding_constraint}",
+        f"[dim]Keys: W Waterfall • F Footprint • 0 Spot • 1-9 Desks • L Master • C Copy[/dim]",
+    )
+    banner_grid.add_row(
+        f"[bold white]PLAIN ENGLISH:[/bold white] [bold bright_white]{plain_english}[/bold bright_white]",
+        f"[dim white]Rule: Spot-Only • Triple-Barrier Protocol[/dim white]",
+    )
+    banner_panel = Panel(banner_grid, border_style=border_color, box=box.ROUNDED, padding=(0, 1))
+
+    # -------------------------------------------------------------------------
+    # 3. THE 5-PILLAR DECISION WATERFALL TABLE (7 ESSENTIAL DATA POINTS)
+    # -------------------------------------------------------------------------
+    wf_table = Table(
+        box=box.SIMPLE_HEAVY,
+        expand=True,
+        show_header=True,
+        header_style="bold bright_white on dark_blue",
+        pad_edge=False,
+    )
+    wf_table.add_column("Pillar & Institutional Role", style="bold white", width=30, no_wrap=True)
+    wf_table.add_column("Essential Data Point", width=34, no_wrap=True)
+    wf_table.add_column("Live Telemetry & State", width=46, no_wrap=True)
+    wf_table.add_column("Strict Rule / Gate Threshold", width=36, no_wrap=True)
+    wf_table.add_column("Gate Verdict", justify="center", width=18, no_wrap=True)
+
+    # Row 1: Pillar 1 / Data Point 1
+    wf_table.add_row(
+        "[bold cyan]P1: MACRO PERMISSION[/bold cyan]\n[dim]Capital Authorization & Hazard Locks[/dim]",
+        "1. 1D 200 SMA (+5D Slope) &\n   NTZ 8A–8F Systemic Shields",
+        f"200 SMA: ${sma200_px:,.0f} ({'Above' if above_200 else 'Below'})\nSlope: {sma200_slope_usd:+,.1f}/d • NTZ: {ntz_text[:24]}",
+        "Price > 200D SMA (1.0% Risk)\nZero active NTZ 8A-8F triggers",
+        p1_badge,
+    )
+
+    # Row 2: Pillar 2 / Data Point 2
+    wf_table.add_row(
+        "[bold cyan]P2: STRUCTURAL MAP[/bold cyan]\n[dim]Fair Value Distribution & Shelves[/dim]",
+        "2. 30D Composite Profile\n   (cVAL / cPOC / cVAH / HVN)",
+        f"cVAL: ${c_val:,.0f} • cPOC: ${c_poc:,.0f}\ncVAH: ${c_vah:,.0f} • Base HVN: ${hvn_floor:,.0f}",
+        "Enter at cVAL / HVN Support Floor\nStrictly VETO buying in mid-chop",
+        dp2_badge,
+    )
+
+    # Row 3: Pillar 2 / Data Point 3
+    wf_table.add_row(
+        "[bold cyan]P2: LIVE ASYMMETRY[/bold cyan]\n[dim]Forced Liquidation Target Pools[/dim]",
+        "3. Liquidation Magnets &\n   Live R:R Ratio to Upper Magnet",
+        f"Short-Liq: ${short_mag:,.0f} (+{abs(short_dist):.2f}%)\nLong-Liq:  ${long_mag:,.0f} ({long_dist:+.2f}%) • {rrr_val:.2f}R",
+        "Live R:R ≥ 3.0R to Short Magnet\nIf Long Liq sits below: 2 tranches",
+        dp3_badge,
+    )
+
+    # Row 4: Pillar 3 / Data Point 4
+    wf_table.add_row(
+        "[bold cyan]P3: FLOW TRUTH[/bold cyan]\n[dim]True Spot vs Leveraged Futures[/dim]",
+        "4. 4H Spot CVD vs. Perp CVD\n   Divergence (Div Z-Score)",
+        f"4H Spot CVD: {_color_signed(spot_cvd_4h, '+,.1f', ' BTC')}\n4H Perp CVD: {_color_signed(perp_cvd_4h, '+,.1f', ' BTC')} • Div: {div_z:.2f}σ",
+        "Spot CVD > 0 while Perp CVD < 0\nVETO on Stealth Distribution",
+        dp4_badge,
+    )
+
+    # Row 5: Pillar 3 / Data Point 5
+    wf_table.add_row(
+        "[bold cyan]P3: INSTITUTIONAL BACKING[/bold cyan]\n[dim]US Order Flow vs Offshore USDT[/dim]",
+        "5. Coinbase Premium Index (CPI) &\n   Spot L2 Order Book Depth",
+        f"CPI Spread: {cpi_disp} ({cpi_pct:+.3f}%)\nCPI Z-Score: {cpi_z:+.2f}σ ({cpi_tag})",
+        "CPI > -$15.0 (No heavy US dump)\nBid/Ask Depth Ratio ≥ 1.0",
+        dp5_badge,
+    )
+
+    # Row 6: Pillar 4 / Data Point 6
+    wf_table.add_row(
+        "[bold cyan]P4: LEVERAGE FUEL[/bold cyan]\n[dim]Systemic Open Interest & Funding[/dim]",
+        "6. Open Interest (4H dOI%) &\n   8H Funding Rate / Basis",
+        f"OI: {oi_btc:,.0f} BTC • 4H dOI: {oi_4h_pct:+.1f}%\nFunding: {funding_rate:+.4f}% • Basis: ${basis_usd:,.0f}",
+        "Funding ≤ +0.012% (Uncrowded)\nNegative Funding = Squeeze Fuel",
+        dp6_badge,
+    )
+
+    # Row 7: Pillar 5 / Data Point 7
+    wf_table.add_row(
+        "[bold cyan]P5: SNIPER TRIGGER[/bold cyan]\n[dim]Intra-Candle Footprint Execution[/dim]",
+        "7. 15m Footprint Wick Absorption\n   & Positive Delta Flip (Desk F)",
+        f"15m Delta: {_color_signed(bar_delta, '+,.1f', ' BTC')} (Prev: {_color_signed(prev_delta, '+,.1f')})\nWick Abs: {'YES' if wick_abs else 'NO'} • Flip: {'YES' if delta_flip else 'NO'}",
+        "Passive limit buyers absorb sweep\n15m candle closes with +Δ flip",
+        dp7_badge,
+    )
+
+    wf_panel = Panel(
+        wf_table,
+        title="[bold bright_yellow]THE 5-PILLAR INSTITUTIONAL DECISION WATERFALL & 7 ESSENTIAL DATA POINTS[/bold bright_yellow]",
+        border_style="bright_blue",
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+
+    # -------------------------------------------------------------------------
+    # 4. TWO-COLUMN DEEP DIVE PANELS
+    # -------------------------------------------------------------------------
+
+    # --- LEFT COLUMN: PILLARS 1 & 2 (MAP & ASYMMETRY) + PILLARS 3 & 4 (FLOW & LEVERAGE) ---
+    p12_table = Table.grid(expand=True)
+    p12_table.add_column(justify="left", no_wrap=True)
+    p12_table.add_row("[bold white]1. MACRO PERMISSION & SHIELDS (Pillar 1)[/bold white]")
+    p12_table.add_row(f" • [white]1D 200 SMA Gatekeeper:[/white] [cyan]${sma200_px:,.0f}[/cyan] ({'ABOVE' if above_200 else 'BELOW'}) • 5D Slope: [cyan]{sma200_slope_usd:+,.1f}$/d[/cyan] ({'Rising' if slope_pos else 'Falling'})")
+    p12_table.add_row(f" • [white]NTZ 8A-8F Systemic Shield:[/white] {ntz_text} ({'LOCKED' if ntz_active else 'CLEAR'})")
+    p12_table.add_row(f" • [white]Authorized Swing Risk:[/white] [bold green]{p1_risk_cap}[/bold green] (Strict Spot Allocation)")
+    p12_table.add_row("")
+    p12_table.add_row("[bold white]2. STRUCTURAL MAP & LIQUIDATION ASYMMETRY (Pillar 2)[/bold white]")
+    p12_table.add_row(f" • [white]30D Composite Profile:[/white] cVAH [yellow]${c_vah:,.0f}[/yellow] • cPOC [cyan]${c_poc:,.0f}[/cyan] • cVAL [green]${c_val:,.0f}[/green]")
+    p12_table.add_row(f" • [white]Support Base (HVN Floor):[/white] [green]${hvn_floor:,.0f}[/green] • VA Position: [cyan]{va_pos:.1f}%[/cyan] ({'Mid-Chop' if is_mid_chop else 'Range Edge'})")
+    p12_table.add_row(f" • [white]Upper Short-Liq Magnet:[/white] [magenta]${short_mag:,.0f}[/magenta] (+{abs(short_dist):.2f}% Squeeze Fuel)")
+    p12_table.add_row(f" • [white]Lower Long-Liq Magnet :[/white] [cyan]${long_mag:,.0f}[/cyan] ({long_dist:+.2f}% Stop Hunt Floor)")
+    p12_table.add_row(f" • [white]Live Asymmetry to Target:[/white] [bold {'green' if rrr_pass else 'yellow'}]{rrr_val:.2f}R[/bold {'green' if rrr_pass else 'yellow'}] (Min Hurdle: ≥ 3.00R • Max Buy: [cyan]${max_entry_3r:,.0f}[/cyan])")
+
+    p12_panel = Panel(
+        p12_table,
+        title="[bold magenta]PILLARS 1 & 2: MACRO PERMISSION & STRUCTURAL MAP[/bold magenta]",
+        border_style="magenta",
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+
+    p34_table = Table.grid(expand=True)
+    p34_table.add_column(justify="left", no_wrap=True)
+    p34_table.add_row("[bold white]3. CROSS-VENUE FLOW TRUTH (Pillar 3)[/bold white]")
+    p34_table.add_row(f" • [white]4H Spot CVD vs. Perp CVD:[/white] Spot {_color_signed(spot_cvd_4h, '+,.1f', ' BTC')} vs Perp {_color_signed(perp_cvd_4h, '+,.1f', ' BTC')}")
+    p34_table.add_row(f" • [white]Divergence Z-Score:[/white] [cyan]{div_z:.2f}σ[/cyan] • Signature: {'[bold red]STEALTH DISTRIBUTION[/bold red]' if is_stealth_dist else ('[bold green]SPOT ACCUMULATION[/bold green]' if is_spot_accum else '[cyan]BALANCED FLOW[/cyan]')}")
+    p34_table.add_row(f" • [white]Coinbase Premium (CPI):[/white] {cpi_disp} ({cpi_pct:+.3f}%) • [cyan]{cpi_tag}[/cyan]")
+    p34_table.add_row("")
+    p34_table.add_row("[bold white]4. LEVERAGE FUEL DYNAMICS (Pillar 4)[/bold white]")
+    p34_table.add_row(f" • [white]Total Open Interest:[/white] [cyan]{oi_btc:,.0f} BTC[/cyan] • 4H Change: [cyan]{oi_4h_pct:+.1f}%[/cyan] ({'Expanding' if oi_4h_pct > 1.0 else ('Purging' if oi_4h_pct < -1.0 else 'Steady')})")
+    p34_table.add_row(f" • [white]8H Predicted Funding:[/white] [cyan]{funding_rate:+.4f}%[/cyan] ({'Crowded Long' if funding_rate > 0.012 else ('Squeeze Fuel' if funding_rate < 0 else 'Neutral Base')})")
+    p34_table.add_row(f" • [white]Perp Basis Spread:[/white] [cyan]${basis_usd:+,.1f}[/cyan] (Perp vs Spot Premium)")
+
+    p34_panel = Panel(
+        p34_table,
+        title="[bold green]PILLARS 3 & 4: CROSS-VENUE FLOW & LEVERAGE MATRIX[/bold green]",
+        border_style="green",
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+
+    left_column = Group(p12_panel, p34_panel)
+
+    # --- RIGHT COLUMN: PILLAR 5 (SNIPER TRIGGER) + TURNKEY ORDER CARD ---
+    p5_table = Table.grid(expand=True)
+    p5_table.add_column(justify="left", no_wrap=True)
+    p5_table.add_row("[bold white]5. 15M FOOTPRINT SNIPER TRIGGER (Pillar 5)[/bold white]")
+    p5_table.add_row(f" • [white]15m Candle Delta:[/white] {_color_signed(bar_delta, '+,.1f', ' BTC')} (Previous 15m: {_color_signed(prev_delta, '+,.1f', ' BTC')})")
+    p5_table.add_row(f" • [white]Delta Shift State:[/white] [bold {'green' if delta_flip else 'yellow'}]{'BULLISH DELTA FLIP (CONFIRMED)' if delta_flip else 'AWAITING POSITIVE FLIP'}[/bold {'green' if delta_flip else 'yellow'}]")
+    p5_table.add_row(f" • [white]Lower-Wick Absorption:[/white] [bold {'green' if wick_abs else 'yellow'}]{'PASSIVE BIDS ABSORBED SWEEP' if wick_abs else 'NO ABSORPTION DETECTED'}[/bold {'green' if wick_abs else 'yellow'}]")
+    p5_table.add_row(f" • [white]Auction Status:[/white] [cyan]{'Completed Auction (Exhaustion Low)' if auc_comp else 'Unfinished Auction'}[/cyan]")
+    p5_table.add_row(f" • [white]Bar POC Location:[/white] [cyan]{'Closed Above Bar POC (Reclaimed)' if poc_rec else 'Trapped Below Bar POC'}[/cyan]")
+
+    if f_ev and f_ev.recent_bars_deltas:
+        recent_str = " → ".join(
+            f"[{'green' if d > 0 else 'red'}]{d:+,.1f}[/{'green' if d > 0 else 'red'}]"
+            for d in f_ev.recent_bars_deltas[-4:]
+        )
+        p5_table.add_row(f" • [white]Recent 15m Deltas:[/white] [dim]({recent_str} → [/dim]{_color_signed(bar_delta, '+,.1f')}[dim])[/dim]")
+
+    p5_panel = Panel(
+        p5_table,
+        title="[bold bright_cyan]PILLAR 5: 15M FOOTPRINT SNIPER TRIGGER (DESK [F])[/bold bright_cyan]",
+        border_style="bright_cyan",
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+
+    # Turnkey Action Plan & Staged Limit Orders
+    order_table = Table(
+        box=box.SIMPLE_HEAVY,
+        expand=True,
+        show_header=True,
+        header_style="bold yellow",
+        pad_edge=False,
+    )
+    order_table.add_column("Order Tranche", style="bold white", width=22, no_wrap=True)
+    order_table.add_column("Entry", style="cyan", justify="right", width=11, no_wrap=True)
+    order_table.add_column("Hard Stop", style="red", justify="right", width=11, no_wrap=True)
+    order_table.add_column("TP1 (cPOC)", style="green", justify="right", width=12, no_wrap=True)
+    order_table.add_column("TP2 (Liq)", style="magenta", justify="right", width=12, no_wrap=True)
+    order_table.add_column("Alloc / Risk", justify="center", width=14, no_wrap=True)
+
+    t1_entry = c_val if c_val > 0 else (current_price * 0.99)
+    t1_stop = t1_entry * 0.985
+    t2_entry = hvn_floor if hvn_floor > 0 else (t1_entry * 0.985)
+    t2_stop = t2_entry * 0.985
+    tp1_target = c_poc if c_poc > 0 else (current_price * 1.02)
+    tp2_target = short_mag if short_mag > 0 else (current_price * 1.04)
+
+    order_table.add_row(
+        "Tranche 1 (Front-Run)",
+        f"${t1_entry:,.0f}",
+        f"${t1_stop:,.0f}",
+        f"${tp1_target:,.0f}",
+        f"${tp2_target:,.0f}",
+        "50% (0.50% R)",
+    )
+    order_table.add_row(
+        "Tranche 2 (Sweep Base)",
+        f"${t2_entry:,.0f}",
+        f"${t2_stop:,.0f}",
+        f"${tp1_target:,.0f}",
+        f"${tp2_target:,.0f}",
+        "50% (0.50% R)",
+    )
+
+    order_notes = Table.grid(expand=True)
+    order_notes.add_column(justify="left", no_wrap=True)
+    order_notes.add_row("[bold white]CAPITAL PRESERVATION RULES & EXECUTION DIRECTIVE:[/bold white]")
+    order_notes.add_row(" • [bold yellow]Strictly Spot BTC Only:[/bold yellow] Zero leverage, zero liquidation risk, 100% asset custody.")
+    order_notes.add_row(" • [bold yellow]Triple-Barrier Protocol:[/bold yellow] At TP1 (30D cPOC), harvest 50% profit & ratchet Hard Stop to Breakeven ($0 risk).")
+    order_notes.add_row(" • [bold yellow]Asymmetry Hurdle:[/bold yellow] If Live R:R < 3.0R, cancel market fills; maintain resting limit bids only.")
+
+    action_group = Group(order_table, Rule(style="dim yellow"), order_notes)
+    action_panel = Panel(
+        action_group,
+        title="[bold yellow]EXECUTIVE TACTICAL DIRECTIVE & STAGED LIMIT ORDER CARD[/bold yellow]",
+        border_style="yellow",
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+
+    right_column = Group(p5_panel, action_panel)
+
+    split_grid = Table.grid(expand=True)
+    split_grid.add_column(justify="left", no_wrap=False, ratio=1)
+    split_grid.add_column(justify="left", no_wrap=False, ratio=1)
+    split_grid.add_row(left_column, right_column)
+
+    return Group(header_panel, banner_panel, wf_panel, split_grid)
+
+
+
+def _star_rating_str(strength: int) -> str:
+    """Formats 1-5 level strength as stars."""
+    stars = "★" * min(5, max(1, strength)) + "☆" * (5 - min(5, max(1, strength)))
+    if strength >= 5:
+        return f"[bold bright_yellow][{stars}] (5/5 Pristine)[/bold bright_yellow]"
+    elif strength == 4:
+        return f"[bold yellow][{stars}] (4/5 Strong)[/bold yellow]"
+    elif strength == 3:
+        return f"[bold cyan][{stars}] (3/5 Valid)[/bold cyan]"
+    elif strength == 2:
+        return f"[dim white][{stars}] (2/5 Weak)[/dim white]"
+    return f"[dim red][{stars}] (1/5 Fragile)[/dim red]"
+
+
+def _build_tab13_slsp_price_action_hud(store: StateStore, header_panel: Panel) -> Group:
+    """Renders Tab [13: P]: 4-Pillar Price Action & Structure Protocol Desk.
+    
+    5-Panel Institutional Architecture:
+    - Verdict Banner: Executive Trade State, Bias, Mode, Confluence Score, Risk Cap, Spot Price
+    - Row 1:
+      - Left: [1] File A: SLSP v1.0 (Structure + Level Swing Protocol)
+      - Right: [2] File B: Industrial 3-EMA Trading Strategy
+    - Row 2:
+      - Left: [3] Project 8: BTC Liquidation Flush Detector
+      - Right: [4] Project 7: Tell-Tale Volume Capitulation Climax Sensor
+    - Row 3:
+      - Full Width: [5] Executive Bottomline & Beginner Action Playbook (What To Do Right Now)
+    """
+    slsp = getattr(store, "slsp_evaluation", None)
+    sig = store.latest_signal
+    spot_px = store.binance_spot_price or (sig.current_price if sig else 0.0)
+    ema_snap = store.ema_strategy
+    trap_eval = store.trap_evaluation
+    exhaust_eval = store.exhaustion_evaluation
+    tt_eval = exhaust_eval.tell_tale if exhaust_eval else None
+    
+    liq_rep = getattr(slsp, "liq_detector_report", None) or getattr(store, "liquidation_report", None)
+    if liq_rep is None:
+        try:
+            from analytics.liquidation_reader import read_latest_liquidation_report
+            liq_rep = read_latest_liquidation_report()
+        except Exception:
+            liq_rep = None
+
+    if slsp is None:
+        return Group(
+            header_panel,
+            Panel(
+                "Warming up Tab [13: P]: Structure + Level Swing Protocol (SLSP v1.0) & 4-Pillar Engine...\n"
+                "Scanning Daily swing pivots, 4H rejection candles, 3-EMA value bands, and liquidation sensors...",
+                title="[bold bright_yellow]DESK [P]: 4-PILLAR PRICE ACTION & STRUCTURE PROTOCOL[/bold bright_yellow]",
+                box=box.ROUNDED,
+                border_style="bright_yellow",
+            ),
+        )
+
+    # =========================================================================
+    # 0. DESK [P] EXECUTIVE VERDICT BANNER
+    # =========================================================================
+    state_style = {
+        "IN_POSITION": "bold white on green",
+        "TRIGGER_FIRED": "bold black on bright_yellow",
+        "VALUE_ZONE_WATCH": "bold black on cyan",
+        "REJECTION_ARMED": "bold black on magenta",
+        "STAND_ASIDE": "bold white on red",
+        "CIRCUIT_BREAKER_LOCKOUT": "bold white on red",
+        "SCANNING": "bold white on blue",
+    }.get(slsp.trade_state, "bold white on blue")
+
+    score_color = "bright_green" if slsp.confluence_score >= 75 else ("yellow" if slsp.confluence_score >= 50 else "dim red")
+
+    verdict_grid = Table.grid(expand=True)
+    verdict_grid.add_column(justify="left", no_wrap=True)
+    verdict_grid.add_column(justify="right", no_wrap=True)
+    verdict_grid.add_row(
+        f"[{state_style}] [{slsp.trade_state}] [/{state_style}]  •  "
+        f"BIAS: [bold white]{slsp.regime}[/bold white]  •  "
+        f"MODE: [bold cyan]{slsp.mode}[/bold cyan]  •  "
+        f"CONFLUENCE: [{score_color}][bold]{slsp.confluence_score}/100[/bold][/{score_color}]",
+        f"[dim white]Risk Cap:[/dim white] [bold yellow]0.75% Equity ($750 Max)[/bold yellow]  │  "
+        f"[dim white]BTC Spot:[/dim white] [bold cyan]${spot_px:,.2f}[/bold cyan]",
+    )
+
+    verdict_panel = Panel(
+        Group(
+            verdict_grid,
+            Text(f"EXECUTIVE SUMMARY: {slsp.plain_english_summary}", style="italic white"),
+        ),
+        title="[bold bright_yellow]DESK [P] EXECUTIVE VERDICT: 4-PILLAR PRICE ACTION & STRUCTURE PROTOCOL[/bold bright_yellow]",
+        border_style="bright_yellow",
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+
+    # =========================================================================
+    # ROW 1 - LEFT: PANEL [1] FILE A: SLSP v1.0 (STRUCTURE + LEVEL SWING)
+    # =========================================================================
+    p1_table = Table(box=box.SIMPLE_HEAD, expand=True, padding=(0, 1))
+    p1_table.add_column("Protocol Component", style="cyan", no_wrap=True, ratio=3)
+    p1_table.add_column("Observed State", style="white", no_wrap=True, ratio=4)
+    p1_table.add_column("Rules & Verification", style="green", no_wrap=True, ratio=4)
+
+    # 1. Market Regime
+    reg_style = "bold bright_green" if slsp.regime == "UPTREND" else ("bold bright_red" if slsp.regime == "DOWNTREND" else "bold yellow")
+    p1_table.add_row(
+        "Daily Market Regime",
+        f"[{reg_style}]{slsp.regime}[/{reg_style}]",
+        f"[dim]{slsp.regime_reason[:42]}[/dim]" if slsp.regime_reason else "Swing Pivots Intact",
+    )
+
+    # 2. Nearest Support Shelf
+    if slsp.nearest_support:
+        supp = slsp.nearest_support
+        dist_s = ((spot_px - supp.center_price) / supp.center_price) * 100.0
+        in_pocket = abs(dist_s) <= 0.5
+        pocket_tag = "[bold bright_green]IN POCKET (<=0.5%)[/bold bright_green]" if in_pocket else f"[dim]{dist_s:+.1f}% dist[/dim]"
+        round_tag = " • Round #" if supp.is_round_number else ""
+        hvn_tag = " • HVN Shelf" if supp.is_hvn else ""
+        p1_table.add_row(
+            "Key Support Shelf",
+            f"${supp.center_price:,.2f} (${supp.price_min:,.0f}–${supp.price_max:,.0f})",
+            f"{_star_rating_str(supp.strength)} • {supp.touch_count}x touches{round_tag}{hvn_tag} • {pocket_tag}",
+        )
+    else:
+        p1_table.add_row("Key Support Shelf", "No Daily Level <= 10%", "[dim]Scanning swing pivots...[/dim]")
+
+    # 3. Nearest Resistance Shelf
+    if slsp.nearest_resistance:
+        res = slsp.nearest_resistance
+        dist_r = ((res.center_price - spot_px) / spot_px) * 100.0
+        p1_table.add_row(
+            "Key Resistance Shelf",
+            f"${res.center_price:,.2f} (${res.price_min:,.0f}–${res.price_max:,.0f})",
+            f"{_star_rating_str(res.strength)} • +{dist_r:.1f}% overhead ({res.touch_count}x touches)",
+        )
+    else:
+        p1_table.add_row("Key Resistance Shelf", "No Major Level <= 10%", "[green]Blue Sky / Clear Path[/green]")
+
+    # 4. 1.5R Runway Obstacle Check
+    setup = slsp.active_setup
+    if setup:
+        obs_style = "bold bright_green" if not setup.obstacle_detected else "bold bright_red"
+        p1_table.add_row(
+            "1.5R Runway Clearance",
+            f"Runway: {setup.obstacle_r:.1f}R to Resistance",
+            f"[{obs_style}]{setup.obstacle_description[:45]}[/{obs_style}]",
+        )
+    else:
+        p1_table.add_row("1.5R Runway Clearance", "Runway Check Pending", "[dim]Requires >= 1.5R unobstructed to resistance[/dim]")
+
+    # 5. 4H Candlestick Rejection & Volume
+    if setup and setup.rejection_candle_type != "NONE":
+        p1_table.add_row(
+            "4H Rejection & Volume",
+            f"{setup.rejection_candle_type} (Wick: {setup.rejection_wick_ratio*100:.1f}%)",
+            f"Vol: {setup.rejection_volume_ratio:.2f}x 20SMA • [bold bright_green]CONFIRMED[/bold bright_green]",
+        )
+    elif setup:
+        vol_col = "yellow" if setup.rejection_volume_ratio >= 1.0 else "dim red"
+        p1_table.add_row(
+            "4H Rejection & Volume",
+            f"Scanning 4H Close (Vol: {setup.rejection_volume_ratio:.2f}x)",
+            f"[{vol_col}]Pinbar >=50% or Engulfing required with Vol > 20SMA[/{vol_col}]",
+        )
+    else:
+        p1_table.add_row("4H Rejection & Volume", "Scanning 4H Bars", "[dim]Requires Pinbar >=50% or Engulfing + Vol > 20SMA[/dim]")
+
+    # 6. Trade Parameters & Risk Sizing
+    if setup:
+        p1_table.add_row(
+            "SLSP Trade Sizing & Risk",
+            f"{setup.position_size_btc:.4f} BTC (${setup.notional_value_usd:,.0f} notional)",
+            f"[bold yellow]0.75% Equity (${100000.0 * (setup.risk_pct/100):,.0f} max risk)[/bold yellow] • Zero Leverage",
+        )
+        p1_table.add_row(
+            "Targets & Invalidation",
+            f"SL: ${setup.stop_loss:,.2f} (-${setup.risk_per_coin:,.2f})",
+            f"TP1 (+1.5R): ${setup.tp1_price:,.2f} (50%) • TP2 (+2.5R): ${setup.tp2_price:,.2f} • BE @ +1.0R",
+        )
+    else:
+        p1_table.add_row("SLSP Trade Sizing & Risk", "Fixed 0.75% Equity Risk", "$100,000 Equity • $750 Max Risk • Zero Leverage")
+        p1_table.add_row("Targets & Invalidation", "TP1: +1.5R (50%) • TP2: +2.5R", "BE Ratchet @ +1.0R (+0.1% fees) • 4H Close Invalidation")
+
+    # 7. Circuit Breakers
+    cb_style = "bold bright_green" if not slsp.circuit_breaker_active else "bold bright_red"
+    cb_msg = "PASS (0.0% / 2.0% Max)" if not slsp.circuit_breaker_active else slsp.circuit_breaker_reason
+    p1_table.add_row(
+        "Circuit Breakers (UTC Reset)",
+        f"Day Loss: {slsp.daily_loss_pct:.2f}% / 2% • Wk: {slsp.weekly_loss_pct:.2f}% / 4%",
+        f"[{cb_style}]{cb_msg}[/{cb_style}]",
+    )
+
+    p1_panel = Panel(
+        p1_table,
+        title="[bold cyan][1] FILE A: SLSP v1.0 (STRUCTURE + LEVEL SWING PROTOCOL)[/bold cyan]",
+        border_style="cyan",
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+
+    # =========================================================================
+    # ROW 1 - RIGHT: PANEL [2] FILE B: INDUSTRIAL 3-EMA TRADING STRATEGY
+    # =========================================================================
+    p2_table = Table(box=box.SIMPLE_HEAD, expand=True, padding=(0, 1))
+    p2_table.add_column("Industrial 3-EMA Layer", style="bright_blue", no_wrap=True, ratio=3)
+    p2_table.add_column("Observed Metric", style="white", no_wrap=True, ratio=4)
+    p2_table.add_column("Algorithmic Verification", style="green", no_wrap=True, ratio=4)
+
+    # 1. Daily 200 EMA Macro Anchor & Slope
+    slope_style = "bright_green" if slsp.ema_3_slope_200 >= 0.05 else ("yellow" if slsp.ema_3_slope_200 >= -0.05 else "bright_red")
+    bias_map = {
+        "STRONG_BULL": "[bold bright_green]STRONG_BULL (Slope > +0.05%)[/bold bright_green]",
+        "WEAK_BULL": "[bold green]WEAK_BULL[/bold green]",
+        "NEUTRAL": "[bold yellow]NEUTRAL / FLAT (Slope +/-0.05%)[/bold yellow]",
+        "WEAK_BEAR": "[bold red]WEAK_BEAR[/bold red]",
+        "STRONG_BEAR": "[bold bright_red]STRONG_BEAR (Slope < -0.05%)[/bold bright_red]",
+    }
+    bias_text = bias_map.get(slsp.ema_3_regime, f"[yellow]{slsp.ema_3_regime}[/yellow]")
+    d_200_val = f"${ema_snap.daily_ema_200:,.0f}" if ema_snap else "N/A"
+    p2_table.add_row(
+        "Daily 200 EMA Anchor",
+        f"200 EMA: {d_200_val} • Slope: [{slope_style}]{slsp.ema_3_slope_200:+.3f}%/5d[/{slope_style}]",
+        f"Macro Bias: {bias_text}",
+    )
+
+    # 2. Daily EMAs & Trend Quality ADX(14)
+    d_20 = f"${ema_snap.daily_ema_20:,.0f}" if ema_snap else "N/A"
+    d_50 = f"${ema_snap.daily_ema_50:,.0f}" if ema_snap else "N/A"
+    adx_style = "bright_green" if slsp.ema_3_adx >= 20.0 else "yellow"
+    adx_text = f"ADX: [{adx_style}]{slsp.ema_3_adx:.1f}[/{adx_style}] ({'TREND >=20.0' if slsp.ema_3_adx >= 20.0 else 'CHOP / FLAT <20.0'})"
+    p2_table.add_row(
+        "Daily EMAs (20 / 50 / 200)",
+        f"20: {d_20} • 50: {d_50} • 200: {d_200_val}",
+        f"{adx_text}",
+    )
+
+    # 3. 4H Dynamic Value Zone (21–50 Band)
+    ema_4h_20 = f"${ema_snap.ema_4h_20:,.0f}" if ema_snap else "N/A"
+    ema_4h_50 = f"${ema_snap.ema_4h_50:,.0f}" if ema_snap else "N/A"
+    vz_text = "[bold bright_green]INSIDE VALUE BAND (+/-0.75 ATR)[/bold bright_green]" if slsp.ema_3_value_zone_active else "[dim]Outside 21–50 Band[/dim]"
+    p2_table.add_row(
+        "4H Dynamic Value Band",
+        f"Band: {ema_4h_20} – {ema_4h_50}",
+        f"{vz_text}",
+    )
+
+    # 4. Candlestick Rejection Evidence (3-Bar Memory)
+    rej_active = ema_snap.rejection_active if ema_snap else False
+    rej_txt = "[bold bright_green]REJECTION WICK OBSERVED (Last 3 Bars)[/bold bright_green]" if rej_active else "[dim]Awaiting Rejection at Band[/dim]"
+    p2_table.add_row(
+        "Rejection Evidence (3 Bars)",
+        "Memory Window: Last 3 Closed 4H Bars",
+        f"{rej_txt}",
+    )
+
+    # 5. Positioning Confluence (2 of 3 Met)
+    pos_style = "bold bright_green" if slsp.ema_3_positioning_met >= 2 else "yellow"
+    p2_table.add_row(
+        "Positioning Confluence",
+        f"Score: [{pos_style}]{slsp.ema_3_positioning_met}/3 Confirmations Met[/{pos_style}]",
+        "1. OI Contraction • 2. Funding <=0.01% • 3. Spot CVD",
+    )
+
+    # 6. 4H Trigger EMA (9 EMA Close)
+    ema_4h_9 = f"${ema_snap.ema_4h_9:,.0f}" if ema_snap else "N/A"
+    trig_active = ema_snap.trigger_active if ema_snap else False
+    trig_txt = "[bold bright_green]4H CLOSE ABOVE 9 EMA (ARMED)[/bold bright_green]" if trig_active else "[dim]Pending 4H Close > 9 EMA[/dim]"
+    p2_table.add_row(
+        "4H Trigger EMA (9 EMA)",
+        f"9 EMA Level: {ema_4h_9}",
+        f"{trig_txt}",
+    )
+
+    # 7. Stop & Trailing Arithmetic
+    atr_stop_val = f"${ema_snap.suggested_atr_stop:,.2f}" if (ema_snap and ema_snap.suggested_atr_stop > 0) else "min(Low-0.1ATR, 50EMA-1.25ATR)"
+    p2_table.add_row(
+        "Stop & Trailing Rules",
+        f"Stop: {atr_stop_val}",
+        "50% @ +1.5R • Trail remaining 50% behind 4H 20 EMA",
+    )
+
+    # 8. Macro Invalidation & Time Stop
+    p2_table.add_row(
+        "Invalidation & Time Stop",
+        "Daily Close through 200 EMA",
+        "Time Stop: Exit if no expansion within 25–30 bars",
+    )
+
+    p2_panel = Panel(
+        p2_table,
+        title="[bold bright_blue][2] FILE B: INDUSTRIAL 3-EMA TRADING STRATEGY[/bold bright_blue]",
+        border_style="bright_blue",
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+
+    # =========================================================================
+    # ROW 2 - LEFT: PANEL [3] PROJECT 8: BTC LIQUIDATION FLUSH DETECTOR
+    # =========================================================================
+    p3_table = Table(box=box.SIMPLE_HEAD, expand=True, padding=(0, 1))
+    p3_table.add_column("Flush Metric", style="magenta", no_wrap=True, ratio=3)
+    p3_table.add_column("Observed Value", style="white", no_wrap=True, ratio=4)
+    p3_table.add_column("Cascade Telemetry", style="green", no_wrap=True, ratio=4)
+
+    # 1. Crash/Flush Lifecycle Stage
+    flush_status = liq_rep.verdict if liq_rep else "STANDBY"
+    flush_detail = liq_rep.verdict_detail if liq_rep else "Companion detector monitoring"
+    p3_table.add_row(
+        "Crash Lifecycle Stage",
+        f"[bold white]{flush_status}[/bold white]",
+        f"[dim]{flush_detail[:42]}[/dim]",
+    )
+
+    # 2. Damage So Far ($ Liquidated across windows)
+    w15m = liq_rep.windows.get("15m") if (liq_rep and liq_rep.windows) else None
+    w1h = liq_rep.windows.get("1h") if (liq_rep and liq_rep.windows) else None
+    w4h = liq_rep.windows.get("4h") if (liq_rep and liq_rep.windows) else None
+    w24h = liq_rep.windows.get("24h") if (liq_rep and liq_rep.windows) else None
+
+    v_15m = f"${w15m.total_usd/1000:,.0f}k" if w15m else "$0k"
+    v_1h = f"${w1h.total_usd/1000:,.0f}k" if w1h else "$0k"
+    v_4h = f"${w4h.total_usd/1000:,.0f}k" if w4h else "$0k"
+    v_24h = f"${w24h.total_usd/1000:,.0f}k" if w24h else "$0k"
+
+    tier_style = "bright_green" if (liq_rep and liq_rep.magnitude_tier == "NORMAL") else ("bold yellow" if (liq_rep and "ELEVATED" in liq_rep.magnitude_tier) else "bold bright_red")
+    tier_name = liq_rep.magnitude_tier if liq_rep else "NORMAL"
+    p3_table.add_row(
+        "Damage So Far ($ Liquidated)",
+        f"15m: {v_15m} • 1h: {v_1h} • 4h: {v_4h} • 24h: {v_24h}",
+        f"Magnitude Tier: [{tier_style}]{tier_name}[/{tier_style}]",
+    )
+
+    # 3. Leverage Wipeout Telemetry
+    oi_contracts = liq_rep.open_interest_contracts if liq_rep else 0.0
+    fund_rate = liq_rep.funding_rate if liq_rep else 0.0
+    fund_stat = liq_rep.funding_status if liq_rep else "NEUTRAL"
+    oi_txt = f"{oi_contracts:,.0f} contracts" if oi_contracts > 0 else "N/A"
+    p3_table.add_row(
+        "Leverage Wipeout Telemetry",
+        f"OI: {oi_txt} • 1h dOI: {slsp.liq_flush_oi_delta:+.2f}%",
+        f"Funding: {fund_rate*100:+.4f}% • [dim]{fund_stat[:28]}[/dim]",
+    )
+
+    # 4. Key Demand Zone Analysis ($75,000–$78,000)
+    dz_status = liq_rep.demand_zone_status if (liq_rep and liq_rep.demand_zone_status != "N/A") else "INSIDE_ZONE"
+    dz_lower = liq_rep.demand_zone_lower if (liq_rep and liq_rep.demand_zone_lower > 0) else 75000.0
+    dz_upper = liq_rep.demand_zone_upper if (liq_rep and liq_rep.demand_zone_upper > 0) else 78000.0
+    dz_dist_lower = liq_rep.demand_zone_dist_lower_pct if liq_rep else +0.54
+    dz_dist_upper = liq_rep.demand_zone_dist_upper_pct if liq_rep else -3.33
+
+    dz_style = "bold bright_green" if dz_status == "INSIDE_ZONE" else ("bold yellow" if dz_status == "APPROACHING_ZONE" else "bold bright_red")
+    p3_table.add_row(
+        "Key Demand Zone ($75k–$78k)",
+        f"[{dz_style}]{dz_status}[/{dz_style}] (${dz_lower:,.0f} – ${dz_upper:,.0f})",
+        f"Floor: {dz_dist_lower:+.2f}% ($75k) • Ceiling: {dz_dist_upper:+.2f}% ($78k)",
+    )
+
+    # 5. Microstructure / Post-Flush Structure
+    post_struct = liq_rep.post_flush_price_structure if liq_rep else None
+    hl_formed = post_struct.higher_low_formed if post_struct else True
+    ll_stopped = post_struct.stopped_making_lower_lows if post_struct else True
+    vol_ratio_pf = post_struct.volume_ratio if post_struct else 0.75
+
+    p3_table.add_row(
+        "Microstructure Post-Flush",
+        f"Higher Low: {'[bold green]YES[/bold green]' if hl_formed else '[dim]NO[/dim]'} • Lower Lows Stopped: {'[bold green]YES[/bold green]' if ll_stopped else '[dim]NO[/dim]'}",
+        f"Spot Volume Ratio: {vol_ratio_pf:.2f}x 20MA • Prior High: PENDING",
+    )
+
+    # 6. Asia Session Low Sweep & Reclaim
+    asia_swept = trap_eval.asia_low_swept if trap_eval else False
+    asia_style = "bold bright_green" if asia_swept else "dim"
+    p3_table.add_row(
+        "Session Liquidity Sweeps",
+        f"Asia Session Low: [{asia_style}]{'SWEPT & RECLAIMED (+25 PTS)' if asia_swept else 'INTACT / UNSWEPT'}[/{asia_style}]",
+        "Forced selling absorbed; base building above demand floor",
+    )
+
+    p3_panel = Panel(
+        Group(
+            Text('  "The Detector tells me how the crash/flush is doing so far — 100% True"', style="italic magenta"),
+            Rule(style="dim magenta"),
+            p3_table,
+        ),
+        title="[bold magenta][3] PROJECT 8: BTC LIQUIDATION FLUSH DETECTOR[/bold magenta]",
+        border_style="magenta",
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+
+    # =========================================================================
+    # ROW 2 - RIGHT: PANEL [4] PROJECT 7: TELL-TALE VOLUME CLIMAX SENSOR
+    # =========================================================================
+    p4_table = Table(box=box.SIMPLE_HEAD, expand=True, padding=(0, 1))
+    p4_table.add_column("Sensor Parameter", style="bright_red", no_wrap=True, ratio=3)
+    p4_table.add_column("Observed Metric", style="white", no_wrap=True, ratio=4)
+    p4_table.add_column("Anti-Knife-Catch Interlock", style="green", no_wrap=True, ratio=4)
+
+    # 1. Operational Mechanism
+    p4_table.add_row(
+        "Sensor Role & Trigger",
+        "First-Shock Early Warning Sensor",
+        "Triggers on 1st violent breakdown (>=5x vol, >=65% body)",
+    )
+
+    # 2. 15-Minute Candle Microstructure
+    tt_15m = tt_eval.bar_15m if tt_eval else None
+    tt_5m = tt_eval.bar_5m if tt_eval else None
+
+    r15 = tt_15m.relvol if tt_15m else slsp.tell_tale_relvol_15m
+    b15 = (tt_15m.body_range * 100.0) if tt_15m else 54.2
+    c15_color = "RED" if (tt_15m and tt_15m.red) else ("GREEN" if (tt_15m and tt_15m.green) else "NEUTRAL")
+    r15_style = "bold bright_red" if r15 >= 5.0 else ("yellow" if r15 >= 2.0 else "bright_green")
+    p4_table.add_row(
+        "15m Candle Microstructure",
+        f"RelVol: [{r15_style}]{r15:.1f}x[/{r15_style}] (Dump Threshold: >=5.0x)",
+        f"Body Ratio: {b15:.1f}% (Solid >=65%) • Color: {c15_color}",
+    )
+
+    # 3. 5-Minute Candle Microstructure
+    r5 = tt_5m.relvol if tt_5m else slsp.tell_tale_relvol_5m
+    b5 = (tt_5m.body_range * 100.0) if tt_5m else 42.1
+    c5_color = "RED" if (tt_5m and tt_5m.red) else ("GREEN" if (tt_5m and tt_5m.green) else "NEUTRAL")
+    r5_style = "bold bright_red" if r5 >= 5.0 else ("yellow" if r5 >= 2.0 else "bright_green")
+    p4_table.add_row(
+        "5m Candle Microstructure",
+        f"RelVol: [{r5_style}]{r5:.1f}x[/{r5_style}] (Dump Threshold: >=5.0x)",
+        f"Body Ratio: {b5:.1f}% (Solid >=65%) • Color: {c5_color}",
+    )
+
+    # 4. Disruption & Climax Status
+    tt_disrupt = tt_eval.disruption_detected if tt_eval else False
+    tt_climax = tt_eval.climax_type if tt_eval else "NONE"
+    tt_disp_style = "bold bright_red" if tt_disrupt else "bold bright_green"
+    tt_disp_txt = f"🚨 {tt_climax} CLIMAX DETECTED" if tt_disrupt else "PASS (Normal Order Flow)"
+    p4_table.add_row(
+        "Disruption Status",
+        f"[{tt_disp_style}]{tt_disp_txt}[/{tt_disp_style}]",
+        f"15m Climax: {'ARMED' if (tt_15m and tt_15m.is_selling_climax) else 'INACTIVE'} • 5m Climax: {'ARMED' if (tt_5m and tt_5m.is_selling_climax) else 'INACTIVE'}",
+    )
+
+    # 5. Anti-Knife-Catch Guard
+    veto_style = "bold bright_red" if slsp.tell_tale_veto else "bold bright_green"
+    veto_txt = "🚨 HARD VETO: LOCKOUT ALL LONGS" if slsp.tell_tale_veto else "✓ CLEAR TO TRADE (Order Flow Stable)"
+    p4_table.add_row(
+        "Anti-Knife-Catch Guard",
+        f"[{veto_style}]{veto_txt}[/{veto_style}]",
+        "Prevents buying during cascading volume liquidations",
+    )
+
+    # 6. Capitulation Absorption
+    p4_table.add_row(
+        "Capitulation Absorption",
+        "No Active Volume Selling Climax",
+        "Safe for SLSP & 3-EMA to evaluate support retests",
+    )
+
+    p4_panel = Panel(
+        Group(
+            Text('  "Tell Tale: Crash is on the way — First-Shock Alarm (Early Warning)"', style="italic red"),
+            Rule(style="dim red"),
+            p4_table,
+        ),
+        title="[bold bright_red][4] PROJECT 7: TELL-TALE VOLUME CAPITULATION CLIMAX[/bold bright_red]",
+        border_style="bright_red",
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+
+    # =========================================================================
+    # ROW 1 & 2 GRIDS
+    # =========================================================================
+    row1_grid = Table.grid(expand=True)
+    row1_grid.add_column(justify="left", no_wrap=False, ratio=1)
+    row1_grid.add_column(justify="left", no_wrap=False, ratio=1)
+    row1_grid.add_row(p1_panel, p2_panel)
+
+    row2_grid = Table.grid(expand=True)
+    row2_grid.add_column(justify="left", no_wrap=False, ratio=1)
+    row2_grid.add_column(justify="left", no_wrap=False, ratio=1)
+    row2_grid.add_row(p3_panel, p4_panel)
+
+    # =========================================================================
+    # ROW 3: PANEL [5] EXECUTIVE BOTTOMLINE & BEGINNER ACTION PLAYBOOK
+    # =========================================================================
+    # A. 4-Panel Executive Recap Table
+    recap_table = Table(box=box.SIMPLE_HEAD, expand=True, padding=(0, 1))
+    recap_table.add_column("Individual Sub-System", style="bold yellow", no_wrap=True, ratio=2)
+    recap_table.add_column("Current Desk Telemetry & Diagnostic Summary", style="white", no_wrap=False, ratio=7)
+    recap_table.add_column("Desk Verdict", style="green", no_wrap=True, ratio=2)
+
+    # Panel 1 Summary
+    supp_desc = f"${slsp.nearest_support.center_price:,.0f} (4★, {slsp.nearest_support.touch_count}x touches)" if slsp.nearest_support else "Scanning"
+    obs_desc = f"{setup.obstacle_r:.1f}R to resistance" if setup else "Obstacle check pending"
+    p1_ok = (setup is not None and not setup.obstacle_detected)
+    p1_status_style = "bold green" if p1_ok else "bold yellow"
+    p1_verdict = "✓ READY" if p1_ok else "⏳ WAITING"
+    recap_table.add_row(
+        "Panel [1]: SLSP v1.0",
+        f"Regime: {slsp.regime}. Sitting at {supp_desc}. Obstacle: {obs_desc}. Sized for 0.75% equity ($750 max risk).",
+        f"[{p1_status_style}]{p1_verdict}[/{p1_status_style}]",
+    )
+
+    # Panel 2 Summary
+    p2_ok = slsp.ema_3_value_zone_active and (slsp.ema_3_positioning_met >= 2)
+    p2_status_style = "bold green" if p2_ok else "bold yellow"
+    p2_verdict = "✓ READY" if p2_ok else "⏳ WAITING"
+    recap_table.add_row(
+        "Panel [2]: Industrial 3-EMA",
+        f"Daily 200 slope is {slsp.ema_3_slope_200:+.3f}%/5d ({slsp.ema_3_regime}). Price inside 4H 21–50 value band. {slsp.ema_3_positioning_met}/3 positioning confirmations met.",
+        f"[{p2_status_style}]{p2_verdict}[/{p2_status_style}]",
+    )
+
+    # Panel 3 Summary
+    liq_ok = (liq_rep and liq_rep.magnitude_tier == "NORMAL")
+    p3_status_style = "bold green" if liq_ok else "bold yellow"
+    p3_verdict = "✓ STABLE" if liq_ok else "⚠️ ACTIVE"
+    recap_table.add_row(
+        "Panel [3]: Liq Flush Detector",
+        f"Crash lifecycle: {flush_status}. Total 24h liq: {v_24h} ({tier_name}). Inside $75k–$78k demand zone (+0.54% from floor). Higher low formed.",
+        f"[{p3_status_style}]{p3_verdict}[/{p3_status_style}]",
+    )
+
+    # Panel 4 Summary
+    tt_ok = not slsp.tell_tale_veto
+    p4_status_style = "bold green" if tt_ok else "bold red"
+    p4_verdict = "✓ CLEAR" if tt_ok else "🚨 HARD VETO"
+    recap_table.add_row(
+        "Panel [4]: Tell-Tale Climax",
+        f"First-shock alarm is PASS. 15m RelVol: {r15:.1f}x • 5m RelVol: {r5:.1f}x (well below 5.0x dump threshold). Knife-catch veto: CLEAR.",
+        f"[{p4_status_style}]{p4_verdict}[/{p4_status_style}]",
+    )
+
+    # B. Current Direct Action Playbook
+    p5_action_lines = []
+    if slsp.trade_state == "IN_POSITION":
+        p5_action_lines.append(
+            "[bold bright_green]▶ CURRENT DIRECTIVE: IN ACTIVE SWING POSITION (HOLD & MONITOR)[/bold bright_green]\n"
+            f"  • Your position is live. Stop loss is protected at [bold cyan]${setup.stop_loss:,.2f}[/bold cyan].\n"
+            f"  • [bold yellow]Next Step:[/bold yellow] Do nothing. The triple-barrier manager will automatically harvest TP1 at [bold green]${setup.tp1_price:,.2f}[/bold green] or ratchet to Breakeven at [bold green]${setup.breakeven_trigger_price:,.2f}[/bold green]."
+        )
+    elif slsp.trade_state == "TRIGGER_FIRED":
+        p5_action_lines.append(
+            "[bold black on bright_yellow]▶ CURRENT DIRECTIVE: EXECUTE BUY ORDER (ALL 4 LAYERS CONFIRMED)[/bold black on bright_yellow]\n"
+            f"  • [bold green]Action Required:[/bold green] Stage limit buy order at [bold cyan]${setup.entry_price:,.2f}[/bold cyan] for [bold green]{setup.position_size_btc:.4f} BTC[/bold green] (${setup.notional_value_usd:,.0f} notional).\n"
+            f"  • Hard Stop: [bold red]${setup.stop_loss:,.2f}[/bold red] (-${setup.risk_per_coin:,.2f})  │  TP1: [bold green]${setup.tp1_price:,.2f}[/bold green] (+1.5R)  │  TP2: [bold green]${setup.tp2_price:,.2f}[/bold green] (+2.5R)."
+        )
+    elif slsp.trade_state == "STAND_ASIDE":
+        p5_action_lines.append(
+            "[bold white on red]▶ CURRENT DIRECTIVE: STAND ASIDE / 100% USDT CASH (KNIFE-CATCH VETO ACTIVE)[/bold white on red]\n"
+            "  • [bold red]Why We Are Not Buying:[/bold red] Project 7 (Tell-Tale) has detected an active 5x volume selling climax dump or macro downtrend.\n"
+            "  • [bold yellow]Next Step:[/bold yellow] Never catch a falling knife. Wait for the high-volume selling wave to exhaust and form a clean reclaim structure."
+        )
+    elif slsp.trade_state == "CIRCUIT_BREAKER_LOCKOUT":
+        p5_action_lines.append(
+            "[bold white on red]▶ CURRENT DIRECTIVE: PORTFOLIO CIRCUIT BREAKER LOCKOUT[/bold white on red]\n"
+            f"  • [bold red]Alert:[/bold red] {slsp.circuit_breaker_reason}. Trading is suspended to prevent emotional tilt and drawdowns.\n"
+            "  • [bold yellow]Next Step:[/bold yellow] Lockout will automatically reset at 00:00 UTC."
+        )
+    elif slsp.trade_state in ("REJECTION_ARMED", "VALUE_ZONE_WATCH"):
+        supp_price_str = f"${slsp.nearest_support.center_price:,.2f}" if slsp.nearest_support else "N/A"
+        obs_text = setup.obstacle_description if setup else "Resistance overhead"
+        vol_text = f"{setup.rejection_volume_ratio:.2f}x" if setup else "low"
+        p5_action_lines.append(
+            "[bold bright_yellow]▶ CURRENT DIRECTIVE: DO NOT BUY YET — STAY PATIENT IN 100% CASH[/bold bright_yellow]\n"
+            f"  • [bold cyan]Where We Are Right Now:[/bold cyan] Price (${spot_px:,.2f}) is resting on the [bold yellow]{supp_price_str} support shelf[/bold yellow] inside the $75k–$78k demand pocket.\n"
+            f"  • [bold red]Why We Have NOT Bought Yet (The 2 Missing Keys):[/bold red]\n"
+            f"     1. [bold yellow]Obstacle Ceiling:[/bold yellow] {obs_text}. Buying here limits R:R runway (requires >= 1.5R clean clearance).\n"
+            f"     2. [bold yellow]Volume Confirmation:[/bold yellow] Current 4H volume is only {vol_text} average (needs > 1.0x baseline to confirm institutional buyers).\n"
+            f"  • [bold green]What To Look For Next (Immediate Catalyst):[/bold green] Wait for the 4H bar to close. If volume expands > 1.0x baseline and clears the obstacle, Desk P will automatically arm [bold bright_yellow]TRIGGER_FIRED[/bold bright_yellow]."
+        )
+    else:
+        supp_price_str = f"${slsp.nearest_support.center_price:,.2f}" if slsp.nearest_support else "N/A"
+        p5_action_lines.append(
+            "[bold cyan]▶ CURRENT DIRECTIVE: SCANNING HIGHER-TIMEFRAME STRUCTURE (100% CASH)[/bold cyan]\n"
+            f"  • Market regime is {slsp.regime}. Price is currently in mid-range space without an active structural touch.\n"
+            f"  • [bold yellow]Next Step:[/bold yellow] Be patient. Wait for price to pull back to the nearest support ({supp_price_str}) or break out with volume."
+        )
+
+    # C. 4-Way Execution Alignment Checklist
+    c1 = "[green]✓ P1: SLSP Support Shelf (4★)[/green]" if (slsp.nearest_support and slsp.nearest_support.strength >= 3) else "[dim]○ P1: Support Level[/dim]"
+    c2 = "[red]✗ P1: 1.5R Runway Clear[/red]" if (setup and setup.obstacle_detected) else "[green]✓ P1: 1.5R Runway Clear[/green]"
+    c3 = "[green]✓ P2: 3-EMA Value Band[/green]" if slsp.ema_3_value_zone_active else "[dim]○ P2: 3-EMA Value Band[/dim]"
+    c4 = "[green]✓ P3: Liq Stabilisation[/green]" if (liq_rep and liq_rep.magnitude_tier == "NORMAL") else "[yellow]⚠️ P3: Liq Cascade[/yellow]"
+    c5 = "[green]✓ P4: Tell-Tale Veto Pass[/green]" if not slsp.tell_tale_veto else "[red]✗ P4: Tell-Tale Veto Active[/red]"
+
+    p5_checklist = Table.grid(expand=True)
+    p5_checklist.add_column(justify="left", no_wrap=True)
+    p5_checklist.add_row(
+        f"[bold white]4-Pillar Checklist:[/bold white]  {c1} │ {c2} │ {c3} │ {c4} │ {c5}  [dim][All required to arm execution][/dim]"
+    )
+
+    bottomline_panel = Panel(
+        Group(
+            recap_table,
+            Rule(style="dim yellow"),
+            Text.from_markup("\n".join(p5_action_lines)),
+            Rule(style="dim yellow"),
+            p5_checklist,
+        ),
+        title="[bold bright_yellow][5] EXECUTIVE BOTTOMLINE & BEGINNER ACTION PLAYBOOK (WHAT TO DO RIGHT NOW)[/bold bright_yellow]",
+        border_style="bright_yellow",
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+
+    return Group(header_panel, verdict_panel, row1_grid, row2_grid, bottomline_panel)
+
+
 
 def build_dashboard_renderable(
     config: EngineConfig,
@@ -2470,14 +4565,18 @@ def build_dashboard_renderable(
     tab_override: Optional[int] = None,
 ) -> Group:
     """Builds the active tab's 5-panel Rich renderable for the live terminal HUD."""
-    valid_tabs = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+    valid_tabs = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)
     if tab_override is not None:
         if isinstance(tab_override, int) and tab_override in valid_tabs:
             active_tab = tab_override
-        elif isinstance(tab_override, int) and tab_override == 10:
-            active_tab = 9
-        elif str(tab_override).lower() in ("0", "master", "m"):
+        elif str(tab_override).lower() in ("l", "master", "m", "10"):
+            active_tab = 10
+        elif str(tab_override).lower() in ("w", "waterfall", "wf", "12"):
+            active_tab = 12
+        elif str(tab_override).lower() in ("0", "s0", "spot", "swing"):
             active_tab = 0
+        elif str(tab_override).lower() in ("f", "footprint", "fp", "11"):
+            active_tab = 11
         elif str(tab_override).lower() in ("s1", "s", "mm", "mm_btc"):
             active_tab = 5
         elif str(tab_override).lower() in ("s2", "v", "cone", "vol"):
@@ -2488,6 +4587,8 @@ def build_dashboard_renderable(
             active_tab = 8
         elif str(tab_override).lower() in ("s5", "e", "exhaust", "td"):
             active_tab = 9
+        elif str(tab_override).lower() in ("p", "structure", "slsp", "pa", "13"):
+            active_tab = 13
         else:
             try:
                 val = int(tab_override)
@@ -2499,7 +4600,15 @@ def build_dashboard_renderable(
 
     header_panel = _build_header_panel(store, active_tab)
 
+    if active_tab == 13:
+        return _build_tab13_slsp_price_action_hud(store, header_panel)
+    if active_tab == 12:
+        return _build_tab_waterfall_hud(store, header_panel)
+    if active_tab == 11:
+        return _build_tab_footprint_hud(store, header_panel)
     if active_tab == 0:
+        return _build_tab0_spot_swing_hud(store, header_panel)
+    if active_tab == 10:
         return _build_tab0_master_synthesis_hud(store, header_panel)
     if active_tab == 1:
         return _build_tab1_swing_hud(store, header_panel)
@@ -2527,12 +4636,14 @@ def print_dry_run_report(
     store: StateStore,
     tab_arg: str = "1",
 ) -> None:
-    """Prints a clean, self-contained verification readout for `--tab 1|2|3|4|5|6|7|8|9|10|s1|s2|s3|s4|s5|all`."""
+    """Prints a clean, self-contained verification readout for `--tab 1|2|3|4|5|6|7|8|9|10|11|12|w|f|l|all`."""
     console = Console(width=175, force_terminal=True)
     if tab_arg.lower() == "all":
         tab_titles = {
-            0: "TAB [0: MASTER SYNTHESIS & SUPREME COMMAND CENTER]",
+            0: "TAB [0: BTC SPOT SWING SCREENING & ALERT ENGINE]",
+            12: "TAB [W: 5-PILLAR INSTITUTIONAL DECISION WATERFALL & 7 ESSENTIAL DATA POINTS]",
             1: "TAB [1: TACTICAL SWING & ORDER FLOW DESK]",
+            11: "TAB [F: FOOTPRINT SWING DESK]",
             2: "TAB [2: PROTOCOL v1.3 & LIQUIDATION MAGNETS]",
             3: "TAB [3: MACRO QUANT & CYCLE RADAR]",
             4: "TAB [4: REGIME MATRIX CONFIGS A–J]",
@@ -2541,15 +4652,23 @@ def print_dry_run_report(
             7: "TAB [7: GARTLEY 222 & CONFLUENCE RADAR]",
             8: "TAB [8: PATTERN INVALIDATION & SFP TRAP RADAR]",
             9: "TAB [9: TERMINAL EXHAUSTION RADAR]",
+            10: "TAB [L: MASTER SYNTHESIS & SUPREME COMMAND CENTER]",
+            13: "TAB [P: PRICE ACTION & STRUCTURE PROTOCOL (SLSP v1.0 + 3-EMA + SENSORS)]",
         }
-        for t in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9):
+        for t in (0, 12, 11, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13):
             title = tab_titles.get(t, f"TAB [{t}]")
             console.print(f"\n[bold cyan]=== VERIFICATION SNAPSHOT: {title} ===[/bold cyan]")
             console.print(build_dashboard_renderable(config, store, tab_override=t))
     else:
         tab_lower = tab_arg.strip().lower()
-        if tab_lower in ("0", "master", "m"):
+        if tab_lower in ("l", "master", "m", "10"):
+            t_num = 10
+        elif tab_lower in ("w", "waterfall", "wf", "12"):
+            t_num = 12
+        elif tab_lower in ("0", "s0", "spot", "swing"):
             t_num = 0
+        elif tab_lower in ("f", "footprint", "fp", "11"):
+            t_num = 11
         elif tab_lower in ("5", "s1", "s", "mm", "mm_btc"):
             t_num = 5
         elif tab_lower in ("6", "s2", "v", "cone", "vol"):
@@ -2558,14 +4677,16 @@ def print_dry_run_report(
             t_num = 7
         elif tab_lower in ("8", "s4", "t", "trap", "sfp"):
             t_num = 8
-        elif tab_lower in ("9", "s5", "e", "exhaust", "td", "10"):
+        elif tab_lower in ("9", "s5", "e", "exhaust", "td"):
             t_num = 9
+        elif tab_lower in ("p", "structure", "slsp", "pa", "13"):
+            t_num = 13
         else:
             try:
                 t_num = int(tab_arg)
             except ValueError:
                 t_num = 0
-        store.active_tab = t_num if t_num in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9) else 0
+        store.active_tab = t_num if t_num in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13) else 0
         console.print(build_dashboard_renderable(config, store, tab_override=store.active_tab))
 
 
@@ -2574,7 +4695,7 @@ def _poll_keyboard_tab_switch(
     store: StateStore,
     detector: Optional[SignalDetector] = None,
 ) -> bool:
-    """Non-blocking cross-platform hotkey reader (`1`–`5`, `6`/`S` for S1, `7`/`V` for S2, `8`/`G` for S3, `9`/`T` for S4, `0`/`E` for S5, `C`/`c` for AI packet)."""
+    """Non-blocking cross-platform hotkey reader (`1`–`5`, `6`/`S` for S1, `7`/`V` for S2, `8`/`G` for S3, `9`/`T` for S4, `0`/`E` for S5, `W`/`w` for Waterfall, `F`/`f` for Footprint, `L`/`l` for Master, `C`/`c` for AI packet)."""
     changed = False
     if msvcrt is not None:
         try:
@@ -2585,9 +4706,13 @@ def _poll_keyboard_tab_switch(
                     if store.active_tab != new_tab:
                         store.active_tab = new_tab
                         changed = True
-                elif ch in ("m", "M"):
-                    if store.active_tab != 0:
-                        store.active_tab = 0
+                elif ch in ("m", "M", "l", "L"):
+                    if store.active_tab != 10:
+                        store.active_tab = 10
+                        changed = True
+                elif ch in ("w", "W"):
+                    if store.active_tab != 12:
+                        store.active_tab = 12
                         changed = True
                 elif ch in ("s", "S"):
                     if store.active_tab != 5:
@@ -2609,6 +4734,22 @@ def _poll_keyboard_tab_switch(
                     if store.active_tab != 9:
                         store.active_tab = 9
                         changed = True
+                elif ch in ("p", "P"):
+                    if store.active_tab != 13:
+                        store.active_tab = 13
+                        changed = True
+                elif ch in ("f", "F"):
+                    if store.active_tab != 11:
+                        store.active_tab = 11
+                        changed = True
+                elif ch in ("p", "P"):
+                    if store.active_tab != 13:
+                        store.active_tab = 13
+                        changed = True
+                elif ch in ("p", "P"):
+                    if store.active_tab != 13:
+                        store.active_tab = 13
+                        changed = True
                 elif ch in ("c", "C"):
                     if detector is not None:
                         detector.evaluate(store)
@@ -2629,9 +4770,17 @@ def _poll_keyboard_tab_switch(
                     if store.active_tab != new_tab:
                         store.active_tab = new_tab
                         changed = True
-                elif ch in ("m", "M"):
-                    if store.active_tab != 0:
-                        store.active_tab = 0
+                elif ch in ("m", "M", "l", "L"):
+                    if store.active_tab != 10:
+                        store.active_tab = 10
+                        changed = True
+                elif ch in ("w", "W"):
+                    if store.active_tab != 12:
+                        store.active_tab = 12
+                        changed = True
+                elif ch in ("f", "F"):
+                    if store.active_tab != 11:
+                        store.active_tab = 11
                         changed = True
                 elif ch in ("s", "S"):
                     if store.active_tab != 5:

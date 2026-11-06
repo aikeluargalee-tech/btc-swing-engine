@@ -21,6 +21,7 @@ from config.settings import EngineConfig
 from core.state_store import StateStore
 from collectors.macro_collector import MacroIntermarketSnapshot
 from analytics.volume_profile import compute_composite_profile
+from analytics.macro_radar import compute_wilder_rsi
 
 
 def compute_protocol_metrics_dossier(
@@ -34,7 +35,8 @@ def compute_protocol_metrics_dossier(
     ts_utc_str = now_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
     as_of_myt_str = now_myt.strftime("%Y-%m-%d %H:%M:%S MYT")
 
-    spot_price = store.binance_spot_price
+    msev = getattr(store, "master_synthesis_evaluation", None)
+    spot_price = (msev.current_price if (msev is not None and msev.current_price > 0) else store.binance_spot_price)
     perp_price = store.binance_perp_price
     daily_bars = list(store.spot_klines_1d)
     weekly_bars = list(store.spot_klines_1w)
@@ -268,13 +270,7 @@ def compute_protocol_metrics_dossier(
     # 7. Mean-Reversion (Landscape)
     rsi14_daily = None
     if len(daily_closes) >= 15:
-        diffs = np.diff(daily_closes)
-        gains = np.maximum(diffs, 0.0)
-        losses = np.maximum(-diffs, 0.0)
-        avg_gain = float(np.mean(gains[-14:]))
-        avg_loss = float(np.mean(losses[-14:]))
-        rs = avg_gain / (avg_loss + 1e-9)
-        rsi14_daily = round(100.0 - (100.0 / (1.0 + rs)), 1)
+        rsi14_daily = round(compute_wilder_rsi(daily_closes, 14), 1)
 
     log_spread_raw = None
     log_spread_50d_std = None
@@ -493,7 +489,7 @@ def format_protocol_metrics_dossier_markdown(dossier: Dict[str, Any]) -> str:
         "| :--- | :--- | :--- | :--- | :--- |",
         f"| **Spot ETF Daily Net Flow**| Most recent completed day | `{_fmt_price(fl.get('etf_daily_net_flow_usd')) if fl.get('etf_daily_net_flow_usd') is not None else fl.get('etf_status', 'unavailable')}` | US Spot BTC ETFs | `{'CONFIRMED' if fl.get('etf_daily_net_flow_usd') is not None else 'UNAVAILABLE (No Guessing)'}` |",
         f"| **Spot ETF 3-Day Cum.** | Last 3 completed days | `{_fmt_price(fl.get('etf_3d_cumulative_flow_usd')) if fl.get('etf_3d_cumulative_flow_usd') is not None else fl.get('etf_status', 'unavailable')}` | US Spot BTC ETFs | `{'CONFIRMED' if fl.get('etf_3d_cumulative_flow_usd') is not None else 'UNAVAILABLE (No Guessing)'}` |",
-        f"| **Passive Absorption Ratio**| 4H Taker vs Price Delta | `{_fmt_val(fl.get('passive_absorption_ratio'))}` | Limit Absorption Index | `{('ACTIVE ABSORPTION' if (fl.get('passive_absorption_ratio') or 0) >= 1.05 else ('MODERATE ABSORPTION' if (fl.get('passive_absorption_ratio') or 0) >= 0.35 else ('SPOT ABSORPTION (ACCUMULATION)' if (fl.get('spot_cvd_4h_btc') or 0) > 0 else 'BALANCED / LOW EFFORT')))}` |",
+        f"| **Passive Absorption Ratio**| 4H Taker vs Price Delta | `{_fmt_val(fl.get('passive_absorption_ratio'))}` | Limit Absorption Index | `{('ACTIVE ABSORPTION' if (fl.get('passive_absorption_ratio') or 0) >= 0.85 else ('MODERATE ABSORPTION' if (fl.get('passive_absorption_ratio') or 0) >= 0.35 else 'BALANCED / NO ABSORPTION'))}` |",
         "",
         "### 12E. Macro & Intermarket Asset Metrics",
         "",
@@ -525,7 +521,7 @@ def format_protocol_metrics_dossier_markdown(dossier: Dict[str, Any]) -> str:
         "| Metric | Preferred Lookback | Value | Specification | Status |",
         "| :--- | :--- | :--- | :--- | :--- |",
         f"| **Daily RSI(14)** | 14 Daily Closes | `{_fmt_val(mr.get('daily_rsi14'))}` | Wilder's RSI(14) | `{'OVERSOLD' if (mr.get('daily_rsi14') or 50) <= 35 else ('OVERBOUGHT' if (mr.get('daily_rsi14') or 50) >= 65 else 'NEUTRAL')}` |",
-        f"| **Log-Spread Raw** | Current Close vs. SMA50 | `{_fmt_val(mr.get('log_spread_raw'))}` | $\\ln(P) - \\ln(\\text{{SMA}}_{{50}})$ | `DISCOUNT TO 50D MEAN` |",
+        f"| **Log-Spread Raw** | Current Close vs. SMA50 | `{_fmt_val(mr.get('log_spread_raw'))}` | $\\ln(P) - \\ln(\\text{{SMA}}_{{50}})$ | `{'PREMIUM TO 50D MEAN' if (mr.get('log_spread_raw') or 0) > 0 else 'DISCOUNT TO 50D MEAN'}` |",
         f"| **Log-Spread 50D StdDev**| 50 Daily Closes | `{_fmt_val(mr.get('log_spread_50d_std'))}` | $\\sigma_{{50}}$ of Log-Spread | `VOLATILITY BASELINE` |",
         f"| **Log-Spread Z-Score** | 50-Day Window | `{_fmt_val(mr.get('log_spread_zscore'), 'σ')}` | $(\\ln(P) - \\ln(\\text{{SMA}}_{{50}})) / \\sigma_{{50}}$ | `{'EXTREME MEAN-REVERSION' if abs(mr.get('log_spread_zscore') or 0) >= 2.0 else 'STANDARD SPREAD'}` |",
     ]

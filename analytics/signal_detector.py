@@ -1,6 +1,7 @@
 """4-Gate Swing Execution State Machine, 0-100 Confluence Scorer, Veto Filters, and JSONL Logger."""
 
 import json
+import logging
 import os
 import time
 from datetime import datetime, timezone
@@ -27,6 +28,7 @@ from .master_synthesis import MasterSynthesisEvaluator
 from .mm_btc_engine import MMBTCEngine
 from .protocol_v13 import ProtocolV13Evaluator
 from .regime_matrix import RegimeMatrixEvaluator
+from .spot_swing_engine import SpotSwingEngine
 from .sweep_retest_fsm import (
     Candle,
     FSMState,
@@ -35,6 +37,7 @@ from .sweep_retest_fsm import (
     SweepInstance,
     SweepRetestFSM,
 )
+from .slsp_engine import SLSPEngine
 from .trap_engine import TrapEngine
 from .exhaustion_engine import ExhaustionEngine
 from .volatility_cone_engine import VolatilityConeEngine
@@ -56,6 +59,9 @@ class SignalDetector:
         self.trap_engine = TrapEngine(config)
         self.exhaustion_engine = ExhaustionEngine(config)
         self.ema_strategy_engine = EMAStrategyEngine(config)
+        self.slsp_engine = SLSPEngine(config, read_only=True)
+        # Side-effect free by default (no state writes / alerts). Only the live HUD opts in via set_read_only(False).
+        self.spot_swing_engine = SpotSwingEngine(config, read_only=True)
         fsm_db_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             "sweep_fsm_state.json",
@@ -100,6 +106,8 @@ class SignalDetector:
         session_vp: Optional[VolumeProfileResult] = None,
         testing_support_hvn: bool = False,
         risk_pct_override: Optional[float] = None,
+        protocol_ev: Optional[object] = None,
+        macro_ev: Optional[object] = None,
     ) -> TradePlan:
         """Calculates structural entry zone, sweep-low/LVN stop-loss, cPOC/cVAH targets, and sizing."""
         recent_swing_low = (
@@ -107,7 +115,65 @@ class SignalDetector:
         )
 
         tact_val = tactical_vp.c_val if tactical_vp is not None else c_val
-        if support_hvn is not None and current_price < (c_val - 0.5 * atr_1h):
+        if support_hvn is not None and current_price < support_hvn:
+            # Dynamic Price-Floor Waterfall (Case B: spot_price < hvn_30d):
+            # 30D Support HVN is breached and now acts as overhead supply (TP1).
+            # Cascade Track A support bids down to min(hvn_7d, support_1d) / lower structural shelves.
+            hvn_7d_candidates = [
+                lvl
+                for lvl in (
+                    tactical_vp.support_hvn_below_val if tactical_vp is not None else None,
+                    tactical_vp.c_val if tactical_vp is not None else None,
+                    session_vp.c_val if session_vp is not None else None,
+                )
+                if lvl is not None and 0 < lvl <= current_price
+            ]
+            hvn_7d = min(hvn_7d_candidates) if hvn_7d_candidates else None
+            daily_sup_raw = getattr(protocol_ev, "daily_support", 0.0) if protocol_ev is not None else 0.0
+            support_1d = daily_sup_raw if (0 < daily_sup_raw <= current_price) else None
+
+            if hvn_7d is not None and support_1d is not None:
+                entry_low = min(hvn_7d, support_1d)
+                entry_high = min(current_price, max(hvn_7d, support_1d, entry_low + 0.15 * atr_1h))
+            elif hvn_7d is not None:
+                entry_low = hvn_7d
+                entry_high = min(current_price, entry_low + 0.25 * atr_1h)
+            elif support_1d is not None:
+                entry_low = support_1d
+                entry_high = min(current_price, entry_low + 0.25 * atr_1h)
+            else:
+                fallback_floor = min(recent_swing_low, current_price - 0.35 * atr_1h)
+                entry_low = fallback_floor
+                entry_high = min(current_price, max(fallback_floor + 0.20 * atr_1h, recent_swing_low))
+
+            if entry_low > entry_high:
+                entry_low = entry_high
+            ref_entry = entry_high
+
+            # Stop Loss: Never park the hard stop directly on top of long_liq_magnet
+            long_liq_mag = getattr(protocol_ev, "long_liq_magnet_usd", 0.0) if protocol_ev is not None else 0.0
+            ema_200_1d = getattr(macro_ev, "ema_200_1d", 0.0) if macro_ev is not None else 0.0
+            atr_1d_floor = getattr(protocol_ev, "downside_ref_1d_atr", 0.0) if protocol_ev is not None else 0.0
+
+            base_floor = min(recent_swing_low, entry_low)
+            stop_loss = base_floor - (self.config.stop_atr_buffer_mult * atr_1h)
+
+            if long_liq_mag > 0 and stop_loss >= (long_liq_mag - 75.0):
+                deep_anchors = [
+                    lvl
+                    for lvl in (ema_200_1d, atr_1d_floor)
+                    if 0 < lvl < (long_liq_mag - 100.0)
+                ]
+                if deep_anchors:
+                    stop_loss = max(deep_anchors) - 50.0
+                else:
+                    stop_loss = long_liq_mag - max(atr_1h, 450.0)
+
+            # Re-anchor breached 30D HVN as TP1 (Overhead Supply) and 7D/30D cPOC as TP2
+            tp1_poc = max(support_hvn, ref_entry + 0.75 * atr_1h)
+            tact_poc = tactical_vp.c_poc if tactical_vp is not None else c_poc
+            tp2_vah = max(tact_poc, c_poc, tp1_poc + 1.5 * atr_1h)
+        elif support_hvn is not None and current_price < (c_val - 0.5 * atr_1h):
             # Trading below 30D Macro cVAL ($81,321) near 7D Tactical cVAL / 30D Support HVN Floor ($79,587):
             # Anchor tactical entry on 7D Tactical cVAL / 24H Session cVAL / 30D Support HVN shelf
             if tactical_vp is not None and support_hvn <= tact_val <= (support_hvn + 2.0 * atr_1h):
@@ -117,8 +183,11 @@ class SignalDetector:
             else:
                 dev_val = support_hvn + 0.25 * atr_1h
             entry_low = min(support_hvn, dev_val)
-            entry_high = max(dev_val, entry_low + 0.25 * atr_1h)
-            ref_entry = dev_val
+            entry_high = min(current_price, max(dev_val, entry_low + 0.25 * atr_1h))
+            if entry_low > entry_high:
+                entry_low = support_hvn
+                entry_high = max(support_hvn, min(current_price, support_hvn + 0.25 * atr_1h))
+            ref_entry = entry_high
 
             floor_candidates = [recent_swing_low, support_hvn]
             if tactical_vp and tactical_vp.support_hvn_below_val:
@@ -229,6 +298,11 @@ class SignalDetector:
         store.session_profile = session_vp
 
         if macro_vp is None or tactical_vp is None:
+            if hasattr(store, "footprint_engine") and store.footprint_engine is not None:
+                try:
+                    store.footprint_evaluation = store.footprint_engine.evaluate(store)
+                except Exception:
+                    pass
             return None
 
         # 2. Compute Order Flow & Derivatives Snapshots
@@ -257,6 +331,10 @@ class SignalDetector:
         # 2c. Evaluate Special Tab [S4]: Pattern Invalidation & Special Tab [S5]: Terminal Exhaustion
         self.trap_engine.evaluate(store, spot_1h, spot_15m, deriv, flow, active_vp=active_vp)
         self.exhaustion_engine.evaluate(store, spot_1h, bars_4h, spot_15m, deriv, flow, active_vp=active_vp)
+        try:
+            self.spot_swing_engine.evaluate(store)  # Tab [0]: Spot Swing & Liquidation Magnet Engine
+        except Exception:
+            logging.getLogger("spot_swing").exception("Tab [0] spot swing evaluation failed")
 
         # 2d. Evaluate 3-EMA Industrial Trend & Pullback System
         ema_snap = self.ema_strategy_engine.evaluate(
@@ -269,6 +347,24 @@ class SignalDetector:
             atr_4h=atr_4h,
         )
         store.ema_strategy = ema_snap
+        # 2e. Evaluate Intra-Candle Footprint & Order Flow Microstructure
+        try:
+            if hasattr(store, "footprint_engine") and store.footprint_engine is not None:
+                store.footprint_evaluation = store.footprint_engine.evaluate(store)
+        except Exception:
+            logging.getLogger("footprint").exception("Footprint evaluation failed")
+
+        # 2f. Evaluate Tab [13]: Structure + Level Swing Protocol (SLSP v1.0) & 4-in-1 Integration
+        try:
+            self.slsp_engine.evaluate(
+                store=store,
+                spot_1d=list(store.spot_klines_1d),
+                bars_4h=bars_4h,
+                current_price=current_price,
+                active_vp=active_vp,
+            )
+        except Exception:
+            logging.getLogger("slsp").exception("Tab [13] SLSP evaluation failed")
 
         c_vah = active_vp.c_vah
         c_poc = active_vp.c_poc
@@ -595,6 +691,8 @@ class SignalDetector:
             session_vp=session_vp,
             testing_support_hvn=testing_support_hvn,
             risk_pct_override=effective_risk_pct,
+            protocol_ev=protocol_ev,
+            macro_ev=macro_ev,
         )
 
         if has_macro_1d_bars and macro_ev.gatekeeper_veto:

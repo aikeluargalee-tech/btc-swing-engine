@@ -226,7 +226,8 @@ class MasterSynthesisEvaluator:
             else:
                 t5_light = "YELLOW"
             t5_driver = f"R={mm_ev.signature.roughness:.2f} | Consensus: {mm_ev.agreeing_models_count}/5"
-            t5_conc = f"{mm_ev.action_plan_cash} ({mm_ev.final_weight:.2f}x)"
+            w_tag = f"{mm_ev.final_weight:.2f}x"
+            t5_conc = mm_ev.action_plan_cash if w_tag in mm_ev.action_plan_cash else f"{mm_ev.action_plan_cash} ({w_tag})"
             t5_status = f"{mm_ev.microstructure_pattern} • H={mm_ev.hurst.hurst:.2f}"
         else:
             t5_light = "YELLOW"
@@ -347,7 +348,11 @@ class MasterSynthesisEvaluator:
                 t9_conc = f"MODERATE MOMENTUM ({ex_ev.exhaustion_score:.1f}/100)"
             else:
                 t9_light = "GREEN"
-                t9_conc = "MOMENTUM HEALTHY (NO DIVERGENCE)"
+                t9_conc = (
+                    "MOMENTUM HEALTHY (NO TERMINAL EXHAUSTION)"
+                    if ex_ev.divergences
+                    else "MOMENTUM HEALTHY (NO DIVERGENCE)"
+                )
             t9_driver = f"Score: {ex_ev.exhaustion_score:.1f} | TD 1H:{ex_ev.td_1h.setup_count}/9 4H:{ex_ev.td_4h.setup_count}/9"
             t9_status = f"{ex_ev.active_exhaustion_signal}"
         else:
@@ -535,6 +540,20 @@ class MasterSynthesisEvaluator:
                 f"and Annualized Basis is {rmev.annualized_basis_pct:+.2f}%, eliminating long-crowding veto risk."
             )
 
+        # Tab [0] Spot Swing Protocol Confluence
+        sw_ev = store.spot_swing_evaluation
+        if sw_ev and sw_ev.data_ready and sw_ev.macro:
+            if sw_ev.trade is not None:
+                confluence_points.append(
+                    f"Spot Swing Protocol [Tab 0]: Active trade in progress from ${sw_ev.trade.entry:,.0f} "
+                    f"(Stop ${sw_ev.trade.current_stop:,.0f}, TP1 ${sw_ev.trade.tp1:,.0f}, PWH ${sw_ev.trade.tp2:,.0f})."
+                )
+            elif sw_ev.verdict == "NEW LONG SETUP" and sw_ev.risk:
+                confluence_points.append(
+                    f"Spot Swing Protocol [Tab 0]: NEW LONG SETUP armed at ${sw_ev.risk.entry:,.0f} "
+                    f"(Stop ${sw_ev.risk.stop:,.0f}, 1% Size: {sw_ev.risk.qty_btc:.4f} BTC, +2.0R Target ${sw_ev.risk.tp1:,.0f})."
+                )
+
         if sig.ema_strategy and sig.ema_strategy.daily_regime in ("STRONG_BULL", "WEAK_BULL"):
             es = sig.ema_strategy
             confluence_points.append(
@@ -634,15 +653,41 @@ class MasterSynthesisEvaluator:
         else:
             cash_permission = f"WAIT FOR EDGE (0% NOW • {cash_edge_risk_pct:.2f}% AT ${target_support:,.0f})"
 
+        breached_30d_hvn = bool(sig.support_hvn and price < sig.support_hvn)
         if tp:
-            cash_entry_zone_str = (
-                f"${tp.entry_zone_low:,.0f} – ${tp.entry_zone_high:,.0f} (Liq Floor: ${pev.long_liq_magnet_usd:,.0f})"
-            )
+            if breached_30d_hvn and sig.support_hvn:
+                cash_entry_zone_str = (
+                    f"T1 (40%): ${tp.entry_zone_low:,.0f}–${tp.entry_zone_high:,.0f} (7D HVN/1D Sup) • "
+                    f"T2 (60%): ${pev.long_liq_magnet_usd:,.0f} (Long-Liq Magnet) | "
+                    f"TP1: ${sig.support_hvn:,.0f} (Overhead 30D HVN)"
+                )
+            elif sig.support_hvn and sig.support_hvn < sig.c_val:
+                cash_entry_zone_str = (
+                    f"T1: ${sig.c_val:,.0f} (30D cVAL) • T2: ${sig.support_hvn:,.0f} (30D HVN) "
+                    f"(Active Bid: ${tp.entry_zone_low:,.0f}–${tp.entry_zone_high:,.0f} • Liq Floor: ${pev.long_liq_magnet_usd:,.0f})"
+                )
+            else:
+                cash_entry_zone_str = (
+                    f"${tp.entry_zone_low:,.0f} – ${tp.entry_zone_high:,.0f} (Liq Floor: ${pev.long_liq_magnet_usd:,.0f})"
+                )
         else:
             cash_entry_zone_str = f"${target_support:,.0f} – ${pev.long_liq_magnet_usd:,.0f}"
 
         if supreme_veto:
             cash_trigger_instruction = f"VETO ({supreme_veto_reason_str[:32]}) -> Stay 100% Cash."
+        elif breached_30d_hvn and sig.support_hvn:
+            active_btc = cash_final_btc if cash_final_risk_pct > 0 else cash_edge_btc
+            t1_btc = round(active_btc * 0.40, 4)
+            t2_btc = round(active_btc * 0.60, 4)
+            z_low = tp.entry_zone_low if tp else target_support
+            z_high = tp.entry_zone_high if tp else target_support
+            s_stop = tp.stop_loss if tp else pev.downside_ref_1d_atr
+            cash_trigger_instruction = (
+                f"30D HVN (${sig.support_hvn:,.0f}) breached -> "
+                f"T1 (40%): {t1_btc:.4f} BTC @ ${z_low:,.0f}–${z_high:,.0f} (15m reclaim); "
+                f"T2 (60%): {t2_btc:.4f} BTC @ ${pev.long_liq_magnet_usd:,.0f} "
+                f"(Stop ${s_stop:,.0f} < 1D 200EMA/ATR; TP1 ${sig.support_hvn:,.0f} Overhead Supply)."
+            )
         elif cash_final_risk_pct > 0:
             cash_trigger_instruction = (
                 f"Bid ${tp.entry_zone_low if tp else target_support:,.0f}–${tp.entry_zone_high if tp else target_support:,.0f} "
@@ -658,12 +703,24 @@ class MasterSynthesisEvaluator:
         tab4_stop = active_cfg.computed_stop_usd
         valid_stops = [s for s in (tab1_stop, tab4_stop) if 0 < s < price * 0.998]
         reconciled_stop = round(min(valid_stops), 2) if valid_stops else round(price * 0.985, 2)
+        if pev.long_liq_magnet_usd > 0 and reconciled_stop >= (pev.long_liq_magnet_usd - 75.0) and price < sig.c_val:
+            ema_200_1d = getattr(mev, "ema_200_1d", 0.0) if mev else 0.0
+            deep_stops = [s for s in (ema_200_1d, pev.downside_ref_1d_atr) if 0 < s < (pev.long_liq_magnet_usd - 100.0)]
+            if deep_stops:
+                reconciled_stop = round(max(deep_stops) - 50.0, 2)
+            else:
+                reconciled_stop = round(pev.long_liq_magnet_usd - 450.0, 2)
         stop_source = f"Tab 1 Tactical: ${tab1_stop:,.0f} • Tab 4 Macro Floor: ${tab4_stop:,.0f} • 50D: ${pev.sma_50_1d:,.0f}"
 
         # Track B: Macro Spot Holder Targets (Multi-Day Swing / Reversion)
-        macro_tp1_candidates = [c for c in [sig.c_poc, mev.ema_21_1d if mev else sig.c_poc] if c > price]
+        raw_tp1_cands = [sig.c_poc, mev.ema_21_1d if mev else sig.c_poc]
+        if breached_30d_hvn and sig.support_hvn:
+            raw_tp1_cands.append(sig.support_hvn)
+        macro_tp1_candidates = [c for c in raw_tp1_cands if c > price]
         holder_tp1_usd = round(min(macro_tp1_candidates), 2) if macro_tp1_candidates else round(max(sig.c_poc, price * 1.03), 2)
-        if mev and abs(holder_tp1_usd - mev.ema_21_1d) < 5.0:
+        if breached_30d_hvn and sig.support_hvn and abs(holder_tp1_usd - sig.support_hvn) < 5.0:
+            holder_tp1_source = "Breached 30D HVN Overhead Supply"
+        elif mev and abs(holder_tp1_usd - mev.ema_21_1d) < 5.0:
             holder_tp1_source = "1D 21 EMA Mean Reversion"
         else:
             holder_tp1_source = "30D cPOC Fair Value Magnet"

@@ -25,6 +25,7 @@ from core.models import (
 )
 from core.state_store import StateStore
 from .volume_profile import compute_atr
+from .tell_tale_engine import TellTaleEngine
 
 
 class ExhaustionEngine:
@@ -32,6 +33,7 @@ class ExhaustionEngine:
 
     def __init__(self, config: EngineConfig) -> None:
         self.config = config
+        self.tell_tale_engine = TellTaleEngine(config)
 
     def _compute_td_sequential(
         self, bars: Sequence[KlineBar], horizon_label: str
@@ -276,6 +278,10 @@ class ExhaustionEngine:
         divergences.extend(div_15m)
         divergences.extend(div_1h)
 
+        # 2b. Evaluate Tell-Tale Candle Climax Sensor (5x Volume Capitulation)
+        bars_5m = getattr(store, "spot_klines_5m", None)
+        tell_tale_ev = self.tell_tale_engine.evaluate(bars_15m, bars_5m)
+
         # 3. Open Interest & Funding Climax Metrics
         oi_15m_pct = deriv.oi_change_15m_pct
         oi_1h_pct = deriv.oi_change_1h_pct
@@ -312,7 +318,11 @@ class ExhaustionEngine:
         elif oi_climax_flag or funding_climax_flag:
             climax_score = 15.0
 
-        total_score = min(td_score + div_score + climax_score, 100.0)
+        tell_tale_bonus = 0.0
+        if tell_tale_ev and tell_tale_ev.disruption_detected:
+            tell_tale_bonus = 15.0
+
+        total_score = min(td_score + div_score + climax_score + tell_tale_bonus, 100.0)
 
         # 5. Resolve Regime State & Primary Signal
         if total_score >= 80.0:
@@ -330,12 +340,14 @@ class ExhaustionEngine:
             or "BEARISH" in td_4h.direction
             or any("BEARISH" in d.divergence_type for d in divergences)
             or funding_pct > 0.015
+            or (tell_tale_ev and tell_tale_ev.is_buying_climax)
         )
         is_bullish_exhaustion = (
             "BULLISH" in td_1h.direction
             or "BULLISH" in td_4h.direction
             or any("BULLISH" in d.divergence_type for d in divergences)
             or funding_pct < -0.010
+            or (tell_tale_ev and tell_tale_ev.is_selling_climax)
         )
 
         active_signal = "MOMENTUM BALANCED (Trend Intact)"
@@ -407,7 +419,13 @@ class ExhaustionEngine:
             takeaway = "TIGHTEN STOPS — Trend momentum is entering late-stage compression."
         else:
             active_signal = f"MOMENTUM HEALTHY (Score: {total_score:.0f}/100 • Trend Expanding)"
-            summary = "Price and volume delta are expanding in harmony without terminal divergence."
+            if divergences:
+                summary = (
+                    f"Local CVD divergence noted ({len(divergences)} active), but TD-9 count and OI/Funding climax stress "
+                    f"remain unconfirmed (Score: {total_score:.0f}/100 < 35). No terminal trend exhaustion."
+                )
+            else:
+                summary = "Price and volume delta are expanding in harmony without terminal divergence."
             takeaway = "TREND INTACT — Let winning swing positions run toward value boundaries."
 
         evaluation = ExhaustionRadarEvaluation(
@@ -426,6 +444,7 @@ class ExhaustionEngine:
             trade_plan=trade_plan,
             plain_english_summary=summary,
             quantitative_takeaway=takeaway,
+            tell_tale=tell_tale_ev,
         )
 
         store.exhaustion_evaluation = evaluation

@@ -4779,8 +4779,12 @@ def _build_tab14_pattern_chart_hud(store: StateStore, header_panel: Panel) -> Gr
         r4h = gartley.res_4h
         r1d = gartley.res_1d
         geo_lines.append(f"• [bold magenta]Harmonics Confluence (S3):[/bold magenta] {gartley.overall_verdict} (1D: {r1d.verdict} • 4H: {r4h.verdict})")
-        if r4h.prz_low > 0 and r4h.prz_high > 0:
-            geo_lines.append(f"• [bold magenta]4H Harmonic PRZ Zone:[/bold magenta] [bold cyan]${r4h.prz_low:,.0f} – ${r4h.prz_high:,.0f}[/bold cyan] ({r4h.pattern_name})")
+        bull_d = getattr(r4h, "bull_d", None)
+        bear_d = getattr(r4h, "bear_d", None)
+        if bull_d:
+            geo_lines.append(f"• [bold magenta]Harmonic Bullish D-Point:[/bold magenta] [bold cyan]${bull_d:,.0f}[/bold cyan] ({getattr(r4h, 'v6_gartley_bull', 'Gartley')})")
+        elif bear_d:
+            geo_lines.append(f"• [bold magenta]Harmonic Bearish D-Point:[/bold magenta] [bold cyan]${bear_d:,.0f}[/bold cyan] ({getattr(r4h, 'v7_gartley_bear', 'Gartley')})")
     if top_p:
         geo_lines.append(f"• [bold white]Leading Pattern:[/bold white] [bold magenta]{top_p.pattern}[/bold magenta] ({top_p.timeframe.upper()})")
         if top_p.high_slope is not None and top_p.low_slope is not None:
@@ -4964,41 +4968,12 @@ def _poll_keyboard_tab_switch(
                 ch = msvcrt.getwch()
                 if ch in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9"):
                     new_tab = int(ch)
-                    if new_tab == 7:
-                        new_tab = 14  # Option B: Map 7 to Dedicated Pattern & Harmonics Desk
                     store.show_help = False
                     if store.active_tab != new_tab:
                         store.active_tab = new_tab
                         changed = True
-                elif ch in ("m", "M", "l", "L"):
-                    if store.active_tab != 10:
-                        store.active_tab = 10
-                        changed = True
-                elif ch in ("w", "W"):
-                    if store.active_tab != 12:
-                        store.active_tab = 12
-                        changed = True
-                elif ch in ("s", "S"):
-                    if store.active_tab != 5:
-                        store.active_tab = 5
-                        changed = True
-                elif ch in ("v", "V"):
-                    if store.active_tab != 6:
-                        store.active_tab = 6
-                        changed = True
-                elif ch in ("g", "G"):
-                    if store.active_tab != 7:
-                        store.active_tab = 7  # Option B: G maps to Desk [B: PATTERNS & HARMONICS]
-                        changed = True
-                elif ch in ("t", "T"):
-                    if store.active_tab != 8:
-                        store.active_tab = 8
-                        changed = True
-                elif ch in ("e", "E"):
-                    if store.active_tab != 9:
-                        store.active_tab = 9
-                        changed = True
                 elif ch in ("p", "P"):
+                    store.show_help = False
                     if store.active_tab != 13:
                         store.active_tab = 13
                         changed = True
@@ -5008,20 +4983,45 @@ def _poll_keyboard_tab_switch(
                         store.active_tab = 14
                         changed = True
                 elif ch in ("f", "F"):
+                    store.show_help = False
                     if store.active_tab != 11:
                         store.active_tab = 11
                         changed = True
-                elif ch in ("p", "P"):
-                    if store.active_tab != 13:
-                        store.active_tab = 13
+                elif ch in ("w", "W"):
+                    store.show_help = False
+                    if store.active_tab != 12:
+                        store.active_tab = 12
                         changed = True
-                elif ch in ("p", "P"):
-                    if store.active_tab != 13:
-                        store.active_tab = 13
+                elif ch in ("m", "M", "l", "L"):
+                    store.show_help = False
+                    if store.active_tab != 10:
+                        store.active_tab = 10
                         changed = True
-                elif ch in ("h", "H", "?"):
-                    store.show_help = not getattr(store, "show_help", False)
-                    changed = True
+                elif ch in ("s", "S"):
+                    store.show_help = False
+                    if store.active_tab != 5:
+                        store.active_tab = 5
+                        changed = True
+                elif ch in ("v", "V"):
+                    store.show_help = False
+                    if store.active_tab != 6:
+                        store.active_tab = 6
+                        changed = True
+                elif ch in ("g", "G"):
+                    store.show_help = False
+                    if store.active_tab != 7:
+                        store.active_tab = 7
+                        changed = True
+                elif ch in ("t", "T"):
+                    store.show_help = False
+                    if store.active_tab != 8:
+                        store.active_tab = 8
+                        changed = True
+                elif ch in ("e", "E"):
+                    store.show_help = False
+                    if store.active_tab != 9:
+                        store.active_tab = 9
+                        changed = True
                 elif ch in ("h", "H", "?"):
                     store.show_help = not getattr(store, "show_help", False)
                     changed = True

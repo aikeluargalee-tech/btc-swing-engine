@@ -1,15 +1,16 @@
 {
+  "pattern_radar": {},
   "order_flow": {
     "footprint": {
-      "active_bar_delta": 1.73,
-      "bar_poc": 76175.0,
-      "gate_1_macro_tap": true,
+      "active_bar_delta": 10.0,
+      "bar_poc": 68425.0,
+      "gate_1_macro_tap": false,
       "gate_2_positioning_crowded": true,
-      "gate_3_wick_absorption": true,
+      "gate_3_wick_absorption": false,
       "gate_4_delta_flip": false,
       "stacked_imbalances_count": 0,
-      "active_battle_zone": 76175.0,
-      "signal": "ARMED",
+      "active_battle_zone": 68425.0,
+      "signal": "OBSERVATION",
       "suggested_entry": 0.0,
       "suggested_stop": 0.0,
       "target_1_to_2": 0.0

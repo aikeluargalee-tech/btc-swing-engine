@@ -184,7 +184,7 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         4: "4: REGIME MATRIX",
         5: "5: MM-BTC INVENTORY",
         6: "6: 72H VOL CONE",
-        7: "7: GARTLEY HARMONICS",
+        7: "7: PATTERNS & HARMONICS [B]",
         8: "8: SFP LIQ TRAP",
         9: "9: TD EXHAUSTION",
         14: "14: PATTERNS & CHART",
@@ -4770,10 +4770,17 @@ def _build_tab14_pattern_chart_hud(store: StateStore, header_panel: Panel) -> Gr
 
     cand_panel = Panel(cand_table, title="[bold white]Detected Pattern Candidates (4H & 1H)[/bold white]", box=box.ROUNDED, border_style="cyan")
 
+    gartley = getattr(store, "gartley_evaluation", None)
     geo_lines = [
         f"• [bold white]Structure Trend:[/bold white] {pat.structure_trend}",
         f"• [bold white]Active Spot Reference:[/bold white] [bold cyan]${spot_px:,.2f}[/bold cyan]",
     ]
+    if gartley:
+        r4h = gartley.res_4h
+        r1d = gartley.res_1d
+        geo_lines.append(f"• [bold magenta]Harmonics Confluence (S3):[/bold magenta] {gartley.overall_verdict} (1D: {r1d.verdict} • 4H: {r4h.verdict})")
+        if r4h.prz_low > 0 and r4h.prz_high > 0:
+            geo_lines.append(f"• [bold magenta]4H Harmonic PRZ Zone:[/bold magenta] [bold cyan]${r4h.prz_low:,.0f} – ${r4h.prz_high:,.0f}[/bold cyan] ({r4h.pattern_name})")
     if top_p:
         geo_lines.append(f"• [bold white]Leading Pattern:[/bold white] [bold magenta]{top_p.pattern}[/bold magenta] ({top_p.timeframe.upper()})")
         if top_p.high_slope is not None and top_p.low_slope is not None:
@@ -4957,6 +4964,8 @@ def _poll_keyboard_tab_switch(
                 ch = msvcrt.getwch()
                 if ch in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9"):
                     new_tab = int(ch)
+                    if new_tab == 7:
+                        new_tab = 14  # Option B: Map 7 to Dedicated Pattern & Harmonics Desk
                     store.show_help = False
                     if store.active_tab != new_tab:
                         store.active_tab = new_tab
@@ -4979,7 +4988,7 @@ def _poll_keyboard_tab_switch(
                         changed = True
                 elif ch in ("g", "G"):
                     if store.active_tab != 7:
-                        store.active_tab = 7
+                        store.active_tab = 7  # Option B: G maps to Desk [B: PATTERNS & HARMONICS]
                         changed = True
                 elif ch in ("t", "T"):
                     if store.active_tab != 8:
@@ -5033,6 +5042,8 @@ def _poll_keyboard_tab_switch(
                 ch = sys.stdin.read(1)
                 if ch in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9"):
                     new_tab = int(ch)
+                    if new_tab == 7:
+                        new_tab = 14  # Option B: Map 7 to Dedicated Pattern & Harmonics Desk
                     store.show_help = False
                     if store.active_tab != new_tab:
                         store.active_tab = new_tab
@@ -5064,7 +5075,7 @@ def _poll_keyboard_tab_switch(
                         changed = True
                 elif ch in ("g", "G"):
                     if store.active_tab != 7:
-                        store.active_tab = 7
+                        store.active_tab = 7  # Option B: G maps to Desk [B: PATTERNS & HARMONICS]
                         changed = True
                 elif ch in ("t", "T"):
                     if store.active_tab != 8:

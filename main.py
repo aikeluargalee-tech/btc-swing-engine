@@ -69,7 +69,8 @@ async def _run_engine(
         store.active_tab = 5
     elif tab_arg.lower() in ("s2", "v", "cone", "vol"):
         store.active_tab = 6
-    elif tab_arg.lower() in ("s3", "g", "gartley"):
+    elif tab_arg.lower() in ("s3", "g", "gartley", "7"):
+        store.active_tab = 7
         store.active_tab = 7
     elif tab_arg.lower() in ("s4", "t", "trap", "sfp"):
         store.active_tab = 8

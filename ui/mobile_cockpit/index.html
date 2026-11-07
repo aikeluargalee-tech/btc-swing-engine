@@ -429,8 +429,8 @@
     .level-bar-segments {
       position: relative;
       width: 100%;
-      height: 44px;
-      border-radius: 9px;
+      height: 36px;
+      border-radius: 8px;
       display: flex;
       overflow: hidden;
       border: 1.5px solid rgba(255, 255, 255, 0.22);
@@ -479,11 +479,11 @@
       box-shadow: inset 0 0 12px rgba(0, 255, 102, 0.35);
     }
     .seg-zone-title {
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 900;
-      letter-spacing: 0.6px;
+      letter-spacing: 1px;
       text-transform: uppercase;
-      line-height: 1.15;
+      line-height: 1;
       text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
     }
     .level-seg.sell .seg-zone-title { color: #ff6b6b; }
@@ -1175,16 +1175,13 @@
         <div style="position: relative; width: 100%;">
           <div class="level-bar-segments">
             <div class="level-seg sell" id="zone-box-sell">
-              <div class="seg-zone-title">🔴 SELL ZONE</div>
-              <div class="seg-zone-range">0–39 (To USDT)</div>
+              <div class="seg-zone-title">🔴 SELL</div>
             </div>
             <div class="level-seg neutral active-zone" id="zone-box-neutral">
-              <div class="seg-zone-title">🟡 NEUTRAL ZONE</div>
-              <div class="seg-zone-range">40–69 (Hold Both)</div>
+              <div class="seg-zone-title">🟡 NEUTRAL</div>
             </div>
             <div class="level-seg buy" id="zone-box-buy">
-              <div class="seg-zone-title">🟢 BUY ZONE</div>
-              <div class="seg-zone-range">70–100 (Buy BTC)</div>
+              <div class="seg-zone-title">🟢 BUY</div>
             </div>
           </div>
           <div class="level-needle-dot" id="level-needle-dot" style="left: 45%;"></div>

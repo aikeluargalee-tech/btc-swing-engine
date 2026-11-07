@@ -383,10 +383,114 @@
     }
 
     
+    /* RADAR SCORE LEVEL BAR & "WE ARE HERE" ARROW */
+    .radar-level-meter-wrap {
+      width: 100%;
+      padding: 12px 14px 2px 14px;
+      pointer-events: none;
+    }
+    .we-are-here-track {
+      position: relative;
+      height: 30px;
+      width: 100%;
+      margin-bottom: 4px;
+    }
+    .we-are-here-marker {
+      position: absolute;
+      left: 45%;
+      top: 0;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: left 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+      z-index: 5;
+    }
+    .we-are-here-pill {
+      background: var(--warning);
+      color: #000;
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      font-weight: 900;
+      padding: 2px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.4px;
+      white-space: nowrap;
+      box-shadow: 0 0 10px rgba(255, 184, 0, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+    }
+    .we-are-here-arrow {
+      font-size: 12px;
+      line-height: 10px;
+      color: var(--warning);
+      text-shadow: 0 0 6px rgba(255, 184, 0, 0.7);
+      margin-top: 1px;
+    }
+    .level-bar-segments {
+      position: relative;
+      width: 100%;
+      height: 10px;
+      border-radius: 5px;
+      display: flex;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(0, 0, 0, 0.6);
+    }
+    .level-seg {
+      height: 100%;
+      position: relative;
+    }
+    .level-seg.sell {
+      width: 40%;
+      background: linear-gradient(90deg, rgba(255, 77, 77, 0.55), rgba(255, 77, 77, 0.25));
+      border-right: 1px solid rgba(255, 255, 255, 0.25);
+    }
+    .level-seg.neutral {
+      width: 30%;
+      background: linear-gradient(90deg, rgba(255, 184, 0, 0.35), rgba(255, 184, 0, 0.55));
+      border-right: 1px solid rgba(255, 255, 255, 0.25);
+    }
+    .level-seg.buy {
+      width: 30%;
+      background: linear-gradient(90deg, rgba(0, 255, 102, 0.25), rgba(0, 255, 102, 0.6));
+    }
+    .level-needle-dot {
+      position: absolute;
+      left: 45%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #fff;
+      border: 2.5px solid var(--warning);
+      box-shadow: 0 0 8px var(--warning);
+      transition: left 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+      z-index: 6;
+    }
+    .level-scale-ticks {
+      position: relative;
+      width: 100%;
+      height: 13px;
+      margin-top: 3px;
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+    .level-scale-ticks span {
+      position: absolute;
+      transform: translateX(-50%);
+    }
+    .level-scale-ticks span.tick-0 { left: 0%; transform: none; }
+    .level-scale-ticks span.tick-40 { left: 40%; color: var(--warning); }
+    .level-scale-ticks span.tick-70 { left: 70%; color: var(--primary); }
+    .level-scale-ticks span.tick-100 { left: 100%; transform: translateX(-100%); }
+
     /* RADAR SCORE SCALE EXPLANATION (0-100 ZONES) */
     .radar-zone-legend {
       width: 100%;
-      padding: 10px 14px 4px 14px;
+      padding: 6px 14px 4px 14px;
       display: grid;
       grid-template-columns: 1fr 1.15fr 1fr;
       gap: 6px;
@@ -1099,6 +1203,30 @@
       <div class="regime-banner" id="regime-pill">
         <span>⚡ REGIME:</span>
         <span id="regime-text" style="color: var(--primary);">RANGE COMPRESSION</span>
+      </div>
+
+      <!-- HORIZONTAL SCORE LEVEL METER WITH "WE ARE HERE" ARROW -->
+      <div class="radar-level-meter-wrap">
+        <div class="we-are-here-track">
+          <div class="we-are-here-marker" id="we-are-here-marker" style="left: 45%;">
+            <div class="we-are-here-pill" id="we-are-here-pill">📍 WE ARE HERE (45/100)</div>
+            <div class="we-are-here-arrow" id="we-are-here-arrow">▼</div>
+          </div>
+        </div>
+        <div style="position: relative; width: 100%;">
+          <div class="level-bar-segments">
+            <div class="level-seg sell"></div>
+            <div class="level-seg neutral"></div>
+            <div class="level-seg buy"></div>
+          </div>
+          <div class="level-needle-dot" id="level-needle-dot" style="left: 45%;"></div>
+        </div>
+        <div class="level-scale-ticks">
+          <span class="tick-0">0</span>
+          <span class="tick-40">40 (Hold)</span>
+          <span class="tick-70">70 (Buy)</span>
+          <span class="tick-100">100</span>
+        </div>
       </div>
 
       <!-- RADAR SCORE SCALE EXPLANATION (NON-CLICKABLE REFERENCE KEY) -->
@@ -1882,6 +2010,90 @@ EXECUTIVE ACTION: DO NOTHING. Hold 100% cash until daily close reclaims $79,826.
       const maxOffset = 534; // Full circle
       const targetOffset = maxOffset - (maxOffset * (score / 100));
       arc.style.strokeDashoffset = targetOffset;
+    }
+
+    // 3-STATE PORTFOLIO & LEVEL POINTER CONTROLLER
+    function setPortfolioState(state) {
+      const neutralView = document.getElementById('card-state-neutral-view');
+      const bullishView = document.getElementById('card-state-bullish-view');
+      const downtrendView = document.getElementById('card-state-downtrend-view');
+      const card = document.getElementById('trade-plan-card');
+      const strip = document.getElementById('action-strip');
+      const scoreEl = document.getElementById('gauge-score');
+      const verdictEl = document.getElementById('gauge-verdict');
+      const regimeEl = document.getElementById('regime-text');
+      const marker = document.getElementById('we-are-here-marker');
+      const pill = document.getElementById('we-are-here-pill');
+      const arrow = document.getElementById('we-are-here-arrow');
+      const dot = document.getElementById('level-needle-dot');
+      const boxSell = document.getElementById('zone-box-sell');
+      const boxNeutral = document.getElementById('zone-box-neutral');
+      const boxBuy = document.getElementById('zone-box-buy');
+
+      ['neutral', 'bullish', 'downtrend'].forEach(s => {
+        const b = document.getElementById('btn-state-' + s);
+        if (b) b.classList.toggle('active', s === state);
+      });
+
+      boxSell.classList.remove('active-zone');
+      boxNeutral.classList.remove('active-zone');
+      boxBuy.classList.remove('active-zone');
+
+      if (state === 'neutral') {
+        neutralView.style.display = 'block';
+        bullishView.style.display = 'none';
+        downtrendView.style.display = 'none';
+        card.className = 'card-container state-neutral';
+        strip.className = 'action-status-strip neutral';
+        strip.innerHTML = '🟡 STATUS: BALANCED CHOP — HOLD ON TO BOTH BTC & USDT';
+        scoreEl.innerText = '45';
+        verdictEl.innerText = 'BALANCED';
+        regimeEl.innerText = 'RANGE COMPRESSION';
+        updateGauge(45);
+        marker.style.left = '45%';
+        dot.style.left = '45%';
+        pill.style.background = 'var(--warning)';
+        pill.innerText = '📍 WE ARE HERE (45/100)';
+        arrow.style.color = 'var(--warning)';
+        dot.style.borderColor = 'var(--warning)';
+        boxNeutral.classList.add('active-zone');
+      } else if (state === 'bullish') {
+        neutralView.style.display = 'none';
+        bullishView.style.display = 'block';
+        downtrendView.style.display = 'none';
+        card.className = 'card-container state-bullish';
+        strip.className = 'action-status-strip bullish';
+        strip.innerHTML = '🟢 STATUS: BREAKOUT CONFIRMED — DEPLOY USDT TO BUY SPOT BTC';
+        scoreEl.innerText = '82';
+        verdictEl.innerText = 'BUY BTC';
+        regimeEl.innerText = 'BULLISH EXPANSION';
+        updateGauge(82);
+        marker.style.left = '82%';
+        dot.style.left = '82%';
+        pill.style.background = 'var(--primary)';
+        pill.innerText = '📍 WE ARE HERE (82/100)';
+        arrow.style.color = 'var(--primary)';
+        dot.style.borderColor = 'var(--primary)';
+        boxBuy.classList.add('active-zone');
+      } else if (state === 'downtrend') {
+        neutralView.style.display = 'none';
+        bullishView.style.display = 'none';
+        downtrendView.style.display = 'block';
+        card.className = 'card-container state-downtrend';
+        strip.className = 'action-status-strip downtrend';
+        strip.innerHTML = '🔴 STATUS: FLOOR BROKEN — SELL BTC TO USDT & WAIT FOR $68K REBATE';
+        scoreEl.innerText = '25';
+        verdictEl.innerText = 'SELL TO CASH';
+        regimeEl.innerText = 'DOWNTREND WATERFALL';
+        updateGauge(25);
+        marker.style.left = '25%';
+        dot.style.left = '25%';
+        pill.style.background = 'var(--danger)';
+        pill.innerText = '📍 WE ARE HERE (25/100)';
+        arrow.style.color = 'var(--danger)';
+        dot.style.borderColor = 'var(--danger)';
+        boxSell.classList.add('active-zone');
+      }
     }
 
     // INITIAL SETUP

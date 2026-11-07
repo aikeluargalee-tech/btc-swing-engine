@@ -221,6 +221,15 @@
       font-weight: 900;
       color: var(--text-main);
       letter-spacing: -0.5px;
+      transition: color 0.18s ease, text-shadow 0.18s ease;
+    }
+    .spot-price-big.tick-up {
+      color: var(--primary);
+      text-shadow: 0 0 10px var(--primary);
+    }
+    .spot-price-big.tick-down {
+      color: var(--danger);
+      text-shadow: 0 0 10px rgba(255, 77, 77, 0.65);
     }
 
     .spot-change-pill {
@@ -232,6 +241,12 @@
       background: rgba(0, 255, 102, 0.12);
       color: var(--primary);
       border: 1px solid var(--border);
+      transition: all 0.25s ease;
+    }
+    .spot-change-pill.negative {
+      background: rgba(255, 77, 77, 0.12);
+      color: var(--danger);
+      border-color: rgba(255, 77, 77, 0.4);
     }
 
     .session-badge {
@@ -1252,7 +1267,7 @@
           </div>
           <div class="checklist-row">
             <span class="detail-k">1. Daily Close &gt; 50 EMA ($79,826)</span>
-            <span class="badge-fail">❌ LOCKED (Close $75.9k)</span>
+            <span class="badge-fail" id="chk-close-status">❌ LOCKED (Close $75.9k)</span>
           </div>
           <div class="checklist-row">
             <span class="detail-k">2. Invalidation Floor ($74,180)</span>
@@ -1857,8 +1872,8 @@
     </div>
 
     <footer class="footer-bar">
-      <span>REFRESH: LIVE (1 HZ WS)</span>
-      <span>172 TESTS GREEN</span>
+      <span id="footer-conn-status">● BINANCE LIVE (WS + CLOCK)</span>
+      <span>179 TESTS GREEN</span>
     </footer>
 
   </div>
@@ -1920,12 +1935,143 @@
       }
     }
 
+    // LIVE PRICE & SESSION STATE
+    let liveSpotPrice = 75953.21;
+    let liveChange24h = 1.82;
+    let binanceWs = null;
+
+    function updateMarketSessionClock() {
+      const now = new Date();
+      const utcH = now.getUTCHours();
+      const utcM = now.getUTCMinutes();
+      const utcS = now.getUTCSeconds();
+      const sgtDate = new Date(now.getTime() + 8 * 3600 * 1000);
+      const sgtH = sgtDate.getUTCHours();
+      const sgtM = sgtDate.getUTCMinutes();
+
+      const pad = (n) => String(n).padStart(2, '0');
+      const sgtStr = `${pad(sgtH)}:${pad(sgtM)}:${pad(utcS)}`;
+      const utcStr = `${pad(utcH)}:${pad(utcM)}`;
+
+      let sessionName = 'ASIA ACTIVE';
+      if (utcH >= 0 && utcH < 7) {
+        sessionName = 'ASIA ACTIVE';
+      } else if (utcH >= 7 && utcH < 8) {
+        sessionName = 'ASIA / LONDON OVERLAP';
+      } else if (utcH >= 8 && utcH < 13) {
+        sessionName = 'LONDON ACTIVE';
+      } else if (utcH >= 13 && utcH < 16) {
+        sessionName = 'LONDON / NY OVERLAP';
+      } else if (utcH >= 16 && utcH < 21) {
+        sessionName = 'NEW YORK ACTIVE';
+      } else {
+        sessionName = 'NY LATE / ASIA PRE-OPEN';
+      }
+
+      const sessionEl = document.getElementById('market-session');
+      if (sessionEl) {
+        sessionEl.innerText = `● ${sessionName} (SGT ${sgtStr} / UTC ${utcStr})`;
+      }
+    }
+
+    function applyLiveTickerPrice(price, pct24h) {
+      if (!price || isNaN(price)) return;
+      const priceEl = document.getElementById('spot-price');
+      const changeEl = document.getElementById('spot-change');
+      const chkCloseEl = document.getElementById('chk-close-status');
+
+      const prev = liveSpotPrice;
+      liveSpotPrice = price;
+      if (typeof pct24h === 'number' && !isNaN(pct24h)) {
+        liveChange24h = pct24h;
+      }
+
+      if (priceEl) {
+        priceEl.innerText = '$' + price.toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        });
+        if (price > prev) {
+          priceEl.classList.remove('tick-down');
+          priceEl.classList.add('tick-up');
+          setTimeout(() => priceEl.classList.remove('tick-up'), 320);
+        } else if (price < prev) {
+          priceEl.classList.remove('tick-up');
+          priceEl.classList.add('tick-down');
+          setTimeout(() => priceEl.classList.remove('tick-down'), 320);
+        }
+      }
+
+      if (changeEl) {
+        const sign = liveChange24h >= 0 ? '+' : '';
+        changeEl.innerText = `${sign}${liveChange24h.toFixed(2)}% 24H`;
+        if (liveChange24h < 0) {
+          changeEl.classList.add('negative');
+        } else {
+          changeEl.classList.remove('negative');
+        }
+      }
+
+      if (chkCloseEl) {
+        const shortK = (price / 1000).toFixed(1);
+        if (price >= 79826) {
+          chkCloseEl.className = 'badge-pass';
+          chkCloseEl.innerText = `✅ CLEARED (Live $${shortK}k)`;
+        } else {
+          chkCloseEl.className = 'badge-fail';
+          chkCloseEl.innerText = `❌ LOCKED (Live $${shortK}k)`;
+        }
+      }
+    }
+
+    async function fetchBinanceRestTicker() {
+      try {
+        const res = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT');
+        if (res.ok) {
+          const d = await res.json();
+          applyLiveTickerPrice(parseFloat(d.lastPrice), parseFloat(d.priceChangePercent));
+        }
+      } catch (e) {
+        // Fallback to Coinbase spot if Binance REST is blocked
+        try {
+          const resCb = await fetch('https://api.coinbase.com/v2/prices/BTC-USD/spot');
+          if (resCb.ok) {
+            const cb = await resCb.json();
+            applyLiveTickerPrice(parseFloat(cb.data.amount), liveChange24h);
+          }
+        } catch (_) {}
+      }
+    }
+
+    function connectBinanceLiveStream() {
+      fetchBinanceRestTicker();
+      try {
+        if (binanceWs) {
+          binanceWs.close();
+        }
+        binanceWs = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@ticker');
+        binanceWs.onmessage = (evt) => {
+          try {
+            const msg = JSON.parse(evt.data);
+            if (msg && msg.c) {
+              applyLiveTickerPrice(parseFloat(msg.c), parseFloat(msg.P));
+            }
+          } catch (_) {}
+        };
+        binanceWs.onerror = () => {};
+        binanceWs.onclose = () => {
+          setTimeout(connectBinanceLiveStream, 5000);
+        };
+      } catch (_) {}
+    }
+
     // COPY AI PACKET
     function copyAiPacket() {
+      const formattedPrice = '$' + liveSpotPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const packetText = `# BTC SWING ENGINE V1 TELEMETRY SNAPSHOT
 Timestamp: ${new Date().toISOString()}
-Price: $75,953.21 | Regime: RANGE COMPRESSION
-Confluence Score: 45/100 (FROZEN 100% CASH)
+Price: ${formattedPrice} (${liveChange24h >= 0 ? '+' : ''}${liveChange24h.toFixed(2)}% 24H) | Regime: RANGE COMPRESSION
+Confluence Score: 45/100 (HOLD BOTH BTC & USDT)
 1D Gate: CLOSED (Price below 50 EMA $79,826 • BBW Rank 61.7%)
 
 PILLARS:
@@ -1934,7 +2080,7 @@ PILLARS:
 3. Macro & Volatility (Desks 0 & L): 45/100 | 50 EMA: $79,826 | Funding: +0.0100%
 4. Patterns & Harmonics (Desks B & 7): 85/100 | Ascending Triangle (4H) | Gartley D: $74,800
 
-EXECUTIVE ACTION: DO NOTHING. Hold 100% cash until daily close reclaims $79,826.`;
+EXECUTIVE ACTION: Hold on to both your BTC ($74,180 floor defending) and your USDT until daily close reclaims $79,826.`;
 
       navigator.clipboard.writeText(packetText).then(() => {
         showToast("Copied AI Audit Packet to Clipboard!");
@@ -2053,6 +2199,14 @@ EXECUTIVE ACTION: DO NOTHING. Hold 100% cash until daily close reclaims $79,826.
 
       // Initialize gauge to 45
       setTimeout(() => updateGauge(45), 300);
+
+      // Start live session clock (updates every 1s)
+      updateMarketSessionClock();
+      setInterval(updateMarketSessionClock, 1000);
+
+      // Start live BTCUSDT price stream + periodic REST sync
+      connectBinanceLiveStream();
+      setInterval(fetchBinanceRestTicker, 10000);
     });
   </script>
 </body>

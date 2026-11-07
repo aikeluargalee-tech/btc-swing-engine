@@ -1032,12 +1032,7 @@
       🟡 STATUS: BALANCED CHOP — HOLD ON TO BOTH BTC & USDT
     </div>
 
-    <!-- 3-STATE PREVIEW SWITCHER (REAL PORTFOLIO GUIDANCE) -->
-    <div class="sim-toggle-pill">
-      <button class="sim-btn active" id="btn-state-neutral" onclick="setPortfolioState('neutral')">🟡 Neutral (45/100)</button>
-      <button class="sim-btn" id="btn-state-bullish" onclick="setPortfolioState('bullish')">🟢 Buy BTC (82/100)</button>
-      <button class="sim-btn" id="btn-state-downtrend" onclick="setPortfolioState('downtrend')">🔴 Sell BTC (25/100)</button>
-    </div>
+
 
     <!-- SECTION 2: 3-STATE PORTFOLIO ACTION CARD -->
     <div class="card-container state-neutral" id="trade-plan-card">
@@ -1678,6 +1673,18 @@
         <button class="desk-btn-back" onclick="switchDeskTab('cockpit')">
           <span>← Back to Master Cockpit</span>
         </button>
+      </div>
+    </div>
+
+        <!-- OPTIONAL DEVELOPER / DEMO SIMULATION BAR (TUCKED IN FOOTER) -->
+    <div style="margin: 16px 14px 6px 14px; padding: 8px 10px; background: rgba(0,0,0,0.5); border-radius: 8px; border: 1px dashed rgba(255,255,255,0.12); text-align: center;">
+      <div style="font-size: 9px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px;">
+        🧪 DEMO MODE: TEST OTHER MARKET SCENARIOS
+      </div>
+      <div style="display: flex; gap: 6px; justify-content: center;">
+        <button onclick="setPortfolioState('neutral')" class="sim-btn active" id="btn-state-neutral" style="font-size: 9px; padding: 4px 8px;">🟡 Live State (45/100)</button>
+        <button onclick="setPortfolioState('bullish')" class="sim-btn" id="btn-state-bullish" style="font-size: 9px; padding: 4px 8px;">🟢 Test Buy Signal (≥70)</button>
+        <button onclick="setPortfolioState('downtrend')" class="sim-btn" id="btn-state-downtrend" style="font-size: 9px; padding: 4px 8px;">🔴 Test Downtrend (&lt;40)</button>
       </div>
     </div>
 

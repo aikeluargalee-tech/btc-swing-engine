@@ -252,10 +252,53 @@
       position: relative;
     }
 
+    /* RADAR SCANNER ANIMATION */
+    @keyframes radar-scan {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .radar-scanner-beam {
+      transform-origin: 100px 100px;
+      animation: radar-scan 3.2s linear infinite;
+    }
+
+    @keyframes blip-pulse {
+      0%, 100% { opacity: 0.25; transform: scale(0.85); }
+      50% { opacity: 1; transform: scale(1.35); filter: drop-shadow(0 0 8px var(--primary)); }
+    }
+
+    .radar-blip-pulse {
+      animation: blip-pulse 1.6s ease-in-out infinite;
+      transform-origin: 148px 148px;
+    }
+
+    .radar-scan-status {
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: 1.2px;
+      color: var(--primary);
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 2px;
+      opacity: 0.9;
+    }
+
+    .scan-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--primary);
+      box-shadow: 0 0 6px var(--primary);
+      animation: pulse 1s infinite alternate;
+    }
+
     .gauge-wrapper {
       position: relative;
-      width: 190px;
-      height: 190px;
+      width: 200px;
+      height: 200px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -264,32 +307,41 @@
     .gauge-svg {
       width: 100%;
       height: 100%;
-      transform: rotate(-90deg);
     }
 
     .gauge-bg-circle {
       fill: none;
-      stroke: rgba(255, 255, 255, 0.08);
-      stroke-width: 14;
+      stroke: rgba(255, 255, 255, 0.07);
+      stroke-width: 12;
     }
 
     .gauge-fill-circle {
       fill: none;
       stroke: var(--primary);
-      stroke-width: 14;
+      stroke-width: 12;
       stroke-linecap: round;
-      stroke-dasharray: 502; /* 2 * PI * 80 */
-      stroke-dashoffset: 276; /* Calculated dynamically */
+      stroke-dasharray: 534;
+      stroke-dashoffset: 294;
+      transform: rotate(-90deg);
+      transform-origin: 100px 100px;
       transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
       filter: drop-shadow(var(--glow));
     }
 
     .gauge-center-content {
       position: absolute;
+      width: 106px;
+      height: 106px;
+      border-radius: 50%;
+      background: var(--bg-card-sub);
+      border: 1px solid var(--border);
+      box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.9), 0 0 12px rgba(0, 0, 0, 0.6);
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: center;
       text-align: center;
+      z-index: 10;
     }
 
     .gauge-num {
@@ -693,14 +745,45 @@
       </div>
     </div>
 
-    <!-- SECTION 1: HERO CONFLUENCE GAUGE -->
+    <!-- SECTION 1: HERO CONFLUENCE RADAR GAUGE -->
     <section class="hero-gauge-section">
       <div class="gauge-wrapper">
-        <svg class="gauge-svg" viewBox="0 0 190 190">
-          <circle class="gauge-bg-circle" cx="95" cy="95" r="80" />
-          <circle class="gauge-fill-circle" id="gauge-arc" cx="95" cy="95" r="80" />
+        <svg class="gauge-svg" viewBox="0 0 200 200">
+          <defs>
+            <radialGradient id="radarSweepGradient" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="var(--primary)" stop-opacity="0.45" />
+              <stop offset="100%" stop-color="var(--primary)" stop-opacity="0.03" />
+            </radialGradient>
+          </defs>
+
+          <!-- Outer Meter Tracks -->
+          <circle class="gauge-bg-circle" cx="100" cy="100" r="85" />
+          <circle class="gauge-fill-circle" id="gauge-arc" cx="100" cy="100" r="85" />
+
+          <!-- Internal Radar Range Rings & Crosshairs (Static Reticle) -->
+          <circle cx="100" cy="100" r="64" fill="none" stroke="var(--border)" stroke-width="0.75" stroke-dasharray="2 3" opacity="0.45" />
+          <circle cx="100" cy="100" r="42" fill="none" stroke="var(--border)" stroke-width="0.75" stroke-dasharray="2 2" opacity="0.3" />
+          <line x1="100" y1="16" x2="100" y2="184" stroke="var(--border)" stroke-width="0.75" opacity="0.35" />
+          <line x1="16" y1="100" x2="184" y2="100" stroke="var(--border)" stroke-width="0.75" opacity="0.35" />
+
+          <!-- Active Blip Ping at 45% (Balanced Squeeze Target) -->
+          <circle cx="148" cy="148" r="3.5" fill="var(--primary)" class="radar-blip-pulse" />
+
+          <!-- 360° Rotating Radar Scanner Beam -->
+          <g class="radar-scanner-beam">
+            <!-- Trailing sweep wedge (45-degree sector) -->
+            <path d="M 100 100 L 100 16 A 84 84 0 0 0 41 41 Z" fill="url(#radarSweepGradient)" />
+            <!-- Leading vector scan beam -->
+            <line x1="100" y1="100" x2="100" y2="15" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" />
+          </g>
         </svg>
+
+        <!-- Central Score & Radar Status Core -->
         <div class="gauge-center-content">
+          <div class="radar-scan-status">
+            <span class="scan-dot"></span>
+            <span>SCANNING</span>
+          </div>
           <div class="gauge-num" id="gauge-score">45</div>
           <div class="gauge-denominator">/ 100</div>
           <div class="gauge-label" id="gauge-verdict">BALANCED</div>
@@ -1032,7 +1115,7 @@ EXECUTIVE ACTION: DO NOTHING. Hold 100% cash until daily close reclaims $79,826.
     // GAUGE ANIMATION
     function updateGauge(score) {
       const arc = document.getElementById('gauge-arc');
-      const maxOffset = 502; // Full circle
+      const maxOffset = 534; // Full circle
       const targetOffset = maxOffset - (maxOffset * (score / 100));
       arc.style.strokeDashoffset = targetOffset;
     }

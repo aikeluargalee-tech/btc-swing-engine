@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Tactical Aerospace HUD — BTC Swing Engine</title>
+  
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#07090d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- Tailwind CSS -->
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+
+  <style>
+    /* NVG Green Theme (Default) */
+    :root {
+      --hud-primary: #00ff66;
+      --hud-dim: #008833;
+      --hud-bg: #030804;
+      --hud-border: #00bb44;
+      --hud-glow: 0 0 10px rgba(0, 255, 102, 0.65), 0 0 25px rgba(0, 255, 102, 0.25);
+      --hud-danger: #ff3333;
+      --hud-success: #00ffbb;
+    }
+
+    /* Tactical Solar Amber Theme */
+    body.theme-amber {
+      --hud-primary: #ffb700;
+      --hud-dim: #a67000;
+      --hud-bg: #0a0702;
+      --hud-border: #d48b00;
+      --hud-glow: 0 0 10px rgba(255, 183, 0, 0.65), 0 0 25px rgba(255, 183, 0, 0.25);
+      --hud-danger: #ff3333;
+      --hud-success: #00ff66;
+    }
+
+    .hud-text {
+      color: var(--hud-primary);
+      text-shadow: var(--hud-glow);
+    }
+    .hud-dim {
+      color: var(--hud-dim);
+    }
+    .hud-border {
+      border-color: var(--hud-border);
+    }
+    .hud-bg {
+      background-color: var(--hud-bg);
+    }
+
+    /* CRT Scanline Effect Overlay */
+    .crt-overlay::before {
+      content: " ";
+      display: block;
+      position: absolute;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.45) 50%), linear-gradient(90deg, rgba(0, 255, 100, 0.03), rgba(0, 0, 0, 0.01), rgba(0, 255, 100, 0.03));
+      z-index: 40;
+      background-size: 100% 3px, 3px 100%;
+      pointer-events: none;
+      opacity: 0.85;
+    }
+
+    /* Pitch Ladder Horizon Animation */
+    @keyframes pitch-drift {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-3px) rotate(0.4deg); }
+    }
+    .pitch-ladder {
+      animation: pitch-drift 4s ease-in-out infinite;
+    }
+
+    /* Target Acquisition Reticle Pulse */
+    @keyframes lock-bracket-pulse {
+      0%, 100% { transform: scale(1); opacity: 0.95; }
+      50% { transform: scale(1.04); opacity: 0.7; }
+    }
+    .reticle-lock {
+      animation: lock-bracket-pulse 1.8s ease-in-out infinite;
+    }
+
+    /* Master Caution Flasher */
+    @keyframes caution-blink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0.35; }
+    }
+    .caution-flash {
+      animation: caution-blink 1.2s infinite;
+    }
+
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-black text-[#00ff66] min-h-screen flex justify-center font-mono antialiased select-none p-0 sm:p-4">
+
+  <!-- Mobile Screen Frame (CRT Overlay applied by default) -->
+  <div id="hud-screen" class="w-full max-w-md hud-bg min-h-screen flex flex-col relative border-x-2 hud-border shadow-[inset_0_0_40px_rgba(0,0,0,0.95)] crt-overlay pb-20 shadow-2xl">
+    
+    <!-- Top Flight Annunciator Panel -->
+    <header class="h-10 px-3.5 flex items-center justify-between text-[11px] font-mono border-b hud-border bg-black/80 shrink-0 z-30">
+      <div class="flex items-center gap-1.5">
+        <span class="hud-text font-black tracking-tight">BTC-HUD // AVIONICS</span>
+        <span class="hud-dim">FL-775</span>
+      </div>
+
+      <!-- Quick Nav Buttons -->
+      <div class="flex items-center gap-1">
+        <a href="/" class="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-zinc-300 text-[10px] font-bold hover:text-white transition">
+          💎 Modern
+        </a>
+        <a href="/retro.html" class="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-emerald-400 text-[10px] font-bold hover:text-white transition">
+          📟 IBM
+        </a>
+      </div>
+
+      <div class="flex items-center gap-1.5">
+        <span id="live-hud-time" class="hud-text font-bold">14:28:10Z</span>
+        <span class="px-1 bg-black border hud-border text-[9px] hud-text font-black">DATALINK</span>
+      </div>
+    </header>
+
+    <!-- Optics & CRT Scanlines Controls -->
+    <div class="px-3 py-1 border-b border-zinc-900 bg-black/90 flex items-center justify-between text-[10px] shrink-0">
+      <div class="flex items-center gap-1.5">
+        <span class="hud-dim text-[9px]">OPTICS:</span>
+        <button onclick="setOptics('nvg')" id="btn-optics-nvg" class="px-1.5 py-0.2 rounded border border-[#00ff66] bg-emerald-950/40 text-[#00ff66] text-[9px] font-bold">NVG-GRN</button>
+        <button onclick="setOptics('amber')" id="btn-optics-amb" class="px-1.5 py-0.2 rounded border border-zinc-800 text-amber-500 text-[9px] font-bold">TACTICAL-AMB</button>
+      </div>
+      <button onclick="toggleCrt()" id="btn-hud-crt" class="px-2 py-0.2 rounded border hud-border hud-text text-[9px] font-bold">CRT:ON</button>
+    </div>
+
+    <!-- Tactical Telemetry & Mach Strip -->
+    <div class="px-3.5 py-2 border-b hud-border bg-black/85 flex items-center justify-between shrink-0 text-xs">
+      <div>
+        <div class="text-[9px] hud-dim tracking-wider">SPOT ALTITUDE TAPE</div>
+        <div class="flex items-baseline gap-2">
+          <span id="live-btc-price" class="text-xl font-black tracking-tight hud-text">$75,894.22</span>
+          <span id="live-btc-delta" class="text-[10px] font-bold hud-text">M+2.84</span>
+        </div>
+      </div>
+      <div class="text-right">
+        <div class="text-[9px] hud-dim">FEED: 1Hz WEBSOCKET</div>
+        <div class="text-[9px] px-1 py-0.2 rounded border hud-border hud-text mt-0.5 inline-block">
+          RADAR: AIR-TO-GROUND
+        </div>
+      </div>
+    </div>
+
+    <!-- MFD Subsystem Selector Ribbon (M1 - M6) -->
+    <div class="px-2 py-1.5 border-b hud-border bg-black/95 flex items-center gap-1 overflow-x-auto no-scrollbar z-20 text-[10px] font-bold shrink-0">
+      <button onclick="switchTab(0)" id="mfd-btn-0" class="px-2 py-1 border-2 hud-border bg-black hud-text shadow-sm whitespace-nowrap">
+        [M1:COCKPIT]
+      </button>
+      <button onclick="switchTab(1)" id="mfd-btn-1" class="px-2 py-1 border border-zinc-800 hud-dim hover:hud-text whitespace-nowrap">
+        [M2:FLIR]
+      </button>
+      <button onclick="switchTab(6)" id="mfd-btn-6" class="px-2 py-1 border border-zinc-800 hud-dim hover:hud-text whitespace-nowrap">
+        [M3:CONE]
+      </button>
+      <button onclick="switchTab(7)" id="mfd-btn-7" class="px-2 py-1 border border-zinc-800 hud-dim hover:hud-text whitespace-nowrap">
+        [M4:GART]
+      </button>
+      <button onclick="switchTab(8)" id="mfd-btn-8" class="px-2 py-1 border border-zinc-800 hud-dim hover:hud-text whitespace-nowrap">
+        [M5:DECOY]
+      </button>
+      <button onclick="switchTab(9)" id="mfd-btn-9" class="px-2 py-1 border border-zinc-800 hud-dim hover:hud-text whitespace-nowrap">
+        [M6:TD-9]
+      </button>
+    </div>
+
+    <!-- Main Cockpit Viewport Area -->
+    <main class="flex-1 overflow-y-auto no-scrollbar p-3 space-y-3 text-xs">
+
+      <!-- TAB 0: FLIGHT DIRECTOR & TARGET ACQUISITION COCKPIT -->
+      <section id="view-tab-0" class="space-y-3">
+        
+        <!-- Tactical HUD Reticle & Artificial Horizon Pitch Ladder -->
+        <div class="border-2 hud-border rounded-xl bg-black/80 p-2.5 flex flex-col items-center text-center relative overflow-hidden shadow-xl">
+          <div class="w-full flex justify-between text-[9px] hud-dim border-b hud-border pb-1 mb-1">
+            <span>══ BORESIGHT 01 ══</span>
+            <span id="hud-flight-state" class="hud-text font-black">MODE: CONFLUENCE CLEARED</span>
+          </div>
+
+          <!-- Pitch Ladder & Reticle Stage -->
+          <div class="relative w-full h-40 flex items-center justify-center my-1">
+            
+            <!-- Artificial Horizon Pitch Ladder -->
+            <div class="pitch-ladder absolute inset-0 flex flex-col items-center justify-between pointer-events-none py-1">
+              <div class="flex items-center gap-2 hud-dim text-[8px]">
+                <span>+10</span>
+                <div class="w-16 h-[1px] border-t hud-border border-dashed"></div>
+                <span>+10</span>
+              </div>
+              <div class="flex items-center gap-2 hud-dim text-[8px]">
+                <span>+05</span>
+                <div class="w-24 h-[1px] border-t hud-border"></div>
+                <span>+05</span>
+              </div>
+              <!-- Zero Horizon Boresight Line -->
+              <div class="w-full flex items-center justify-center gap-1.5 hud-text">
+                <div class="w-14 h-[1.5px] bg-current"></div>
+                <span class="text-xs font-black">─ v ─</span>
+                <div class="w-14 h-[1.5px] bg-current"></div>
+              </div>
+              <div class="flex items-center gap-2 hud-dim text-[8px]">
+                <span>-05</span>
+                <div class="w-24 h-[1px] border-t hud-border"></div>
+                <span>-05</span>
+              </div>
+              <div class="flex items-center gap-2 hud-dim text-[8px]">
+                <span>-10</span>
+                <div class="w-16 h-[1px] border-t hud-border border-dashed"></div>
+                <span>-10</span>
+              </div>
+            </div>
+
+            <!-- Target Lock Box on Liquidation Magnet -->
+            <div class="reticle-lock z-10 border-2 hud-border bg-black/90 p-2.5 rounded-xl flex flex-col items-center justify-center w-52 shadow-2xl">
+              <div class="flex items-center justify-between w-full text-[9px] border-b hud-border pb-0.5">
+                <span class="hud-text font-bold">TARGET LOCK: LIQ MAGNET</span>
+                <span class="text-rose-400 font-black animate-pulse">[LOCKED]</span>
+              </div>
+              <div class="flex items-baseline justify-between w-full mt-1">
+                <span class="text-[9px] hud-dim">BEARING ELEV:</span>
+                <span class="hud-text font-black text-base">$82,450.00</span>
+              </div>
+              <div class="flex items-center justify-between w-full text-[9px] hud-dim mt-0.5">
+                <span>RANGE: +6.3%</span>
+                <span id="hud-score-tag" class="hud-text font-bold">CONFLUENCE: 72/100</span>
+              </div>
+            </div>
+
+            <!-- Left Altitude Tape Visual -->
+            <div class="absolute left-1 top-2 bottom-2 w-7 border-r border-zinc-800 flex flex-col justify-between text-[8px] hud-dim">
+              <span>79.0K</span>
+              <span>78.2K</span>
+              <span class="hud-text font-bold">75.8K &lt;</span>
+              <span>75.1K</span>
+              <span>74.5K</span>
+            </div>
+
+            <!-- Right Airspeed Tape Visual -->
+            <div class="absolute right-1 top-2 bottom-2 w-7 border-l border-zinc-800 flex flex-col justify-between text-[8px] hud-dim text-right">
+              <span>M 3.2</span>
+              <span>M 3.0</span>
+              <span class="hud-text font-bold">&gt; M 2.8</span>
+              <span>M 2.5</span>
+              <span>M 2.2</span>
+            </div>
+
+          </div>
+
+          <!-- Master Flight Readout -->
+          <div id="hud-master-headline" class="text-[11px] font-black hud-text tracking-tight mt-1">
+            [BLUE LIGHT // CONSTRUCTIVE ACCUMULATION FLIGHT PATH]
+          </div>
+          <div class="text-[9px] hud-dim mt-0.5">
+            MACRO VOL SQUEEZE: 24.2% &le; 30% [PASS] &bull; 4H ANCHOR RECLAIM [LOCKED]
+          </div>
+        </div>
+
+        <!-- Master Caution: Weapons Release / Risk Box -->
+        <div class="border-2 border-amber-500/80 bg-black/90 rounded-xl p-3 space-y-1.5 shadow-md">
+          <div class="flex justify-between items-center text-[10px] border-b border-amber-500/50 pb-1">
+            <span class="text-amber-400 font-black flex items-center gap-1">
+              <span class="caution-flash text-rose-500">▲</span> MASTER CAUTION // WEAPONS RELEASE
+            </span>
+            <span class="px-1.5 py-0.2 bg-black border border-amber-500 text-amber-300 font-bold text-[9px]">
+              0.75% RISK CAP
+            </span>
+          </div>
+          <div class="text-[11px] text-amber-200 leading-tight pt-0.5">
+            GATE 4 INTERCEPT VETO: Short-Liq Pool ($82,450) yields <span class="font-bold underline text-white">RRR 1:2.14</span>.
+          </div>
+          <div class="text-[10px] text-rose-400 font-bold">
+            !! MANDATORY RRR &ge; 1:3.0 RULE: ENFORCE RESTING DROP ZONE BIDS !!
+          </div>
+          <div class="text-[9px] hud-dim border-t border-zinc-800 pt-1 mt-1">
+            TACTICAL RULE: TRADING HEADLINES CAUSES INTERCEPTION; LIQ MAGNETS DICTATE VECTOR.
+          </div>
+        </div>
+
+        <!-- Tactical Mission Parameters (Order of Battle) -->
+        <div class="border-2 hud-border bg-black/85 rounded-xl p-3 space-y-2 shadow-md">
+          <div class="flex justify-between items-center text-[10px] border-b hud-border pb-1">
+            <span class="hud-text font-bold">TACTICAL MISSION FLIGHT PLAN</span>
+          </div>
+
+          <div class="space-y-1.5 text-[10px]">
+            <div class="flex justify-between">
+              <span class="hud-dim">DROP ZONE LIMIT:</span>
+              <span id="hud-entry" class="hud-text font-bold">$75,900 – $76,400</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="hud-dim">HARD-DECK (EJECT STOP):</span>
+              <span id="hud-stop" class="text-rose-400 font-bold">$75,183.42 (-1.42%)</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="hud-dim">PRIMARY TARGET (1:2.5):</span>
+              <span id="hud-tp1" class="hud-text font-bold">$78,983.37</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="hud-dim">SECONDARY TARGET (1:5.0):</span>
+              <span id="hud-tp2" class="hud-text font-bold">$81,697.62</span>
+            </div>
+            <div class="flex justify-between pt-1 border-t border-zinc-900">
+              <span class="hud-dim">PAYLOAD SIZING (0.75% RISK):</span>
+              <span id="hud-size" class="hud-text font-black">0.6908 BTC ($52,686)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4 Pillars Telemetry -->
+        <div class="border border-zinc-800 bg-black/70 p-2.5 rounded-xl text-[10px] space-y-1.5">
+          <div class="hud-dim font-bold border-b border-zinc-800 pb-1">AVIONICS SENSOR CONFLUENCE</div>
+          <div class="flex justify-between">
+            <span class="hud-dim">ORDER FLOW SENSOR:</span>
+            <span id="hud-p1-val" class="hud-text font-bold">20/25 [BULLISH ABSORPTION]</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="hud-dim">DERIVATIVES RADAR:</span>
+            <span id="hud-p2-val" class="hud-text font-bold">22/25 [SHORT SQUEEZE FUEL]</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="hud-dim">MACRO FLIGHT PROFILE:</span>
+            <span id="hud-p3-val" class="hud-text font-bold">18/25 [ABOVE 200D EMA]</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="hud-dim">VOLATILITY COMPRESSION:</span>
+            <span id="hud-p4-val" class="hud-text font-bold">21/25 [SQUEEZE &le; 30%]</span>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- TAB 1: FLIR VOLUME PROFILE -->
+      <section id="view-tab-1" class="hidden space-y-3">
+        <div class="border-2 hud-border bg-black/85 p-3 rounded-xl space-y-2">
+          <div class="text-xs font-bold hud-text border-b hud-border pb-1 flex justify-between">
+            <span>══ DESK 1: FLIR THERMAL VOLUME PROFILE ══</span>
+            <span>IN VA GATE</span>
+          </div>
+          <div class="text-[10px] font-mono bg-black p-2.5 border border-zinc-900 rounded space-y-1.5">
+            <div class="text-rose-400">cVAH FLIR ROOF  : $78,890 (HIGH RESISTANCE GATE)</div>
+            <div class="hud-text font-black">cPOC THERMAL CORE: $77,250 (PRIMARY VOLUME CONDUIT)</div>
+            <div class="text-emerald-400">cVAL FLIR DECK  : $75,410 (SUPPORT SHELF)</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 6: 72H DISPERSION ENVELOPE -->
+      <section id="view-tab-6" class="hidden space-y-3">
+        <div class="border-2 hud-border bg-black/85 p-3 rounded-xl space-y-2">
+          <div class="text-xs font-bold hud-text border-b hud-border pb-1 flex justify-between">
+            <span>══ DESK 6: 72H DISPERSION ENVELOPE ══</span>
+            <span>H = 0.62</span>
+          </div>
+          <div class="text-[10px] font-mono bg-black p-2.5 border border-zinc-900 rounded space-y-1.5">
+            <div>MAX VECTOR CEILING : $81,388 (+3,840)</div>
+            <div class="hud-text font-bold">BORESIGHT FLIGHT    : $75,894 (CURRENT POSITION)</div>
+            <div>MAX VECTOR FLOOR   : $72,054 (-3,840)</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 7: GARTLEY 222 WAYPOINTS -->
+      <section id="view-tab-7" class="hidden space-y-3">
+        <div class="border-2 hud-border bg-black/85 p-3 rounded-xl space-y-2">
+          <div class="text-xs font-bold hud-text border-b hud-border pb-1 flex justify-between">
+            <span>══ DESK 7: GARTLEY 222 WAYPOINTS ══</span>
+            <span>94% MATCH</span>
+          </div>
+          <div class="text-[10px] font-mono bg-black p-2.5 border border-zinc-900 rounded space-y-1.5">
+            <div>WPT-X: $72,500 ──&gt; WPT-A: $78,900</div>
+            <div>WPT-B: $76,120 (0.618 RETRACE)</div>
+            <div class="hud-text font-bold">WPT-D: $74,450 (0.786 PRZ TARGET DROP ZONE)</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 8: SFP DECOY RADAR -->
+      <section id="view-tab-8" class="hidden space-y-3">
+        <div class="border-2 hud-border bg-black/85 p-3 rounded-xl space-y-2">
+          <div class="text-xs font-bold hud-text border-b hud-border pb-1 flex justify-between">
+            <span>══ DESK 8: SFP DECOY RADAR ══</span>
+            <span>RECLAIM PASS</span>
+          </div>
+          <div class="text-[10px] font-mono bg-black p-2.5 border border-zinc-900 rounded space-y-1.5">
+            <div>ASIA HIGH: $78,120 [HOSTILE CEILING]</div>
+            <div>ASIA LOW : $75,400 [DECOY SWEPT]</div>
+            <div class="hud-text font-bold">SFP STATUS: LIQUIDITY PROBE RECLAIMED</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 9: DEMARK TD-9 BURN -->
+      <section id="view-tab-9" class="hidden space-y-3">
+        <div class="border-2 hud-border bg-black/85 p-3 rounded-xl space-y-2">
+          <div class="text-xs font-bold hud-text border-b hud-border pb-1 flex justify-between">
+            <span>══ DESK 9: DEMARK TD-9 BURN ══</span>
+            <span>6 OF 9 BURN</span>
+          </div>
+          <div class="text-[10px] font-mono bg-black p-2.5 border border-zinc-900 rounded space-y-2">
+            <div class="hud-text font-bold">COUNTDOWN STAGES: [1][2][3][4][5][6] _ _ _</div>
+            <div class="hud-dim">ESTIMATED FINAL EXHAUSTION BURN: ~12 HOURS</div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Master Arm AI Mission Dump Line -->
+    <div onclick="triggerMissionDump()" class="fixed bottom-0 left-0 right-0 z-50 flex justify-center p-2.5 bg-black/95 border-t-2 hud-border cursor-pointer">
+      <div class="w-full max-w-md flex items-center justify-between text-xs font-mono">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+          <span class="hud-text font-black">[MASTER ARM: DUMP MISSION AI TELEMETRY]</span>
+        </div>
+        <span class="text-[9px] hud-dim">13-SEC</span>
+      </div>
+    </div>
+
+    <!-- HUD Toast -->
+    <div id="hud-toast" class="fixed bottom-14 left-1/2 -translate-x-1/2 z-50 bg-black border-2 hud-border text-[10px] font-mono p-2 text-center hud-text opacity-0 pointer-events-none transition-all duration-300 shadow-2xl whitespace-nowrap">
+      &gt;&gt; MISSION DOSSIER TELEMETRY TRANSFERRED TO CLIPBOARD (16,420 BYTES)
+    </div>
+
+  </div>
+
+  <script>
+    let ws = null;
+    let reconnectTimer = null;
+
+    function applyHudData(data) {
+      if (!data) return;
+      if (data.spot_price) {
+        document.getElementById('live-btc-price').textContent = `$${data.spot_price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      }
+      if (data.spot_change_pct !== undefined) {
+        const sign = data.spot_change_pct >= 0 ? '+' : '';
+        document.getElementById('live-btc-delta').textContent = `M${sign}${data.spot_change_pct.toFixed(2)}`;
+      }
+      if (data.confluence_score !== undefined) {
+        document.getElementById('hud-score-tag').textContent = `CONFLUENCE: ${Math.round(data.confluence_score)}/100`;
+      }
+      if (data.confluence_label) {
+        document.getElementById('hud-flight-state').textContent = `MODE: ${data.confluence_label}`;
+      }
+      if (data.trade_plan) {
+        document.getElementById('hud-entry').textContent = data.trade_plan.entry_zone || '$75,900 – $76,400';
+        document.getElementById('hud-stop').textContent = `$${(data.trade_plan.invalidation_floor || 0).toLocaleString()} (${data.trade_plan.invalidation_distance_pct || 0}%)`;
+        document.getElementById('hud-tp1').textContent = `$${(data.trade_plan.take_profit_1 || 0).toLocaleString()}`;
+        document.getElementById('hud-tp2').textContent = `$${(data.trade_plan.take_profit_2 || 0).toLocaleString()}`;
+        document.getElementById('hud-size').textContent = `${data.trade_plan.position_size_btc || 0} BTC ($${(data.trade_plan.notional_usd || 0).toLocaleString()})`;
+      }
+      if (data.pillars && Array.isArray(data.pillars)) {
+        if (data.pillars[0]) document.getElementById('hud-p1-val').textContent = `${Math.round(data.pillars[0].score)}/25 [${data.pillars[0].status}]`;
+        if (data.pillars[1]) document.getElementById('hud-p2-val').textContent = `${Math.round(data.pillars[1].score)}/25 [${data.pillars[1].status}]`;
+        if (data.pillars[2]) document.getElementById('hud-p3-val').textContent = `${Math.round(data.pillars[2].score)}/25 [${data.pillars[2].status}]`;
+        if (data.pillars[3]) document.getElementById('hud-p4-val').textContent = `${Math.round(data.pillars[3].score)}/25 [${data.pillars[3].status}]`;
+      }
+    }
+
+    function initHudFeed() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws/metrics`;
+
+      try {
+        if (ws) ws.close();
+        ws = new WebSocket(wsUrl);
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            applyHudData(data);
+          } catch (e) {}
+        };
+        ws.onerror = () => {
+          pollFallback();
+        };
+        ws.onclose = () => {
+          if (!reconnectTimer) {
+            reconnectTimer = setTimeout(() => {
+              reconnectTimer = null;
+              initHudFeed();
+            }, 3000);
+          }
+        };
+      } catch (e) {
+        pollFallback();
+      }
+
+      setInterval(() => {
+        const now = new Date();
+        document.getElementById('live-hud-time').textContent = `${now.toISOString().substring(11, 19)}Z`;
+      }, 1000);
+    }
+
+    async function pollFallback() {
+      try {
+        const res = await fetch('/api/v1/metrics/latest');
+        if (res.ok) {
+          const data = await res.json();
+          applyHudData(data);
+        }
+      } catch {}
+    }
+
+    function switchTab(num) {
+      [0, 1, 6, 7, 8, 9].forEach(id => {
+        const view = document.getElementById(`view-tab-${id}`);
+        const btn = document.getElementById(`mfd-btn-${id}`);
+        if (view) view.classList.add('hidden');
+        if (btn) btn.className = "px-2 py-1 border border-zinc-800 hud-dim hover:hud-text whitespace-nowrap";
+      });
+
+      const targetView = document.getElementById(`view-tab-${num}`);
+      const targetBtn = document.getElementById(`mfd-btn-${num}`);
+      if (targetView) targetView.classList.remove('hidden');
+      if (targetBtn) targetBtn.className = "px-2 py-1 border-2 hud-border bg-black hud-text shadow-sm whitespace-nowrap";
+    }
+
+    function setOptics(optics) {
+      const btnNvg = document.getElementById('btn-optics-nvg');
+      const btnAmb = document.getElementById('btn-optics-amb');
+      if (optics === 'amber') {
+        document.body.className = "bg-black text-[#ffb700] min-h-screen flex justify-center font-mono antialiased select-none p-0 sm:p-4 theme-amber";
+        btnAmb.className = "px-1.5 py-0.2 rounded border border-amber-500 bg-amber-950/40 text-amber-400 text-[9px] font-bold";
+        btnNvg.className = "px-1.5 py-0.2 rounded border border-zinc-800 text-emerald-500 text-[9px] font-bold";
+      } else {
+        document.body.className = "bg-black text-[#00ff66] min-h-screen flex justify-center font-mono antialiased select-none p-0 sm:p-4";
+        btnNvg.className = "px-1.5 py-0.2 rounded border border-[#00ff66] bg-emerald-950/40 text-[#00ff66] text-[9px] font-bold";
+        btnAmb.className = "px-1.5 py-0.2 rounded border border-zinc-800 text-amber-500 text-[9px] font-bold";
+      }
+    }
+
+    function toggleCrt() {
+      const hud = document.getElementById('hud-screen');
+      const btn = document.getElementById('btn-hud-crt');
+      if (hud.classList.contains('crt-overlay')) {
+        hud.classList.remove('crt-overlay');
+        btn.textContent = "CRT:OFF";
+        btn.className = "px-2 py-0.2 rounded border border-zinc-800 hud-dim text-[9px] font-bold";
+      } else {
+        hud.classList.add('crt-overlay');
+        btn.textContent = "CRT:ON";
+        btn.className = "px-2 py-0.2 rounded border hud-border hud-text text-[9px] font-bold";
+      }
+    }
+
+    async function triggerMissionDump() {
+      try {
+        const res = await fetch('/api/v1/ai-packet');
+        const text = await res.text();
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(text);
+        }
+      } catch {}
+
+      const toast = document.getElementById('hud-toast');
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      toast.classList.add('opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('opacity-100');
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 2600);
+    }
+
+    document.addEventListener('DOMContentLoaded', initHudFeed);
+  </script>
+</body>
+</html>

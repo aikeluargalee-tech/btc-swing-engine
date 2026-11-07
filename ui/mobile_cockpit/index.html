@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>BTC Swing Cockpit — Setup B</title>
+  <title>BTC Swing Cockpit — Beginner Edition</title>
   
   <meta name="theme-color" content="#030804">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -31,52 +31,49 @@
       transition: background-color 0.25s ease, color 0.25s ease;
     }
 
-    /* THEME SYSTEM */
-    /* 1. Tactical NVG-Green (Default) */
+    /* THEME PALETTES */
     body.theme-nvg {
       --bg-base: #030804;
-      --bg-card: rgba(6, 20, 10, 0.75);
-      --bg-card-sub: rgba(4, 14, 7, 0.9);
-      --border: rgba(0, 255, 102, 0.3);
+      --bg-card: rgba(6, 20, 10, 0.78);
+      --bg-card-sub: rgba(4, 14, 7, 0.95);
+      --border: rgba(0, 255, 102, 0.28);
       --border-bright: #00ff66;
       --primary: #00ff66;
       --primary-dim: #00a843;
-      --text-muted: #5e9e73;
-      --text-main: #d4ffd9;
-      --glow: 0 0 12px rgba(0, 255, 102, 0.4);
+      --text-muted: #6ba880;
+      --text-main: #dcfce7;
+      --glow: 0 0 12px rgba(0, 255, 102, 0.35);
       --danger: #ff4d4d;
-      --warning: #ffb800;
+      --warning: #fbbf24;
       --font-mono: 'Consolas', 'Courier New', monospace;
     }
 
-    /* 2. Vintage IBM 3270 Mainframe */
     body.theme-ibm {
       --bg-base: #0a0600;
-      --bg-card: rgba(26, 17, 0, 0.8);
-      --bg-card-sub: rgba(18, 11, 0, 0.95);
-      --border: rgba(255, 176, 0, 0.35);
+      --bg-card: rgba(26, 17, 0, 0.82);
+      --bg-card-sub: rgba(18, 11, 0, 0.96);
+      --border: rgba(255, 176, 0, 0.32);
       --border-bright: #ffb000;
       --primary: #ffb000;
       --primary-dim: #b37b00;
-      --text-muted: #9e7a40;
-      --text-main: #ffe8b3;
-      --glow: 0 0 12px rgba(255, 176, 0, 0.4);
+      --text-muted: #a38249;
+      --text-main: #fef3c7;
+      --glow: 0 0 12px rgba(255, 176, 0, 0.35);
       --danger: #ff4444;
-      --warning: #ffcc00;
+      --warning: #f59e0b;
       --font-mono: 'Courier New', monospace;
     }
 
-    /* 3. Modern Slate / Institutional Dark */
     body.theme-modern {
       --bg-base: #090d16;
-      --bg-card: rgba(15, 23, 42, 0.8);
-      --bg-card-sub: rgba(20, 30, 55, 0.9);
+      --bg-card: rgba(15, 23, 42, 0.82);
+      --bg-card-sub: rgba(20, 30, 55, 0.95);
       --border: rgba(56, 189, 248, 0.25);
       --border-bright: #38bdf8;
       --primary: #38bdf8;
       --primary-dim: #0284c7;
       --text-muted: #64748b;
-      --text-main: #f1f5f9;
+      --text-main: #f8fafc;
       --glow: 0 0 14px rgba(56, 189, 248, 0.35);
       --danger: #f87171;
       --warning: #fbbf24;
@@ -113,7 +110,7 @@
       display: block;
     }
 
-    /* TOP BAR & THEME SWITCHER */
+    /* TOP BAR */
     .top-header {
       padding: 12px 14px;
       background: var(--bg-card);
@@ -136,7 +133,7 @@
     .brand-title {
       font-size: 11px;
       font-weight: 800;
-      letter-spacing: 1.5px;
+      letter-spacing: 1.2px;
       text-transform: uppercase;
       color: var(--primary);
       display: flex;
@@ -203,7 +200,7 @@
       box-shadow: var(--glow);
     }
 
-    /* SPOT TICKER LINE */
+    /* PRICE TICKER */
     .spot-ticker-card {
       padding: 14px 16px;
       display: flex;
@@ -211,13 +208,13 @@
       align-items: center;
       background: var(--bg-card);
       margin: 12px 14px 0 14px;
-      border-radius: 10px;
+      border-radius: 12px;
       border: 1px solid var(--border);
     }
 
     .spot-price-big {
       font-family: var(--font-mono);
-      font-size: 24px;
+      font-size: 26px;
       font-weight: 900;
       color: var(--text-main);
       letter-spacing: -0.5px;
@@ -243,56 +240,13 @@
       margin-top: 3px;
     }
 
-    /* SECTION 1: HERO CONFLUENCE GAUGE */
+    /* HERO GAUGE SECTION */
     .hero-gauge-section {
       padding: 16px 14px;
       display: flex;
       flex-direction: column;
       align-items: center;
       position: relative;
-    }
-
-    /* RADAR SCANNER ANIMATION */
-    @keyframes radar-scan {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-
-    .radar-scanner-beam {
-      transform-origin: 100px 100px;
-      animation: radar-scan 3.2s linear infinite;
-    }
-
-    @keyframes blip-pulse {
-      0%, 100% { opacity: 0.25; transform: scale(0.85); }
-      50% { opacity: 1; transform: scale(1.35); filter: drop-shadow(0 0 8px var(--primary)); }
-    }
-
-    .radar-blip-pulse {
-      animation: blip-pulse 1.6s ease-in-out infinite;
-      transform-origin: 148px 148px;
-    }
-
-    .radar-scan-status {
-      font-size: 8px;
-      font-weight: 800;
-      letter-spacing: 1.2px;
-      color: var(--primary);
-      text-transform: uppercase;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      margin-bottom: 2px;
-      opacity: 0.9;
-    }
-
-    .scan-dot {
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      background: var(--primary);
-      box-shadow: 0 0 6px var(--primary);
-      animation: pulse 1s infinite alternate;
     }
 
     .gauge-wrapper {
@@ -328,10 +282,30 @@
       filter: drop-shadow(var(--glow));
     }
 
+    @keyframes radar-scan {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .radar-scanner-beam {
+      transform-origin: 100px 100px;
+      animation: radar-scan 3.2s linear infinite;
+    }
+
+    @keyframes blip-pulse {
+      0%, 100% { opacity: 0.25; transform: scale(0.85); }
+      50% { opacity: 1; transform: scale(1.35); filter: drop-shadow(0 0 8px var(--primary)); }
+    }
+
+    .radar-blip-pulse {
+      animation: blip-pulse 1.6s ease-in-out infinite;
+      transform-origin: 148px 148px;
+    }
+
     .gauge-center-content {
       position: absolute;
-      width: 106px;
-      height: 106px;
+      width: 108px;
+      height: 108px;
       border-radius: 50%;
       background: var(--bg-card-sub);
       border: 1px solid var(--border);
@@ -344,144 +318,161 @@
       z-index: 10;
     }
 
+    .radar-scan-status {
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: 1.2px;
+      color: var(--primary);
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 2px;
+      opacity: 0.9;
+    }
+
+    .scan-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--primary);
+      box-shadow: 0 0 6px var(--primary);
+      animation: pulse 1s infinite alternate;
+    }
+
     .gauge-num {
       font-family: var(--font-mono);
-      font-size: 44px;
+      font-size: 38px;
       font-weight: 900;
       line-height: 1;
       color: var(--text-main);
     }
 
     .gauge-denominator {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
       color: var(--text-muted);
     }
 
     .gauge-label {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 800;
-      letter-spacing: 1.2px;
+      letter-spacing: 1px;
       text-transform: uppercase;
       color: var(--primary);
-      margin-top: 4px;
+      margin-top: 3px;
     }
 
     .regime-banner {
       margin-top: 10px;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 800;
       padding: 5px 12px;
       border-radius: 20px;
       background: rgba(0, 0, 0, 0.4);
       border: 1px solid var(--border);
-      letter-spacing: 1px;
+      letter-spacing: 0.8px;
       color: var(--text-main);
       display: flex;
       align-items: center;
       gap: 6px;
     }
 
-    /* ACTION STATE STRIP */
+    /* ACTION STATUS STRIP */
     .action-status-strip {
-      margin: 6px 14px 12px 14px;
-      padding: 10px 14px;
-      border-radius: 8px;
+      margin: 4px 14px 10px 14px;
+      padding: 11px 14px;
+      border-radius: 10px;
       font-size: 12px;
       font-weight: 800;
       text-align: center;
-      letter-spacing: 1px;
+      letter-spacing: 0.8px;
       text-transform: uppercase;
       border: 1px solid;
     }
 
     .action-status-strip.cash {
-      background: rgba(255, 184, 0, 0.08);
-      border-color: rgba(255, 184, 0, 0.35);
+      background: rgba(251, 191, 36, 0.1);
+      border-color: rgba(251, 191, 36, 0.4);
       color: var(--warning);
     }
 
     .action-status-strip.long {
-      background: rgba(0, 255, 102, 0.12);
+      background: rgba(0, 255, 102, 0.14);
       border-color: var(--border-bright);
       color: var(--primary);
       box-shadow: var(--glow);
     }
 
-    /* SECTION 2: DETERMINISTIC TRADE PLAN CARD */
-    /* DYNAMIC TRADE PLAN CARD STATES */
-    .card-container.state-cash {
-      border-color: rgba(255, 184, 0, 0.35);
-      background: rgba(26, 17, 0, 0.3);
-    }
-
-    .checklist-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 6px 0;
-      font-size: 11px;
-      border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
-    }
-
-    .checklist-row:last-child {
-      border-bottom: none;
-    }
-
-    .badge-pass {
-      color: var(--primary);
-      font-weight: 800;
-    }
-
-    .badge-fail {
-      color: var(--warning);
-      font-weight: 800;
-    }
-
+    /* PREVIEW SWITCHER */
     .sim-toggle-pill {
       display: flex;
       justify-content: center;
+      align-items: center;
       gap: 6px;
-      margin: 0 14px 10px 14px;
+      margin: 0 14px 12px 14px;
+      padding: 4px 8px;
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 20px;
+      border: 1px solid var(--border);
     }
 
     .sim-btn {
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 800;
-      padding: 4px 10px;
-      border-radius: 6px;
-      border: 1px solid var(--border);
-      background: rgba(0, 0, 0, 0.4);
+      padding: 5px 10px;
+      border-radius: 12px;
+      border: 1px solid transparent;
+      background: transparent;
       color: var(--text-muted);
       cursor: pointer;
       text-transform: uppercase;
       letter-spacing: 0.5px;
+      transition: all 0.15s;
     }
 
     .sim-btn.active {
+      background: var(--bg-card);
       border-color: var(--primary);
       color: var(--primary);
       box-shadow: var(--glow);
     }
 
+    /* CARD CONTAINER */
     .card-container {
       margin: 0 14px 14px 14px;
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 14px;
+      border-radius: 14px;
+      padding: 16px;
       backdrop-filter: blur(8px);
+    }
+
+    .card-container.state-cash {
+      border-color: rgba(251, 191, 36, 0.3);
+      background: rgba(26, 17, 0, 0.25);
     }
 
     .card-header-title {
       font-size: 11px;
-      font-weight: 800;
-      letter-spacing: 1px;
+      font-weight: 900;
+      letter-spacing: 0.8px;
       text-transform: uppercase;
       color: var(--primary);
       display: flex;
       justify-content: space-between;
       align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .friendly-explain-box {
+      padding: 10px 12px;
+      background: rgba(0, 0, 0, 0.3);
+      border-left: 3px solid var(--primary);
+      border-radius: 0 8px 8px 0;
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--text-main);
       margin-bottom: 12px;
     }
 
@@ -495,8 +486,8 @@
     .stat-box {
       background: var(--bg-card-sub);
       border: 1px solid var(--border);
-      padding: 8px 10px;
-      border-radius: 7px;
+      padding: 9px 11px;
+      border-radius: 8px;
     }
 
     .stat-label {
@@ -504,7 +495,7 @@
       font-weight: 700;
       text-transform: uppercase;
       color: var(--text-muted);
-      margin-bottom: 3px;
+      margin-bottom: 4px;
     }
 
     .stat-value {
@@ -524,10 +515,10 @@
 
     .risk-formula-pill {
       margin-top: 8px;
-      padding: 8px 10px;
+      padding: 9px 12px;
       background: rgba(0, 0, 0, 0.35);
       border: 1px dashed var(--border);
-      border-radius: 6px;
+      border-radius: 8px;
       font-size: 11px;
       font-family: var(--font-mono);
       color: var(--text-muted);
@@ -540,13 +531,32 @@
       color: var(--text-main);
     }
 
-    /* SECTION 3: 4 CONFLUENCE PILLARS (EXPANDABLE ACCORDIONS) */
+    .checklist-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 0;
+      font-size: 11px;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+    }
+
+    .checklist-row:last-child {
+      border-bottom: none;
+    }
+
+    .badge-fail {
+      color: var(--warning);
+      font-weight: 800;
+      font-size: 10px;
+    }
+
+    /* 4 CHECKS SECTION */
     .pillars-header {
-      margin: 6px 14px 8px 14px;
+      margin: 4px 14px 10px 14px;
       font-size: 11px;
       font-weight: 800;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 0.8px;
       color: var(--text-muted);
       display: flex;
       justify-content: space-between;
@@ -556,7 +566,7 @@
       margin: 0 14px 10px 14px;
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: 12px;
       overflow: hidden;
       transition: all 0.2s ease;
     }
@@ -565,9 +575,8 @@
       padding: 12px 14px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 7px;
       cursor: pointer;
-      user-select: none;
     }
 
     .pillar-title-line {
@@ -579,7 +588,6 @@
     .pillar-name {
       font-size: 12px;
       font-weight: 800;
-      letter-spacing: 0.5px;
       color: var(--text-main);
       display: flex;
       align-items: center;
@@ -628,28 +636,6 @@
       color: var(--primary);
     }
 
-    .pillar-plain-english-box {
-      margin-bottom: 12px;
-      padding: 9px 12px;
-      background: rgba(255, 255, 255, 0.04);
-      border-left: 3px solid var(--primary);
-      border-radius: 0 8px 8px 0;
-      font-size: 11px;
-      line-height: 1.5;
-      color: var(--text-main);
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
-
-    .plain-english-tag {
-      font-size: 9px;
-      font-weight: 800;
-      letter-spacing: 0.8px;
-      color: var(--primary);
-      text-transform: uppercase;
-    }
-
     .pillar-details-drawer {
       max-height: 0;
       overflow: hidden;
@@ -659,9 +645,14 @@
       padding: 0 14px;
     }
 
-    .pillar-accordion.open .pillar-plain-english-box {
+    .pillar-accordion.open .pillar-details-drawer {
+      max-height: 440px;
+      padding: 14px;
+    }
+
+    .pillar-plain-english-box {
       margin-bottom: 12px;
-      padding: 9px 12px;
+      padding: 10px 12px;
       background: rgba(255, 255, 255, 0.04);
       border-left: 3px solid var(--primary);
       border-radius: 0 8px 8px 0;
@@ -681,16 +672,11 @@
       text-transform: uppercase;
     }
 
-    .pillar-details-drawer {
-      max-height: 400px;
-      padding: 12px 14px;
-    }
-
     .detail-item-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 5px 0;
+      padding: 6px 0;
       font-size: 11px;
       border-bottom: 1px dashed rgba(255, 255, 255, 0.06);
     }
@@ -717,23 +703,20 @@
       color: var(--danger);
     }
 
-    /* SECTION 4: ACTIONS & AI AUDIT PACKET */
+    /* ACTION BUTTONS */
     .action-button-group {
-      margin: 6px 14px 10px 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
+      margin: 8px 14px 12px 14px;
     }
 
     .btn-ai-packet {
       width: 100%;
-      padding: 13px;
-      border-radius: 10px;
+      padding: 14px;
+      border-radius: 12px;
       background: var(--primary);
       color: var(--bg-base);
       font-weight: 900;
       font-size: 13px;
-      letter-spacing: 0.8px;
+      letter-spacing: 0.5px;
       text-transform: uppercase;
       border: none;
       cursor: pointer;
@@ -742,12 +725,11 @@
       align-items: center;
       gap: 8px;
       box-shadow: var(--glow);
-      transition: transform 0.1s, opacity 0.15s;
+      transition: transform 0.1s;
     }
 
     .btn-ai-packet:active {
       transform: scale(0.98);
-      opacity: 0.9;
     }
 
     .toast-msg {
@@ -759,7 +741,7 @@
       color: var(--bg-base);
       font-size: 12px;
       font-weight: 800;
-      padding: 8px 18px;
+      padding: 9px 20px;
       border-radius: 20px;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
       opacity: 0;
@@ -773,15 +755,15 @@
       opacity: 1;
     }
 
-    /* EXECUTIVE SUMMARY NOTE */
+    /* 10-SECOND MEMO */
     .executive-memo-card {
-      margin: 6px 14px 14px 14px;
-      padding: 12px 14px;
+      margin: 4px 14px 16px 14px;
+      padding: 14px;
       background: rgba(0, 0, 0, 0.35);
       border-left: 3px solid var(--primary);
-      border-radius: 0 8px 8px 0;
+      border-radius: 0 10px 10px 0;
       font-size: 11px;
-      line-height: 1.5;
+      line-height: 1.55;
       color: var(--text-muted);
     }
 
@@ -792,8 +774,7 @@
     /* FOOTER */
     .footer-bar {
       margin-top: auto;
-      padding: 12px 14px 0 14px;
-      text-align: center;
+      padding: 14px;
       font-size: 10px;
       color: var(--text-muted);
       border-top: 1px solid var(--border);
@@ -805,24 +786,20 @@
 </head>
 <body class="theme-nvg">
 
-  <!-- CRT SCANLINE OVERLAY -->
   <div class="crt-overlay" id="crt-overlay"></div>
-
-  <!-- TOAST NOTIFICATION -->
-  <div class="toast-msg" id="toast-msg">Copied AI Audit Packet to Clipboard!</div>
+  <div class="toast-msg" id="toast-msg">Copied Plain-English AI Briefing!</div>
 
   <div class="mobile-wrapper">
     
-    <!-- TOP BAR -->
+    <!-- TOP HEADER -->
     <header class="top-header">
       <div class="top-row-1">
         <div class="brand-title">
           <div class="status-pulse" id="conn-dot"></div>
           <span>BTC SWING COCKPIT</span>
-          <span style="opacity: 0.6; font-size: 9px;">SETUP B</span>
+          <span style="opacity: 0.6; font-size: 9px;">BEGINNER EDITION</span>
         </div>
         
-        <!-- THEME SELECTION -->
         <div class="theme-pill-group">
           <button class="theme-btn active" id="btn-theme-nvg" onclick="setTheme('nvg')">NVG</button>
           <button class="theme-btn" id="btn-theme-ibm" onclick="setTheme('ibm')">IBM</button>
@@ -832,19 +809,19 @@
       </div>
     </header>
 
-    <!-- LIVE SPOT PRICE TICKER -->
+    <!-- LIVE SPOT PRICE -->
     <div class="spot-ticker-card">
       <div>
         <div class="spot-price-big" id="spot-price">$75,953.21</div>
-        <div class="session-badge" id="market-session">● ASIA ACTIVE (SGT 19:18 / UTC 11:18)</div>
+        <div class="session-badge" id="market-session">● ASIA MARKET OPEN (SGT 19:18)</div>
       </div>
       <div style="text-align: right;">
-        <div class="spot-change-pill" id="spot-change">+1.82% 24H</div>
-        <div class="session-badge" style="margin-top: 5px;">SPOT ONLY (0x LEV)</div>
+        <div class="spot-change-pill" id="spot-change">+1.82% TODAY</div>
+        <div class="session-badge" style="margin-top: 5px;">🛡️ SPOT ONLY (0x LEVERAGE)</div>
       </div>
     </div>
 
-    <!-- SECTION 1: HERO CONFLUENCE RADAR GAUGE -->
+    <!-- HERO DIAL (TRAFFIC LIGHT GREEN-LIGHT BUY METER) -->
     <section class="hero-gauge-section">
       <div class="gauge-wrapper">
         <svg class="gauge-svg" viewBox="0 0 200 200">
@@ -855,29 +832,27 @@
             </radialGradient>
           </defs>
 
-          <!-- Outer Meter Tracks -->
+          <!-- Outer Meter Track -->
           <circle class="gauge-bg-circle" cx="100" cy="100" r="85" />
           <circle class="gauge-fill-circle" id="gauge-arc" cx="100" cy="100" r="85" />
 
-          <!-- Internal Radar Range Rings & Crosshairs (Static Reticle) -->
-          <circle cx="100" cy="100" r="64" fill="none" stroke="var(--border)" stroke-width="0.75" stroke-dasharray="2 3" opacity="0.45" />
+          <!-- Subtle Radar Reticle -->
+          <circle cx="100" cy="100" r="64" fill="none" stroke="var(--border)" stroke-width="0.75" stroke-dasharray="2 3" opacity="0.4" />
           <circle cx="100" cy="100" r="42" fill="none" stroke="var(--border)" stroke-width="0.75" stroke-dasharray="2 2" opacity="0.3" />
           <line x1="100" y1="16" x2="100" y2="184" stroke="var(--border)" stroke-width="0.75" opacity="0.35" />
           <line x1="16" y1="100" x2="184" y2="100" stroke="var(--border)" stroke-width="0.75" opacity="0.35" />
 
-          <!-- Active Blip Ping at 45% (Balanced Squeeze Target) -->
+          <!-- Target Blip -->
           <circle cx="148" cy="148" r="3.5" fill="var(--primary)" class="radar-blip-pulse" />
 
-          <!-- 360° Rotating Radar Scanner Beam -->
+          <!-- Rotating Radar Beam -->
           <g class="radar-scanner-beam">
-            <!-- Trailing sweep wedge (45-degree sector) -->
             <path d="M 100 100 L 100 16 A 84 84 0 0 0 41 41 Z" fill="url(#radarSweepGradient)" />
-            <!-- Leading vector scan beam -->
             <line x1="100" y1="100" x2="100" y2="15" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" />
           </g>
         </svg>
 
-        <!-- Central Score & Radar Status Core -->
+        <!-- Center Score Readout -->
         <div class="gauge-center-content">
           <div class="radar-scan-status">
             <span class="scan-dot"></span>
@@ -885,335 +860,311 @@
           </div>
           <div class="gauge-num" id="gauge-score">45</div>
           <div class="gauge-denominator">/ 100</div>
-          <div class="gauge-label" id="gauge-verdict">BALANCED</div>
+          <div class="gauge-label" id="gauge-verdict">PATIENT WAIT</div>
         </div>
       </div>
 
       <div class="regime-banner" id="regime-pill">
-        <span>⚡ REGIME:</span>
-        <span id="regime-text" style="color: var(--primary);">RANGE COMPRESSION</span>
+        <span>😴 MARKET MOOD:</span>
+        <span id="regime-text" style="color: var(--warning);">SIDEWAYS NAP (WAITING FOR SPARK)</span>
       </div>
     </section>
 
-    <!-- ACTION STATUS STRIP -->
+    <!-- TRAFFIC LIGHT STATUS BANNER -->
     <div class="action-status-strip cash" id="action-strip">
-      🛡️ 1D GATE FROZEN: 100% CASH (DO NOTHING)
+      🛡️ STATUS: SAFE IN CASH (DO NOT BUY YET)
     </div>
 
-    <!-- SIMULATION TOGGLE BAR (FOR TESTING) -->
+    <!-- PREVIEW TOGGLE (TO TEST CASH VS BUY PLAN) -->
     <div class="sim-toggle-pill">
-      <span style="font-size: 10px; color: var(--text-muted); align-self: center; margin-right: 4px;">PREVIEW STATE:</span>
-      <button class="sim-btn active" id="btn-state-cash" onclick="setTradeState('cash')">🛡️ 100% Cash (Current)</button>
-      <button class="sim-btn" id="btn-state-long" onclick="setTradeState('long')">🟢 Active Long Setup</button>
+      <span style="font-size: 9px; color: var(--text-muted); font-weight: 800;">PREVIEW MODE:</span>
+      <button class="sim-btn active" id="btn-state-cash" onclick="setTradeState('cash')">🛡️ Safe in Cash (Now)</button>
+      <button class="sim-btn" id="btn-state-long" onclick="setTradeState('long')">🟢 Buy Signal Active</button>
     </div>
 
-    <!-- SECTION 2: DYNAMIC TRADE PLAN & CAPITAL PRESERVATION CARD -->
+    <!-- MAIN DECISION CARD -->
     <div class="card-container state-cash" id="trade-plan-card">
       
-      <!-- STATE 1: FROZEN CASH (ACTIVE WHEN SCORE < 70) -->
+      <!-- STATE 1: SAFE IN CASH (SCORE < 70) -->
       <div id="card-state-cash-view">
         <div class="card-header-title">
-          <span style="color: var(--warning);">🛡️ CAPITAL PRESERVATION MODE</span>
-          <span style="font-size: 10px; color: var(--warning);">100% CASH ALLOCATED</span>
+          <span style="color: var(--warning);">🛡️ YOUR MONEY IS SAFE IN CASH</span>
+          <span style="font-size: 10px; color: var(--warning);">100% PROTECTED</span>
+        </div>
+
+        <div class="friendly-explain-box" style="border-left-color: var(--warning);">
+          Bitcoin is currently moving sideways with no clear institutional fuel. Buying now is like guessing on a coin flip. Our engine protects your wealth by waiting 100% in cash until high-probability conditions arrive.
         </div>
 
         <div class="grid-2col">
           <div class="stat-box">
-            <div class="stat-label">Active Position</div>
-            <div class="stat-value danger">0.0000 BTC</div>
+            <div class="stat-label">Active Bitcoin Buys</div>
+            <div class="stat-value" style="color: var(--warning);">0.0000 BTC</div>
           </div>
           <div class="stat-box">
-            <div class="stat-label">Capital at Risk</div>
-            <div class="stat-value" style="color: var(--warning);">$0.00 (0.00%)</div>
+            <div class="stat-label">Money at Risk</div>
+            <div class="stat-value">$0.00 (Zero Risk)</div>
           </div>
           <div class="stat-box">
-            <div class="stat-label">Portfolio Allocation</div>
+            <div class="stat-label">Account Allocation</div>
             <div class="stat-value">100% Cash / USDT</div>
           </div>
           <div class="stat-box">
-            <div class="stat-label">Current Execution</div>
-            <div class="stat-value" style="color: var(--warning);">DO NOTHING</div>
+            <div class="stat-label">Recommended Action</div>
+            <div class="stat-value" style="color: var(--warning);">Sit on Hands (Patience)</div>
           </div>
         </div>
 
-        <!-- RECLAIM CHECKLIST -->
-        <div style="margin-top: 10px; padding: 8px 10px; background: rgba(0,0,0,0.3); border-radius: 6px; border: 1px solid rgba(255,184,0,0.2);">
+        <!-- 3 SIMPLE RULES TO BUY -->
+        <div style="margin-top: 10px; padding: 10px 12px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid rgba(251,191,36,0.25);">
           <div style="font-size: 9px; font-weight: 800; color: var(--warning); letter-spacing: 0.8px; margin-bottom: 6px; text-transform: uppercase;">
-            GATE RECLAIM CHECKLIST (Requirements to Trigger a Buy):
+            WHAT NEEDS TO HAPPEN BEFORE WE BUY:
           </div>
           <div class="checklist-row">
-            <span class="detail-k">1. Daily Close &gt; 50 EMA ($79,826)</span>
-            <span class="badge-fail">❌ LOCKED (Close $75.9k)</span>
+            <span class="detail-k">1. Price climbs above 50-day line ($79,826)</span>
+            <span class="badge-fail">❌ NOT YET ($75.9k)</span>
           </div>
           <div class="checklist-row">
-            <span class="detail-k">2. Volatility Squeeze (BBW Rank &lt; 30%)</span>
-            <span class="badge-fail">❌ EXPANDED (61.7%)</span>
+            <span class="detail-k">2. Wild market price swings calm down</span>
+            <span class="badge-fail">❌ STILL CHOPPY</span>
           </div>
           <div class="checklist-row">
-            <span class="detail-k">3. Confluence Score &ge; 70/100</span>
-            <span class="badge-fail">❌ INSUFFICIENT (45/100)</span>
+            <span class="detail-k">3. Green-Light Meter reaches 70% or higher</span>
+            <span class="badge-fail">❌ AT 45% (Needs +25%)</span>
           </div>
         </div>
       </div>
 
-      <!-- STATE 2: ACTIVE LONG SETUP (ACTIVE WHEN SCORE >= 70) -->
+      <!-- STATE 2: ACTIVE BUY PLAN (SCORE >= 70) -->
       <div id="card-state-long-view" style="display: none;">
         <div class="card-header-title">
-          <span>🟢 ACTIVE SPOT SWING PLAN</span>
-          <span style="font-size: 10px; color: var(--primary);">0.75% RISK ENFORCED</span>
+          <span>🟢 ALL-CLEAR: 4-STEP BUY PLAN</span>
+          <span style="font-size: 10px; color: var(--primary);">0.75% SAFETY RULE</span>
+        </div>
+
+        <div class="friendly-explain-box">
+          All safety checks have passed! Big institutions have stepped in. Follow the 4 exact steps below—your maximum downside loss is mathematically capped at $750.
         </div>
 
         <div class="grid-2col">
           <div class="stat-box">
-            <div class="stat-label">Entry Range</div>
-            <div class="stat-value" id="val-entry">$75,200 – $75,500</div>
+            <div class="stat-label">Step 1: Buy Price Range</div>
+            <div class="stat-value highlight" id="val-entry">$75,200 – $75,500</div>
           </div>
           <div class="stat-box">
-            <div class="stat-label">Invalidation Stop</div>
+            <div class="stat-label">Step 2: Safety Exit Floor</div>
             <div class="stat-value danger" id="val-invalidation">$74,180 (-1.6%)</div>
           </div>
           <div class="stat-box">
-            <div class="stat-label">Target 1 (1:2.5)</div>
-            <div class="stat-value highlight" id="val-tp1">$78,500</div>
+            <div class="stat-label">First Profit Target</div>
+            <div class="stat-value highlight" id="val-tp1">$78,500 (Sell half)</div>
           </div>
           <div class="stat-box">
-            <div class="stat-label">Target 2 (1:5.0)</div>
-            <div class="stat-value highlight" id="val-tp2">$82,000</div>
+            <div class="stat-label">Second Profit Target</div>
+            <div class="stat-value highlight" id="val-tp2">$82,000 (Ride runner)</div>
           </div>
         </div>
 
         <div class="risk-formula-pill">
-          <span>Max Dollar Risk (0.75% of $100k):</span>
-          <strong id="val-risk-usd">$750.00</strong>
+          <span>Your Max Loss (0.75% of $100k account):</span>
+          <strong id="val-risk-usd">$750.00 Max</strong>
         </div>
         <div class="risk-formula-pill" style="margin-top: 5px;">
-          <span>Position Size (BTC Spot):</span>
-          <strong style="color: var(--primary);" id="val-size-btc">0.6908 BTC</strong>
+          <span>Recommended Buy Amount:</span>
+          <strong style="color: var(--primary);" id="val-size-btc">0.6908 Bitcoin</strong>
         </div>
       </div>
 
     </div>
 
-    <!-- SECTION 3: THE 4 CONFLUENCE PILLARS (PROGRESSIVE DISCLOSURE) -->
+    <!-- 4 PRE-FLIGHT SAFETY CHECKS -->
     <div class="pillars-header">
-      <span>4 Confluence Pillars</span>
-      <span>Tap to Inspect</span>
+      <span>4 Pre-Flight Safety Checks</span>
+      <span>Tap to Understand Why</span>
     </div>
 
-    <!-- PILLAR 1: STRUCTURE (DESK P) -->
+    <!-- CHECK 1: SAFETY FLOOR -->
     <div class="pillar-accordion" id="pillar-1" onclick="toggleAccordion('pillar-1')">
       <div class="pillar-summary-row">
         <div class="pillar-title-line">
           <div class="pillar-name">
-            <span>🏛️ PILLAR 1: STRUCTURE & LEVELS</span>
+            <span>🏛️ CHECK 1: SAFETY FLOORS & CEILINGS</span>
           </div>
-          <div class="pillar-score-badge" id="p1-score">80/100</div>
+          <div class="pillar-score-badge" id="p1-score">80% PASSED</div>
         </div>
         <div class="progress-bar-bg">
           <div class="progress-bar-fill" id="p1-bar" style="width: 80%;"></div>
         </div>
         <div class="pillar-preview-subtext">
-          <span id="p1-preview">Defending $74,180 floor inside weekly range</span>
+          <span id="p1-preview">Big buyers are defending the $74,180 floor</span>
           <span class="chevron">▼</span>
         </div>
       </div>
       <div class="pillar-details-drawer">
         <div class="pillar-plain-english-box">
           <span class="plain-english-tag">💡 WHAT THIS MEANS:</span>
-          <span>Bitcoin is holding inside its macro weekly range ($74.8k–$87.0k) with strong institutional buyers defending the $74,180 invalidation floor. Downside risk is clearly defined.</span>
+          <span>Big institutions are placing heavy buy orders around $74,180. As long as Bitcoin stays above this floor, buyers remain in control. If this floor breaks, our trade idea dies and we walk away safely.</span>
         </div>
         <div class="detail-item-row">
-          <span class="detail-k">Desk Origin</span>
-          <span class="detail-v hi">[Desk P] Structure</span>
+          <span class="detail-k">Emergency Safety Floor</span>
+          <span class="detail-v danger">$74,180 (Exit here if broken)</span>
         </div>
         <div class="detail-item-row">
-          <span class="detail-k">HTF Swing High (1W)</span>
-          <span class="detail-v">$86,999</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">HTF Swing Low (1W)</span>
+          <span class="detail-k">Proven Weekly Low</span>
           <span class="detail-v">$74,888</span>
         </div>
         <div class="detail-item-row">
-          <span class="detail-k">MSS / BOS Trigger</span>
-          <span class="detail-v hi">Bullish MSS &gt; $76,400</span>
+          <span class="detail-k">Major Price Ceiling</span>
+          <span class="detail-v">$86,999</span>
         </div>
         <div class="detail-item-row">
-          <span class="detail-k">Short-Liq Magnet (Pool)</span>
-          <span class="detail-v hi">$81,602 (~$234M)</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">Long-Liq Magnet (Pool)</span>
-          <span class="detail-v danger">$74,514 (~$329M)</span>
+          <span class="detail-k">Next Big Price Target</span>
+          <span class="detail-v hi">$81,602 (~$234M fuel pool)</span>
         </div>
       </div>
     </div>
 
-    <!-- PILLAR 2: ORDER FLOW & WATERFALL (DESKS F & W) -->
+    <!-- CHECK 2: DUMP PROTECTION -->
     <div class="pillar-accordion" id="pillar-2" onclick="toggleAccordion('pillar-2')">
       <div class="pillar-summary-row">
         <div class="pillar-title-line">
           <div class="pillar-name">
-            <span>🌊 PILLAR 2: ORDER FLOW & LIQUIDITY</span>
+            <span>🌊 CHECK 2: BIG BUYERS & DUMP PROTECTION</span>
           </div>
-          <div class="pillar-score-badge" id="p2-score">75/100</div>
+          <div class="pillar-score-badge" id="p2-score">75% PASSED</div>
         </div>
         <div class="progress-bar-bg">
           <div class="progress-bar-fill" id="p2-bar" style="width: 75%;"></div>
         </div>
         <div class="pillar-preview-subtext">
-          <span id="p2-preview">Buyers absorbing sales with zero liquidations</span>
+          <span id="p2-preview">Panic-selling has stopped; spot buyers active</span>
           <span class="chevron">▼</span>
         </div>
       </div>
       <div class="pillar-details-drawer">
         <div class="pillar-plain-english-box">
           <span class="plain-english-tag">💡 WHAT THIS MEANS:</span>
-          <span>Aggressive selling volume has dried up and passive buyers are absorbing spot volume (+201 BTC net) with zero cascading liquidations. Order flow is stabilized.</span>
+          <span>Panic sellers tried to push price down, but large passive buyers absorbed every single sell order. In the last 15 minutes, buyers took in +201 Bitcoin more than sellers. The dumping has dried up.</span>
         </div>
         <div class="detail-item-row">
-          <span class="detail-k">Desk Origins</span>
-          <span class="detail-v hi">[Desk F] Footprint & [Desk W] Waterfall</span>
+          <span class="detail-k">Recent 15-Minute Flow</span>
+          <span class="detail-v hi">+201.4 Bitcoin (Buyers Winning)</span>
         </div>
         <div class="detail-item-row">
-          <span class="detail-k">15m Active Footprint Delta</span>
-          <span class="detail-v hi">+201.4 BTC (Buyers Absorbing)</span>
+          <span class="detail-k">24-Hour Spot Buying</span>
+          <span class="detail-v hi">+1,091 Bitcoin (Accumulation)</span>
         </div>
         <div class="detail-item-row">
-          <span class="detail-k">Active Bar POC Price</span>
-          <span class="detail-v">$75,840</span>
+          <span class="detail-k">Market Crash Threat</span>
+          <span class="detail-v hi">NONE DETECTED (Calm & Stable)</span>
         </div>
         <div class="detail-item-row">
-          <span class="detail-k">24H Spot CVD Net</span>
-          <span class="detail-v hi">+1,091 BTC (Accumulation)</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">Waterfall Cascade State</span>
-          <span class="detail-v hi">NO CASCADE (Stable)</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">1-Hour ForceOrders Vol</span>
-          <span class="detail-v">$1.50M / $20M Threshold</span>
+          <span class="detail-k">Panic Selling Volume</span>
+          <span class="detail-v">$1.5M (Well below danger mark)</span>
         </div>
       </div>
     </div>
 
-    <!-- PILLAR 3: MACRO & REGIME (DESKS 0 & L) -->
+    <!-- CHECK 3: BIG PICTURE TREND -->
     <div class="pillar-accordion" id="pillar-3" onclick="toggleAccordion('pillar-3')">
       <div class="pillar-summary-row">
         <div class="pillar-title-line">
           <div class="pillar-name">
-            <span>🌐 PILLAR 3: MACRO & VOLATILITY</span>
+            <span>🌐 CHECK 3: THE BIG PICTURE TREND</span>
           </div>
-          <div class="pillar-score-badge" id="p3-score" style="color: var(--warning);">45/100</div>
+          <div class="pillar-score-badge" id="p3-score" style="color: var(--warning);">45% NOT READY</div>
         </div>
         <div class="progress-bar-bg">
           <div class="progress-bar-fill" id="p3-bar" style="width: 45%; background: var(--warning);"></div>
         </div>
         <div class="pillar-preview-subtext">
-          <span id="p3-preview">Locked in cash below 50-day average ($79.8k)</span>
+          <span id="p3-preview">Overall market trend is still too weak to buy</span>
           <span class="chevron">▼</span>
         </div>
       </div>
       <div class="pillar-details-drawer">
         <div class="pillar-plain-english-box" style="border-left-color: var(--warning);">
           <span class="plain-english-tag" style="color: var(--warning);">🛡️ WHAT THIS MEANS (CAPITAL PRESERVATION):</span>
-          <span>The macro gate is locked in 100% cash mode because price is below the 50-day average ($79,826) and volatility has not yet compressed. Protects capital from false breakouts.</span>
+          <span>Think of this like checking the weather before a flight. Right now, the long-term trend is still foggy. Bitcoin is trading below its 50-day average ($79,826), meaning sellers still have an advantage. We stay in cash until the sunshine returns.</span>
         </div>
         <div class="detail-item-row">
-          <span class="detail-k">Desk Origins</span>
-          <span class="detail-v hi">[Desk 0] Screener & [Desk L] Master</span>
+          <span class="detail-k">Big Picture Weather</span>
+          <span class="detail-v danger">FROZEN (Wait for sunny weather)</span>
         </div>
         <div class="detail-item-row">
-          <span class="detail-k">1D Trend Gate</span>
-          <span class="detail-v danger">FROZEN (Below 50 EMA)</span>
+          <span class="detail-k">The Big 50-Day Line</span>
+          <span class="detail-v">$79,826 (Price must climb above)</span>
         </div>
         <div class="detail-item-row">
-          <span class="detail-k">50-Day Daily EMA</span>
-          <span class="detail-v">$79,826</span>
+          <span class="detail-k">The 200-Day Bull Line</span>
+          <span class="detail-v">$82,050 (Major bull market line)</span>
         </div>
         <div class="detail-item-row">
-          <span class="detail-k">200-Day Daily SMA</span>
-          <span class="detail-v">$82,050</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">Volatility Squeeze (BBW)</span>
-          <span class="detail-v">Rank 61.7% (Needs &lt; 30%)</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">Funding Rate (8h)</span>
-          <span class="detail-v">+0.0100% (Neutral)</span>
+          <span class="detail-k">Price Volatility State</span>
+          <span class="detail-v">Still Choppy (Wait for calm coil)</span>
         </div>
       </div>
     </div>
 
-    <!-- PILLAR 4: PATTERNS & GEOMETRY (DESKS B & 7) -->
+    <!-- CHECK 4: CHART LAUNCH SHAPE -->
     <div class="pillar-accordion" id="pillar-4" onclick="toggleAccordion('pillar-4')">
       <div class="pillar-summary-row">
         <div class="pillar-title-line">
           <div class="pillar-name">
-            <span>📐 PILLAR 4: PATTERNS & GEOMETRY</span>
+            <span>📐 CHECK 4: CHART LAUNCH SHAPE</span>
           </div>
-          <div class="pillar-score-badge" id="p4-score">85/100</div>
+          <div class="pillar-score-badge" id="p4-score">85% PASSED</div>
         </div>
         <div class="progress-bar-bg">
           <div class="progress-bar-fill" id="p4-bar" style="width: 85%;"></div>
         </div>
         <div class="pillar-preview-subtext">
-          <span id="p4-preview">4H triangle coiling below $76,200 breakout</span>
+          <span id="p4-preview">A spring-loaded triangle is coiling on the chart</span>
           <span class="chevron">▼</span>
         </div>
       </div>
       <div class="pillar-details-drawer">
         <div class="pillar-plain-english-box">
           <span class="plain-english-tag">💡 WHAT THIS MEANS:</span>
-          <span>A 4-hour ascending triangle is coiling with higher lows, waiting for a confirmed volume breakout above the $76,200 resistance neckline before opening a swing.</span>
+          <span>Bitcoin's chart is forming an 'Ascending Triangle'—every time price pulls back, buyers step in earlier than before (higher lows). This acts like a coiled spring building energy. We just need price to pop through the $76,200 ceiling.</span>
         </div>
         <div class="detail-item-row">
-          <span class="detail-k">Desk Origins</span>
-          <span class="detail-v hi">[Desk B] Patterns & [Desk 7] Gartley</span>
+          <span class="detail-k">Chart Shape Detected</span>
+          <span class="detail-v hi">ASCENDING TRIANGLE (4-Hour)</span>
         </div>
         <div class="detail-item-row">
-          <span class="detail-k">Leading Chart Pattern</span>
-          <span class="detail-v hi">ASCENDING TRIANGLE (4H)</span>
+          <span class="detail-k">Ceiling Resistance Line</span>
+          <span class="detail-v">$76,200 (Breakout trigger)</span>
         </div>
         <div class="detail-item-row">
-          <span class="detail-k">Pattern Neckline</span>
-          <span class="detail-v">$76,200</span>
+          <span class="detail-k">Floor Support Angle</span>
+          <span class="detail-v hi">Floors Rising +$124 / Day</span>
         </div>
         <div class="detail-item-row">
-          <span class="detail-k">Lower Support Slope</span>
-          <span class="detail-v hi">+$124 / day (Higher Lows)</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">Gartley 222 (4H)</span>
-          <span class="detail-v hi">Bullish D-Point ($74,800)</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">Harmonic Verdict</span>
-          <span class="detail-v">NEUTRAL_ACCUMULATION</span>
+          <span class="detail-k">Technical Rebound Area</span>
+          <span class="detail-v hi">$74,800 (Strong bounce zone)</span>
         </div>
       </div>
     </div>
 
-    <!-- SECTION 4: ACTIONS & AI AUDIT PACKET -->
+    <!-- ASK AI COPILOT BUTTON -->
     <div class="action-button-group">
       <button class="btn-ai-packet" onclick="copyAiPacket()">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-        <span>Copy AI Audit Packet</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        <span>Ask AI: "Explain This in Simple Words"</span>
       </button>
     </div>
 
-    <!-- EXECUTIVE MEMO -->
+    <!-- 10-SECOND GOLDEN RULE FOR BEGINNERS -->
     <div class="executive-memo-card">
-      <strong>10-Second Executive Verdict:</strong><br>
-      The 1D Macro Gate is currently FROZEN. Price is oscillating below the 50-day EMA ($79,826) and volatility is expanded (BBW 61.7%). The system mandates <strong>100% Cash</strong> until price reclaims $79,826 with volatility compression. Zero trades allowed.
+      <strong>🧘 The Golden Rule for Beginners:</strong><br>
+      Pros make money by waiting, not by over-trading. Right now, Bitcoin is sleeping below its 50-day line ($79,826). Keeping your money 100% in cash today means you have full buying power when the real all-clear signal arrives.
     </div>
 
     <!-- FOOTER -->
     <footer class="footer-bar">
-      <span>REFRESH: LIVE (1 HZ WS)</span>
-      <span>172 TESTS GREEN</span>
+      <span>LIVE RADAR MONITORING</span>
+      <span>179 VERIFICATION CHECKS GREEN</span>
     </footer>
 
   </div>
@@ -1229,7 +1180,7 @@
       localStorage.setItem('btc_cockpit_theme', theme);
     }
 
-    // CRT SCANLINE TOGGLE
+    // CRT TOGGLE
     function toggleCRT() {
       const active = document.body.classList.toggle('crt-active');
       const btn = document.getElementById('btn-crt');
@@ -1245,35 +1196,35 @@
     function toggleAccordion(id) {
       const el = document.getElementById(id);
       const isOpen = el.classList.contains('open');
-      
-      // Close all accordions first for clean mobile feel
       document.querySelectorAll('.pillar-accordion').forEach(acc => acc.classList.remove('open'));
-      
       if (!isOpen) {
         el.classList.add('open');
       }
     }
 
-    // COPY AI PACKET
+    // COPY AI BRIEFING
     function copyAiPacket() {
-      const packetText = `# BTC SWING ENGINE V1 TELEMETRY SNAPSHOT
-Timestamp: ${new Date().toISOString()}
-Price: $75,953.21 | Regime: RANGE COMPRESSION
-Confluence Score: 45/100 (FROZEN 100% CASH)
-1D Gate: CLOSED (Price below 50 EMA $79,826 • BBW Rank 61.7%)
+      const packetText = `Hey AI Copilot,
 
-PILLARS:
-1. Structure (Desk P): 80/100 | Invalidation: $74,180 | Short Magnet: $81,602
-2. Order Flow & Waterfall (Desks F & W): 75/100 | 15m Delta: +201 BTC | Waterfall: STABLE
-3. Macro & Volatility (Desks 0 & L): 45/100 | 50 EMA: $79,826 | Funding: +0.0100%
-4. Patterns & Harmonics (Desks B & 7): 85/100 | Ascending Triangle (4H) | Gartley D: $74,800
+I am looking at the Bitcoin Swing Engine dashboard. Here is my current market snapshot:
+- Bitcoin Spot Price: $75,953.21
+- Green-Light Buy Meter: 45/100 (Safe in Cash Mode)
+- Market Mood: Sideways Nap (Consolidation)
+- The 4 Safety Checks:
+  1. Safety Floors: 80% Passed (Defending $74,180 floor)
+  2. Dump Protection: 75% Passed (Buyers absorbed selling; net +201 BTC)
+  3. Big Picture Trend: 45% Not Ready (Price is below 50-day average $79,826)
+  4. Chart Shape: 85% Passed (4-hour Ascending Triangle coiling)
 
-EXECUTIVE ACTION: DO NOTHING. Hold 100% cash until daily close reclaims $79,826.`;
+Please explain to me in 3 simple bullet points:
+1. Why sitting 100% in cash right now is the smartest move for my money.
+2. What exact event needs to happen before I should consider buying.
+3. How our 0.75% ($750 max loss) safety rule protects beginners from getting wrecked.`;
 
       navigator.clipboard.writeText(packetText).then(() => {
-        showToast("Copied AI Audit Packet to Clipboard!");
+        showToast("Copied Plain-English AI Prompt to Clipboard!");
       }).catch(() => {
-        showToast("Packet ready on clipboard!");
+        showToast("Prompt ready on clipboard!");
       });
     }
 
@@ -1281,15 +1232,62 @@ EXECUTIVE ACTION: DO NOTHING. Hold 100% cash until daily close reclaims $79,826.
       const toast = document.getElementById('toast-msg');
       toast.innerText = text;
       toast.classList.add('show');
-      setTimeout(() => toast.classList.remove('show'), 2200);
+      setTimeout(() => toast.classList.remove('show'), 2400);
     }
 
     // GAUGE ANIMATION
     function updateGauge(score) {
       const arc = document.getElementById('gauge-arc');
-      const maxOffset = 534; // Full circle
+      const maxOffset = 534;
       const targetOffset = maxOffset - (maxOffset * (score / 100));
       arc.style.strokeDashoffset = targetOffset;
+    }
+
+    // DYNAMIC STATE TOGGLE
+    function setTradeState(state) {
+      const card = document.getElementById('trade-plan-card');
+      const cashView = document.getElementById('card-state-cash-view');
+      const longView = document.getElementById('card-state-long-view');
+      const actionStrip = document.getElementById('action-strip');
+      const gaugeScore = document.getElementById('gauge-score');
+      const gaugeVerdict = document.getElementById('gauge-verdict');
+      const regimeText = document.getElementById('regime-text');
+      const btnCash = document.getElementById('btn-state-cash');
+      const btnLong = document.getElementById('btn-state-long');
+
+      if (state === 'cash') {
+        btnCash.classList.add('active');
+        btnLong.classList.remove('active');
+        card.classList.add('state-cash');
+        cashView.style.display = 'block';
+        longView.style.display = 'none';
+
+        actionStrip.className = 'action-status-strip cash';
+        actionStrip.innerText = '🛡️ STATUS: SAFE IN CASH (DO NOT BUY YET)';
+
+        gaugeScore.innerText = '45';
+        gaugeVerdict.innerText = 'PATIENT WAIT';
+        gaugeVerdict.style.color = 'var(--text-muted)';
+        regimeText.innerText = 'SIDEWAYS NAP (WAITING FOR SPARK)';
+        regimeText.style.color = 'var(--warning)';
+        updateGauge(45);
+      } else {
+        btnLong.classList.add('active');
+        btnCash.classList.remove('active');
+        card.classList.remove('state-cash');
+        cashView.style.display = 'none';
+        longView.style.display = 'block';
+
+        actionStrip.className = 'action-status-strip long';
+        actionStrip.innerText = '🟢 STATUS: ALL CLEAR — BUY SIGNAL ACTIVE';
+
+        gaugeScore.innerText = '82';
+        gaugeVerdict.innerText = 'ALL CLEAR';
+        gaugeVerdict.style.color = 'var(--primary)';
+        regimeText.innerText = 'BULLISH EXPANSION (GREEN LIGHT)';
+        regimeText.style.color = 'var(--primary)';
+        updateGauge(82);
+      }
     }
 
     // INITIAL SETUP
@@ -1301,7 +1299,6 @@ EXECUTIVE ACTION: DO NOTHING. Hold 100% cash until daily close reclaims $79,826.
         toggleCRT();
       }
 
-      // Initialize gauge to 45
       setTimeout(() => updateGauge(45), 300);
     });
   </script>

@@ -573,6 +573,28 @@
       color: var(--primary);
     }
 
+    .pillar-plain-english-box {
+      margin-bottom: 12px;
+      padding: 9px 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border-left: 3px solid var(--primary);
+      border-radius: 0 8px 8px 0;
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .plain-english-tag {
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      color: var(--primary);
+      text-transform: uppercase;
+    }
+
     .pillar-details-drawer {
       max-height: 0;
       overflow: hidden;
@@ -582,7 +604,29 @@
       padding: 0 14px;
     }
 
-    .pillar-accordion.open .pillar-details-drawer {
+    .pillar-accordion.open .pillar-plain-english-box {
+      margin-bottom: 12px;
+      padding: 9px 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border-left: 3px solid var(--primary);
+      border-radius: 0 8px 8px 0;
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .plain-english-tag {
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      color: var(--primary);
+      text-transform: uppercase;
+    }
+
+    .pillar-details-drawer {
       max-height: 400px;
       padding: 12px 14px;
     }
@@ -857,11 +901,15 @@
           <div class="progress-bar-fill" id="p1-bar" style="width: 80%;"></div>
         </div>
         <div class="pillar-preview-subtext">
-          <span id="p1-preview">Macro Range • Invalidation Floor: $74,180</span>
+          <span id="p1-preview">Defending $74,180 floor inside weekly range</span>
           <span class="chevron">▼</span>
         </div>
       </div>
       <div class="pillar-details-drawer">
+        <div class="pillar-plain-english-box">
+          <span class="plain-english-tag">💡 WHAT THIS MEANS:</span>
+          <span>Bitcoin is holding inside its macro weekly range ($74.8k–$87.0k) with strong institutional buyers defending the $74,180 invalidation floor. Downside risk is clearly defined.</span>
+        </div>
         <div class="detail-item-row">
           <span class="detail-k">Desk Origin</span>
           <span class="detail-v hi">[Desk P] Structure</span>
@@ -902,11 +950,15 @@
           <div class="progress-bar-fill" id="p2-bar" style="width: 75%;"></div>
         </div>
         <div class="pillar-preview-subtext">
-          <span id="p2-preview">15m Delta: +201 BTC • Waterfall: STABLE</span>
+          <span id="p2-preview">Buyers absorbing sales with zero liquidations</span>
           <span class="chevron">▼</span>
         </div>
       </div>
       <div class="pillar-details-drawer">
+        <div class="pillar-plain-english-box">
+          <span class="plain-english-tag">💡 WHAT THIS MEANS:</span>
+          <span>Aggressive selling volume has dried up and passive buyers are absorbing spot volume (+201 BTC net) with zero cascading liquidations. Order flow is stabilized.</span>
+        </div>
         <div class="detail-item-row">
           <span class="detail-k">Desk Origins</span>
           <span class="detail-v hi">[Desk F] Footprint & [Desk W] Waterfall</span>
@@ -947,11 +999,15 @@
           <div class="progress-bar-fill" id="p3-bar" style="width: 45%; background: var(--warning);"></div>
         </div>
         <div class="pillar-preview-subtext">
-          <span id="p3-preview">Gate: FROZEN • 50 EMA: $79,826</span>
+          <span id="p3-preview">Locked in cash below 50-day average ($79.8k)</span>
           <span class="chevron">▼</span>
         </div>
       </div>
       <div class="pillar-details-drawer">
+        <div class="pillar-plain-english-box" style="border-left-color: var(--warning);">
+          <span class="plain-english-tag" style="color: var(--warning);">🛡️ WHAT THIS MEANS (CAPITAL PRESERVATION):</span>
+          <span>The macro gate is locked in 100% cash mode because price is below the 50-day average ($79,826) and volatility has not yet compressed. Protects capital from false breakouts.</span>
+        </div>
         <div class="detail-item-row">
           <span class="detail-k">Desk Origins</span>
           <span class="detail-v hi">[Desk 0] Screener & [Desk L] Master</span>
@@ -992,11 +1048,15 @@
           <div class="progress-bar-fill" id="p4-bar" style="width: 85%;"></div>
         </div>
         <div class="pillar-preview-subtext">
-          <span id="p4-preview">Ascending Triangle (4H) • Breakout: PENDING</span>
+          <span id="p4-preview">4H triangle coiling below $76,200 breakout</span>
           <span class="chevron">▼</span>
         </div>
       </div>
       <div class="pillar-details-drawer">
+        <div class="pillar-plain-english-box">
+          <span class="plain-english-tag">💡 WHAT THIS MEANS:</span>
+          <span>A 4-hour ascending triangle is coiling with higher lows, waiting for a confirmed volume breakout above the $76,200 resistance neckline before opening a swing.</span>
+        </div>
         <div class="detail-item-row">
           <span class="detail-k">Desk Origins</span>
           <span class="detail-v hi">[Desk B] Patterns & [Desk 7] Gartley</span>

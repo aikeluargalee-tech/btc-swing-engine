@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<html lang="en" class="dark">
+<html lang="en" class="dark" data-theme="nvg">
 
 <head>
 
@@ -54,121 +54,111 @@
 
   <style>
 
-    /* Theme CSS Variables for Slate (Default), NVG (Night Vision), and IBM (Daylight Paper) */
-
-    :root, [data-theme="slate"] {
-
-      --bg-outer: #070b14;
-
-      --bg-app: #0f172a;
-
-      --bg-card: #1e293b;
-
-      --bg-card-elevated: #263349;
-
-      --bg-subtle: rgba(255, 255, 255, 0.04);
-
-      --text-primary: #f8fafc;
-
-      --text-secondary: #94a3b8;
-
-      --text-muted: #64748b;
-
-      --border-color: rgba(148, 163, 184, 0.16);
-
-      --accent-green: #10b981;
-
-      --accent-green-soft: rgba(16, 185, 129, 0.14);
-
-      --accent-amber: #f59e0b;
-
-      --accent-amber-soft: rgba(245, 158, 11, 0.14);
-
-      --accent-red: #f43f5e;
-
-      --accent-red-soft: rgba(244, 63, 94, 0.15);
-
-      --accent-blue: #38bdf8;
-
-    }
-
-
-
-    [data-theme="nvg"] {
-
+    /* THEME PALETTES: RETRO NVG GREEN (DEFAULT), IBM AMBER CRT, SLATE MODERN */
+    :root, [data-theme="nvg"] {
       --bg-outer: #020503;
-
-      --bg-app: #050b07;
-
-      --bg-card: #0a160e;
-
-      --bg-card-elevated: #112418;
-
-      --bg-subtle: rgba(34, 197, 94, 0.06);
-
+      --bg-app: #030804;
+      --bg-card: rgba(6, 20, 10, 0.88);
+      --bg-card-elevated: rgba(10, 32, 16, 0.96);
+      --bg-subtle: rgba(0, 255, 102, 0.08);
       --text-primary: #dcfce7;
-
       --text-secondary: #86efac;
-
       --text-muted: #4ade80;
-
-      --border-color: rgba(34, 197, 94, 0.25);
-
-      --accent-green: #22c55e;
-
-      --accent-green-soft: rgba(34, 197, 94, 0.18);
-
+      --border-color: rgba(0, 255, 102, 0.30);
+      --border-bright: #00ff66;
+      --accent-green: #00ff66;
+      --accent-green-soft: rgba(0, 255, 102, 0.18);
       --accent-amber: #facc15;
-
       --accent-amber-soft: rgba(250, 204, 21, 0.16);
-
-      --accent-red: #fb7185;
-
-      --accent-red-soft: rgba(251, 113, 133, 0.18);
-
-      --accent-blue: #4ade80;
-
+      --accent-red: #ff4d4d;
+      --accent-red-soft: rgba(255, 77, 77, 0.20);
+      --accent-blue: #00ff66;
+      --radar-color: #00ff66;
+      --glow: 0 0 14px rgba(0, 255, 102, 0.45);
+      --glow-subtle: 0 0 8px rgba(0, 255, 102, 0.25);
     }
-
-
 
     [data-theme="ibm"] {
-
-      --bg-outer: #e2e8f0;
-
-      --bg-app: #f8fafc;
-
-      --bg-card: #ffffff;
-
-      --bg-card-elevated: #f1f5f9;
-
-      --bg-subtle: rgba(15, 23, 42, 0.04);
-
-      --text-primary: #0f172a;
-
-      --text-secondary: #475569;
-
-      --text-muted: #64748b;
-
-      --border-color: rgba(15, 23, 42, 0.12);
-
-      --accent-green: #059669;
-
-      --accent-green-soft: rgba(5, 150, 105, 0.12);
-
-      --accent-amber: #d97706;
-
-      --accent-amber-soft: rgba(217, 119, 6, 0.12);
-
-      --accent-red: #e11d48;
-
-      --accent-red-soft: rgba(225, 29, 72, 0.12);
-
-      --accent-blue: #0284c7;
-
+      --bg-outer: #0a0600;
+      --bg-app: #080400;
+      --bg-card: rgba(26, 17, 0, 0.88);
+      --bg-card-elevated: rgba(38, 24, 0, 0.96);
+      --bg-subtle: rgba(255, 176, 0, 0.08);
+      --text-primary: #fef3c7;
+      --text-secondary: #fde68a;
+      --text-muted: #a38249;
+      --border-color: rgba(255, 176, 0, 0.35);
+      --border-bright: #ffb000;
+      --accent-green: #ffb000;
+      --accent-green-soft: rgba(255, 176, 0, 0.18);
+      --accent-amber: #ffb000;
+      --accent-amber-soft: rgba(255, 176, 0, 0.18);
+      --accent-red: #ff4444;
+      --accent-red-soft: rgba(255, 68, 68, 0.20);
+      --accent-blue: #ffb000;
+      --radar-color: #ffb000;
+      --glow: 0 0 14px rgba(255, 176, 0, 0.45);
+      --glow-subtle: 0 0 8px rgba(255, 176, 0, 0.25);
     }
 
+    [data-theme="slate"] {
+      --bg-outer: #070b14;
+      --bg-app: #0f172a;
+      --bg-card: #1e293b;
+      --bg-card-elevated: #263349;
+      --bg-subtle: rgba(255, 255, 255, 0.04);
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --border-color: rgba(148, 163, 184, 0.16);
+      --border-bright: #38bdf8;
+      --accent-green: #10b981;
+      --accent-green-soft: rgba(16, 185, 129, 0.14);
+      --accent-amber: #f59e0b;
+      --accent-amber-soft: rgba(245, 158, 11, 0.14);
+      --accent-red: #f43f5e;
+      --accent-red-soft: rgba(244, 63, 94, 0.15);
+      --accent-blue: #38bdf8;
+      --radar-color: #38bdf8;
+      --glow: 0 0 14px rgba(56, 189, 248, 0.35);
+      --glow-subtle: 0 0 8px rgba(56, 189, 248, 0.20);
+    }
 
+    /* CRT SCANLINE OVERLAY */
+    .crt-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 9999;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.35) 50%), 
+                  linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+      background-size: 100% 3px, 6px 100%;
+      display: none;
+    }
+
+    body.crt-active .crt-overlay {
+      display: block;
+    }
+
+    /* Phosphor Glow Accents for Retro Themes */
+    [data-theme="nvg"] .surface-card {
+      box-shadow: 0 0 10px rgba(0, 255, 102, 0.08), inset 0 0 14px rgba(0, 255, 102, 0.03);
+    }
+    [data-theme="nvg"] .gauge-arc {
+      filter: drop-shadow(0 0 10px var(--accent-green));
+    }
+    [data-theme="nvg"] #headerStatusDot {
+      box-shadow: 0 0 10px #00ff66;
+    }
+    [data-theme="ibm"] .surface-card {
+      box-shadow: 0 0 10px rgba(255, 176, 0, 0.08), inset 0 0 14px rgba(255, 176, 0, 0.03);
+    }
+    [data-theme="ibm"] .gauge-arc {
+      filter: drop-shadow(0 0 10px #ffb000);
+    }
+    [data-theme="ibm"] #headerStatusDot {
+      box-shadow: 0 0 10px #ffb000;
+    }
 
     body {
 
@@ -327,6 +317,7 @@
 </head>
 
 <body class="min-h-screen flex flex-col items-center justify-start py-0 sm:py-6 px-0 sm:px-4 select-none">
+  <div class="crt-overlay" id="crt-overlay"></div>
 
 
 
@@ -398,33 +389,15 @@
 
 
 
-        <!-- Display Theme Menu Button (Replaces cryptic [NVG] [IBM] [SLATE] buttons) -->
-
-        <div class="relative">
-
-          <button id="themeMenuBtn" onclick="toggleThemePopover()" class="px-2.5 py-1.5 rounded-xl surface-elevated text-xs font-semibold text-main flex items-center gap-1.5 hover:opacity-90 active:scale-95 transition shadow-sm">
-
-            <span>⚙️ Display</span>
-
-          </button>
-
-
-
-          <!-- Theme Popover Menu -->
-
-          <div id="themePopover" class="hidden absolute right-0 mt-2 w-56 rounded-2xl surface-card shadow-2xl p-2 z-50 border" style="border-color: var(--border-color);">
-
-            <div class="text-[10px] font-bold uppercase tracking-wider text-dim px-2.5 py-1">Select Cockpit Theme</div>
-
-            <button onclick="setTheme('slate')" id="themeBtn-slate" class="w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between hover:bg-white/5 transition">
-
-              <div>
-
-                <div class="font-semibold text-main">🛡️ Slate Guardian</div>
-
-                <div class="text-[10px] text-sub">Calm Dark Slate (Default)</div>
-
-              </div>
+        <!-- Top Right Theme Pill Bar: [NVG] [IBM] [SLATE] [CRT] -->
+        <div class="flex items-center gap-1 shrink-0">
+          <div class="flex items-center p-0.5 rounded-lg border surface-elevated" style="border-color: var(--border-color);">
+            <button onclick="setTheme('nvg')" id="themeBtn-nvg" class="theme-pill px-2 py-1 rounded text-[10px] font-mono font-bold transition" title="Retro Night Vision Green (Phosphor CRT)">NVG</button>
+            <button onclick="setTheme('ibm')" id="themeBtn-ibm" class="theme-pill px-2 py-1 rounded text-[10px] font-mono font-bold transition" title="Retro IBM Amber CRT">IBM</button>
+            <button onclick="setTheme('slate')" id="themeBtn-slate" class="theme-pill px-2 py-1 rounded text-[10px] font-mono font-bold transition" title="Modern Slate Guardian">SLATE</button>
+          </div>
+          <button onclick="toggleCRT()" id="btn-crt" class="px-2 py-1 rounded-lg border text-[10px] font-mono font-bold transition surface-elevated hover:opacity-80" style="border-color: var(--border-color);" title="Toggle CRT Scanline Overlay">CRT</button>
+        </div>
 
               <span class="theme-check text-emerald-400 font-bold">✓</span>
 
@@ -610,7 +583,7 @@
               <!-- Rotating Radar Beam -->
               <g class="radar-scanner-beam">
                 <path d="M 60 65 L 14 65 A 46 46 0 0 1 25 33 Z" fill="url(#radarSweepGradient)" />
-                <line x1="60" y1="65" x2="13" y2="65" stroke="#38bdf8" stroke-width="1.5" stroke-linecap="round" opacity="0.85" />
+                <line x1="60" y1="65" x2="13" y2="65" stroke="var(--radar-color, #00ff66)" stroke-width="1.5" stroke-linecap="round" opacity="0.85" />
               </g>
 
               <!-- Target Blip Pulse -->
@@ -1780,7 +1753,7 @@
 
     const state = {
 
-      theme: 'slate',          // 'slate' | 'nvg' | 'ibm'
+      theme: 'nvg',          // 'slate' | 'nvg' | 'ibm'
 
       scenario: 'cash',        // 'cash' (45/100) | 'buy' (82/100) | 'crash' (22/100)
 
@@ -1992,59 +1965,45 @@
 
 
 
+        // =========================================================================
+    // THEME CONTROLLER & CRT SCANLINES
     // =========================================================================
-
-    // THEME CONTROLLER
-
-    // =========================================================================
-
-    function toggleThemePopover() {
-
-      const pop = document.getElementById('themePopover');
-
-      pop.classList.toggle('hidden');
-
-    }
-
-
-
     function setTheme(themeName) {
-
       state.theme = themeName;
-
       document.documentElement.setAttribute('data-theme', themeName);
+      localStorage.setItem('btc_cockpit_theme', themeName);
 
-      document.querySelectorAll('.theme-check').forEach(el => el.classList.add('hidden'));
+      // Highlight active theme pill
+      ['nvg', 'ibm', 'slate'].forEach(t => {
+        const btn = document.getElementById(`themeBtn-${t}`);
+        if (!btn) return;
+        if (t === themeName) {
+          if (t === 'nvg') btn.className = 'theme-pill px-2 py-1 rounded text-[10px] font-mono font-bold bg-emerald-500/30 text-[#00ff66] border border-[#00ff66]/50 shadow-[0_0_8px_rgba(0,255,102,0.4)]';
+          else if (t === 'ibm') btn.className = 'theme-pill px-2 py-1 rounded text-[10px] font-mono font-bold bg-amber-500/30 text-[#ffb000] border border-[#ffb000]/50 shadow-[0_0_8px_rgba(255,176,0,0.4)]';
+          else btn.className = 'theme-pill px-2 py-1 rounded text-[10px] font-mono font-bold bg-sky-500/30 text-[#38bdf8] border border-[#38bdf8]/50 shadow-[0_0_8px_rgba(56,189,248,0.4)]';
+        } else {
+          btn.className = 'theme-pill px-2 py-1 rounded text-[10px] font-mono font-bold text-sub hover:text-main';
+        }
+      });
 
-      const activeBtn = document.querySelector(`#themeBtn-${themeName} .theme-check`);
-
-      if (activeBtn) activeBtn.classList.remove('hidden');
-
-      document.getElementById('themePopover').classList.add('hidden');
-
-      const labels = { slate: 'Slate Guardian', nvg: 'Night Vision (NVG)', ibm: 'Warm Daylight (IBM)' };
-
-      showToast(`🎨 Display Theme: ${labels[themeName]}`);
-
+      const labels = { nvg: 'Retro Night Vision (NVG Green)', ibm: 'IBM Amber Phosphor', slate: 'Slate Modern Guardian' };
+      showToast(`🎨 Cockpit Theme: ${labels[themeName] || themeName}`);
     }
 
-
-
-    // Close theme popover when clicking outside
-
-    window.addEventListener('click', (e) => {
-
-      const pop = document.getElementById('themePopover');
-
-      const btn = document.getElementById('themeMenuBtn');
-
-      if (pop && !pop.classList.contains('hidden') && !pop.contains(e.target) && !btn.contains(e.target)) {
-
-        pop.classList.add('hidden');
-
+    function toggleCRT() {
+      const active = document.body.classList.toggle('crt-active');
+      const btn = document.getElementById('btn-crt');
+      if (btn) {
+        if (active) {
+          btn.classList.add('bg-emerald-500/25', 'text-[#00ff66]', 'border-[#00ff66]/60');
+          showToast('📺 CRT Phosphor Scanlines: ACTIVE');
+        } else {
+          btn.classList.remove('bg-emerald-500/25', 'text-[#00ff66]', 'border-[#00ff66]/60');
+          showToast('📺 CRT Phosphor Scanlines: OFF');
+        }
       }
-
-    });
+      localStorage.setItem('btc_cockpit_crt', active ? '1' : '0');
+    }
 
 
 
@@ -2793,9 +2752,12 @@ ${questionsBlock}`;
     // Initialize on load
 
     window.onload = function () {
-
+      const savedTheme = localStorage.getItem('btc_cockpit_theme') || 'nvg';
+      setTheme(savedTheme);
+      if (localStorage.getItem('btc_cockpit_crt') === '1') {
+        toggleCRT();
+      }
       renderAll();
-
     };
 
   </script>

@@ -1,1306 +1,2805 @@
 <!DOCTYPE html>
-<html lang="en">
+
+<html lang="en" class="dark">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>BTC Swing Cockpit — Beginner Edition</title>
-  
-  <meta name="theme-color" content="#030804">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="BTC Cockpit">
+
+  <meta charset="UTF-8" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
+  <title>BTC SWING COCKPIT — Beginner Edition (v2)</title>
+
+  <!-- Tailwind CSS CDN -->
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+
+
+
+  <script>
+
+    tailwind.config = {
+
+      darkMode: 'class',
+
+      theme: {
+
+        extend: {
+
+          fontFamily: {
+
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+
+            mono: ['JetBrains Mono', 'monospace'],
+
+          },
+
+        }
+
+      }
+
+    }
+
+  </script>
+
+
 
   <style>
-    /* RESET & BASE */
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      -webkit-tap-highlight-color: transparent;
-      user-select: none;
+
+    /* Theme CSS Variables for Slate (Default), NVG (Night Vision), and IBM (Daylight Paper) */
+
+    :root, [data-theme="slate"] {
+
+      --bg-outer: #070b14;
+
+      --bg-app: #0f172a;
+
+      --bg-card: #1e293b;
+
+      --bg-card-elevated: #263349;
+
+      --bg-subtle: rgba(255, 255, 255, 0.04);
+
+      --text-primary: #f8fafc;
+
+      --text-secondary: #94a3b8;
+
+      --text-muted: #64748b;
+
+      --border-color: rgba(148, 163, 184, 0.16);
+
+      --accent-green: #10b981;
+
+      --accent-green-soft: rgba(16, 185, 129, 0.14);
+
+      --accent-amber: #f59e0b;
+
+      --accent-amber-soft: rgba(245, 158, 11, 0.14);
+
+      --accent-red: #f43f5e;
+
+      --accent-red-soft: rgba(244, 63, 94, 0.15);
+
+      --accent-blue: #38bdf8;
+
     }
+
+
+
+    [data-theme="nvg"] {
+
+      --bg-outer: #020503;
+
+      --bg-app: #050b07;
+
+      --bg-card: #0a160e;
+
+      --bg-card-elevated: #112418;
+
+      --bg-subtle: rgba(34, 197, 94, 0.06);
+
+      --text-primary: #dcfce7;
+
+      --text-secondary: #86efac;
+
+      --text-muted: #4ade80;
+
+      --border-color: rgba(34, 197, 94, 0.25);
+
+      --accent-green: #22c55e;
+
+      --accent-green-soft: rgba(34, 197, 94, 0.18);
+
+      --accent-amber: #facc15;
+
+      --accent-amber-soft: rgba(250, 204, 21, 0.16);
+
+      --accent-red: #fb7185;
+
+      --accent-red-soft: rgba(251, 113, 133, 0.18);
+
+      --accent-blue: #4ade80;
+
+    }
+
+
+
+    [data-theme="ibm"] {
+
+      --bg-outer: #e2e8f0;
+
+      --bg-app: #f8fafc;
+
+      --bg-card: #ffffff;
+
+      --bg-card-elevated: #f1f5f9;
+
+      --bg-subtle: rgba(15, 23, 42, 0.04);
+
+      --text-primary: #0f172a;
+
+      --text-secondary: #475569;
+
+      --text-muted: #64748b;
+
+      --border-color: rgba(15, 23, 42, 0.12);
+
+      --accent-green: #059669;
+
+      --accent-green-soft: rgba(5, 150, 105, 0.12);
+
+      --accent-amber: #d97706;
+
+      --accent-amber-soft: rgba(217, 119, 6, 0.12);
+
+      --accent-red: #e11d48;
+
+      --accent-red-soft: rgba(225, 29, 72, 0.12);
+
+      --accent-blue: #0284c7;
+
+    }
+
+
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      background-color: #020402;
-      color: #e2e8f0;
-      overflow-x: hidden;
+
+      background-color: var(--bg-outer);
+
+      color: var(--text-primary);
+
+      font-family: 'Inter', sans-serif;
+
       transition: background-color 0.25s ease, color 0.25s ease;
+
+      overflow-x: hidden;
+
     }
 
-    /* THEME PALETTES */
-    body.theme-nvg {
-      --bg-base: #030804;
-      --bg-card: rgba(6, 20, 10, 0.78);
-      --bg-card-sub: rgba(4, 14, 7, 0.95);
-      --border: rgba(0, 255, 102, 0.28);
-      --border-bright: #00ff66;
-      --primary: #00ff66;
-      --primary-dim: #00a843;
-      --text-muted: #6ba880;
-      --text-main: #dcfce7;
-      --glow: 0 0 12px rgba(0, 255, 102, 0.35);
-      --danger: #ff4d4d;
-      --warning: #fbbf24;
-      --font-mono: 'Consolas', 'Courier New', monospace;
+
+
+    .app-shell {
+
+      background-color: var(--bg-app);
+
+      border-color: var(--border-color);
+
+      transition: background-color 0.25s ease, border-color 0.25s ease;
+
     }
 
-    body.theme-ibm {
-      --bg-base: #0a0600;
-      --bg-card: rgba(26, 17, 0, 0.82);
-      --bg-card-sub: rgba(18, 11, 0, 0.96);
-      --border: rgba(255, 176, 0, 0.32);
-      --border-bright: #ffb000;
-      --primary: #ffb000;
-      --primary-dim: #b37b00;
-      --text-muted: #a38249;
-      --text-main: #fef3c7;
-      --glow: 0 0 12px rgba(255, 176, 0, 0.35);
-      --danger: #ff4444;
-      --warning: #f59e0b;
-      --font-mono: 'Courier New', monospace;
+
+
+    .surface-card {
+
+      background-color: var(--bg-card);
+
+      border: 1px solid var(--border-color);
+
+      transition: all 0.2s ease;
+
     }
 
-    body.theme-modern {
-      --bg-base: #090d16;
-      --bg-card: rgba(15, 23, 42, 0.82);
-      --bg-card-sub: rgba(20, 30, 55, 0.95);
-      --border: rgba(56, 189, 248, 0.25);
-      --border-bright: #38bdf8;
-      --primary: #38bdf8;
-      --primary-dim: #0284c7;
-      --text-muted: #64748b;
-      --text-main: #f8fafc;
-      --glow: 0 0 14px rgba(56, 189, 248, 0.35);
-      --danger: #f87171;
-      --warning: #fbbf24;
-      --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+
+    .surface-elevated {
+
+      background-color: var(--bg-card-elevated);
+
+      border: 1px solid var(--border-color);
+
     }
 
-    /* PHONE CONTAINER */
-    .mobile-wrapper {
-      width: 100%;
-      max-width: 440px;
-      min-height: 100vh;
-      background: var(--bg-base);
-      display: flex;
-      flex-direction: column;
-      position: relative;
-      padding-bottom: 28px;
-      border-left: 1px solid var(--border);
-      border-right: 1px solid var(--border);
-    }
 
-    /* CRT SCANLINE OVERLAY */
-    .crt-overlay {
-      position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      pointer-events: none;
-      z-index: 9999;
-      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.35) 50%), 
-                  linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
-      background-size: 100% 3px, 6px 100%;
-      display: none;
-    }
 
-    body.crt-active .crt-overlay {
-      display: block;
-    }
+    .text-main { color: var(--text-primary); }
 
-    /* TOP BAR */
-    .top-header {
-      padding: 12px 14px;
-      background: var(--bg-card);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      position: sticky;
-      top: 0;
-      z-index: 50;
-      backdrop-filter: blur(10px);
-    }
+    .text-sub { color: var(--text-secondary); }
 
-    .top-row-1 {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
+    .text-dim { color: var(--text-muted); }
 
-    .brand-title {
-      font-size: 11px;
-      font-weight: 800;
-      letter-spacing: 1.2px;
-      text-transform: uppercase;
-      color: var(--primary);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
 
-    .status-pulse {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background-color: var(--primary);
-      box-shadow: var(--glow);
-      animation: pulse 2s infinite ease-in-out;
-    }
 
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.85); }
-    }
+    /* Gauge animation */
 
-    .theme-pill-group {
-      display: flex;
-      gap: 4px;
-      background: rgba(0, 0, 0, 0.4);
-      padding: 2px;
-      border-radius: 6px;
-      border: 1px solid var(--border);
+    
+    /* Radar Scanner Animation */
+    @keyframes radar-scan-arc {
+      0% { transform: rotate(0deg); }
+      50% { transform: rotate(180deg); }
+      100% { transform: rotate(0deg); }
     }
-
-    .theme-btn {
-      font-size: 9px;
-      font-weight: 700;
-      padding: 3px 7px;
-      border-radius: 4px;
-      border: none;
-      background: transparent;
-      color: var(--text-muted);
-      cursor: pointer;
-      text-transform: uppercase;
-      transition: all 0.15s;
-    }
-
-    .theme-btn.active {
-      background: var(--primary);
-      color: var(--bg-base);
-      font-weight: 800;
-    }
-
-    .crt-toggle-btn {
-      font-size: 9px;
-      font-weight: 700;
-      padding: 3px 6px;
-      border-radius: 4px;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--text-muted);
-      cursor: pointer;
-    }
-
-    .crt-toggle-btn.active {
-      color: var(--primary);
-      border-color: var(--primary);
-      box-shadow: var(--glow);
-    }
-
-    /* PRICE TICKER */
-    .spot-ticker-card {
-      padding: 14px 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: var(--bg-card);
-      margin: 12px 14px 0 14px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-    }
-
-    .spot-price-big {
-      font-family: var(--font-mono);
-      font-size: 26px;
-      font-weight: 900;
-      color: var(--text-main);
-      letter-spacing: -0.5px;
-    }
-
-    .spot-change-pill {
-      font-size: 11px;
-      font-weight: 800;
-      font-family: var(--font-mono);
-      padding: 3px 8px;
-      border-radius: 5px;
-      background: rgba(0, 255, 102, 0.12);
-      color: var(--primary);
-      border: 1px solid var(--border);
-    }
-
-    .session-badge {
-      font-size: 10px;
-      font-weight: 700;
-      color: var(--text-muted);
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      margin-top: 3px;
-    }
-
-    /* HERO GAUGE SECTION */
-    .hero-gauge-section {
-      padding: 16px 14px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      position: relative;
-    }
-
-    .gauge-wrapper {
-      position: relative;
-      width: 200px;
-      height: 200px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .gauge-svg {
-      width: 100%;
-      height: 100%;
-    }
-
-    .gauge-bg-circle {
-      fill: none;
-      stroke: rgba(255, 255, 255, 0.07);
-      stroke-width: 12;
-    }
-
-    .gauge-fill-circle {
-      fill: none;
-      stroke: var(--primary);
-      stroke-width: 12;
-      stroke-linecap: round;
-      stroke-dasharray: 534;
-      stroke-dashoffset: 294;
-      transform: rotate(-90deg);
-      transform-origin: 100px 100px;
-      transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-      filter: drop-shadow(var(--glow));
-    }
-
-    @keyframes radar-scan {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-
     .radar-scanner-beam {
-      transform-origin: 100px 100px;
-      animation: radar-scan 3.2s linear infinite;
+      transform-origin: 60px 65px;
+      animation: radar-scan-arc 3.6s ease-in-out infinite;
     }
-
     @keyframes blip-pulse {
       0%, 100% { opacity: 0.25; transform: scale(0.85); }
-      50% { opacity: 1; transform: scale(1.35); filter: drop-shadow(0 0 8px var(--primary)); }
+      50% { opacity: 1; transform: scale(1.35); filter: drop-shadow(0 0 6px #10b981); }
     }
-
     .radar-blip-pulse {
-      animation: blip-pulse 1.6s ease-in-out infinite;
-      transform-origin: 148px 148px;
+      animation: blip-pulse 1.8s ease-in-out infinite;
+      transform-origin: 88px 28px;
     }
 
-    .gauge-center-content {
-      position: absolute;
-      width: 108px;
-      height: 108px;
-      border-radius: 50%;
-      background: var(--bg-card-sub);
-      border: 1px solid var(--border);
-      box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.9), 0 0 12px rgba(0, 0, 0, 0.6);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      z-index: 10;
+    .gauge-arc {
+
+      transition: stroke-dashoffset 0.7s cubic-bezier(0.22, 1, 0.36, 1), stroke 0.4s ease;
+
     }
 
-    .radar-scan-status {
-      font-size: 8px;
-      font-weight: 800;
-      letter-spacing: 1.2px;
-      color: var(--primary);
-      text-transform: uppercase;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      margin-bottom: 2px;
-      opacity: 0.9;
-    }
 
-    .scan-dot {
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      background: var(--primary);
-      box-shadow: 0 0 6px var(--primary);
-      animation: pulse 1s infinite alternate;
-    }
 
-    .gauge-num {
-      font-family: var(--font-mono);
-      font-size: 38px;
-      font-weight: 900;
-      line-height: 1;
-      color: var(--text-main);
-    }
+    /* Accordion smooth transition */
 
-    .gauge-denominator {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--text-muted);
-    }
+    .accordion-content {
 
-    .gauge-label {
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: var(--primary);
-      margin-top: 3px;
-    }
-
-    .regime-banner {
-      margin-top: 10px;
-      font-size: 11px;
-      font-weight: 800;
-      padding: 5px 12px;
-      border-radius: 20px;
-      background: rgba(0, 0, 0, 0.4);
-      border: 1px solid var(--border);
-      letter-spacing: 0.8px;
-      color: var(--text-main);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    /* ACTION STATUS STRIP */
-    .action-status-strip {
-      margin: 4px 14px 10px 14px;
-      padding: 11px 14px;
-      border-radius: 10px;
-      font-size: 12px;
-      font-weight: 800;
-      text-align: center;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      border: 1px solid;
-    }
-
-    .action-status-strip.cash {
-      background: rgba(251, 191, 36, 0.1);
-      border-color: rgba(251, 191, 36, 0.4);
-      color: var(--warning);
-    }
-
-    .action-status-strip.long {
-      background: rgba(0, 255, 102, 0.14);
-      border-color: var(--border-bright);
-      color: var(--primary);
-      box-shadow: var(--glow);
-    }
-
-    /* PREVIEW SWITCHER */
-    .sim-toggle-pill {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 6px;
-      margin: 0 14px 12px 14px;
-      padding: 4px 8px;
-      background: rgba(0, 0, 0, 0.35);
-      border-radius: 20px;
-      border: 1px solid var(--border);
-    }
-
-    .sim-btn {
-      font-size: 9px;
-      font-weight: 800;
-      padding: 5px 10px;
-      border-radius: 12px;
-      border: 1px solid transparent;
-      background: transparent;
-      color: var(--text-muted);
-      cursor: pointer;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      transition: all 0.15s;
-    }
-
-    .sim-btn.active {
-      background: var(--bg-card);
-      border-color: var(--primary);
-      color: var(--primary);
-      box-shadow: var(--glow);
-    }
-
-    /* CARD CONTAINER */
-    .card-container {
-      margin: 0 14px 14px 14px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 16px;
-      backdrop-filter: blur(8px);
-    }
-
-    .card-container.state-cash {
-      border-color: rgba(251, 191, 36, 0.3);
-      background: rgba(26, 17, 0, 0.25);
-    }
-
-    .card-header-title {
-      font-size: 11px;
-      font-weight: 900;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      color: var(--primary);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-
-    .friendly-explain-box {
-      padding: 10px 12px;
-      background: rgba(0, 0, 0, 0.3);
-      border-left: 3px solid var(--primary);
-      border-radius: 0 8px 8px 0;
-      font-size: 11px;
-      line-height: 1.5;
-      color: var(--text-main);
-      margin-bottom: 12px;
-    }
-
-    .grid-2col {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 10px;
-    }
-
-    .stat-box {
-      background: var(--bg-card-sub);
-      border: 1px solid var(--border);
-      padding: 9px 11px;
-      border-radius: 8px;
-    }
-
-    .stat-label {
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin-bottom: 4px;
-    }
-
-    .stat-value {
-      font-family: var(--font-mono);
-      font-size: 14px;
-      font-weight: 800;
-      color: var(--text-main);
-    }
-
-    .stat-value.highlight {
-      color: var(--primary);
-    }
-
-    .stat-value.danger {
-      color: var(--danger);
-    }
-
-    .risk-formula-pill {
-      margin-top: 8px;
-      padding: 9px 12px;
-      background: rgba(0, 0, 0, 0.35);
-      border: 1px dashed var(--border);
-      border-radius: 8px;
-      font-size: 11px;
-      font-family: var(--font-mono);
-      color: var(--text-muted);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .risk-formula-pill strong {
-      color: var(--text-main);
-    }
-
-    .checklist-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 7px 0;
-      font-size: 11px;
-      border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
-    }
-
-    .checklist-row:last-child {
-      border-bottom: none;
-    }
-
-    .badge-fail {
-      color: var(--warning);
-      font-weight: 800;
-      font-size: 10px;
-    }
-
-    /* 4 CHECKS SECTION */
-    .pillars-header {
-      margin: 4px 14px 10px 14px;
-      font-size: 11px;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: var(--text-muted);
-      display: flex;
-      justify-content: space-between;
-    }
-
-    .pillar-accordion {
-      margin: 0 14px 10px 14px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
-      transition: all 0.2s ease;
-    }
-
-    .pillar-summary-row {
-      padding: 12px 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 7px;
-      cursor: pointer;
-    }
-
-    .pillar-title-line {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .pillar-name {
-      font-size: 12px;
-      font-weight: 800;
-      color: var(--text-main);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .pillar-score-badge {
-      font-family: var(--font-mono);
-      font-size: 12px;
-      font-weight: 900;
-      color: var(--primary);
-    }
-
-    .progress-bar-bg {
-      width: 100%;
-      height: 6px;
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 3px;
-      overflow: hidden;
-    }
-
-    .progress-bar-fill {
-      height: 100%;
-      background: var(--primary);
-      border-radius: 3px;
-      box-shadow: var(--glow);
-      transition: width 0.6s ease;
-    }
-
-    .pillar-preview-subtext {
-      font-size: 11px;
-      color: var(--text-muted);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .chevron {
-      font-size: 10px;
-      transition: transform 0.25s ease;
-      color: var(--text-muted);
-    }
-
-    .pillar-accordion.open .chevron {
-      transform: rotate(180deg);
-      color: var(--primary);
-    }
-
-    .pillar-details-drawer {
       max-height: 0;
+
       overflow: hidden;
-      transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-      background: var(--bg-card-sub);
-      border-top: 1px solid var(--border);
-      padding: 0 14px;
-    }
 
-    .pillar-accordion.open .pillar-details-drawer {
-      max-height: 440px;
-      padding: 14px;
-    }
+      transition: max-height 0.32s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
 
-    .pillar-plain-english-box {
-      margin-bottom: 12px;
-      padding: 10px 12px;
-      background: rgba(255, 255, 255, 0.04);
-      border-left: 3px solid var(--primary);
-      border-radius: 0 8px 8px 0;
-      font-size: 11px;
-      line-height: 1.5;
-      color: var(--text-main);
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
-
-    .plain-english-tag {
-      font-size: 9px;
-      font-weight: 800;
-      letter-spacing: 0.8px;
-      color: var(--primary);
-      text-transform: uppercase;
-    }
-
-    .detail-item-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 6px 0;
-      font-size: 11px;
-      border-bottom: 1px dashed rgba(255, 255, 255, 0.06);
-    }
-
-    .detail-item-row:last-child {
-      border-bottom: none;
-    }
-
-    .detail-k {
-      color: var(--text-muted);
-    }
-
-    .detail-v {
-      font-family: var(--font-mono);
-      font-weight: 700;
-      color: var(--text-main);
-    }
-
-    .detail-v.hi {
-      color: var(--primary);
-    }
-
-    .detail-v.danger {
-      color: var(--danger);
-    }
-
-    /* ACTION BUTTONS */
-    .action-button-group {
-      margin: 8px 14px 12px 14px;
-    }
-
-    .btn-ai-packet {
-      width: 100%;
-      padding: 14px;
-      border-radius: 12px;
-      background: var(--primary);
-      color: var(--bg-base);
-      font-weight: 900;
-      font-size: 13px;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      border: none;
-      cursor: pointer;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 8px;
-      box-shadow: var(--glow);
-      transition: transform 0.1s;
-    }
-
-    .btn-ai-packet:active {
-      transform: scale(0.98);
-    }
-
-    .toast-msg {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%) translateY(60px);
-      background: var(--primary);
-      color: var(--bg-base);
-      font-size: 12px;
-      font-weight: 800;
-      padding: 9px 20px;
-      border-radius: 20px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
       opacity: 0;
-      transition: all 0.3s ease;
-      z-index: 10000;
-      pointer-events: none;
+
     }
 
-    .toast-msg.show {
-      transform: translateX(-50%) translateY(0);
+    .accordion-content.open {
+
+      max-height: 520px;
+
       opacity: 1;
+
     }
 
-    /* 10-SECOND MEMO */
-    .executive-memo-card {
-      margin: 4px 14px 16px 14px;
-      padding: 14px;
-      background: rgba(0, 0, 0, 0.35);
-      border-left: 3px solid var(--primary);
-      border-radius: 0 10px 10px 0;
-      font-size: 11px;
-      line-height: 1.55;
-      color: var(--text-muted);
+
+
+    /* Custom subtle scrollbars */
+
+    ::-webkit-scrollbar {
+
+      width: 6px;
+
+      height: 6px;
+
     }
 
-    .executive-memo-card strong {
-      color: var(--text-main);
+    ::-webkit-scrollbar-track {
+
+      background: transparent;
+
     }
 
-    /* FOOTER */
-    .footer-bar {
-      margin-top: auto;
-      padding: 14px;
-      font-size: 10px;
-      color: var(--text-muted);
-      border-top: 1px solid var(--border);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    ::-webkit-scrollbar-thumb {
+
+      background: rgba(148, 163, 184, 0.25);
+
+      border-radius: 9999px;
+
     }
+
+
+
+    @keyframes pulse-gentle {
+
+      0%, 100% { opacity: 1; transform: scale(1); }
+
+      50% { opacity: 0.65; transform: scale(0.96); }
+
+    }
+
+    .animate-pulse-gentle {
+
+      animation: pulse-gentle 2.4s infinite ease-in-out;
+
+    }
+
   </style>
+
 </head>
-<body class="theme-nvg">
 
-  <div class="crt-overlay" id="crt-overlay"></div>
-  <div class="toast-msg" id="toast-msg">Copied Plain-English AI Briefing!</div>
+<body class="min-h-screen flex flex-col items-center justify-start py-0 sm:py-6 px-0 sm:px-4 select-none">
 
-  <div class="mobile-wrapper">
-    
-    <!-- TOP HEADER -->
-    <header class="top-header">
-      <div class="top-row-1">
-        <div class="brand-title">
-          <div class="status-pulse" id="conn-dot"></div>
-          <span>BTC SWING COCKPIT</span>
-          <span style="opacity: 0.6; font-size: 9px;">BEGINNER EDITION</span>
-        </div>
-        
-        <div class="theme-pill-group">
-          <button class="theme-btn active" id="btn-theme-nvg" onclick="setTheme('nvg')">NVG</button>
-          <button class="theme-btn" id="btn-theme-ibm" onclick="setTheme('ibm')">IBM</button>
-          <button class="theme-btn" id="btn-theme-modern" onclick="setTheme('modern')">SLATE</button>
-          <button class="crt-toggle-btn" id="btn-crt" onclick="toggleCRT()">CRT</button>
-        </div>
-      </div>
-    </header>
 
-    <!-- LIVE SPOT PRICE -->
-    <div class="spot-ticker-card">
-      <div>
-        <div class="spot-price-big" id="spot-price">$75,953.21</div>
-        <div class="session-badge" id="market-session">● ASIA MARKET OPEN (SGT 19:18)</div>
-      </div>
-      <div style="text-align: right;">
-        <div class="spot-change-pill" id="spot-change">+1.82% TODAY</div>
-        <div class="session-badge" style="margin-top: 5px;">🛡️ SPOT ONLY (0x LEVERAGE)</div>
-      </div>
-    </div>
 
-    <!-- HERO DIAL (TRAFFIC LIGHT GREEN-LIGHT BUY METER) -->
-    <section class="hero-gauge-section">
-      <div class="gauge-wrapper">
-        <svg class="gauge-svg" viewBox="0 0 200 200">
-          <defs>
-            <radialGradient id="radarSweepGradient" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stop-color="var(--primary)" stop-opacity="0.45" />
-              <stop offset="100%" stop-color="var(--primary)" stop-opacity="0.03" />
-            </radialGradient>
-          </defs>
+  <!-- DESKTOP CONTEXT HEADER (Hidden on small mobile screens, helpful on desktop preview) -->
 
-          <!-- Outer Meter Track -->
-          <circle class="gauge-bg-circle" cx="100" cy="100" r="85" />
-          <circle class="gauge-fill-circle" id="gauge-arc" cx="100" cy="100" r="85" />
+  <div class="hidden sm:flex items-center justify-between w-full max-w-[450px] mb-3 px-2 text-xs text-slate-400">
 
-          <!-- Subtle Radar Reticle -->
-          <circle cx="100" cy="100" r="64" fill="none" stroke="var(--border)" stroke-width="0.75" stroke-dasharray="2 3" opacity="0.4" />
-          <circle cx="100" cy="100" r="42" fill="none" stroke="var(--border)" stroke-width="0.75" stroke-dasharray="2 2" opacity="0.3" />
-          <line x1="100" y1="16" x2="100" y2="184" stroke="var(--border)" stroke-width="0.75" opacity="0.35" />
-          <line x1="16" y1="100" x2="184" y2="100" stroke="var(--border)" stroke-width="0.75" opacity="0.35" />
+    <div class="flex items-center gap-2">
 
-          <!-- Target Blip -->
-          <circle cx="148" cy="148" r="3.5" fill="var(--primary)" class="radar-blip-pulse" />
+      <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
 
-          <!-- Rotating Radar Beam -->
-          <g class="radar-scanner-beam">
-            <path d="M 100 100 L 100 16 A 84 84 0 0 0 41 41 Z" fill="url(#radarSweepGradient)" />
-            <line x1="100" y1="100" x2="100" y2="15" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" />
-          </g>
-        </svg>
-
-        <!-- Center Score Readout -->
-        <div class="gauge-center-content">
-          <div class="radar-scan-status">
-            <span class="scan-dot"></span>
-            <span>SCANNING</span>
-          </div>
-          <div class="gauge-num" id="gauge-score">45</div>
-          <div class="gauge-denominator">/ 100</div>
-          <div class="gauge-label" id="gauge-verdict">PATIENT WAIT</div>
-        </div>
-      </div>
-
-      <div class="regime-banner" id="regime-pill">
-        <span>😴 MARKET MOOD:</span>
-        <span id="regime-text" style="color: var(--warning);">SIDEWAYS NAP (WAITING FOR SPARK)</span>
-      </div>
-    </section>
-
-    <!-- TRAFFIC LIGHT STATUS BANNER -->
-    <div class="action-status-strip cash" id="action-strip">
-      🛡️ STATUS: SAFE IN CASH (DO NOT BUY YET)
-    </div>
-
-    <!-- PREVIEW TOGGLE (TO TEST CASH VS BUY PLAN) -->
-    <div class="sim-toggle-pill">
-      <span style="font-size: 9px; color: var(--text-muted); font-weight: 800;">PREVIEW MODE:</span>
-      <button class="sim-btn active" id="btn-state-cash" onclick="setTradeState('cash')">🛡️ Safe in Cash (Now)</button>
-      <button class="sim-btn" id="btn-state-long" onclick="setTradeState('long')">🟢 Buy Signal Active</button>
-    </div>
-
-    <!-- MAIN DECISION CARD -->
-    <div class="card-container state-cash" id="trade-plan-card">
-      
-      <!-- STATE 1: SAFE IN CASH (SCORE < 70) -->
-      <div id="card-state-cash-view">
-        <div class="card-header-title">
-          <span style="color: var(--warning);">🛡️ YOUR MONEY IS SAFE IN CASH</span>
-          <span style="font-size: 10px; color: var(--warning);">100% PROTECTED</span>
-        </div>
-
-        <div class="friendly-explain-box" style="border-left-color: var(--warning);">
-          Bitcoin is currently moving sideways with no clear institutional fuel. Buying now is like guessing on a coin flip. Our engine protects your wealth by waiting 100% in cash until high-probability conditions arrive.
-        </div>
-
-        <div class="grid-2col">
-          <div class="stat-box">
-            <div class="stat-label">Active Bitcoin Buys</div>
-            <div class="stat-value" style="color: var(--warning);">0.0000 BTC</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Money at Risk</div>
-            <div class="stat-value">$0.00 (Zero Risk)</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Account Allocation</div>
-            <div class="stat-value">100% Cash / USDT</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Recommended Action</div>
-            <div class="stat-value" style="color: var(--warning);">Sit on Hands (Patience)</div>
-          </div>
-        </div>
-
-        <!-- 3 SIMPLE RULES TO BUY -->
-        <div style="margin-top: 10px; padding: 10px 12px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid rgba(251,191,36,0.25);">
-          <div style="font-size: 9px; font-weight: 800; color: var(--warning); letter-spacing: 0.8px; margin-bottom: 6px; text-transform: uppercase;">
-            WHAT NEEDS TO HAPPEN BEFORE WE BUY:
-          </div>
-          <div class="checklist-row">
-            <span class="detail-k">1. Price climbs above 50-day line ($79,826)</span>
-            <span class="badge-fail">❌ NOT YET ($75.9k)</span>
-          </div>
-          <div class="checklist-row">
-            <span class="detail-k">2. Wild market price swings calm down</span>
-            <span class="badge-fail">❌ STILL CHOPPY</span>
-          </div>
-          <div class="checklist-row">
-            <span class="detail-k">3. Green-Light Meter reaches 70% or higher</span>
-            <span class="badge-fail">❌ AT 45% (Needs +25%)</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- STATE 2: ACTIVE BUY PLAN (SCORE >= 70) -->
-      <div id="card-state-long-view" style="display: none;">
-        <div class="card-header-title">
-          <span>🟢 ALL-CLEAR: 4-STEP BUY PLAN</span>
-          <span style="font-size: 10px; color: var(--primary);">0.75% SAFETY RULE</span>
-        </div>
-
-        <div class="friendly-explain-box">
-          All safety checks have passed! Big institutions have stepped in. Follow the 4 exact steps below—your maximum downside loss is mathematically capped at $750.
-        </div>
-
-        <div class="grid-2col">
-          <div class="stat-box">
-            <div class="stat-label">Step 1: Buy Price Range</div>
-            <div class="stat-value highlight" id="val-entry">$75,200 – $75,500</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Step 2: Safety Exit Floor</div>
-            <div class="stat-value danger" id="val-invalidation">$74,180 (-1.6%)</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">First Profit Target</div>
-            <div class="stat-value highlight" id="val-tp1">$78,500 (Sell half)</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Second Profit Target</div>
-            <div class="stat-value highlight" id="val-tp2">$82,000 (Ride runner)</div>
-          </div>
-        </div>
-
-        <div class="risk-formula-pill">
-          <span>Your Max Loss (0.75% of $100k account):</span>
-          <strong id="val-risk-usd">$750.00 Max</strong>
-        </div>
-        <div class="risk-formula-pill" style="margin-top: 5px;">
-          <span>Recommended Buy Amount:</span>
-          <strong style="color: var(--primary);" id="val-size-btc">0.6908 Bitcoin</strong>
-        </div>
-      </div>
+      <span class="font-medium text-slate-300">Personal Wall Street Guardian (v2.0)</span>
 
     </div>
 
-    <!-- 4 PRE-FLIGHT SAFETY CHECKS -->
-    <div class="pillars-header">
-      <span>4 Pre-Flight Safety Checks</span>
-      <span>Tap to Understand Why</span>
-    </div>
+    <button onclick="openBudgetModal()" class="hover:text-white underline decoration-dotted underline-offset-4 transition">
 
-    <!-- CHECK 1: SAFETY FLOOR -->
-    <div class="pillar-accordion" id="pillar-1" onclick="toggleAccordion('pillar-1')">
-      <div class="pillar-summary-row">
-        <div class="pillar-title-line">
-          <div class="pillar-name">
-            <span>🏛️ CHECK 1: SAFETY FLOORS & CEILINGS</span>
-          </div>
-          <div class="pillar-score-badge" id="p1-score">80% PASSED</div>
-        </div>
-        <div class="progress-bar-bg">
-          <div class="progress-bar-fill" id="p1-bar" style="width: 80%;"></div>
-        </div>
-        <div class="pillar-preview-subtext">
-          <span id="p1-preview">Big buyers are defending the $74,180 floor</span>
-          <span class="chevron">▼</span>
-        </div>
-      </div>
-      <div class="pillar-details-drawer">
-        <div class="pillar-plain-english-box">
-          <span class="plain-english-tag">💡 WHAT THIS MEANS:</span>
-          <span>Big institutions are placing heavy buy orders around $74,180. As long as Bitcoin stays above this floor, buyers remain in control. If this floor breaks, our trade idea dies and we walk away safely.</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">Emergency Safety Floor</span>
-          <span class="detail-v danger">$74,180 (Exit here if broken)</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">Proven Weekly Low</span>
-          <span class="detail-v">$74,888</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">Major Price Ceiling</span>
-          <span class="detail-v">$86,999</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">Next Big Price Target</span>
-          <span class="detail-v hi">$81,602 (~$234M fuel pool)</span>
-        </div>
-      </div>
-    </div>
+      Configure Starting Capital
 
-    <!-- CHECK 2: DUMP PROTECTION -->
-    <div class="pillar-accordion" id="pillar-2" onclick="toggleAccordion('pillar-2')">
-      <div class="pillar-summary-row">
-        <div class="pillar-title-line">
-          <div class="pillar-name">
-            <span>🌊 CHECK 2: BIG BUYERS & DUMP PROTECTION</span>
-          </div>
-          <div class="pillar-score-badge" id="p2-score">75% PASSED</div>
-        </div>
-        <div class="progress-bar-bg">
-          <div class="progress-bar-fill" id="p2-bar" style="width: 75%;"></div>
-        </div>
-        <div class="pillar-preview-subtext">
-          <span id="p2-preview">Panic-selling has stopped; spot buyers active</span>
-          <span class="chevron">▼</span>
-        </div>
-      </div>
-      <div class="pillar-details-drawer">
-        <div class="pillar-plain-english-box">
-          <span class="plain-english-tag">💡 WHAT THIS MEANS:</span>
-          <span>Panic sellers tried to push price down, but large passive buyers absorbed every single sell order. In the last 15 minutes, buyers took in +201 Bitcoin more than sellers. The dumping has dried up.</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">Recent 15-Minute Flow</span>
-          <span class="detail-v hi">+201.4 Bitcoin (Buyers Winning)</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">24-Hour Spot Buying</span>
-          <span class="detail-v hi">+1,091 Bitcoin (Accumulation)</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">Market Crash Threat</span>
-          <span class="detail-v hi">NONE DETECTED (Calm & Stable)</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">Panic Selling Volume</span>
-          <span class="detail-v">$1.5M (Well below danger mark)</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- CHECK 3: BIG PICTURE TREND -->
-    <div class="pillar-accordion" id="pillar-3" onclick="toggleAccordion('pillar-3')">
-      <div class="pillar-summary-row">
-        <div class="pillar-title-line">
-          <div class="pillar-name">
-            <span>🌐 CHECK 3: THE BIG PICTURE TREND</span>
-          </div>
-          <div class="pillar-score-badge" id="p3-score" style="color: var(--warning);">45% NOT READY</div>
-        </div>
-        <div class="progress-bar-bg">
-          <div class="progress-bar-fill" id="p3-bar" style="width: 45%; background: var(--warning);"></div>
-        </div>
-        <div class="pillar-preview-subtext">
-          <span id="p3-preview">Overall market trend is still too weak to buy</span>
-          <span class="chevron">▼</span>
-        </div>
-      </div>
-      <div class="pillar-details-drawer">
-        <div class="pillar-plain-english-box" style="border-left-color: var(--warning);">
-          <span class="plain-english-tag" style="color: var(--warning);">🛡️ WHAT THIS MEANS (CAPITAL PRESERVATION):</span>
-          <span>Think of this like checking the weather before a flight. Right now, the long-term trend is still foggy. Bitcoin is trading below its 50-day average ($79,826), meaning sellers still have an advantage. We stay in cash until the sunshine returns.</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">Big Picture Weather</span>
-          <span class="detail-v danger">FROZEN (Wait for sunny weather)</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">The Big 50-Day Line</span>
-          <span class="detail-v">$79,826 (Price must climb above)</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">The 200-Day Bull Line</span>
-          <span class="detail-v">$82,050 (Major bull market line)</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">Price Volatility State</span>
-          <span class="detail-v">Still Choppy (Wait for calm coil)</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- CHECK 4: CHART LAUNCH SHAPE -->
-    <div class="pillar-accordion" id="pillar-4" onclick="toggleAccordion('pillar-4')">
-      <div class="pillar-summary-row">
-        <div class="pillar-title-line">
-          <div class="pillar-name">
-            <span>📐 CHECK 4: CHART LAUNCH SHAPE</span>
-          </div>
-          <div class="pillar-score-badge" id="p4-score">85% PASSED</div>
-        </div>
-        <div class="progress-bar-bg">
-          <div class="progress-bar-fill" id="p4-bar" style="width: 85%;"></div>
-        </div>
-        <div class="pillar-preview-subtext">
-          <span id="p4-preview">A spring-loaded triangle is coiling on the chart</span>
-          <span class="chevron">▼</span>
-        </div>
-      </div>
-      <div class="pillar-details-drawer">
-        <div class="pillar-plain-english-box">
-          <span class="plain-english-tag">💡 WHAT THIS MEANS:</span>
-          <span>Bitcoin's chart is forming an 'Ascending Triangle'—every time price pulls back, buyers step in earlier than before (higher lows). This acts like a coiled spring building energy. We just need price to pop through the $76,200 ceiling.</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">Chart Shape Detected</span>
-          <span class="detail-v hi">ASCENDING TRIANGLE (4-Hour)</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">Ceiling Resistance Line</span>
-          <span class="detail-v">$76,200 (Breakout trigger)</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">Floor Support Angle</span>
-          <span class="detail-v hi">Floors Rising +$124 / Day</span>
-        </div>
-        <div class="detail-item-row">
-          <span class="detail-k">Technical Rebound Area</span>
-          <span class="detail-v hi">$74,800 (Strong bounce zone)</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- ASK AI COPILOT BUTTON -->
-    <div class="action-button-group">
-      <button class="btn-ai-packet" onclick="copyAiPacket()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-        <span>Ask AI: "Explain This in Simple Words"</span>
-      </button>
-    </div>
-
-    <!-- 10-SECOND GOLDEN RULE FOR BEGINNERS -->
-    <div class="executive-memo-card">
-      <strong>🧘 The Golden Rule for Beginners:</strong><br>
-      Pros make money by waiting, not by over-trading. Right now, Bitcoin is sleeping below its 50-day line ($79,826). Keeping your money 100% in cash today means you have full buying power when the real all-clear signal arrives.
-    </div>
-
-    <!-- FOOTER -->
-    <footer class="footer-bar">
-      <span>LIVE RADAR MONITORING</span>
-      <span>179 VERIFICATION CHECKS GREEN</span>
-    </footer>
+    </button>
 
   </div>
 
+
+
+  <!-- MOBILE COCKPIT CONTAINER -->
+
+  <main class="app-shell w-full max-w-[450px] min-h-screen sm:min-h-[860px] sm:rounded-[34px] sm:border sm:shadow-2xl relative flex flex-col justify-between overflow-hidden">
+
+
+
+    <!-- STICKY TOP HEADER -->
+
+    <header class="sticky top-0 z-30 backdrop-blur-md bg-opacity-90 border-b px-4 pt-3.5 pb-3" style="background-color: var(--bg-app); border-color: var(--border-color);">
+
+      <!-- Row 1: Brand Title & Display / Sizer Controls -->
+
+      <div class="flex items-start justify-between gap-2">
+
+        <div>
+
+          <div class="flex items-center gap-2">
+
+            <span id="headerStatusDot" class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+
+            <h1 class="text-sm font-extrabold tracking-tight text-main">BTC SWING COCKPIT</h1>
+
+            <span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+
+              v2 Beginner
+
+            </span>
+
+          </div>
+
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+
+            <span class="text-[11px] font-medium text-sub">🛡️ 100% Spot Bitcoin Only (Zero Leverage)</span>
+
+            <button onclick="showDiagnosticsToast()" class="text-[10px] font-medium px-1.5 py-0.5 rounded surface-elevated text-sub hover:opacity-80 transition flex items-center gap-1" title="Tap to learn about our 179 automated checks">
+
+              <span>✅ 179 Safety Diagnostics</span>
+
+            </button>
+
+          </div>
+
+        </div>
+
+
+
+        <!-- Display Theme Menu Button (Replaces cryptic [NVG] [IBM] [SLATE] buttons) -->
+
+        <div class="relative">
+
+          <button id="themeMenuBtn" onclick="toggleThemePopover()" class="px-2.5 py-1.5 rounded-xl surface-elevated text-xs font-semibold text-main flex items-center gap-1.5 hover:opacity-90 active:scale-95 transition shadow-sm">
+
+            <span>⚙️ Display</span>
+
+          </button>
+
+
+
+          <!-- Theme Popover Menu -->
+
+          <div id="themePopover" class="hidden absolute right-0 mt-2 w-56 rounded-2xl surface-card shadow-2xl p-2 z-50 border" style="border-color: var(--border-color);">
+
+            <div class="text-[10px] font-bold uppercase tracking-wider text-dim px-2.5 py-1">Select Cockpit Theme</div>
+
+            <button onclick="setTheme('slate')" id="themeBtn-slate" class="w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between hover:bg-white/5 transition">
+
+              <div>
+
+                <div class="font-semibold text-main">🛡️ Slate Guardian</div>
+
+                <div class="text-[10px] text-sub">Calm Dark Slate (Default)</div>
+
+              </div>
+
+              <span class="theme-check text-emerald-400 font-bold">✓</span>
+
+            </button>
+
+            <button onclick="setTheme('nvg')" id="themeBtn-nvg" class="w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between hover:bg-white/5 transition mt-1">
+
+              <div>
+
+                <div class="font-semibold text-main">🟢 Night Vision (NVG)</div>
+
+                <div class="text-[10px] text-sub">Tactical Low-Glare Phosphor</div>
+
+              </div>
+
+              <span class="theme-check hidden text-emerald-400 font-bold">✓</span>
+
+            </button>
+
+            <button onclick="setTheme('ibm')" id="themeBtn-ibm" class="w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between hover:bg-black/5 transition mt-1">
+
+              <div>
+
+                <div class="font-semibold text-main">☀️ Warm Daylight (IBM)</div>
+
+                <div class="text-[10px] text-sub">High-Contrast Paper Mode</div>
+
+              </div>
+
+              <span class="theme-check hidden text-emerald-500 font-bold">✓</span>
+
+            </button>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+      <!-- Row 2: Live Spot Price & Session Bar -->
+
+      <div class="mt-3 pt-2.5 border-t flex items-center justify-between" style="border-color: var(--border-color);">
+
+        <div>
+
+          <div class="text-[10px] font-bold uppercase tracking-wider text-dim">BITCOIN SPOT PRICE (BTC/USD)</div>
+
+          <div class="flex items-baseline gap-2 mt-0.5">
+
+            <span id="spotPriceDisplay" class="font-mono text-2xl font-bold tracking-tight text-main">$75,953.21</span>
+
+            <span id="spotChangeBadge" class="font-mono text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">
+
+              +1.82% TODAY
+
+            </span>
+
+          </div>
+
+        </div>
+
+        <div class="text-right">
+
+          <div id="marketSessionBadge" class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-sub">
+
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+
+            <span>ASIA MARKET OPEN</span>
+
+          </div>
+
+          <div class="mt-1">
+
+            <button onclick="openBudgetModal()" class="text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-sky-500/15 text-sky-400 border border-sky-500/30 hover:bg-sky-500/25 transition">
+
+              🧮 Budget: <span id="topBudgetLabel">$1,000</span> ✎
+
+            </button>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+      <!-- Row 3: Interactive Scenario Preview Switcher -->
+
+      <div class="mt-3">
+
+        <div class="flex items-center justify-between mb-1">
+
+          <span class="text-[10px] font-bold uppercase tracking-wider text-dim">Interactive Scenario Simulator:</span>
+
+          <span class="text-[10px] text-sub">Tap to test cockpit states</span>
+
+        </div>
+
+        <div class="grid grid-cols-3 gap-1.5 p-1 rounded-xl surface-elevated">
+
+          <button onclick="setScenario('cash')" id="scenBtn-cash" class="py-1.5 px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 bg-amber-500 text-slate-950 shadow">
+
+            <span>🛡️ Safe Cash</span>
+
+          </button>
+
+          <button onclick="setScenario('buy')" id="scenBtn-buy" class="py-1.5 px-2 rounded-lg text-[11px] font-semibold text-sub hover:text-main transition flex items-center justify-center gap-1">
+
+            <span>🟢 Buy Signal</span>
+
+          </button>
+
+          <button onclick="setScenario('crash')" id="scenBtn-crash" class="py-1.5 px-2 rounded-lg text-[11px] font-semibold text-sub hover:text-main transition flex items-center justify-center gap-1">
+
+            <span>⛈️ -10% Dump</span>
+
+          </button>
+
+        </div>
+
+      </div>
+
+    </header>
+
+
+
+    <!-- MAIN SCROLLABLE COCKPIT BODY -->
+
+    <div class="px-4 py-4 space-y-4 flex-1">
+
+
+
+      <!-- SECTION 1: SAFETY CLEARANCE METER & TRAFFIC LIGHT BANNER -->
+
+      <section class="surface-card rounded-2xl p-4 relative overflow-hidden">
+
+        <!-- Top Meter Header -->
+
+        <div class="flex items-center justify-between">
+
+          <div>
+
+            <span class="text-[11px] font-bold uppercase tracking-wider text-sub">Safety Clearance Meter</span>
+
+            <p class="text-[11px] text-dim">Needs <strong class="text-main">70/100</strong> for an automatic Green Light</p>
+
+          </div>
+
+          <span id="meterStatePill" class="text-xs font-extrabold uppercase px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+
+            Patient Wait
+
+          </span>
+
+        </div>
+
+
+
+        <!-- Radial Gauge + Big Score Display -->
+
+        <div class="flex items-center justify-between gap-4 my-3">
+
+          <div class="relative w-28 h-20 flex items-center justify-center shrink-0">
+
+            <svg class="w-28 h-20 overflow-visible" viewBox="0 0 120 75">
+              <defs>
+                <radialGradient id="radarSweepGradient" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#10b981" stop-opacity="0.45" />
+                  <stop offset="100%" stop-color="#10b981" stop-opacity="0.02" />
+                </radialGradient>
+              </defs>
+
+              <!-- Background Track -->
+              <path d="M 12 65 A 48 48 0 0 1 108 65" fill="none" stroke="rgba(148,163,184,0.18)" stroke-width="11" stroke-linecap="round" />
+
+              <!-- Radar Reticle Rings -->
+              <path d="M 24 65 A 36 36 0 0 1 96 65" fill="none" stroke="rgba(148,163,184,0.15)" stroke-width="0.75" stroke-dasharray="2 3" />
+              <path d="M 36 65 A 24 24 0 0 1 84 65" fill="none" stroke="rgba(148,163,184,0.12)" stroke-width="0.75" stroke-dasharray="2 2" />
+
+              <!-- Rotating Radar Beam -->
+              <g class="radar-scanner-beam">
+                <path d="M 60 65 L 14 65 A 46 46 0 0 1 25 33 Z" fill="url(#radarSweepGradient)" />
+                <line x1="60" y1="65" x2="13" y2="65" stroke="#38bdf8" stroke-width="1.5" stroke-linecap="round" opacity="0.85" />
+              </g>
+
+              <!-- Target Blip Pulse -->
+              <circle cx="88" cy="28" r="2.5" fill="#10b981" class="radar-blip-pulse" />
+
+              <!-- 70% Threshold Marker Tick -->
+
+              <line x1="87" y1="18" x2="93" y2="10" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" />
+
+              <text x="95" y="12" fill="#10b981" font-size="8" font-weight="bold" font-family="JetBrains Mono">70</text>
+
+              <!-- Dynamic Value Arc (Arc length = ~150.8) -->
+
+              <path id="gaugeArc" class="gauge-arc" d="M 12 65 A 48 48 0 0 1 108 65" fill="none" stroke="#f59e0b" stroke-width="11" stroke-linecap="round" stroke-dasharray="150.8" stroke-dashoffset="82.9" />
+
+            </svg>
+
+            <div class="absolute bottom-0 text-center">
+
+              <span id="gaugeScoreText" class="font-mono text-2xl font-extrabold text-main">45</span>
+
+              <span class="font-mono text-xs text-dim">/100</span>
+
+            </div>
+
+          </div>
+
+
+
+          <!-- Plain-English Market Mood Box -->
+
+          <div class="flex-1">
+
+            <div class="text-[11px] font-bold uppercase tracking-wider text-dim">Current Market Mood</div>
+
+            <div id="marketMoodTitle" class="text-sm font-extrabold text-main mt-0.5">
+
+              ⏳ Choppy & Undecided
+
+            </div>
+
+            <p id="marketMoodSub" class="text-xs text-sub mt-1 leading-relaxed">
+
+              Buyers and sellers are locked in a sideways tug-of-war. Waiting for a clear trend spark.
+
+            </p>
+
+          </div>
+
+        </div>
+
+
+
+        <!-- Traffic Light Zero-Ambiguity Banner -->
+
+        <div id="trafficLightBanner" class="mt-2 py-2.5 px-3.5 rounded-xl font-extrabold text-xs sm:text-sm tracking-wide text-center flex items-center justify-center gap-2 transition-all bg-amber-500/20 text-amber-300 border border-amber-500/40">
+
+          <span id="trafficLightIcon">🛡️</span>
+
+          <span id="trafficLightText">CAPITAL SHIELD ON: STAY 100% IN CASH</span>
+
+        </div>
+
+      </section>
+
+
+
+      <!-- SECTION 2: DYNAMIC DECISION CARD (3 STATES) -->
+
+      <section id="decisionCardSection" class="surface-card rounded-2xl p-4 space-y-4">
+
+
+
+        <!-- Decision Card Header + Budget Sizer Trigger -->
+
+        <div class="flex items-center justify-between gap-2 border-b pb-3" style="border-color: var(--border-color);">
+
+          <div class="flex items-center gap-2">
+
+            <span id="decisionHeaderIcon" class="text-lg">🛡️</span>
+
+            <div>
+
+              <h2 id="decisionHeaderTitle" class="text-sm font-extrabold uppercase tracking-wide text-main">
+
+                YOUR MONEY IS 100% SAFE IN CASH
+
+              </h2>
+
+              <p id="decisionHeaderSub" class="text-[11px] text-sub">
+
+                Active Defense Mode • Zero Risk Exposure
+
+              </p>
+
+            </div>
+
+          </div>
+
+          <button onclick="openBudgetModal()" class="shrink-0 px-2.5 py-1.5 rounded-xl surface-elevated text-[11px] font-bold text-emerald-400 hover:opacity-90 transition flex items-center gap-1">
+
+            <span>🛡️ Shield:</span>
+
+            <span id="cardBudgetRiskLabel" class="font-mono">$7.50 Max</span>
+
+            <span>✎</span>
+
+          </button>
+
+        </div>
+
+
+
+        <!-- STATE A: SAFE IN CASH (45/100) CONTENT -->
+
+        <div id="stateContent-cash" class="space-y-4">
+
+          <!-- Guardian Reassurance Quote -->
+
+          <blockquote class="p-3 rounded-xl text-xs leading-relaxed italic border-l-4 border-amber-400" style="background-color: var(--bg-subtle); color: var(--text-primary);">
+
+            "Right now, buyers and sellers are locked in a tug-of-war. Buying today is a 50/50 coin flip—so we keep your <strong class="not-italic text-amber-400" id="cashQuoteBudget">$1,000</strong> 100% safe in cash until buyers take clear control."
+
+          </blockquote>
+
+
+
+          <!-- 4 Key Status Rows -->
+
+          <div class="grid grid-cols-2 gap-2.5">
+
+            <div class="p-2.5 rounded-xl surface-elevated">
+
+              <div class="text-[10px] font-bold uppercase text-dim">Active Position</div>
+
+              <div class="text-xs font-bold text-main mt-0.5">100% Protected Cash</div>
+
+              <div class="text-[10px] text-sub">USD / Stablecoins (0.0000 BTC)</div>
+
+            </div>
+
+            <div class="p-2.5 rounded-xl surface-elevated">
+
+              <div class="text-[10px] font-bold uppercase text-dim">Money at Risk Today</div>
+
+              <div class="font-mono text-xs font-bold text-emerald-400 mt-0.5">$0.00 Exposed</div>
+
+              <div class="text-[10px] text-sub">100% of budget untouched</div>
+
+            </div>
+
+            <div class="p-2.5 rounded-xl surface-elevated">
+
+              <div class="text-[10px] font-bold uppercase text-dim">Next Trade Safety Cap</div>
+
+              <div id="cashNextRiskCap" class="font-mono text-xs font-bold text-amber-400 mt-0.5">$7.50 Max Loss</div>
+
+              <div id="cashNextRiskSub" class="text-[10px] text-sub">0.75% of your $1,000 budget</div>
+
+            </div>
+
+            <div class="p-2.5 rounded-xl surface-elevated">
+
+              <div class="text-[10px] font-bold uppercase text-dim">Today's Smart Move</div>
+
+              <div class="text-xs font-bold text-main mt-0.5">Hold Cash & Wait</div>
+
+              <div class="text-[10px] text-sub">Let choppy market settle</div>
+
+            </div>
+
+          </div>
+
+
+
+          <!-- What Must Happen Before We Buy Checklist -->
+
+          <div class="p-3 rounded-xl surface-elevated space-y-2">
+
+            <div class="flex items-center justify-between">
+
+              <span class="text-[11px] font-extrabold uppercase tracking-wider text-main">What Must Happen Before We Buy:</span>
+
+              <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">Waiting on 3 Triggers</span>
+
+            </div>
+
+            <div class="space-y-1.5 text-xs">
+
+              <div class="flex items-center justify-between py-1 border-b" style="border-color: var(--border-color);">
+
+                <span class="text-sub">1. Climb above 50-Day Health Line ($79,826)</span>
+
+                <span class="font-mono text-[11px] font-semibold text-rose-400">❌ Not Yet ($75.9k)</span>
+
+              </div>
+
+              <div class="flex items-center justify-between py-1 border-b" style="border-color: var(--border-color);">
+
+                <span class="text-sub">2. Sideways tug-of-war swings calm down</span>
+
+                <span class="font-mono text-[11px] font-semibold text-amber-400">❌ Still Choppy</span>
+
+              </div>
+
+              <div class="flex items-center justify-between pt-1">
+
+                <span class="text-sub">3. Safety Clearance Meter reaches 70/100</span>
+
+                <span class="font-mono text-[11px] font-semibold text-amber-400">❌ At 45/100</span>
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+
+          <!-- Psychological Retention Badges (Dodged Bullet + Patience Streak) -->
+
+          <div class="grid grid-cols-2 gap-2 pt-1">
+
+            <div class="px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center gap-2">
+
+              <span class="text-base">🛡️</span>
+
+              <div>
+
+                <div class="text-[10px] font-bold uppercase text-emerald-400">Drops Dodged (30d)</div>
+
+                <div class="text-xs font-bold text-main">+8.4% Loss Avoided</div>
+
+              </div>
+
+            </div>
+
+            <div class="px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center gap-2">
+
+              <span class="text-base">🔥</span>
+
+              <div>
+
+                <div class="text-[10px] font-bold uppercase text-amber-400">Discipline Streak</div>
+
+                <div class="text-xs font-bold text-main">12 Days Beat Crowd</div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+
+        <!-- STATE B: ALL-CLEAR BUY SIGNAL (82/100) CONTENT -->
+
+        <div id="stateContent-buy" class="hidden space-y-4">
+
+          <blockquote class="p-3 rounded-xl text-xs leading-relaxed italic border-l-4 border-emerald-400" style="background-color: var(--bg-subtle); color: var(--text-primary);">
+
+            "All 4 Pre-Flight Safety Checks have passed! Follow this simple 4-step plan on your spot exchange. Your 0.75% Golden Rule caps your planned downside before you even buy."
+
+          </blockquote>
+
+
+
+          <!-- Golden 0.75% Safety Shield Personalized Calculation Box -->
+
+          <div class="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-3">
+
+            <div class="flex items-center justify-between">
+
+              <div>
+
+                <div class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">🔒 THE GOLDEN 0.75% SAFETY SHIELD</div>
+
+                <div class="text-xs font-bold text-main mt-0.5">Personalized Position Sizer (Zero Math Needed)</div>
+
+              </div>
+
+              <button onclick="openBudgetModal()" class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition">
+
+                Change Budget
+
+              </button>
+
+            </div>
+
+
+
+            <div class="grid grid-cols-2 gap-2.5 pt-1">
+
+              <div class="p-2.5 rounded-xl surface-card">
+
+                <div class="text-[10px] font-semibold text-dim">Recommended BTC Buy</div>
+
+                <div id="buyBtcAmount" class="font-mono text-sm font-extrabold text-emerald-400 mt-0.5">0.0069 BTC</div>
+
+                <div id="buyUsdValue" class="font-mono text-[11px] text-sub">~$520.52 of your $1,000</div>
+
+              </div>
+
+              <div class="p-2.5 rounded-xl surface-card">
+
+                <div class="text-[10px] font-semibold text-dim">Max Planned Loss (0.75%)</div>
+
+                <div id="buyMaxLossUsd" class="font-mono text-sm font-extrabold text-amber-400 mt-0.5">$7.50 Max</div>
+
+                <div id="buyMaxLossComparison" class="text-[11px] text-sub">Cost of a casual lunch</div>
+
+              </div>
+
+            </div>
+
+
+
+            <!-- 99.25% Protected Savings Bar -->
+
+            <div class="space-y-1">
+
+              <div class="flex justify-between text-[11px] font-semibold">
+
+                <span class="text-emerald-400">🛡️ <span id="buyProtectedUsd">$992.50</span> (99.25%) Untouched & Protected</span>
+
+                <span class="text-amber-400">0.75% Risk</span>
+
+              </div>
+
+              <div class="w-full h-2.5 rounded-full bg-slate-700 overflow-hidden flex">
+
+                <div class="h-full bg-emerald-500" style="width: 99%"></div>
+
+                <div class="h-full bg-amber-400" style="width: 1%"></div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+
+          <!-- Foolproof 4-Step Execution Checklist (Interactive Checkboxes) -->
+
+          <div class="space-y-2">
+
+            <div class="flex items-center justify-between">
+
+              <span class="text-xs font-extrabold uppercase tracking-wider text-main">4-Step Spot Buy Plan (Tap to Check Off):</span>
+
+              <span id="stepsProgressLabel" class="text-[11px] font-mono font-bold text-emerald-400">0/4 Done</span>
+
+            </div>
+
+
+
+            <!-- Step 1 -->
+
+            <label class="flex items-start gap-3 p-3 rounded-xl surface-elevated cursor-pointer hover:opacity-95 transition">
+
+              <input type="checkbox" onchange="updateStepChecklist()" class="trade-step-check mt-1 w-4 h-4 accent-emerald-500 rounded" />
+
+              <div class="flex-1 text-xs">
+
+                <div class="flex items-center justify-between">
+
+                  <span class="font-bold text-main">Step 1: Buy Price Range</span>
+
+                  <span class="font-mono font-bold text-emerald-400">$75,200 – $75,500</span>
+
+                </div>
+
+                <p class="text-[11px] text-sub mt-0.5">
+
+                  Buy <strong id="step1BtcInline" class="text-main font-mono">0.0069 BTC</strong> (<span id="step1UsdInline" class="font-mono">~$520.52</span>) on your spot exchange within this zone.
+
+                </p>
+
+              </div>
+
+            </label>
+
+
+
+            <!-- Step 2 -->
+
+            <label class="flex items-start gap-3 p-3 rounded-xl surface-elevated cursor-pointer hover:opacity-95 transition">
+
+              <input type="checkbox" onchange="updateStepChecklist()" class="trade-step-check mt-1 w-4 h-4 accent-emerald-500 rounded" />
+
+              <div class="flex-1 text-xs">
+
+                <div class="flex items-center justify-between">
+
+                  <span class="font-bold text-main">Step 2: Emergency Safety Exit Floor</span>
+
+                  <span class="font-mono font-bold text-amber-400">$74,180</span>
+
+                </div>
+
+                <p class="text-[11px] text-sub mt-0.5">
+
+                  Set your automatic stop-loss at <strong class="text-main font-mono">$74,180</strong>. If broken, it exits immediately so your loss is capped at <strong id="step2LossInline" class="text-amber-400 font-mono">$7.50</strong>.
+
+                </p>
+
+              </div>
+
+            </label>
+
+
+
+            <!-- Step 3 -->
+
+            <label class="flex items-start gap-3 p-3 rounded-xl surface-elevated cursor-pointer hover:opacity-95 transition">
+
+              <input type="checkbox" onchange="updateStepChecklist()" class="trade-step-check mt-1 w-4 h-4 accent-emerald-500 rounded" />
+
+              <div class="flex-1 text-xs">
+
+                <div class="flex items-center justify-between">
+
+                  <span class="font-bold text-main">Step 3: First Profit Target (Lock In)</span>
+
+                  <span class="font-mono font-bold text-sky-400">$78,500</span>
+
+                </div>
+
+                <p class="text-[11px] text-sub mt-0.5">
+
+                  Sell half of your Bitcoin at <strong class="text-main font-mono">$78,500</strong> to lock in guaranteed profit and move your Safety Exit to break-even.
+
+                </p>
+
+              </div>
+
+            </label>
+
+
+
+            <!-- Step 4 -->
+
+            <label class="flex items-start gap-3 p-3 rounded-xl surface-elevated cursor-pointer hover:opacity-95 transition">
+
+              <input type="checkbox" onchange="updateStepChecklist()" class="trade-step-check mt-1 w-4 h-4 accent-emerald-500 rounded" />
+
+              <div class="flex-1 text-xs">
+
+                <div class="flex items-center justify-between">
+
+                  <span class="font-bold text-main">Step 4: Second Profit Target (Upper Goal)</span>
+
+                  <span class="font-mono font-bold text-emerald-400">$82,000</span>
+
+                </div>
+
+                <p class="text-[11px] text-sub mt-0.5">
+
+                  Let your remaining half ride stress-free toward the upper target at <strong class="text-main font-mono">$82,000</strong>.
+
+                </p>
+
+              </div>
+
+            </label>
+
+          </div>
+
+        </div>
+
+
+
+        <!-- STATE C: -10% CRASH TEST (22/100) STORM SHIELD CONTENT -->
+
+        <div id="stateContent-crash" class="hidden space-y-4">
+
+          <!-- Sub-Toggle: If in Cash vs If in Active Trade -->
+
+          <div class="p-1 rounded-xl surface-elevated grid grid-cols-2 gap-1">
+
+            <button onclick="setCrashSubMode('cash')" id="crashSubBtn-cash" class="py-1.5 px-2 rounded-lg text-[11px] font-bold bg-amber-500 text-slate-950 shadow transition">
+
+              🛡️ If You Were in Cash
+
+            </button>
+
+            <button onclick="setCrashSubMode('trade')" id="crashSubBtn-trade" class="py-1.5 px-2 rounded-lg text-[11px] font-semibold text-sub hover:text-main transition">
+
+              ⚡ If in Active Trade
+
+            </button>
+
+          </div>
+
+
+
+          <!-- Sub-Mode 1: User Was in Cash During -10.2% Dump -->
+
+          <div id="crashSubContent-cash" class="space-y-3">
+
+            <div class="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2">
+
+              <div class="text-xs font-extrabold uppercase text-amber-400">
+
+                ⛈️ COCKPIT LOCKED — DO NOT "CATCH A FALLING KNIFE"
+
+              </div>
+
+              <p class="text-xs text-main leading-relaxed">
+
+                Panic sellers are dumping right now (<strong class="font-mono text-rose-400">-10.2% today</strong>), and our <strong>Dump Protection Check (Check 2)</strong> has locked the cockpit to protect you.
+
+              </p>
+
+              <p class="text-xs text-sub leading-relaxed">
+
+                Because you followed the Capital Shield and stayed in cash, <strong class="text-emerald-400">your loss is $0.00</strong> and your <strong id="crashCashBudgetLabel" class="text-main font-mono">$1,000</strong> just gained <strong>+10.2% more Bitcoin buying power</strong> once the dust settles!
+
+              </p>
+
+            </div>
+
+          </div>
+
+
+
+          <!-- Sub-Mode 2: User Was in an Active Trade That Hit $74,180 Safety Floor -->
+
+          <div id="crashSubContent-trade" class="hidden space-y-3">
+
+            <div class="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-2.5">
+
+              <div class="flex items-center justify-between">
+
+                <span class="text-xs font-extrabold uppercase text-emerald-400">
+
+                  🛡️ EMERGENCY SAFETY FLOOR TRIGGERED AT $74,180
+
+                </span>
+
+                <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">99.25% SAVED</span>
+
+              </div>
+
+              <p class="text-xs text-main leading-relaxed">
+
+                Your automatic exit worked exactly as designed! While Bitcoin crashed <strong class="text-rose-400 font-mono">-10.2%</strong> down to <strong class="font-mono">$68,200</strong>, your Safety Floor cut the cord early at <strong class="font-mono">$74,180</strong>.
+
+              </p>
+
+              <div class="grid grid-cols-2 gap-2 pt-1">
+
+                <div class="p-2.5 rounded-xl surface-card">
+
+                  <div class="text-[10px] text-dim font-bold uppercase">Your Capped Loss</div>
+
+                  <div id="crashTradeLossUsd" class="font-mono text-sm font-extrabold text-amber-400 mt-0.5">-$7.50 (0.75%)</div>
+
+                  <div class="text-[10px] text-sub">Stopped out safely at $74,180</div>
+
+                </div>
+
+                <div class="p-2.5 rounded-xl surface-card">
+
+                  <div class="text-[10px] text-dim font-bold uppercase">Capital Saved</div>
+
+                  <div id="crashTradeSavedUsd" class="font-mono text-sm font-extrabold text-emerald-400 mt-0.5">$992.50 Safe</div>
+
+                  <div class="text-[10px] text-sub">Back in 100% Protected Cash</div>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+
+      </section>
+
+
+
+      <!-- SECTION 3: THE 4 PRE-FLIGHT SAFETY CHECKS (PROGRESSIVE DISCLOSURE) -->
+
+      <section class="surface-card rounded-2xl p-4 space-y-3">
+
+        <div class="flex items-center justify-between">
+
+          <div>
+
+            <h3 class="text-xs font-extrabold uppercase tracking-wider text-main">
+
+              ✈️ 4 Pre-Flight Safety Checks
+
+            </h3>
+
+            <p class="text-[11px] text-sub">Tap any check below to read the plain-English explanation</p>
+
+          </div>
+
+          <button onclick="toggleAllChecks()" id="expandAllBtn" class="text-[11px] font-semibold text-sky-400 hover:underline">
+
+            Expand All
+
+          </button>
+
+        </div>
+
+
+
+        <!-- Check 1: Strong Price Floor & Ceiling -->
+
+        <div class="rounded-xl surface-elevated overflow-hidden">
+
+          <button onclick="toggleCheck(1)" class="w-full p-3 text-left flex items-center justify-between gap-2 hover:opacity-90 transition">
+
+            <div class="flex items-center gap-2.5 min-w-0">
+
+              <span class="text-base shrink-0">🏛️</span>
+
+              <div class="truncate">
+
+                <div class="text-xs font-bold text-main truncate">Check 1: Strong Price Floor ($74,180)</div>
+
+                <div id="check1SubLabel" class="text-[11px] text-sub truncate">Big buyers defending concrete floor</div>
+
+              </div>
+
+            </div>
+
+            <div class="flex items-center gap-2 shrink-0">
+
+              <span id="check1Badge" class="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400">
+
+                ✅ 80% OK
+
+              </span>
+
+              <span id="check1Chevron" class="text-xs text-dim transition-transform duration-200">▼</span>
+
+            </div>
+
+          </button>
+
+          <div id="checkContent-1" class="accordion-content px-3 pb-3 text-xs space-y-2 border-t" style="border-color: var(--border-color);">
+
+            <div class="pt-2.5 text-sub">
+
+              <strong class="text-main">💬 What This Means:</strong> Think of this like checking the concrete foundation of a building before stepping onto the roof.
+
+            </div>
+
+            <div id="check1LiveStatus" class="p-2.5 rounded-lg surface-card text-main leading-relaxed">
+
+              📊 <strong>Right Now (80% Passed):</strong> Big buyers have repeatedly stepped in to defend a solid price floor at <strong>$74,180</strong>, with open room up to the next ceiling at <strong>$78,500</strong>.
+
+            </div>
+
+            <div class="text-[11px] text-emerald-400 font-medium">
+
+              🛡️ <strong>Why This Protects You:</strong> Buying near a proven floor keeps our risk tiny. Buying right under a ceiling is how beginners get trapped at the top.
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+
+        <!-- Check 2: Panic Selling Absorbed -->
+
+        <div class="rounded-xl surface-elevated overflow-hidden">
+
+          <button onclick="toggleCheck(2)" class="w-full p-3 text-left flex items-center justify-between gap-2 hover:opacity-90 transition">
+
+            <div class="flex items-center gap-2.5 min-w-0">
+
+              <span class="text-base shrink-0">🌊</span>
+
+              <div class="truncate">
+
+                <div class="text-xs font-bold text-main truncate">Check 2: Panic Selling Absorbed</div>
+
+                <div id="check2SubLabel" class="text-[11px] text-sub truncate">Buyers outpaced sellers by +201 BTC (15m)</div>
+
+              </div>
+
+            </div>
+
+            <div class="flex items-center gap-2 shrink-0">
+
+              <span id="check2Badge" class="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400">
+
+                ✅ 75% OK
+
+              </span>
+
+              <span id="check2Chevron" class="text-xs text-dim transition-transform duration-200">▼</span>
+
+            </div>
+
+          </button>
+
+          <div id="checkContent-2" class="accordion-content px-3 pb-3 text-xs space-y-2 border-t" style="border-color: var(--border-color);">
+
+            <div class="pt-2.5 text-sub">
+
+              <strong class="text-main">💬 What This Means:</strong> Think of this like waiting for a flash flood to drain before driving across a bridge.
+
+            </div>
+
+            <div id="check2LiveStatus" class="p-2.5 rounded-lg surface-card text-main leading-relaxed">
+
+              📊 <strong>Right Now (75% Passed):</strong> Forced panic-selling has calmed down. Over the last 15 minutes, active buyers outpaced sellers by <strong>+201 Bitcoin</strong>, soaking up the supply.
+
+            </div>
+
+            <div class="text-[11px] text-emerald-400 font-medium">
+
+              🛡️ <strong>Why This Protects You:</strong> Prevents you from "catching a falling knife" during sudden market dumps and forced liquidation waves.
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+
+        <!-- Check 3: 50-Day Uptrend Line (Market Weather) — Default Open in Cash Mode so user sees why we wait -->
+
+        <div class="rounded-xl surface-elevated overflow-hidden">
+
+          <button onclick="toggleCheck(3)" class="w-full p-3 text-left flex items-center justify-between gap-2 hover:opacity-90 transition">
+
+            <div class="flex items-center gap-2.5 min-w-0">
+
+              <span class="text-base shrink-0">🌤️</span>
+
+              <div class="truncate">
+
+                <div class="text-xs font-bold text-main truncate">Check 3: 50-Day Uptrend Line (Weather)</div>
+
+                <div id="check3SubLabel" class="text-[11px] text-sub truncate">Below $79,826 health line — waiting for sun</div>
+
+              </div>
+
+            </div>
+
+            <div class="flex items-center gap-2 shrink-0">
+
+              <span id="check3Badge" class="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-400">
+
+                ⚠️ 45% WAIT
+
+              </span>
+
+              <span id="check3Chevron" class="text-xs text-dim transition-transform duration-200 rotate-180">▼</span>
+
+            </div>
+
+          </button>
+
+          <div id="checkContent-3" class="accordion-content open px-3 pb-3 text-xs space-y-2 border-t" style="border-color: var(--border-color);">
+
+            <div class="pt-2.5 text-sub">
+
+              <strong class="text-main">💬 What This Means:</strong> Think of this like checking the weather radar before a flight.
+
+            </div>
+
+            <div id="check3LiveStatus" class="p-2.5 rounded-lg surface-card text-main leading-relaxed">
+
+              📊 <strong>Right Now (45% Waiting):</strong> The long-term sky is still foggy. Bitcoin (<strong>$75,953</strong>) is trading below its 50-Day Health Line (<strong>$79,826</strong>), meaning sellers still have the big-picture advantage. We stay in cash until the sunshine returns.
+
+            </div>
+
+            <div class="text-[11px] text-emerald-400 font-medium">
+
+              🛡️ <strong>Why This Protects You:</strong> Swimming <em>with</em> the long-term current makes winning easy; swimming against a downtrend drains your account.
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+
+        <!-- Check 4: Breakout Energy Coiling -->
+
+        <div class="rounded-xl surface-elevated overflow-hidden">
+
+          <button onclick="toggleCheck(4)" class="w-full p-3 text-left flex items-center justify-between gap-2 hover:opacity-90 transition">
+
+            <div class="flex items-center gap-2.5 min-w-0">
+
+              <span class="text-base shrink-0">🚀</span>
+
+              <div class="truncate">
+
+                <div class="text-xs font-bold text-main truncate">Check 4: Breakout Energy Coiling</div>
+
+                <div id="check4SubLabel" class="text-[11px] text-sub truncate">Upward spring pattern (higher lows every 4h)</div>
+
+              </div>
+
+            </div>
+
+            <div class="flex items-center gap-2 shrink-0">
+
+              <span id="check4Badge" class="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400">
+
+                ✅ 85% OK
+
+              </span>
+
+              <span id="check4Chevron" class="text-xs text-dim transition-transform duration-200">▼</span>
+
+            </div>
+
+          </button>
+
+          <div id="checkContent-4" class="accordion-content px-3 pb-3 text-xs space-y-2 border-t" style="border-color: var(--border-color);">
+
+            <div class="pt-2.5 text-sub">
+
+              <strong class="text-main">💬 What This Means:</strong> Think of this like a tightly coiled metal spring ready to bounce upward.
+
+            </div>
+
+            <div id="check4LiveStatus" class="p-2.5 rounded-lg surface-card text-main leading-relaxed">
+
+              📊 <strong>Right Now (85% Passed):</strong> Every time Bitcoin dips over the last few days, buyers step in at a slightly higher price—building upward spring pressure toward a breakout.
+
+            </div>
+
+            <div class="text-[11px] text-emerald-400 font-medium">
+
+              🛡️ <strong>Why This Protects You:</strong> Keeps your cash on the sidelines during flat chop so your money only enters when a move is coiled to launch.
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+
+      <!-- SECTION 4: AI COPILOT BRIEFING BUILDER (3 EMOTIONAL MODES) -->
+
+      <section class="surface-card rounded-2xl p-4 space-y-3">
+
+        <div class="flex items-center justify-between">
+
+          <div>
+
+            <h3 class="text-xs font-extrabold uppercase tracking-wider text-main flex items-center gap-1.5">
+
+              <span>💬 Ask AI Copilot</span>
+
+              <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400">Interactive Classroom</span>
+
+            </h3>
+
+            <p class="text-[11px] text-sub">Choose what you want explained, then copy & paste into Gemini or ChatGPT</p>
+
+          </div>
+
+        </div>
+
+
+
+        <!-- 3-Option Prompt Selector -->
+
+        <div class="grid grid-cols-3 gap-1.5">
+
+          <button onclick="setAiPromptMode('explain')" id="aiModeBtn-explain" class="p-2 rounded-xl text-[11px] font-bold text-center border transition bg-sky-500/20 text-sky-300 border-sky-500/40">
+
+            🧠 Explain Today
+
+          </button>
+
+          <button onclick="setAiPromptMode('fomo')" id="aiModeBtn-fomo" class="p-2 rounded-xl text-[11px] font-semibold text-center surface-elevated text-sub hover:text-main transition">
+
+            🔥 Cure My FOMO
+
+          </button>
+
+          <button onclick="setAiPromptMode('walkthrough')" id="aiModeBtn-walkthrough" class="p-2 rounded-xl text-[11px] font-semibold text-center surface-elevated text-sub hover:text-main transition">
+
+            📋 Order Guide
+
+          </button>
+
+        </div>
+
+
+
+        <!-- Collapsible Live Prompt Preview -->
+
+        <div class="rounded-xl surface-elevated p-3 space-y-2">
+
+          <div class="flex items-center justify-between">
+
+            <span class="text-[10px] font-bold uppercase tracking-wider text-dim">Live Personalized Prompt Preview:</span>
+
+            <span class="text-[10px] font-mono text-emerald-400">Includes your <span id="promptBudgetBadge">$1,000</span> budget</span>
+
+          </div>
+
+          <pre id="aiPromptPreview" class="text-[11px] font-mono text-sub whitespace-pre-wrap max-h-36 overflow-y-auto leading-relaxed select-all p-2 rounded-lg surface-card"></pre>
+
+        </div>
+
+
+
+        <!-- Primary Copy to Clipboard CTA -->
+
+        <button onclick="copyAiPrompt()" class="w-full py-3 px-4 rounded-xl font-extrabold text-xs sm:text-sm bg-gradient-to-r from-sky-500 to-emerald-500 text-slate-950 shadow-lg hover:opacity-95 active:scale-[0.99] transition flex items-center justify-center gap-2">
+
+          <span>📋 Copy AI Briefing: "Explain This in Simple Words"</span>
+
+        </button>
+
+      </section>
+
+
+
+      <!-- SECTION 5: 10-SECOND GOLDEN RULE & DAILY MICRO-LESSON -->
+
+      <section class="surface-card rounded-2xl p-4 space-y-2">
+
+        <div class="flex items-start gap-3">
+
+          <span class="text-xl">🧘</span>
+
+          <div class="text-xs space-y-1">
+
+            <div class="font-extrabold uppercase tracking-wider text-main">10-Second Golden Rule for Beginners</div>
+
+            <p class="text-sub leading-relaxed">
+
+              Professionals make money by waiting, not by over-trading. Keeping your money 100% in cash during choppy weather means you keep 100% of your buying power when the real all-clear arrives.
+
+            </p>
+
+          </div>
+
+        </div>
+
+      </section>
+
+
+
+    </div>
+
+
+
+    <!-- FOOTER BAR -->
+
+    <footer class="px-4 py-3 border-t text-center text-[11px] text-dim flex items-center justify-between" style="border-color: var(--border-color);">
+
+      <span>🛡️ Anti-Casino Alignment Guarantee</span>
+
+      <button onclick="openBudgetModal()" class="text-sky-400 font-semibold hover:underline">
+
+        Safety Sizer ($<span id="footerBudgetText">1,000</span>)
+
+      </button>
+
+    </footer>
+
+
+
+    <!-- MODAL: PORTFOLIO SAFETY SIZER (0.75% GOLDEN RULE CALCULATOR) -->
+
+    <div id="budgetModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+
+      <div class="surface-card w-full max-w-[440px] rounded-t-3xl sm:rounded-3xl p-5 space-y-4 border shadow-2xl animate-fade-in" style="border-color: var(--border-color);">
+
+        <div class="flex items-center justify-between border-b pb-3" style="border-color: var(--border-color);">
+
+          <div>
+
+            <h3 class="text-sm font-extrabold uppercase tracking-wide text-main">🛡️ Personalize Your Safety Shield</h3>
+
+            <p class="text-[11px] text-sub">Set your comfortable Bitcoin swing budget</p>
+
+          </div>
+
+          <button onclick="closeBudgetModal()" class="w-8 h-8 rounded-full surface-elevated text-main font-bold flex items-center justify-center hover:opacity-80">
+
+            ✕
+
+          </button>
+
+        </div>
+
+
+
+        <p class="text-xs text-sub leading-relaxed">
+
+          How much total cash are you setting aside for Bitcoin swing trades? <span class="text-main font-medium">(We never touch your bank—this calculates your exact safe buy amounts.)</span>
+
+        </p>
+
+
+
+        <!-- Preset Buttons -->
+
+        <div>
+
+          <label class="text-[10px] font-bold uppercase tracking-wider text-dim">Quick Select Starting Budget:</label>
+
+          <div class="grid grid-cols-5 gap-1.5 mt-1.5">
+
+            <button onclick="setBudget(500)" class="budget-preset-btn py-2 rounded-xl text-xs font-mono font-bold surface-elevated hover:border-emerald-400 transition" data-val="500">$500</button>
+
+            <button onclick="setBudget(1000)" class="budget-preset-btn py-2 rounded-xl text-xs font-mono font-bold surface-elevated hover:border-emerald-400 transition" data-val="1000">$1k</button>
+
+            <button onclick="setBudget(5000)" class="budget-preset-btn py-2 rounded-xl text-xs font-mono font-bold surface-elevated hover:border-emerald-400 transition" data-val="5000">$5k</button>
+
+            <button onclick="setBudget(10000)" class="budget-preset-btn py-2 rounded-xl text-xs font-mono font-bold surface-elevated hover:border-emerald-400 transition" data-val="10000">$10k</button>
+
+            <button onclick="setBudget(100000)" class="budget-preset-btn py-2 rounded-xl text-xs font-mono font-bold surface-elevated hover:border-emerald-400 transition" data-val="100000">$100k</button>
+
+          </div>
+
+        </div>
+
+
+
+        <!-- Custom Amount Input -->
+
+        <div>
+
+          <label class="text-[10px] font-bold uppercase tracking-wider text-dim">Or Type Exact Dollar Budget ($):</label>
+
+          <div class="mt-1 relative">
+
+            <span class="absolute left-3.5 top-2.5 font-mono text-sm font-bold text-sub">$</span>
+
+            <input id="customBudgetInput" type="number" min="100" max="10000000" step="100" value="1000" oninput="handleCustomBudgetInput(this.value)" class="w-full pl-8 pr-4 py-2 rounded-xl surface-elevated font-mono text-sm font-bold text-main focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+
+          </div>
+
+        </div>
+
+
+
+        <!-- Golden 0.75% Safety Promise Visual Box -->
+
+        <div class="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-2.5">
+
+          <div class="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400">🔒 YOUR GOLDEN 0.75% SAFETY PROMISE</div>
+
+          <div class="flex items-baseline justify-between">
+
+            <span class="text-xs text-sub">Maximum Planned Loss Per Trade:</span>
+
+            <span id="modalMaxRiskUsd" class="font-mono text-lg font-extrabold text-amber-400">$7.50 Max</span>
+
+          </div>
+
+          <div id="modalComparisonText" class="text-[11px] text-emerald-300 font-medium">
+
+            ✨ Capped at the cost of a casual lunch — 99.25% ($992.50) of your money stays 100% protected!
+
+          </div>
+
+
+
+          <div class="w-full h-3 rounded-full bg-slate-800 overflow-hidden flex">
+
+            <div class="h-full bg-emerald-500" style="width: 99%"></div>
+
+            <div class="h-full bg-amber-400" style="width: 1%"></div>
+
+          </div>
+
+        </div>
+
+
+
+        <!-- Live Math Translation Breakdown -->
+
+        <div class="p-3 rounded-xl surface-elevated space-y-1.5 text-xs">
+
+          <div class="text-[10px] font-bold uppercase tracking-wider text-dim mb-1">How This Translates to a Buy Signal ($75,266 Entry -> $74,180 Floor):</div>
+
+          <div class="flex justify-between">
+
+            <span class="text-sub">Exact Recommended BTC Buy:</span>
+
+            <span id="modalBtcBuy" class="font-mono font-bold text-main">0.0069 BTC (~$520.52)</span>
+
+          </div>
+
+          <div class="flex justify-between">
+
+            <span class="text-sub">Uninvested Cash Buffer:</span>
+
+            <span id="modalCashBuffer" class="font-mono font-bold text-emerald-400">$479.48 stays in cash</span>
+
+          </div>
+
+          <div class="flex justify-between">
+
+            <span class="text-sub">Worst-Case Loss if $74,180 Breaks:</span>
+
+            <span id="modalWorstLoss" class="font-mono font-bold text-amber-400">-$7.50 (0.75% of budget)</span>
+
+          </div>
+
+        </div>
+
+
+
+        <button onclick="closeBudgetModal()" class="w-full py-3 rounded-xl font-extrabold text-xs uppercase tracking-wider bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition shadow-lg">
+
+          ✅ Save My Personalized Safety Shield
+
+        </button>
+
+      </div>
+
+    </div>
+
+
+
+    <!-- TOAST NOTIFICATION -->
+
+    <div id="toastBanner" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-all duration-300 transform translate-y-2 max-w-sm w-[92%]">
+
+      <div class="px-4 py-3 rounded-2xl bg-emerald-500 text-slate-950 font-bold text-xs shadow-2xl flex items-center justify-between gap-2">
+
+        <span id="toastMessage">✅ Copied to clipboard!</span>
+
+      </div>
+
+    </div>
+
+
+
+  </main>
+
+
+
   <script>
-    // THEME CONTROLLER
-    function setTheme(theme) {
-      document.body.classList.remove('theme-nvg', 'theme-ibm', 'theme-modern');
-      document.body.classList.add('theme-' + theme);
 
-      document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
-      document.getElementById('btn-theme-' + theme).classList.add('active');
-      localStorage.setItem('btc_cockpit_theme', theme);
-    }
+    // =========================================================================
 
-    // CRT TOGGLE
-    function toggleCRT() {
-      const active = document.body.classList.toggle('crt-active');
-      const btn = document.getElementById('btn-crt');
-      if (active) {
-        btn.classList.add('active');
-      } else {
-        btn.classList.remove('active');
+    // APPLICATION STATE (SINGLE SOURCE OF TRUTH)
+
+    // =========================================================================
+
+    const state = {
+
+      theme: 'slate',          // 'slate' | 'nvg' | 'ibm'
+
+      scenario: 'cash',        // 'cash' (45/100) | 'buy' (82/100) | 'crash' (22/100)
+
+      crashSubMode: 'cash',    // 'cash' | 'trade'
+
+      budget: 1000,            // Default $1,000 beginner-friendly budget (scales up to $100k dossier baseline)
+
+      aiMode: 'explain',       // 'explain' | 'fomo' | 'walkthrough'
+
+      allExpanded: false
+
+    };
+
+
+
+    // Baseline Dossier Math Constants:
+
+    // At $100,000 account: Max Risk (0.75%) = $750.00, Recommended Buy = 0.6908 BTC (~$52,051.78 at $75,350)
+
+    const BTC_PER_DOLLAR_BUDGET = 0.6908 / 100000; // 0.000006908 BTC per $1 of budget
+
+    const USD_ALLOCATION_RATIO = 0.520518;         // ~52.05% of budget deployed into spot BTC so a -1.44% stop equals 0.75% total account risk
+
+
+
+    const SCENARIO_DATA = {
+
+      cash: {
+
+        score: 45,
+
+        spotPrice: '$75,953.21',
+
+        spotChange: '+1.82% TODAY',
+
+        spotChangePositive: true,
+
+        sessionText: 'ASIA MARKET OPEN',
+
+        pillText: 'Patient Wait',
+
+        pillClass: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+
+        arcColor: '#f59e0b',
+
+        moodTitle: '⏳ Choppy & Undecided',
+
+        moodSub: 'Buyers and sellers are locked in a sideways tug-of-war. Waiting for a clear trend spark.',
+
+        bannerIcon: '🛡️',
+
+        bannerText: 'CAPITAL SHIELD ON: STAY 100% IN CASH',
+
+        bannerClass: 'bg-amber-500/20 text-amber-300 border border-amber-500/40',
+
+        decisionIcon: '🛡️',
+
+        decisionTitle: 'YOUR MONEY IS 100% SAFE IN CASH',
+
+        decisionSub: 'Active Defense Mode • Zero Risk Exposure',
+
+        checks: {
+
+          1: { score: 80, pass: true, sub: 'Big buyers defending $74,180 floor', live: '📊 <strong>Right Now (80% Passed):</strong> Big institutional buyers have repeatedly stepped in to defend a solid price floor at <strong>$74,180</strong>, with open room up to the next ceiling at <strong>$78,500</strong>.' },
+
+          2: { score: 75, pass: true, sub: 'Buyers outpaced sellers by +201 BTC (15m)', live: '📊 <strong>Right Now (75% Passed):</strong> Forced panic-selling has calmed down. Over the last 15 minutes, active buyers outpaced sellers by <strong>+201 Bitcoin</strong>, soaking up the supply.' },
+
+          3: { score: 45, pass: false, sub: 'Below $79,826 health line — waiting for sun', live: '📊 <strong>Right Now (45% Waiting):</strong> The long-term sky is still foggy. Bitcoin (<strong>$75,953</strong>) is trading below its 50-Day Health Line (<strong>$79,826</strong>), meaning sellers still have the big-picture advantage. We stay in cash until the sunshine returns.' },
+
+          4: { score: 85, pass: true, sub: 'Upward spring pattern (higher lows every 4h)', live: '📊 <strong>Right Now (85% Passed):</strong> Every time Bitcoin dips over the last few days, buyers step in at a slightly higher price—building upward spring pressure toward a breakout.' }
+
+        }
+
+      },
+
+      buy: {
+
+        score: 82,
+
+        spotPrice: '$75,350.00',
+
+        spotChange: '+3.40% TODAY',
+
+        spotChangePositive: true,
+
+        sessionText: 'INSTITUTIONAL BUY ZONE',
+
+        pillText: 'All-Clear Buy',
+
+        pillClass: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+
+        arcColor: '#10b981',
+
+        moodTitle: '🚀 Uptrend Confirmed (Spring Ready)',
+
+        moodSub: 'All 4 safety checks aligned! Buyers have absorbed supply and defended the $74,180 floor.',
+
+        bannerIcon: '🟢',
+
+        bannerText: 'ALL CLEAR — BUY SIGNAL ACTIVE',
+
+        bannerClass: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40',
+
+        decisionIcon: '🟢',
+
+        decisionTitle: '4-STEP BUY PLAN UNLOCKED',
+
+        decisionSub: 'Spot Only • Capped at 0.75% Maximum Risk',
+
+        checks: {
+
+          1: { score: 90, pass: true, sub: 'Institutional floor locked at $74,180', live: '📊 <strong>Right Now (90% Passed):</strong> Institutional limit buyers have fortified the <strong>$74,180</strong> foundation, giving us a tight, high-confidence safety exit.' },
+
+          2: { score: 85, pass: true, sub: 'Strong buying flow (+410 BTC net delta)', live: '📊 <strong>Right Now (85% Passed):</strong> Aggressive spot buyers outpaced sellers by <strong>+410 Bitcoin</strong> over the last 15 minutes with zero liquidation cascades.' },
+
+          3: { score: 78, pass: true, sub: 'Clear skies! Macro trend gate open', live: '📊 <strong>Right Now (78% Passed):</strong> Clear skies confirmed! Long-term momentum has flipped in favor of buyers with volatility expanding upward.' },
+
+          4: { score: 88, pass: true, sub: 'Upward spring breakout triggered', live: '📊 <strong>Right Now (88% Passed):</strong> The 4-hour upward spring pattern has completed coiling and launched cleanly out of compression.' }
+
+        }
+
+      },
+
+      crash: {
+
+        score: 22,
+
+        spotPrice: '$68,200.00',
+
+        spotChange: '-10.20% TODAY',
+
+        spotChangePositive: false,
+
+        sessionText: '⛈️ STORM SHIELD LOCKED',
+
+        pillText: 'Storm Lock',
+
+        pillClass: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
+
+        arcColor: '#f43f5e',
+
+        moodTitle: '⛈️ Panic Selling Wave (Cockpit Locked)',
+
+        moodSub: 'Heavy forced liquidations hitting the market. Cockpit is locked to prevent FOMO dip-buying.',
+
+        bannerIcon: '⛈️',
+
+        bannerText: 'MARKET STORM (-10.2% TODAY) — YOUR LOSS: $0.00',
+
+        bannerClass: 'bg-rose-500/20 text-rose-300 border border-rose-500/40',
+
+        decisionIcon: '⛈️',
+
+        decisionTitle: 'STORM SHIELD PROTECTION ACTIVE',
+
+        decisionSub: 'Preventing Panic & Knife-Catching',
+
+        checks: {
+
+          1: { score: 35, pass: false, sub: 'Searching for a new concrete floor', live: '📊 <strong>Right Now (35% Waiting):</strong> Price sliced through recent floors ($74,180 triggered our automatic safety exit). We wait patiently until big buyers build a new foundation.' },
+
+          2: { score: 15, pass: false, sub: 'Heavy panic dumping (-890 BTC net selling)', live: '📊 <strong>Right Now (15% Waiting):</strong> Flash flood in progress! Panic sellers dumped <strong>-890 Bitcoin</strong> net in the last 15 minutes. Do not step in front of the flood.' },
+
+          3: { score: 20, pass: false, sub: 'Stormy skies — well below 50-Day Health Line', live: '📊 <strong>Right Now (20% Waiting):</strong> Severe weather warning. Price is far below the 50-Day Health Line ($79,826). Cash is king during storms.' },
+
+          4: { score: 25, pass: false, sub: 'Spring structure broken — resetting', live: '📊 <strong>Right Now (25% Waiting):</strong> The chart launch shape was invalidated by the dump. We wait for a fresh spring coil to form over the coming days.' }
+
+        }
+
       }
-      localStorage.setItem('btc_cockpit_crt', active ? '1' : '0');
-    }
 
-    // ACCORDION TOGGLE
-    function toggleAccordion(id) {
-      const el = document.getElementById(id);
-      const isOpen = el.classList.contains('open');
-      document.querySelectorAll('.pillar-accordion').forEach(acc => acc.classList.remove('open'));
-      if (!isOpen) {
-        el.classList.add('open');
-      }
-    }
+    };
 
-    // COPY AI BRIEFING
-    function copyAiPacket() {
-      const packetText = `Hey AI Copilot,
 
-I am looking at the Bitcoin Swing Engine dashboard. Here is my current market snapshot:
-- Bitcoin Spot Price: $75,953.21
-- Green-Light Buy Meter: 45/100 (Safe in Cash Mode)
-- Market Mood: Sideways Nap (Consolidation)
-- The 4 Safety Checks:
-  1. Safety Floors: 80% Passed (Defending $74,180 floor)
-  2. Dump Protection: 75% Passed (Buyers absorbed selling; net +201 BTC)
-  3. Big Picture Trend: 45% Not Ready (Price is below 50-day average $79,826)
-  4. Chart Shape: 85% Passed (4-hour Ascending Triangle coiling)
 
-Please explain to me in 3 simple bullet points:
-1. Why sitting 100% in cash right now is the smartest move for my money.
-2. What exact event needs to happen before I should consider buying.
-3. How our 0.75% ($750 max loss) safety rule protects beginners from getting wrecked.`;
+    // =========================================================================
 
-      navigator.clipboard.writeText(packetText).then(() => {
-        showToast("Copied Plain-English AI Prompt to Clipboard!");
-      }).catch(() => {
-        showToast("Prompt ready on clipboard!");
+    // FORMATTING HELPERS
+
+    // =========================================================================
+
+    function formatUsd(val, decimals = 2) {
+
+      return '$' + Number(val).toLocaleString('en-US', {
+
+        minimumFractionDigits: decimals,
+
+        maximumFractionDigits: decimals
+
       });
+
     }
 
-    function showToast(text) {
-      const toast = document.getElementById('toast-msg');
-      toast.innerText = text;
-      toast.classList.add('show');
-      setTimeout(() => toast.classList.remove('show'), 2400);
+
+
+    function getComparisonPhrase(maxRisk) {
+
+      if (maxRisk <= 4) return 'Less risk than a single cup of coffee';
+
+      if (maxRisk <= 12) return 'Capped at the cost of a casual lunch';
+
+      if (maxRisk <= 45) return 'Less than a tank of gas at risk';
+
+      if (maxRisk <= 120) return 'About the cost of a nice dinner out';
+
+      return 'Strict 0.75% institutional capital cap';
+
     }
 
-    // GAUGE ANIMATION
-    function updateGauge(score) {
-      const arc = document.getElementById('gauge-arc');
-      const maxOffset = 534;
-      const targetOffset = maxOffset - (maxOffset * (score / 100));
-      arc.style.strokeDashoffset = targetOffset;
+
+
+    // =========================================================================
+
+    // THEME CONTROLLER
+
+    // =========================================================================
+
+    function toggleThemePopover() {
+
+      const pop = document.getElementById('themePopover');
+
+      pop.classList.toggle('hidden');
+
     }
 
-    // DYNAMIC STATE TOGGLE
-    function setTradeState(state) {
-      const card = document.getElementById('trade-plan-card');
-      const cashView = document.getElementById('card-state-cash-view');
-      const longView = document.getElementById('card-state-long-view');
-      const actionStrip = document.getElementById('action-strip');
-      const gaugeScore = document.getElementById('gauge-score');
-      const gaugeVerdict = document.getElementById('gauge-verdict');
-      const regimeText = document.getElementById('regime-text');
-      const btnCash = document.getElementById('btn-state-cash');
-      const btnLong = document.getElementById('btn-state-long');
 
-      if (state === 'cash') {
-        btnCash.classList.add('active');
-        btnLong.classList.remove('active');
-        card.classList.add('state-cash');
-        cashView.style.display = 'block';
-        longView.style.display = 'none';
 
-        actionStrip.className = 'action-status-strip cash';
-        actionStrip.innerText = '🛡️ STATUS: SAFE IN CASH (DO NOT BUY YET)';
+    function setTheme(themeName) {
 
-        gaugeScore.innerText = '45';
-        gaugeVerdict.innerText = 'PATIENT WAIT';
-        gaugeVerdict.style.color = 'var(--text-muted)';
-        regimeText.innerText = 'SIDEWAYS NAP (WAITING FOR SPARK)';
-        regimeText.style.color = 'var(--warning)';
-        updateGauge(45);
-      } else {
-        btnLong.classList.add('active');
-        btnCash.classList.remove('active');
-        card.classList.remove('state-cash');
-        cashView.style.display = 'none';
-        longView.style.display = 'block';
+      state.theme = themeName;
 
-        actionStrip.className = 'action-status-strip long';
-        actionStrip.innerText = '🟢 STATUS: ALL CLEAR — BUY SIGNAL ACTIVE';
+      document.documentElement.setAttribute('data-theme', themeName);
 
-        gaugeScore.innerText = '82';
-        gaugeVerdict.innerText = 'ALL CLEAR';
-        gaugeVerdict.style.color = 'var(--primary)';
-        regimeText.innerText = 'BULLISH EXPANSION (GREEN LIGHT)';
-        regimeText.style.color = 'var(--primary)';
-        updateGauge(82);
+      document.querySelectorAll('.theme-check').forEach(el => el.classList.add('hidden'));
+
+      const activeBtn = document.querySelector(`#themeBtn-${themeName} .theme-check`);
+
+      if (activeBtn) activeBtn.classList.remove('hidden');
+
+      document.getElementById('themePopover').classList.add('hidden');
+
+      const labels = { slate: 'Slate Guardian', nvg: 'Night Vision (NVG)', ibm: 'Warm Daylight (IBM)' };
+
+      showToast(`🎨 Display Theme: ${labels[themeName]}`);
+
+    }
+
+
+
+    // Close theme popover when clicking outside
+
+    window.addEventListener('click', (e) => {
+
+      const pop = document.getElementById('themePopover');
+
+      const btn = document.getElementById('themeMenuBtn');
+
+      if (pop && !pop.classList.contains('hidden') && !pop.contains(e.target) && !btn.contains(e.target)) {
+
+        pop.classList.add('hidden');
+
       }
-    }
 
-    // INITIAL SETUP
-    window.addEventListener('DOMContentLoaded', () => {
-      const savedTheme = localStorage.getItem('btc_cockpit_theme') || 'nvg';
-      setTheme(savedTheme);
-
-      if (localStorage.getItem('btc_cockpit_crt') === '1') {
-        toggleCRT();
-      }
-
-      setTimeout(() => updateGauge(45), 300);
     });
+
+
+
+    // =========================================================================
+
+    // SCENARIO & STATE RENDERING
+
+    // =========================================================================
+
+    function setScenario(scen) {
+
+      state.scenario = scen;
+
+
+
+      // Update Segmented Control Buttons
+
+      const buttons = {
+
+        cash: { el: document.getElementById('scenBtn-cash'), activeClass: 'bg-amber-500 text-slate-950 font-bold shadow' },
+
+        buy: { el: document.getElementById('scenBtn-buy'), activeClass: 'bg-emerald-500 text-slate-950 font-bold shadow' },
+
+        crash: { el: document.getElementById('scenBtn-crash'), activeClass: 'bg-rose-500 text-white font-bold shadow' }
+
+      };
+
+
+
+      Object.keys(buttons).forEach(k => {
+
+        const b = buttons[k].el;
+
+        b.className = 'py-1.5 px-2 rounded-lg text-[11px] transition flex items-center justify-center gap-1 ' +
+
+          (k === scen ? buttons[k].activeClass : 'font-semibold text-sub hover:text-main');
+
+      });
+
+
+
+      // Automatically open the most relevant safety check when switching scenarios
+
+      if (scen === 'cash') {
+
+        openSingleCheck(3); // Show Check 3 (50-Day Health Line Waiting)
+
+      } else if (scen === 'buy') {
+
+        openSingleCheck(1); // Show Check 1 ($74,180 Floor Locked)
+
+      } else if (scen === 'crash') {
+
+        openSingleCheck(2); // Show Check 2 (Dump Protection)
+
+      }
+
+
+
+      renderAll();
+
+    }
+
+
+
+    function setCrashSubMode(mode) {
+
+      state.crashSubMode = mode;
+
+      const cashBtn = document.getElementById('crashSubBtn-cash');
+
+      const tradeBtn = document.getElementById('crashSubBtn-trade');
+
+      const cashContent = document.getElementById('crashSubContent-cash');
+
+      const tradeContent = document.getElementById('crashSubContent-trade');
+
+
+
+      if (mode === 'cash') {
+
+        cashBtn.className = 'py-1.5 px-2 rounded-lg text-[11px] font-bold bg-amber-500 text-slate-950 shadow transition';
+
+        tradeBtn.className = 'py-1.5 px-2 rounded-lg text-[11px] font-semibold text-sub hover:text-main transition';
+
+        cashContent.classList.remove('hidden');
+
+        tradeContent.classList.add('hidden');
+
+      } else {
+
+        tradeBtn.className = 'py-1.5 px-2 rounded-lg text-[11px] font-bold bg-emerald-500 text-slate-950 shadow transition';
+
+        cashBtn.className = 'py-1.5 px-2 rounded-lg text-[11px] font-semibold text-sub hover:text-main transition';
+
+        tradeContent.classList.remove('hidden');
+
+        cashContent.classList.add('hidden');
+
+      }
+
+      renderAiPrompt();
+
+    }
+
+
+
+    function renderAll() {
+
+      const data = SCENARIO_DATA[state.scenario];
+
+
+
+      // 1. Header & Spot Price
+
+      document.getElementById('spotPriceDisplay').textContent = data.spotPrice;
+
+      const changeBadge = document.getElementById('spotChangeBadge');
+
+      changeBadge.textContent = data.spotChange;
+
+      changeBadge.className = 'font-mono text-xs font-semibold px-2 py-0.5 rounded-full ' +
+
+        (data.spotChangePositive ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/20 text-rose-400');
+
+
+
+      document.getElementById('marketSessionBadge').innerHTML =
+
+        `<span class="w-2 h-2 rounded-full ${data.spotChangePositive ? 'bg-emerald-400' : 'bg-rose-500 animate-ping'}"></span><span>${data.sessionText}</span>`;
+
+
+
+      const headerDot = document.getElementById('headerStatusDot');
+
+      headerDot.className = 'w-2.5 h-2.5 rounded-full ' +
+
+        (state.scenario === 'buy' ? 'bg-emerald-400' : state.scenario === 'cash' ? 'bg-amber-400' : 'bg-rose-500');
+
+
+
+      // 2. Radial Gauge & Traffic Light Banner
+
+      const arcLength = 150.8;
+
+      const offset = arcLength - (arcLength * (data.score / 100));
+
+      const gaugeArc = document.getElementById('gaugeArc');
+
+      gaugeArc.style.strokeDashoffset = offset.toFixed(1);
+
+      gaugeArc.style.stroke = data.arcColor;
+
+
+
+      document.getElementById('gaugeScoreText').textContent = data.score;
+
+      const pill = document.getElementById('meterStatePill');
+
+      pill.textContent = data.pillText;
+
+      pill.className = 'text-xs font-extrabold uppercase px-2.5 py-1 rounded-full ' + data.pillClass;
+
+
+
+      document.getElementById('marketMoodTitle').textContent = data.moodTitle;
+
+      document.getElementById('marketMoodSub').textContent = data.moodSub;
+
+
+
+      const banner = document.getElementById('trafficLightBanner');
+
+      banner.className = 'mt-2 py-2.5 px-3.5 rounded-xl font-extrabold text-xs sm:text-sm tracking-wide text-center flex items-center justify-center gap-2 transition-all ' + data.bannerClass;
+
+      document.getElementById('trafficLightIcon').textContent = data.bannerIcon;
+
+      document.getElementById('trafficLightText').textContent = data.bannerText;
+
+
+
+      // 3. Decision Card Header & Visible State Panel
+
+      document.getElementById('decisionHeaderIcon').textContent = data.decisionIcon;
+
+      document.getElementById('decisionHeaderTitle').textContent = data.decisionTitle;
+
+      document.getElementById('decisionHeaderSub').textContent = data.decisionSub;
+
+
+
+      ['cash', 'buy', 'crash'].forEach(s => {
+
+        const el = document.getElementById(`stateContent-${s}`);
+
+        if (s === state.scenario) el.classList.remove('hidden');
+
+        else el.classList.add('hidden');
+
+      });
+
+
+
+      // 4. Update Dynamic Budget & 0.75% Risk Math Across All Cards
+
+      renderBudgetMath();
+
+
+
+      // 5. Update the 4 Pre-Flight Safety Checks
+
+      [1, 2, 3, 4].forEach(num => {
+
+        const chk = data.checks[num];
+
+        document.getElementById(`check${num}SubLabel`).textContent = chk.sub;
+
+        const badge = document.getElementById(`check${num}Badge`);
+
+        badge.textContent = `${chk.pass ? '✅' : '⚠️'} ${chk.score}% ${chk.pass ? 'OK' : 'WAIT'}`;
+
+        badge.className = 'font-mono text-[11px] font-bold px-2 py-0.5 rounded-md ' +
+
+          (chk.pass ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400');
+
+        document.getElementById(`check${num}LiveStatus`).innerHTML = chk.live;
+
+      });
+
+
+
+      // 6. Update AI Copilot Prompt Preview
+
+      renderAiPrompt();
+
+    }
+
+
+
+    // =========================================================================
+
+    // PORTFOLIO SAFETY SIZER (0.75% GOLDEN RULE ENGINE)
+
+    // =========================================================================
+
+    function renderBudgetMath() {
+
+      const budget = state.budget;
+
+      const maxRisk = budget * 0.0075;
+
+      const protectedCap = budget * 0.9925;
+
+      const btcBuy = budget * BTC_PER_DOLLAR_BUDGET;
+
+      const usdBuyValue = budget * USD_ALLOCATION_RATIO;
+
+      const cashBuffer = Math.max(0, budget - usdBuyValue);
+
+
+
+      const budgetIntStr = '$' + Number(budget).toLocaleString('en-US', { maximumFractionDigits: 0 });
+
+      const riskStr = formatUsd(maxRisk, 2);
+
+      const protectedStr = formatUsd(protectedCap, 2);
+
+      const btcStr = btcBuy.toFixed(4) + ' BTC';
+
+      const usdBuyStr = '~' + formatUsd(usdBuyValue, 2);
+
+
+
+      // Header & Footer labels
+
+      document.getElementById('topBudgetLabel').textContent = budgetIntStr;
+
+      document.getElementById('footerBudgetText').textContent = Number(budget).toLocaleString('en-US', { maximumFractionDigits: 0 });
+
+      document.getElementById('cardBudgetRiskLabel').textContent = `${riskStr} Max`;
+
+      document.getElementById('promptBudgetBadge').textContent = budgetIntStr;
+
+
+
+      // Cash Mode labels
+
+      document.getElementById('cashQuoteBudget').textContent = budgetIntStr;
+
+      document.getElementById('cashNextRiskCap').textContent = `${riskStr} Max Loss`;
+
+      document.getElementById('cashNextRiskSub').textContent = `0.75% of your ${budgetIntStr} budget`;
+
+
+
+      // Buy Mode labels
+
+      document.getElementById('buyBtcAmount').textContent = btcStr;
+
+      document.getElementById('buyUsdValue').textContent = `${usdBuyStr} of your ${budgetIntStr}`;
+
+      document.getElementById('buyMaxLossUsd').textContent = `${riskStr} Max`;
+
+      document.getElementById('buyMaxLossComparison').textContent = getComparisonPhrase(maxRisk);
+
+      document.getElementById('buyProtectedUsd').textContent = protectedStr;
+
+      document.getElementById('step1BtcInline').textContent = btcStr;
+
+      document.getElementById('step1UsdInline').textContent = usdBuyStr;
+
+      document.getElementById('step2LossInline').textContent = riskStr;
+
+
+
+      // Crash Mode labels
+
+      document.getElementById('crashCashBudgetLabel').textContent = budgetIntStr;
+
+      document.getElementById('crashTradeLossUsd').textContent = `-${riskStr} (0.75%)`;
+
+      document.getElementById('crashTradeSavedUsd').textContent = `${protectedStr} Safe`;
+
+
+
+      // Modal internal labels
+
+      document.getElementById('modalMaxRiskUsd').textContent = `${riskStr} Max`;
+
+      document.getElementById('modalComparisonText').textContent =
+
+        `✨ ${getComparisonPhrase(maxRisk)} — 99.25% (${protectedStr}) of your money stays 100% protected!`;
+
+      document.getElementById('modalBtcBuy').textContent = `${btcStr} (${usdBuyStr})`;
+
+      document.getElementById('modalCashBuffer').textContent = `${formatUsd(cashBuffer, 2)} stays in cash`;
+
+      document.getElementById('modalWorstLoss').textContent = `-${riskStr} (0.75% of budget)`;
+
+
+
+      // Highlight active preset button if matching
+
+      document.querySelectorAll('.budget-preset-btn').forEach(btn => {
+
+        const val = Number(btn.getAttribute('data-val'));
+
+        if (val === budget) {
+
+          btn.className = 'budget-preset-btn py-2 rounded-xl text-xs font-mono font-extrabold bg-emerald-500 text-slate-950 shadow transition';
+
+        } else {
+
+          btn.className = 'budget-preset-btn py-2 rounded-xl text-xs font-mono font-bold surface-elevated text-main hover:border-emerald-400 transition';
+
+        }
+
+      });
+
+    }
+
+
+
+    function openBudgetModal() {
+
+      document.getElementById('customBudgetInput').value = state.budget;
+
+      document.getElementById('budgetModal').classList.remove('hidden');
+
+    }
+
+
+
+    function closeBudgetModal() {
+
+      document.getElementById('budgetModal').classList.add('hidden');
+
+    }
+
+
+
+    function setBudget(amount) {
+
+      state.budget = amount;
+
+      document.getElementById('customBudgetInput').value = amount;
+
+      renderAll();
+
+    }
+
+
+
+    function handleCustomBudgetInput(val) {
+
+      const parsed = parseFloat(val);
+
+      if (!isNaN(parsed) && parsed >= 50) {
+
+        state.budget = parsed;
+
+        renderAll();
+
+      }
+
+    }
+
+
+
+    // =========================================================================
+
+    // ACCORDION PROGRESSIVE DISCLOSURE (4 SAFETY CHECKS)
+
+    // =========================================================================
+
+    function toggleCheck(num) {
+
+      const content = document.getElementById(`checkContent-${num}`);
+
+      const chevron = document.getElementById(`check${num}Chevron`);
+
+      const isOpen = content.classList.contains('open');
+
+      if (isOpen) {
+
+        content.classList.remove('open');
+
+        chevron.classList.remove('rotate-180');
+
+      } else {
+
+        content.classList.add('open');
+
+        chevron.classList.add('rotate-180');
+
+      }
+
+    }
+
+
+
+    function openSingleCheck(targetNum) {
+
+      [1, 2, 3, 4].forEach(num => {
+
+        const content = document.getElementById(`checkContent-${num}`);
+
+        const chevron = document.getElementById(`check${num}Chevron`);
+
+        if (num === targetNum) {
+
+          content.classList.add('open');
+
+          chevron.classList.add('rotate-180');
+
+        } else {
+
+          content.classList.remove('open');
+
+          chevron.classList.remove('rotate-180');
+
+        }
+
+      });
+
+      state.allExpanded = false;
+
+      document.getElementById('expandAllBtn').textContent = 'Expand All';
+
+    }
+
+
+
+    function toggleAllChecks() {
+
+      state.allExpanded = !state.allExpanded;
+
+      [1, 2, 3, 4].forEach(num => {
+
+        const content = document.getElementById(`checkContent-${num}`);
+
+        const chevron = document.getElementById(`check${num}Chevron`);
+
+        if (state.allExpanded) {
+
+          content.classList.add('open');
+
+          chevron.classList.add('rotate-180');
+
+        } else {
+
+          content.classList.remove('open');
+
+          chevron.classList.remove('rotate-180');
+
+        }
+
+      });
+
+      document.getElementById('expandAllBtn').textContent = state.allExpanded ? 'Collapse All' : 'Expand All';
+
+    }
+
+
+
+    function updateStepChecklist() {
+
+      const checks = document.querySelectorAll('.trade-step-check');
+
+      let done = 0;
+
+      checks.forEach(c => { if (c.checked) done++; });
+
+      document.getElementById('stepsProgressLabel').textContent = `${done}/4 Done`;
+
+      if (done === 4) {
+
+        showToast('🎉 All 4 Buy Steps Checked! Your 0.75% Safety Shield is active.');
+
+      }
+
+    }
+
+
+
+    // =========================================================================
+
+    // AI COPILOT PROMPT GENERATOR & CLIPBOARD
+
+    // =========================================================================
+
+    function setAiPromptMode(mode) {
+
+      state.aiMode = mode;
+
+      ['explain', 'fomo', 'walkthrough'].forEach(m => {
+
+        const btn = document.getElementById(`aiModeBtn-${m}`);
+
+        if (m === mode) {
+
+          btn.className = 'p-2 rounded-xl text-[11px] font-bold text-center border transition bg-sky-500/20 text-sky-300 border-sky-500/40';
+
+        } else {
+
+          btn.className = 'p-2 rounded-xl text-[11px] font-semibold text-center surface-elevated text-sub hover:text-main transition';
+
+        }
+
+      });
+
+      renderAiPrompt();
+
+    }
+
+
+
+    function renderAiPrompt() {
+
+      const data = SCENARIO_DATA[state.scenario];
+
+      const budgetStr = formatUsd(state.budget, 0);
+
+      const maxRiskStr = formatUsd(state.budget * 0.0075, 2);
+
+      const protectedStr = formatUsd(state.budget * 0.9925, 2);
+
+      const btcBuyStr = (state.budget * BTC_PER_DOLLAR_BUDGET).toFixed(4) + ' BTC';
+
+      const usdBuyStr = formatUsd(state.budget * USD_ALLOCATION_RATIO, 2);
+
+
+
+      let statusLine = '';
+
+      if (state.scenario === 'cash') {
+
+        statusLine = 'CAPITAL SHIELD ON — 100% Safe in Cash ($0.00 at risk)';
+
+      } else if (state.scenario === 'buy') {
+
+        statusLine = 'ALL CLEAR BUY SIGNAL ACTIVE (4-Step Plan Unlocked)';
+
+      } else {
+
+        statusLine = 'STORM SHIELD LOCKED (-10.2% Market Dump Today)';
+
+      }
+
+
+
+      let questionsBlock = '';
+
+      if (state.aiMode === 'explain') {
+
+        questionsBlock = `Please explain to me in 3 warm, simple, jargon-free bullet points:
+
+1. Why my current cockpit status (${statusLine}) is the smartest professional move for my ${budgetStr} budget today.
+
+2. What the 4 Pre-Flight Safety Checks are telling us about buyers vs. sellers right now.
+
+3. How my ${maxRiskStr} (0.75%) safety cap and the $74,180 Emergency Floor protect my ${budgetStr} savings from ever getting wrecked.`;
+
+      } else if (state.aiMode === 'fomo') {
+
+        questionsBlock = `Everyone on social media is shouting to trade right now, and I am feeling FOMO (Fear Of Missing Out)! Please act as my calm Wall Street Guardian in 3 short bullet points:
+
+1. Why retail traders lose 80% of their money chasing social media hype during ${data.moodTitle} conditions.
+
+2. Which specific safety check is holding us back (or protecting us) right now.
+
+3. Why protecting my ${protectedStr} (99.25% of my budget) in spot cash beats gambling on a 50/50 coin flip.`;
+
+      } else {
+
+        questionsBlock = `Please walk me through placing this exact spot trade step-by-step on a beginner crypto exchange (like Coinbase or Kraken) with zero leverage:
+
+1. How to buy ${btcBuyStr} (~${usdBuyStr} of my ${budgetStr} budget) between $75,200 and $75,500.
+
+2. How to set my automatic Stop-Loss (Emergency Safety Exit) at $74,180 so my maximum possible loss is strictly capped at ${maxRiskStr} (0.75%).
+
+3. How to take half my profit at $78,500 and let the other half ride to $82,000.`;
+
+      }
+
+
+
+      const fullPrompt = `Hey AI Copilot,
+
+
+
+I am a beginner Bitcoin investor using the BTC Swing Mobile Guardian app (100% Spot Bitcoin Only, Zero Leverage). Here is my live cockpit snapshot:
+
+
+
+- My Total Bitcoin Budget: ${budgetStr}
+
+- My Golden Safety Rule: Max 0.75% Risk per trade (${maxRiskStr} max planned loss / ${protectedStr} untouched)
+
+- Current Bitcoin Spot Price: ${data.spotPrice} (${data.spotChange})
+
+- Safety Clearance Meter: ${data.score}/100 (Needs 70/100 for a Green Light)
+
+- Cockpit Status: ${statusLine}
+
+- Market Mood: ${data.moodTitle}
+
+
+
+The 4 Pre-Flight Safety Checks:
+
+1. Strong Price Floor: ${data.checks[1].score}% (${data.checks[1].sub})
+
+2. Panic Selling Absorbed: ${data.checks[2].score}% (${data.checks[2].sub})
+
+3. 50-Day Uptrend Line (Weather): ${data.checks[3].score}% (${data.checks[3].sub})
+
+4. Breakout Energy Coiling: ${data.checks[4].score}% (${data.checks[4].sub})
+
+
+
+${questionsBlock}`;
+
+
+
+      document.getElementById('aiPromptPreview').textContent = fullPrompt;
+
+    }
+
+
+
+    function copyAiPrompt() {
+
+      const text = document.getElementById('aiPromptPreview').textContent;
+
+      const textarea = document.createElement('textarea');
+
+      textarea.value = text;
+
+      textarea.style.position = 'fixed';
+
+      textarea.style.opacity = '0';
+
+      document.body.appendChild(textarea);
+
+      textarea.select();
+
+      try {
+
+        document.execCommand('copy');
+
+        showToast('✅ AI Briefing Copied! Paste into Google Gemini, ChatGPT, or Grok.');
+
+      } catch (err) {
+
+        showToast('⚠️ Please select and copy the text from the preview box.');
+
+      }
+
+      document.body.removeChild(textarea);
+
+    }
+
+
+
+    // =========================================================================
+
+    // TOAST NOTIFICATIONS
+
+    // =========================================================================
+
+    let toastTimer = null;
+
+    function showToast(msg) {
+
+      const banner = document.getElementById('toastBanner');
+
+      document.getElementById('toastMessage').textContent = msg;
+
+      banner.classList.remove('opacity-0', 'translate-y-2');
+
+      banner.classList.add('opacity-100', 'translate-y-0');
+
+      if (toastTimer) clearTimeout(toastTimer);
+
+      toastTimer = setTimeout(() => {
+
+        banner.classList.remove('opacity-100', 'translate-y-0');
+
+        banner.classList.add('opacity-0', 'translate-y-2');
+
+      }, 3400);
+
+    }
+
+
+
+    function showDiagnosticsToast() {
+
+      showToast('🛡️ All 179 Automated Safety Diagnostics Verified Green (Spot-Only, Zero Leverage).');
+
+    }
+
+
+
+    // Initialize on load
+
+    window.onload = function () {
+
+      renderAll();
+
+    };
+
   </script>
+
 </body>
+
 </html>

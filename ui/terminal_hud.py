@@ -5549,11 +5549,11 @@ def _build_tab18_trend_pullback_hud(
     w50_status = "ABOVE" if (tp_eval.ema50_1w > 0 and spot_p > tp_eval.ema50_1w) else ("BELOW" if tp_eval.ema50_1w > 0 else "N/A")
     regime_lines = [
         f"[bold white]Daily Regime:[/bold white]     [bold {reg_col}]{tp_eval.daily_regime}[/bold {reg_col}]",
-        f"[bold white]1D Close (Closed):[/bold white] [cyan]${tp_eval.daily_close_completed:,.2f}[/cyan]",
-        f"[bold white]Daily SMA200:[/bold white]     [cyan]${tp_eval.daily_sma200:,.2f}[/cyan]",
+        f"[bold white]1D Open -> Close:[/bold white] [white]{tp_eval.daily_open_time_utc} -> {tp_eval.daily_close_time_utc}[/white]",
+        f"[bold white]1D Close (Closed):[/bold white] [cyan]${tp_eval.daily_close_completed:,.2f}[/cyan] [dim](O ${tp_eval.daily_open_completed:,.0f} H ${tp_eval.daily_high_completed:,.0f} L ${tp_eval.daily_low_completed:,.0f})[/dim]",
+        f"[bold white]Daily SMA200:[/bold white]     [cyan]${tp_eval.daily_sma200:,.2f}[/cyan] [dim](20D Prior: ${tp_eval.daily_sma200_prev20:,.2f})[/dim]",
         f"[bold white]SMA200 20D Slope:[/bold white] [{slope_1d_col}]{slope_1d_lbl} ({tp_eval.daily_sma200_slope_20d:+,.2f})[/{slope_1d_col}]",
-        f"[dim]1W EMA50 Context: ${tp_eval.ema50_1w:,.0f} ({w50_status} — Read-Only)[/dim]",
-        f"[dim]1D EMA50 Context: ${tp_eval.ema50_1d:,.0f} ({'ABOVE' if (tp_eval.ema50_1d > 0 and spot_p > tp_eval.ema50_1d) else 'BELOW'} — Read-Only)[/dim]",
+        f"[dim]Macro Context (Read-Only): 1W EMA50 ${tp_eval.ema50_1w:,.0f} ({w50_status}) • 1D EMA50 ${tp_eval.ema50_1d:,.0f}[/dim]",
     ]
     regime_panel = Panel(
         "\n".join(regime_lines),
@@ -5568,10 +5568,10 @@ def _build_tab18_trend_pullback_hud(
     slope_4h_col = "green" if tp_eval.ema50_rising_6bars else "red"
     trend_lines = [
         f"[bold white]4H Trend:[/bold white]             [bold {tr_col}]{tp_eval.trend_4h}[/bold {tr_col}]",
+        f"[bold white]4H Open -> Close:[/bold white]     [white]{tp_eval.candle_4h_open_time_utc} -> {tp_eval.candle_4h_close_time_utc}[/white]",
         f"[bold white]4H Close (Closed):[/bold white]    [cyan]${tp_eval.close_4h_completed:,.2f}[/cyan]",
-        f"[bold white]4H EMA50:[/bold white]             [cyan]${tp_eval.ema50_4h:,.2f}[/cyan]",
-        f"[bold white]4H EMA200:[/bold white]            [cyan]${tp_eval.ema200_4h:,.2f}[/cyan]",
-        f"[bold white]4H EMA50 6-Bar Slope:[/bold white] [{slope_4h_col}]{slope_4h_lbl} ({tp_eval.ema50_4h_slope_6bars:+,.2f})[/{slope_4h_col}]",
+        f"[bold white]4H EMA50 / EMA200:[/bold white]    [cyan]${tp_eval.ema50_4h:,.2f}[/cyan] / [cyan]${tp_eval.ema200_4h:,.2f}[/cyan]",
+        f"[bold white]4H EMA50 6-Bar Slope:[/bold white] [{slope_4h_col}]{slope_4h_lbl} ({tp_eval.ema50_4h_slope_6bars:+,.2f})[/{slope_4h_col}] [dim](Prior: ${tp_eval.ema50_4h_prev6:,.2f})[/dim]",
         f"[bold white]4H ATR14:[/bold white]             [cyan]${tp_eval.atr14_4h:,.2f}[/cyan]",
     ]
     trend_panel = Panel(
@@ -5587,11 +5587,11 @@ def _build_tab18_trend_pullback_hud(
     pb_col = "bright_green" if pb_valid else "bright_blue"
     age_str = f"{tp_eval.bars_since_recovery} / 3 4H bars" if tp_eval.bars_since_recovery >= 0 else "No active recovery candle"
     pullback_lines = [
-        f"[bold white]Pullback Zone:[/bold white]   [cyan]${tp_eval.pullback_zone_lower:,.2f} - ${tp_eval.pullback_zone_upper:,.2f}[/cyan]",
-        f"[bold white]Recovery Candle:[/bold white] {pb_valid_str}",
-        f"[bold white]Setup Status:[/bold white]    [bold white]{tp_eval.setup_status}[/bold white] [dim]({age_str})[/dim]",
-        f"[bold white]Max Extension:[/bold white]   [cyan]${tp_eval.max_extension_price:,.2f}[/cyan] [dim](EMA50 + 1.0 ATR)[/dim]",
-        f"[bold white]4H Bar Low/High:[/bold white] [white]${tp_eval.low_4h_completed:,.2f} / ${tp_eval.high_4h_completed:,.2f}[/white]",
+        f"[bold white]Evaluated 4H Bar:[/bold white] [white]{tp_eval.candle_4h_open_time_utc} -> {tp_eval.candle_4h_close_time_utc}[/white]",
+        f"[bold white]4H Candle OHLC:[/bold white]   [white]O ${tp_eval.open_4h_completed:,.2f} H ${tp_eval.high_4h_completed:,.2f} L ${tp_eval.low_4h_completed:,.2f} C ${tp_eval.close_4h_completed:,.2f}[/white]",
+        f"[bold white]Pullback Zone:[/bold white]    [cyan]${tp_eval.pullback_zone_lower:,.2f} - ${tp_eval.pullback_zone_upper:,.2f}[/cyan] [dim](-0.50 to +0.25 ATR)[/dim]",
+        f"[bold white]Max Extension:[/bold white]    [cyan]${tp_eval.max_extension_price:,.2f}[/cyan] [dim](EMA50 + 1.00 ATR)[/dim]",
+        f"[bold white]Recovery / Setup:[/bold white] {pb_valid_str} • [bold white]{tp_eval.setup_status}[/bold white] [dim]({age_str})[/dim]",
         f"[dim]{tp_eval.pullback_rejection_reason}[/dim]",
     ]
     pullback_panel = Panel(
@@ -5609,17 +5609,19 @@ def _build_tab18_trend_pullback_hud(
     top_row_grid.add_row(regime_panel, trend_panel, pullback_panel)
 
     # 3. Row 2 Grid: TRADE PLAN (Left) + POSITION MANAGEMENT (Center) + DATA INTEGRITY (Right)
-    stop_badge = "[green]VALID[/green]" if tp_eval.stop_valid else f"[yellow]REJECTED[/yellow]"
+    stop_badge = "[green]VALID[/green]" if tp_eval.stop_valid else "[yellow]REJECTED[/yellow]"
+    active_sz_note = "[dim](Hypothetical Ref • Active Order: 0.00000 BTC)[/dim]" if tp_eval.trade_decision == "NO TRADE" else "[bold green](Active Setup Size)[/bold green]"
     trade_lines = [
-        f"[bold white]Decision:[/bold white]            [bold bright_white]{tp_eval.trade_decision}[/bold bright_white]",
-        f"[bold white]Reference Equity:[/bold white]    [cyan]US${tp_eval.simulation_equity_usd:,.0f} (Simulation / Paper Mode)[/cyan]",
-        f"[bold white]Limit Entry Zone:[/bold white]    [cyan]${tp_eval.limit_entry_low:,.2f} - ${tp_eval.limit_entry_high:,.2f}[/cyan] [dim](4H EMA50 Watch)[/dim]",
-        f"[bold white]Structural Stop:[/bold white]     [cyan]${tp_eval.structural_stop:,.2f}[/cyan] ({stop_badge})",
-        f"[bold white]Stop Distance:[/bold white]       [white]{tp_eval.stop_distance_atr:.2f} ATR (-${tp_eval.stop_distance_usd:,.2f})[/white]",
-        f"[bold white]Risk Per Trade:[/bold white]      [cyan]{tp_eval.risk_per_trade_pct:.2f}% (${tp_eval.risk_budget_usd:,.0f})[/cyan]",
-        f"[bold white]Position Size:[/bold white]       [bold bright_cyan]{tp_eval.position_size_btc:.5f} BTC[/bold bright_cyan] [dim](Sim if Armed • Active: 0.0 BTC)[/dim]",
-        f"[bold white]Position Value:[/bold white]      [cyan]${tp_eval.position_value_usd:,.2f}[/cyan]",
-        f"[bold white]Risk / Reward:[/bold white]       [dim]{tp_eval.risk_reward_label}[/dim]",
+        f"[bold white]Decision / Equity:[/bold white]  [bold bright_white]{tp_eval.trade_decision}[/bold bright_white] • [cyan]US${tp_eval.simulation_equity_usd:,.2f}[/cyan] [dim]({tp_eval.risk_per_trade_pct:.2f}% = ${tp_eval.risk_budget_usd:,.2f} Risk)[/dim]",
+        f"[bold white]Limit Entry Zone:[/bold white]   [cyan]${tp_eval.limit_entry_low:,.2f} - ${tp_eval.limit_entry_high:,.2f}[/cyan] [dim](Sizing Ref: ${tp_eval.sizing_entry_price:,.2f})[/dim]",
+        f"[bold white]Stop Calculation:[/bold white]   [white]5-Bar Low ${tp_eval.stop_lowest_low_5bars:,.2f} - Buffer ${tp_eval.stop_buffer_usd:,.2f} =[/white] [cyan]${tp_eval.structural_stop:,.2f}[/cyan] ({stop_badge})",
+        f"[bold white]Stop Distance:[/bold white]      [white]-${tp_eval.stop_distance_usd:,.2f} ({tp_eval.stop_distance_atr:.2f} ATR / exact {tp_eval.stop_distance_atr_exact:.4f} ATR)[/white]",
+        f"[bold white]Gross Price Risk:[/bold white]   [white]${tp_eval.gross_price_risk_per_btc:,.2f}/BTC -> ${tp_eval.gross_price_risk_usd:,.2f}[/white]",
+        f"[bold white]Fees (0.10%x2):[/bold white]     [dim]Entry ${tp_eval.entry_fee_usd:,.2f} (${tp_eval.entry_fee_per_btc:,.2f}/BTC) + Exit ${tp_eval.exit_fee_usd:,.2f} (${tp_eval.exit_fee_per_btc:,.2f}/BTC)[/dim]",
+        f"[bold white]Slippage (0.05%x2):[/bold white] [dim]Entry ${tp_eval.entry_slippage_usd:,.2f} (${tp_eval.entry_slippage_per_btc:,.2f}/BTC) + Exit ${tp_eval.exit_slippage_usd:,.2f} (${tp_eval.exit_slippage_per_btc:,.2f}/BTC)[/dim]",
+        f"[bold white]Total Est. Risk:[/bold white]    [cyan]${tp_eval.total_risk_per_btc:,.2f}/BTC -> ${tp_eval.total_estimated_risk_usd:,.2f}[/cyan] [dim](<= ${tp_eval.risk_budget_usd:,.2f} Budget)[/dim]",
+        f"[bold white]Position Size:[/bold white]      [bold bright_cyan]{tp_eval.position_size_btc:.5f} BTC[/bold bright_cyan] ([cyan]${tp_eval.position_value_usd:,.2f}[/cyan]) {active_sz_note}",
+        f"[bold white]Risk / Reward:[/bold white]      [dim]{tp_eval.risk_reward_label}[/dim]",
     ]
     trade_panel = Panel(
         "\n".join(trade_lines),
@@ -5630,19 +5632,24 @@ def _build_tab18_trend_pullback_hud(
     )
 
     pos_col = "bright_green" if tp_eval.position_status == "HOLDING" else "white"
-    sb_str = "[bold bright_red]TRIGGERED[/bold bright_red]" if tp_eval.exit_stop_breached else "[green]CLEAR[/green]"
-    e4h_str = "[bold bright_red]TRIGGERED[/bold bright_red]" if tp_eval.exit_two_4h_below_ema50 else "[green]CLEAR[/green]"
-    s1d_str = "[bold bright_red]TRIGGERED[/bold bright_red]" if tp_eval.exit_two_1d_below_sma200 else "[green]CLEAR[/green]"
+    if tp_eval.position_status == "CASH":
+        sb_str = "[dim]INACTIVE (IN CASH)[/dim]"
+        e4h_str = "[dim]INACTIVE (IN CASH)[/dim]"
+        s1d_str = "[dim]INACTIVE (IN CASH)[/dim]"
+    else:
+        sb_str = "[bold bright_red]TRIGGERED[/bold bright_red]" if tp_eval.exit_stop_breached else "[green]CLEAR[/green]"
+        e4h_str = "[bold bright_red]TRIGGERED[/bold bright_red]" if tp_eval.exit_two_4h_below_ema50 else "[green]CLEAR[/green]"
+        s1d_str = "[bold bright_red]TRIGGERED[/bold bright_red]" if tp_eval.exit_two_1d_below_sma200 else "[green]CLEAR[/green]"
     pos_lines = [
-        f"[bold white]Current Status:[/bold white]   [bold {pos_col}]{tp_eval.position_status}[/bold {pos_col}]",
-        f"[bold white]Exit Conditions:[/bold white]  [bold white]{'N/A (100% USDT CASH)' if tp_eval.position_status == 'CASH' else tp_eval.exit_conditions_status}[/bold white]",
-        f"[bold white]Stop Breach:[/bold white]      {sb_str}",
-        f"[bold white]2x 4H < EMA50:[/bold white]    {e4h_str}",
-        f"[bold white]2x 1D < SMA200:[/bold white]   {s1d_str}",
+        f"[bold white]Current Status:[/bold white]     [bold {pos_col}]{tp_eval.position_status}[/bold {pos_col}]",
+        f"[bold white]Active Exit Status:[/bold white] [bold white]{tp_eval.exit_conditions_status}[/bold white]",
+        f"[bold white]Entry Eligibility:[/bold white]  [yellow]{tp_eval.entry_eligibility_status}[/yellow]",
+        f"[bold white]Active Stop Breach:[/bold white] {sb_str}",
+        f"[bold white]Active 2x4H<EMA50:[/bold white]  {e4h_str}",
+        f"[bold white]Active 2x1D<SMA200:[/bold white] {s1d_str}",
+        f"[dim]{tp_eval.hypothetical_exit_status}[/dim]",
         f"[dim]Invalidation: {tp_eval.invalidation_reason}[/dim]",
-        f"[bold white]Execution Mode:[/bold white]   [white]Manual Spot Only (No Auto-Exec)[/white]",
-        f"[bold white]Leverage / Short:[/bold white] [green]0.0x Leverage • Long-Only[/green]",
-        f"[dim]Trailing Rule: 2x 4H Close < EMA50 OR 2x 1D Close < SMA200[/dim]",
+        f"[bold white]Execution Mode:[/bold white]     [green]Manual Spot Only • 0.0x Leverage • Long-Only[/green]",
     ]
     pos_panel = Panel(
         "\n".join(pos_lines),
@@ -5654,16 +5661,18 @@ def _build_tab18_trend_pullback_hud(
 
     di_col = "bright_green" if tp_eval.data_integrity_ok else "bright_red"
     di_label = "OK (CLOSED CANDLES ONLY)" if tp_eval.data_integrity_ok else "DATA UNAVAILABLE"
+    f1d_str = f"YES (Excluded Open {tp_eval.daily_forming_open_utc})" if tp_eval.daily_forming_excluded else f"NO ({tp_eval.daily_forming_open_utc})"
+    f4h_str = f"YES (Excluded Open {tp_eval.candle_4h_forming_open_utc})" if tp_eval.candle_4h_forming_excluded else f"NO ({tp_eval.candle_4h_forming_open_utc})"
     data_lines = [
-        f"[bold white]Daily Candle:[/bold white]      [cyan]{tp_eval.daily_candle_status}[/cyan]",
-        f"[bold white]4H Candle:[/bold white]         [cyan]{tp_eval.candle_4h_status}[/cyan]",
-        f"[bold white]Last Update:[/bold white]       [white]{tp_eval.timestamp_myt}[/white]",
-        f"[bold white]Integrity Gate:[/bold white]    [bold {di_col}]{di_label}[/bold {di_col}]",
+        f"[bold white]Daily Candle:[/bold white]       [cyan]{tp_eval.daily_candle_status}[/cyan]",
+        f"[bold white]Forming 1D Bar:[/bold white]     [green]{f1d_str}[/green]",
+        f"[bold white]4H Candle:[/bold white]          [cyan]{tp_eval.candle_4h_status}[/cyan]",
+        f"[bold white]Forming 4H Bar:[/bold white]     [green]{f4h_str}[/green]",
+        f"[bold white]Retrieval (MYT):[/bold white]    [white]{tp_eval.timestamp_myt}[/white]",
+        f"[bold white]Retrieval (UTC):[/bold white]    [white]{tp_eval.timestamp_utc}[/white]",
+        f"[bold white]Integrity Gate:[/bold white]     [bold {di_col}]{di_label}[/bold {di_col}]",
         f"[dim]{tp_eval.integrity_failure_reason or 'All required spot OHLCV series verified & fresh.'}[/dim]",
-        f"[bold white]Closed Candle:[/bold white]     [bold bright_green]ENFORCED (Forming Bars Excluded)[/bold bright_green]",
-        f"[bold white]Internal Clock:[/bold white]    [white]{tp_eval.timestamp_utc}[/white]",
-        f"[bold white]Fee Assumption:[/bold white]    [dim]0.10% Entry + 0.10% Exit[/dim]",
-        f"[bold white]Slippage Buffer:[/bold white]   [dim]0.05% Entry + 0.05% Exit[/dim]",
+        f"[bold white]Cost Model:[/bold white]         [dim]Fee 0.10%/side + Slippage 0.05%/side[/dim]",
     ]
     data_panel = Panel(
         "\n".join(data_lines),
@@ -5896,6 +5905,12 @@ def print_dry_run_report(
                 t_num = 0
         store.active_tab = t_num if t_num in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18) else 0
         console.print(build_dashboard_renderable(config, store, tab_override=store.active_tab))
+        if store.active_tab == 18:
+            try:
+                from analytics.strategy_trend_pullback import copy_trend_pullback_to_clipboard
+                copy_trend_pullback_to_clipboard(store)
+            except Exception:
+                pass
 
 
 def _poll_keyboard_tab_switch(

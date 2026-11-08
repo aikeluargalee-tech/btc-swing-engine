@@ -258,6 +258,28 @@ def verify_and_extract_completed_candles(
     return True, "LAST CLOSE", completed, ""
 
 
+def _inspect_forming_candles(
+    bars: Sequence[KlineBar],
+    tf_ms: int,
+    now_ms: int,
+) -> Tuple[bool, str]:
+    """Checks whether any incomplete/forming candle was present and excluded from completed bars."""
+    if not bars:
+        return False, "None"
+    forming_ts: List[int] = []
+    for b in bars:
+        ts = int(b.timestamp_ms)
+        explicit_closed = getattr(b, "is_closed", True)
+        if not explicit_closed or (ts + tf_ms > now_ms):
+            forming_ts.append(ts)
+    if not forming_ts:
+        return False, "None (all input bars already closed)"
+    latest_forming = max(forming_ts)
+    open_str = datetime.fromtimestamp(latest_forming / 1000.0, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    return True, open_str
+
+
+
 # ============================================================================
 # CORE STRATEGY FUNCTIONS (SECTION 10 MODULAR SPECIFICATION)
 # ============================================================================
@@ -570,56 +592,83 @@ def calculate_stop(
     entry_price: float,
     cfg: Optional[TrendPullbackConfig] = None,
 ) -> Dict[str, Any]:
-    """Section 5: Calculates initial structural stop and validates [0.75 ATR, 3.00 ATR] bounds."""
+    """Section 5: Calculates initial structural stop and validates [0.75 ATR, 3.00 ATR] bounds.
+
+    Formula:
+      lowest_low_5bars = round(min(low of last 5 completed 4H candles), 2)
+      stop_buffer_usd  = round(0.25 * ATR14, 2)
+      stop_price       = round(lowest_low_5bars - stop_buffer_usd, 2)
+      stop_distance_usd = round(round(entry_price, 2) - stop_price, 2)
+      stop_distance_atr_exact = stop_distance_usd / ATR14
+    """
     cfg = cfg or TrendPullbackConfig()
     if len(completed_4h_bars) < cfg.stop_lookback or atr14_4h <= 0 or entry_price <= 0:
         return {
+            "lowest_low_5bars": 0.0,
+            "atr14_used": 0.0,
+            "stop_buffer_usd": 0.0,
             "stop_price": 0.0,
             "stop_distance_usd": 0.0,
             "stop_distance_atr": 0.0,
+            "stop_distance_atr_exact": 0.0,
             "valid": False,
             "reason": "Insufficient bars or invalid entry/ATR for stop calculation",
         }
 
     recent = completed_4h_bars[-cfg.stop_lookback :]
-    lowest_low = min(float(b.low) for b in recent)
-    stop_price = lowest_low - (cfg.stop_buffer_atr * atr14_4h)
-    stop_dist_usd = entry_price - stop_price
-    stop_dist_atr = stop_dist_usd / atr14_4h
+    lowest_low = round(min(float(b.low) for b in recent), 2)
+    stop_buffer_usd = round(cfg.stop_buffer_atr * float(atr14_4h), 2)
+    stop_price = round(lowest_low - stop_buffer_usd, 2)
+    entry_px = round(float(entry_price), 2)
+    stop_dist_usd = round(entry_px - stop_price, 2)
+    stop_dist_atr_exact = stop_dist_usd / float(atr14_4h)
+    stop_dist_atr_check = round(stop_dist_atr_exact, 8)
+    stop_dist_atr = round(stop_dist_atr_exact, 2)
 
-    if stop_price >= entry_price:
+    base_out = {
+        "lowest_low_5bars": lowest_low,
+        "atr14_used": round(float(atr14_4h), 2),
+        "stop_buffer_usd": stop_buffer_usd,
+        "stop_price": stop_price,
+        "stop_distance_usd": stop_dist_usd,
+        "stop_distance_atr": stop_dist_atr,
+        "stop_distance_atr_exact": round(stop_dist_atr_exact, 4),
+    }
+
+    if stop_price >= entry_px:
         return {
-            "stop_price": round(stop_price, 2),
-            "stop_distance_usd": round(stop_dist_usd, 2),
-            "stop_distance_atr": round(stop_dist_atr, 2),
+            **base_out,
             "valid": False,
-            "reason": f"Stop rejected: structural stop (${stop_price:,.2f}) is at or above entry (${entry_price:,.2f})",
+            "reason": f"Stop rejected: structural stop (${stop_price:,.2f}) is at or above entry (${entry_px:,.2f})",
         }
 
-    if stop_dist_atr < cfg.minimum_stop_atr:
+    if stop_dist_atr_check < cfg.minimum_stop_atr:
         return {
-            "stop_price": round(stop_price, 2),
-            "stop_distance_usd": round(stop_dist_usd, 2),
-            "stop_distance_atr": round(stop_dist_atr, 2),
+            **base_out,
             "valid": False,
-            "reason": f"Stop rejected: distance ({stop_dist_atr:.2f} ATR) < minimum {cfg.minimum_stop_atr:.2f} ATR",
+            "reason": (
+                f"Stop rejected: distance ({stop_dist_atr:.2f} ATR / exact {stop_dist_atr_exact:.4f} ATR) "
+                f"< minimum {cfg.minimum_stop_atr:.2f} ATR"
+            ),
         }
 
-    if stop_dist_atr > cfg.maximum_stop_atr:
+    if stop_dist_atr_check > cfg.maximum_stop_atr:
         return {
-            "stop_price": round(stop_price, 2),
-            "stop_distance_usd": round(stop_dist_usd, 2),
-            "stop_distance_atr": round(stop_dist_atr, 2),
+            **base_out,
             "valid": False,
-            "reason": f"Stop rejected: distance ({stop_dist_atr:.2f} ATR) > maximum {cfg.maximum_stop_atr:.2f} ATR",
+            "reason": (
+                f"Stop rejected: distance ({stop_dist_atr:.2f} ATR / exact {stop_dist_atr_exact:.4f} ATR) "
+                f"> maximum {cfg.maximum_stop_atr:.2f} ATR"
+            ),
         }
 
     return {
-        "stop_price": round(stop_price, 2),
-        "stop_distance_usd": round(stop_dist_usd, 2),
-        "stop_distance_atr": round(stop_dist_atr, 2),
+        **base_out,
         "valid": True,
-        "reason": f"Stop valid ({stop_dist_atr:.2f} ATR within {cfg.minimum_stop_atr:.2f}-{cfg.maximum_stop_atr:.2f} ATR bounds)",
+        "reason": (
+            f"Stop valid ({stop_dist_atr:.2f} ATR / exact {stop_dist_atr_exact:.4f} ATR within "
+            f"{cfg.minimum_stop_atr:.2f}-{cfg.maximum_stop_atr:.2f} ATR bounds)"
+        ),
     }
 
 
@@ -628,38 +677,91 @@ def calculate_position_size(
     stop_price: float,
     cfg: Optional[TrendPullbackConfig] = None,
 ) -> Dict[str, float]:
-    """Section 6: Calculates unleveraged spot position size with fee & slippage cost allowance."""
-    cfg = cfg or TrendPullbackConfig()
-    equity = float(cfg.initial_simulation_equity)
-    risk_budget = equity * float(cfg.risk_per_trade)
+    """Section 6: Calculates unleveraged spot position size with full fee & slippage audit breakdown.
 
-    if entry_price <= 0 or stop_price <= 0 or stop_price >= entry_price:
+    Guarantees:
+      1. Total estimated loss (gross price risk + entry/exit fees + entry/exit slippage) <= risk_budget_usd ($500.00).
+      2. Position notional <= equity_usd ($100,000.00, 0.0x leverage).
+      3. All displayed per-BTC and USD risk components reconcile to the cent.
+    """
+    cfg = cfg or TrendPullbackConfig()
+    equity = round(float(cfg.initial_simulation_equity), 2)
+    risk_budget = round(equity * float(cfg.risk_per_trade), 2)
+    entry_px = round(float(entry_price), 2)
+    stop_px = round(float(stop_price), 2)
+
+    if entry_px <= 0 or stop_px <= 0 or stop_px >= entry_px:
         return {
             "equity_usd": equity,
             "risk_budget_usd": risk_budget,
+            "sizing_entry_price": entry_px if entry_px > 0 else 0.0,
+            "sizing_stop_price": stop_px if stop_px > 0 else 0.0,
+            "gross_price_risk_per_btc": 0.0,
+            "entry_fee_per_btc": 0.0,
+            "exit_fee_per_btc": 0.0,
+            "entry_slippage_per_btc": 0.0,
+            "exit_slippage_per_btc": 0.0,
             "cost_allowance_per_btc": 0.0,
+            "total_risk_per_btc": 0.0,
+            "gross_price_risk_usd": 0.0,
+            "entry_fee_usd": 0.0,
+            "exit_fee_usd": 0.0,
+            "entry_slippage_usd": 0.0,
+            "exit_slippage_usd": 0.0,
+            "total_estimated_risk_usd": 0.0,
             "position_size_btc": 0.0,
             "position_value_usd": 0.0,
         }
 
-    entry_cost_rate = float(cfg.entry_fee_pct + cfg.entry_slippage_pct)
-    exit_cost_rate = float(cfg.exit_fee_pct + cfg.exit_slippage_pct)
-    cost_allowance = (entry_price * entry_cost_rate) + (stop_price * exit_cost_rate)
+    gross_risk_per_btc = round(entry_px - stop_px, 2)
+    entry_fee_per_btc = entry_px * float(cfg.entry_fee_pct)
+    exit_fee_per_btc = stop_px * float(cfg.exit_fee_pct)
+    entry_slip_per_btc = entry_px * float(cfg.entry_slippage_pct)
+    exit_slip_per_btc = stop_px * float(cfg.exit_slippage_pct)
+    cost_allowance_per_btc = entry_fee_per_btc + exit_fee_per_btc + entry_slip_per_btc + exit_slip_per_btc
+    total_risk_per_btc = gross_risk_per_btc + cost_allowance_per_btc
 
-    risk_per_btc = (entry_price - stop_price) + cost_allowance
-    raw_qty = risk_budget / risk_per_btc
+    raw_qty = risk_budget / total_risk_per_btc
+    max_spot_qty = equity / entry_px
 
-    # Cap position value to available spot equity (no leverage permitted)
-    max_spot_qty = equity / entry_price
-    final_qty = min(raw_qty, max_spot_qty)
-    final_val = final_qty * entry_price
+    # Floor to 5 decimal places (0.00001 BTC step) so total loss never exceeds risk_budget
+    final_qty = math.floor(min(raw_qty, max_spot_qty) * 100_000.0 + 1e-12) / 100_000.0
+
+    def _compute_usd_breakdown(qty: float) -> Tuple[float, float, float, float, float, float, float]:
+        val_usd = round(qty * entry_px, 2)
+        g_usd = round(qty * gross_risk_per_btc, 2)
+        ef_usd = round(qty * entry_fee_per_btc, 2)
+        xf_usd = round(qty * exit_fee_per_btc, 2)
+        es_usd = round(qty * entry_slip_per_btc, 2)
+        xs_usd = round(qty * exit_slip_per_btc, 2)
+        tot_usd = round(g_usd + ef_usd + xf_usd + es_usd + xs_usd, 2)
+        return val_usd, g_usd, ef_usd, xf_usd, es_usd, xs_usd, tot_usd
+
+    val_usd, g_usd, ef_usd, xf_usd, es_usd, xs_usd, tot_usd = _compute_usd_breakdown(final_qty)
+    while final_qty > 0.0 and (tot_usd > risk_budget or val_usd > equity):
+        final_qty = round(max(0.0, final_qty - 0.00001), 5)
+        val_usd, g_usd, ef_usd, xf_usd, es_usd, xs_usd, tot_usd = _compute_usd_breakdown(final_qty)
 
     return {
-        "equity_usd": round(equity, 2),
-        "risk_budget_usd": round(risk_budget, 2),
-        "cost_allowance_per_btc": round(cost_allowance, 2),
+        "equity_usd": equity,
+        "risk_budget_usd": risk_budget,
+        "sizing_entry_price": entry_px,
+        "sizing_stop_price": stop_px,
+        "gross_price_risk_per_btc": round(gross_risk_per_btc, 2),
+        "entry_fee_per_btc": round(entry_fee_per_btc, 2),
+        "exit_fee_per_btc": round(exit_fee_per_btc, 2),
+        "entry_slippage_per_btc": round(entry_slip_per_btc, 2),
+        "exit_slippage_per_btc": round(exit_slip_per_btc, 2),
+        "cost_allowance_per_btc": round(cost_allowance_per_btc, 2),
+        "total_risk_per_btc": round(total_risk_per_btc, 2),
+        "gross_price_risk_usd": g_usd,
+        "entry_fee_usd": ef_usd,
+        "exit_fee_usd": xf_usd,
+        "entry_slippage_usd": es_usd,
+        "exit_slippage_usd": xs_usd,
+        "total_estimated_risk_usd": tot_usd,
         "position_size_btc": round(final_qty, 5),
-        "position_value_usd": round(final_val, 2),
+        "position_value_usd": val_usd,
     }
 
 
@@ -672,66 +774,100 @@ def evaluate_exit(
     sma200_1d_series: Sequence[float],
     position_status: str = "CASH",
 ) -> Dict[str, Any]:
-    """Section 5: Evaluates exit conditions for an existing position:
-    1. Current price <= structural stop -> EXIT ALERT.
-    2. Two consecutive completed 4H candles close below EMA50 -> EXIT CONDITION.
-    3. Two consecutive completed daily candles close below SMA200 -> EXIT CONDITION.
-    """
-    stop_breached = bool(stop_price > 0 and current_price > 0 and current_price <= stop_price)
+    """Section 5: Evaluates exit conditions for an existing position (`HOLDING`) vs `CASH`.
 
-    two_4h_below = False
-    one_4h_below = False
+    When `position_status == "CASH"`:
+      - Never reports an active position exit as `TRIGGERED` (`exit_conditions_status = "NONE (IN CASH)"`).
+      - Active exit flags (`stop_breached`, `two_4h_below_ema50`, `two_1d_below_sma200`) are `False`.
+      - Reports what the exit rules would say if a position were open under `hypothetical_exit_status`.
+    When `position_status == "HOLDING"`:
+      - Evaluates stop breach, 2 consecutive completed 4H closes < EMA50, and 2 consecutive completed 1D closes < SMA200.
+    """
+    pos_mode = position_status.strip().upper()
+    raw_stop_breached = bool(stop_price > 0 and current_price > 0 and current_price <= stop_price)
+
+    raw_two_4h_below = False
+    raw_one_4h_below = False
     if len(completed_4h_bars) >= 2 and len(ema50_4h_series) >= 2:
         c_last = completed_4h_bars[-1].close < ema50_4h_series[-1]
         c_prev = completed_4h_bars[-2].close < ema50_4h_series[-2]
-        two_4h_below = bool(c_last and c_prev)
-        one_4h_below = bool(c_last and not c_prev)
+        raw_two_4h_below = bool(c_last and c_prev)
+        raw_one_4h_below = bool(c_last and not c_prev)
 
-    two_1d_below = False
-    one_1d_below = False
+    raw_two_1d_below = False
+    raw_one_1d_below = False
     if len(completed_1d_bars) >= 2 and len(sma200_1d_series) >= 2:
         d_last = completed_1d_bars[-1].close < sma200_1d_series[-1]
         d_prev = completed_1d_bars[-2].close < sma200_1d_series[-2]
-        two_1d_below = bool(d_last and d_prev)
-        one_1d_below = bool(d_last and not d_prev)
+        raw_two_1d_below = bool(d_last and d_prev)
+        raw_one_1d_below = bool(d_last and not d_prev)
 
-    reasons: List[str] = []
-    if stop_breached:
-        reasons.append(f"EXIT ALERT: Current price (${current_price:,.2f}) reached/fell below structural stop (${stop_price:,.2f})")
-    if two_4h_below:
-        reasons.append(f"EXIT CONDITION: Two consecutive completed 4H closes below 4H EMA50 (${ema50_4h_series[-1]:,.2f})")
-    if two_1d_below:
-        reasons.append(f"EXIT CONDITION: Two consecutive completed 1D closes below Daily SMA200 (${sma200_1d_series[-1]:,.2f})")
+    raw_reasons: List[str] = []
+    if raw_stop_breached:
+        raw_reasons.append(f"Current price (${current_price:,.2f}) <= structural stop (${stop_price:,.2f})")
+    if raw_two_4h_below:
+        raw_reasons.append(f"Two consecutive completed 4H closes below 4H EMA50 (${ema50_4h_series[-1]:,.2f})")
+    if raw_two_1d_below:
+        raw_reasons.append(f"Two consecutive completed 1D closes below Daily SMA200 (${sma200_1d_series[-1]:,.2f})")
 
-    if reasons:
+    warn_parts: List[str] = []
+    if raw_one_4h_below:
+        warn_parts.append(f"1 completed 4H close (${completed_4h_bars[-1].close:,.2f}) below EMA50 (${ema50_4h_series[-1]:,.2f})")
+    if raw_one_1d_below:
+        warn_parts.append(f"1 completed 1D close (${completed_1d_bars[-1].close:,.2f}) below SMA200 (${sma200_1d_series[-1]:,.2f})")
+
+    if pos_mode != "HOLDING":
+        if raw_reasons:
+            hyp_text = "HYPOTHETICAL ONLY (No Open Position): " + " | ".join(raw_reasons) + " would trigger exit if HOLDING"
+        elif warn_parts:
+            hyp_text = "HYPOTHETICAL ONLY (No Open Position): " + "; ".join(warn_parts) + " would warn if HOLDING"
+        else:
+            hyp_text = "HYPOTHETICAL ONLY (No Open Position): All exit rules clear"
+
+        inv_rules = (
+            f"No open position (100% USDT Cash). If entered later, exit triggers on: "
+            f"Stop <= ${stop_price:,.2f} | 2x 4H close < EMA50 | 2x 1D close < SMA200"
+            if stop_price > 0
+            else "No open position (100% USDT Cash). Active exit rules apply only when HOLDING."
+        )
+        return {
+            "exit_conditions_status": "NONE (IN CASH)",
+            "stop_breached": False,
+            "two_4h_below_ema50": False,
+            "two_1d_below_sma200": False,
+            "one_4h_below_ema50": False,
+            "one_1d_below_sma200": False,
+            "hypothetical_stop_breached": raw_stop_breached,
+            "hypothetical_two_4h_below_ema50": raw_two_4h_below,
+            "hypothetical_two_1d_below_sma200": raw_two_1d_below,
+            "hypothetical_exit_status": hyp_text,
+            "invalidation_reason": inv_rules,
+        }
+
+    # HOLDING mode: active position exit evaluation
+    if raw_reasons:
         exit_status = "TRIGGERED"
-        invalidation_text = " | ".join(reasons)
-    elif one_4h_below or one_1d_below:
+        invalidation_text = "EXIT CONDITION TRIGGERED: " + " | ".join(raw_reasons)
+    elif warn_parts:
         exit_status = "WARNING"
-        warn_parts = []
-        if one_4h_below:
-            warn_parts.append(f"1 completed 4H close (${completed_4h_bars[-1].close:,.2f}) below EMA50 (${ema50_4h_series[-1]:,.2f})")
-        if one_1d_below:
-            warn_parts.append(f"1 completed 1D close (${completed_1d_bars[-1].close:,.2f}) below SMA200 (${sma200_1d_series[-1]:,.2f})")
         invalidation_text = "EXIT WARNING: " + "; ".join(warn_parts)
     else:
         exit_status = "CLEAR"
-        if position_status.upper() == "HOLDING":
-            invalidation_text = f"Stop <= ${stop_price:,.2f} | 2x 4H close < ${ema50_4h_series[-1]:,.0f} | 2x 1D close < ${sma200_1d_series[-1]:,.0f}"
-        else:
-            invalidation_text = (
-                f"Stop <= ${stop_price:,.2f} (if entered) | 2x 4H close < EMA50 | 2x 1D close < SMA200"
-                if stop_price > 0
-                else "No active position (100% USDT Cash)"
-            )
+        e50_str = f"${ema50_4h_series[-1]:,.2f}" if ema50_4h_series else "EMA50"
+        s200_str = f"${sma200_1d_series[-1]:,.2f}" if sma200_1d_series else "SMA200"
+        invalidation_text = f"Active position CLEAR. Exit triggers on: Stop <= ${stop_price:,.2f} | 2x 4H close < {e50_str} | 2x 1D close < {s200_str}"
 
     return {
         "exit_conditions_status": exit_status,
-        "stop_breached": stop_breached,
-        "two_4h_below_ema50": two_4h_below,
-        "two_1d_below_sma200": two_1d_below,
-        "one_4h_below_ema50": one_4h_below,
-        "one_1d_below_sma200": one_1d_below,
+        "stop_breached": raw_stop_breached,
+        "two_4h_below_ema50": raw_two_4h_below,
+        "two_1d_below_sma200": raw_two_1d_below,
+        "one_4h_below_ema50": raw_one_4h_below,
+        "one_1d_below_sma200": raw_one_1d_below,
+        "hypothetical_stop_breached": raw_stop_breached,
+        "hypothetical_two_4h_below_ema50": raw_two_4h_below,
+        "hypothetical_two_1d_below_sma200": raw_two_1d_below,
+        "hypothetical_exit_status": f"ACTIVE POSITION MODE: {exit_status}",
         "invalidation_reason": invalidation_text,
     }
 
@@ -955,9 +1091,28 @@ class TrendPullbackEngine:
             label="4H",
         )
 
+        forming_1d_excl, forming_1d_open_utc = _inspect_forming_candles(raw_1d, TF_1D_MS, now_ms)
+        forming_4h_excl, forming_4h_open_utc = _inspect_forming_candles(candidate_4h, TF_4H_MS, now_ms)
+        if not forming_4h_excl and raw_1h:
+            # Check if forming 1H bars exist for the current in-progress 4H bucket
+            curr_4h_bucket = (now_ms // TF_4H_MS) * TF_4H_MS
+            if any(int(b.timestamp_ms) >= curr_4h_bucket for b in raw_1h):
+                forming_4h_excl = True
+                forming_4h_open_utc = datetime.fromtimestamp(curr_4h_bucket / 1000.0, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+        open_1d_utc = (
+            datetime.fromtimestamp(int(comp_1d[-1].timestamp_ms) / 1000.0, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+            if comp_1d
+            else "N/A"
+        )
         last_1d_utc = (
             datetime.fromtimestamp((int(comp_1d[-1].timestamp_ms) + TF_1D_MS) / 1000.0, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
             if comp_1d
+            else "N/A"
+        )
+        open_4h_utc = (
+            datetime.fromtimestamp(int(comp_4h[-1].timestamp_ms) / 1000.0, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+            if comp_4h
             else "N/A"
         )
         last_4h_utc = (
@@ -1039,9 +1194,13 @@ class TrendPullbackEngine:
 
         ref_entry = hold_entry if (pos_status == "HOLDING" and hold_entry > 0) else ez_res["reference_entry"]
         stp_res = calculate_stop(comp_4h, trd_res["atr14"], ref_entry, cfg) if (ok_4h and ref_entry > 0) else {
+            "lowest_low_5bars": 0.0,
+            "atr14_used": 0.0,
+            "stop_buffer_usd": 0.0,
             "stop_price": hold_stop if hold_stop > 0 else 0.0,
             "stop_distance_usd": 0.0,
             "stop_distance_atr": 0.0,
+            "stop_distance_atr_exact": 0.0,
             "valid": False,
             "reason": "Data unavailable for stop calculation",
         }
@@ -1051,13 +1210,7 @@ class TrendPullbackEngine:
         sz_res = (
             calculate_position_size(ref_entry, active_stop, cfg)
             if (data_integrity_ok and stp_res["valid"])
-            else {
-                "equity_usd": cfg.initial_simulation_equity,
-                "risk_budget_usd": cfg.initial_simulation_equity * cfg.risk_per_trade,
-                "cost_allowance_per_btc": 0.0,
-                "position_size_btc": 0.0,
-                "position_value_usd": 0.0,
-            }
+            else calculate_position_size(0.0, 0.0, cfg)
         )
 
         # 6. Exit Evaluation & Deterministic Verdict
@@ -1090,7 +1243,26 @@ class TrendPullbackEngine:
             exit_eval=exit_res,
         )
 
+        if pos_status == "HOLDING":
+            entry_elig_str = "IN POSITION (Managing open BTC spot holding; new entries paused)"
+        elif verdict_res["strategy_verdict"] == "ENTRY READY":
+            entry_elig_str = "ELIGIBLE (All 1D Regime, 4H Trend, Pullback Recovery, and Stop gates passed)"
+        else:
+            entry_elig_str = f"BLOCKED ({verdict_res['decision_state']})"
+
+        last_1d_bar = comp_1d[-1] if comp_1d else KlineBar(0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
         last_4h_bar = comp_4h[-1] if comp_4h else KlineBar(0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+        daily_status_str = (
+            f"LAST CLOSE (Open {open_1d_utc} -> Close {last_1d_utc})"
+            if status_1d == "LAST CLOSE"
+            else status_1d
+        )
+        c4h_status_str = (
+            f"LAST CLOSE (Open {open_4h_utc} -> Close {last_4h_utc})"
+            if status_4h == "LAST CLOSE"
+            else status_4h
+        )
 
         ev = TrendPullbackEvaluation(
             strategy_name="BTC TREND-PULLBACK v1.0",
@@ -1101,6 +1273,9 @@ class TrendPullbackEngine:
             spot_price=spot_price,
             daily_regime=reg_res["regime"],
             daily_close_completed=reg_res["last_close"],
+            daily_open_completed=last_1d_bar.open,
+            daily_high_completed=last_1d_bar.high,
+            daily_low_completed=last_1d_bar.low,
             daily_sma200=reg_res["sma200"],
             daily_sma200_prev20=reg_res["sma200_prev20"],
             daily_sma200_slope_20d=reg_res["sma200_slope_20d"],
@@ -1134,14 +1309,31 @@ class TrendPullbackEngine:
             limit_entry_high=ez_res["entry_high"],
             reference_entry_price=ref_entry,
             structural_stop=active_stop,
+            stop_lowest_low_5bars=stp_res["lowest_low_5bars"],
+            stop_buffer_usd=stp_res["stop_buffer_usd"],
             stop_distance_usd=stp_res["stop_distance_usd"],
             stop_distance_atr=stp_res["stop_distance_atr"],
+            stop_distance_atr_exact=stp_res["stop_distance_atr_exact"],
             stop_valid=stp_res["valid"],
             stop_rejection_reason=stp_res["reason"],
             simulation_equity_usd=sz_res["equity_usd"],
             risk_per_trade_pct=cfg.risk_per_trade * 100.0,
             risk_budget_usd=sz_res["risk_budget_usd"],
+            sizing_entry_price=sz_res["sizing_entry_price"],
+            sizing_stop_price=sz_res["sizing_stop_price"],
+            gross_price_risk_per_btc=sz_res["gross_price_risk_per_btc"],
+            entry_fee_per_btc=sz_res["entry_fee_per_btc"],
+            exit_fee_per_btc=sz_res["exit_fee_per_btc"],
+            entry_slippage_per_btc=sz_res["entry_slippage_per_btc"],
+            exit_slippage_per_btc=sz_res["exit_slippage_per_btc"],
             cost_allowance_per_btc=sz_res["cost_allowance_per_btc"],
+            total_risk_per_btc=sz_res["total_risk_per_btc"],
+            gross_price_risk_usd=sz_res["gross_price_risk_usd"],
+            entry_fee_usd=sz_res["entry_fee_usd"],
+            exit_fee_usd=sz_res["exit_fee_usd"],
+            entry_slippage_usd=sz_res["entry_slippage_usd"],
+            exit_slippage_usd=sz_res["exit_slippage_usd"],
+            total_estimated_risk_usd=sz_res["total_estimated_risk_usd"],
             position_size_btc=sz_res["position_size_btc"],
             position_value_usd=sz_res["position_value_usd"],
             risk_reward_label="DATA UNAVAILABLE (No fixed target - trend-continuation research model)",
@@ -1153,11 +1345,21 @@ class TrendPullbackEngine:
             exit_two_4h_below_ema50=exit_res["two_4h_below_ema50"],
             exit_two_1d_below_sma200=exit_res["two_1d_below_sma200"],
             invalidation_reason=exit_res["invalidation_reason"],
+            entry_eligibility_status=entry_elig_str,
+            hypothetical_exit_status=exit_res["hypothetical_exit_status"],
             data_integrity_ok=data_integrity_ok,
-            daily_candle_status=f"{status_1d} ({last_1d_utc})" if status_1d == "LAST CLOSE" else status_1d,
+            daily_candle_status=daily_status_str,
+            daily_open_time_utc=open_1d_utc,
+            daily_close_time_utc=last_1d_utc,
             daily_last_close_utc=last_1d_utc,
-            candle_4h_status=f"{status_4h} ({last_4h_utc})" if status_4h == "LAST CLOSE" else status_4h,
+            daily_forming_excluded=forming_1d_excl,
+            daily_forming_open_utc=forming_1d_open_utc,
+            candle_4h_status=c4h_status_str,
+            candle_4h_open_time_utc=open_4h_utc,
+            candle_4h_close_time_utc=last_4h_utc,
             candle_4h_last_close_utc=last_4h_utc,
+            candle_4h_forming_excluded=forming_4h_excl,
+            candle_4h_forming_open_utc=forming_4h_open_utc,
             integrity_failure_reason=integrity_failure_reason,
             strategy_verdict=verdict_res["strategy_verdict"],
             verdict_explanation=verdict_res["explanation"],
@@ -1168,32 +1370,51 @@ class TrendPullbackEngine:
 
     @staticmethod
     def _build_markdown_summary(ev: TrendPullbackEvaluation) -> str:
+        active_order_note = (
+            " *(Hypothetical Sizing Audit at Ref Entry — Active Order: 0.00000 BTC / $0.00)*"
+            if ev.trade_decision == "NO TRADE"
+            else ""
+        )
         lines = [
             f"# {ev.strategy_name} | {ev.mode_label}",
-            f"**STRATEGY STATUS:** `{ev.strategy_status}`  |  **Last Update:** `{ev.timestamp_myt}`",
+            f"**STRATEGY STATUS:** `{ev.strategy_status}`  |  **Retrieval Time (MYT):** `{ev.timestamp_myt}`  |  **Retrieval Time (UTC):** `{ev.timestamp_utc}`",
             f"**Spot Price:** `${ev.spot_price:,.2f}`  |  **Decision State:** `{ev.decision_state}`  |  **Verdict:** `{ev.strategy_verdict}`",
             "",
             "## 1. MARKET REGIME & 4H TREND",
-            f"- **Daily Regime:** `{ev.daily_regime}` (Last Completed 1D Close: `${ev.daily_close_completed:,.2f}` vs Daily SMA200: `${ev.daily_sma200:,.2f}`, 20D Slope: `{ev.daily_sma200_slope_20d:+,.2f}`)",
-            f"- **4H Trend:** `{ev.trend_4h}` (4H EMA50: `${ev.ema50_4h:,.2f}`, 4H EMA200: `${ev.ema200_4h:,.2f}`, 6-Bar EMA50 Slope: `{ev.ema50_4h_slope_6bars:+,.2f}`, 4H ATR14: `${ev.atr14_4h:,.2f}`)",
+            f"- **Daily Regime:** `{ev.daily_regime}` (Completed 1D Candle: `Open {ev.daily_open_time_utc} -> Close {ev.daily_close_time_utc}` | Close: `${ev.daily_close_completed:,.2f}` vs Daily SMA200: `${ev.daily_sma200:,.2f}`, 20D Slope: `{ev.daily_sma200_slope_20d:+,.2f}`)",
+            f"- **4H Trend:** `{ev.trend_4h}` (Completed 4H Candle: `Open {ev.candle_4h_open_time_utc} -> Close {ev.candle_4h_close_time_utc}` | 4H EMA50: `${ev.ema50_4h:,.2f}`, 4H EMA200: `${ev.ema200_4h:,.2f}`, 6-Bar EMA50 Slope: `{ev.ema50_4h_slope_6bars:+,.2f}`, 4H ATR14: `${ev.atr14_4h:,.2f}`)",
             "",
-            "## 2. PULLBACK ANALYSIS",
-            f"- **Pullback Zone:** `${ev.pullback_zone_lower:,.2f} - ${ev.pullback_zone_upper:,.2f}` (`EMA50 - 0.50*ATR` to `EMA50 + 0.25*ATR`)",
+            "## 2. PULLBACK ANALYSIS (LAST COMPLETED 4H CANDLE AUDIT)",
+            f"- **Evaluated 4H Candle Window:** `Open {ev.candle_4h_open_time_utc} -> Close {ev.candle_4h_close_time_utc}`",
+            f"- **Evaluated 4H Candle OHLC:** `Open ${ev.open_4h_completed:,.2f}` | `High ${ev.high_4h_completed:,.2f}` | `Low ${ev.low_4h_completed:,.2f}` | `Close ${ev.close_4h_completed:,.2f}`",
+            f"- **4H Indicators Used:** `4H EMA50 = ${ev.ema50_4h:,.2f}`  |  `4H ATR14 = ${ev.atr14_4h:,.2f}`",
+            f"- **Pullback Zone (`[EMA50 - 0.50*ATR, EMA50 + 0.25*ATR]`):** `${ev.pullback_zone_lower:,.2f} - ${ev.pullback_zone_upper:,.2f}`",
+            f"- **Max Recovery Extension (`EMA50 + 1.00*ATR`):** `${ev.max_extension_price:,.2f}`",
             f"- **Recovery Candle:** `{ev.recovery_candle}`  |  **Setup Status:** `{ev.setup_status}`",
-            f"- **Note:** {ev.pullback_rejection_reason}",
+            f"- **Confirmation / Rejection Reason:** {ev.pullback_rejection_reason}",
             "",
-            "## 3. TRADE PLAN (SIMULATION / PAPER EQUITY: US$100,000)",
-            f"- **Decision:** `{ev.trade_decision}`",
-            f"- **Limit Entry Zone (4H EMA50 Watch):** `${ev.limit_entry_low:,.2f} - ${ev.limit_entry_high:,.2f}`",
-            f"- **Structural Stop:** `${ev.structural_stop:,.2f}` (`{ev.stop_distance_atr:.2f} ATR` / `-${ev.stop_distance_usd:,.2f}` from EMA50)",
-            f"- **Risk Budget (0.50%):** `${ev.risk_budget_usd:,.2f}`  |  **Position Size:** `{ev.position_size_btc:.5f} BTC` (`${ev.position_value_usd:,.2f}`)"
-            + (" *(Sim Reference if Armed — Active Order: 0.00000 BTC)*" if ev.trade_decision == "NO TRADE" else ""),
+            "## 3. TRADE PLAN & POSITION-SIZING AUDIT (SIMULATION EQUITY: US$100,000.00)",
+            f"- **Decision:** `{ev.trade_decision}`  |  **Entry Eligibility:** `{ev.entry_eligibility_status}`",
+            f"- **Limit Entry Zone (`[EMA50, EMA50 + 0.10*ATR]`):** `${ev.limit_entry_low:,.2f} - ${ev.limit_entry_high:,.2f}` (Sizing Reference Entry: `${ev.sizing_entry_price:,.2f}`)",
+            f"- **Structural Stop Audit (`5-Bar Low - 0.25*ATR`):** 5-Bar Lowest Low `${ev.stop_lowest_low_5bars:,.2f}` - Buffer `${ev.stop_buffer_usd:,.2f}` (`0.25 * ${ev.atr14_4h:,.2f}`) = **Stop `${ev.structural_stop:,.2f}`**",
+            f"- **Stop Distance & Boundary Check (`[0.75, 3.00] ATR`):** `-${ev.stop_distance_usd:,.2f}` from Ref Entry `${ev.sizing_entry_price:,.2f}` = **`{ev.stop_distance_atr:.2f} ATR`** (exact `{ev.stop_distance_atr_exact:.4f} ATR`) — `{ev.stop_rejection_reason}`",
+            f"- **Position Sizing Breakdown (`0.50%` Risk Budget = `${ev.risk_budget_usd:,.2f}`):**",
+            f"  - **Final BTC Quantity:** `{ev.position_size_btc:.5f} BTC`  |  **Position Notional:** `${ev.position_value_usd:,.2f}`{active_order_note}",
+            f"  - **Gross Price Risk:** `${ev.gross_price_risk_per_btc:,.2f}/BTC` -> **`${ev.gross_price_risk_usd:,.2f}`**",
+            f"  - **Entry Fee Allowance (`0.10%`):** `${ev.entry_fee_per_btc:,.2f}/BTC` -> **`${ev.entry_fee_usd:,.2f}`**",
+            f"  - **Exit Fee Allowance (`0.10%`):** `${ev.exit_fee_per_btc:,.2f}/BTC` -> **`${ev.exit_fee_usd:,.2f}`**",
+            f"  - **Entry Slippage Allowance (`0.05%`):** `${ev.entry_slippage_per_btc:,.2f}/BTC` -> **`${ev.entry_slippage_usd:,.2f}`**",
+            f"  - **Exit Slippage Allowance (`0.05%`):** `${ev.exit_slippage_per_btc:,.2f}/BTC` -> **`${ev.exit_slippage_usd:,.2f}`**",
+            f"  - **Total Estimated Loss (Gross + Fees + Slippage):** `${ev.total_risk_per_btc:,.2f}/BTC` -> **`${ev.total_estimated_risk_usd:,.2f}`** (<= `${ev.risk_budget_usd:,.2f}` budget)",
             f"- **Risk / Reward:** `{ev.risk_reward_label}`",
             "",
             "## 4. POSITION MANAGEMENT & DATA INTEGRITY",
-            f"- **Current Status:** `{ev.position_status}`  |  **Exit Conditions:** `{'N/A (IN CASH)' if ev.position_status == 'CASH' else ev.exit_conditions_status}`",
-            f"- **Invalidation / Exit Rules:** {ev.invalidation_reason}",
-            f"- **Daily Candle:** `{ev.daily_candle_status}`  |  **4H Candle:** `{ev.candle_4h_status}`",
+            f"- **Current Position Status:** `{ev.position_status}`  |  **Active Position Exit Status:** `{ev.exit_conditions_status}`",
+            f"- **Active Exit Rule Flags:** Stop Breach `{ev.exit_stop_breached}` | 2x 4H < EMA50 `{ev.exit_two_4h_below_ema50}` | 2x 1D < SMA200 `{ev.exit_two_1d_below_sma200}`",
+            f"- **Position / Market Invalidation:** {ev.invalidation_reason}",
+            f"- **Hypothetical Exit Check:** {ev.hypothetical_exit_status}",
+            f"- **Last Completed 1D Candle:** `{ev.daily_candle_status}` (Forming 1D Excluded: `{ev.daily_forming_excluded}` — `{ev.daily_forming_open_utc}`)",
+            f"- **Last Completed 4H Candle:** `{ev.candle_4h_status}` (Forming 4H Excluded: `{ev.candle_4h_forming_excluded}` — `{ev.candle_4h_forming_open_utc}`)",
             f"- **Verdict Explanation:** {ev.verdict_explanation}",
         ]
         return "\n".join(lines)

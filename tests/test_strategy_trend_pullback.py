@@ -552,3 +552,131 @@ def test_18_tui_and_ai_packet_integration() -> None:
 
     packet = build_ai_telemetry_packet(config, store)
     assert "SECTION 18: TAB [A] BTC TREND-PULLBACK v1.0" in packet
+
+
+def test_19_audit_candle_open_vs_close_timestamps() -> None:
+    """Audit Section 1: Verifies open vs close timestamp distinction and forming candle exclusion."""
+    # Simulate run time at 2026-11-08 13:52:56 UTC (NOW_MS + 13h 52m 56s)
+    # NOW_MS = 1_794_096_000_000 is 2026-11-08 00:00:00 UTC
+    nov08_00_ms = 1_794_096_000_000
+    run_ms = nov08_00_ms + (13 * 3_600_000) + (52 * 60_000) + 56_000
+
+    store = StateStore()
+    store.binance_spot_price = 75_935.57
+    # Completed 1D bars up to 2026-11-07 (open = 2026-11-07 00:00 UTC, close = 2026-11-08 00:00 UTC)
+    bars_1d = _build_bullish_1d_bars(225, now_ms=nov08_00_ms)
+    # Append the forming 2026-11-08 daily candle (open = 2026-11-08 00:00 UTC, closes 2026-11-09 00:00 UTC)
+    bars_1d.append(_make_bar(nov08_00_ms, 75_867.59, 76_100.0, 75_700.0, 75_935.57, is_closed=False))
+    store.spot_klines_1d.extend(bars_1d)
+
+    # 1H bars up to 2026-11-08 13:00 UTC (so 08:00->12:00 UTC 4H is completed, 12:00->16:00 UTC is forming)
+    bars_1h = _build_1h_bars(900, now_ms=nov08_00_ms + 12 * ONE_H_MS, base_px=76_000.0)
+    bars_1h.append(_make_bar(nov08_00_ms + 12 * ONE_H_MS, 75_980.0, 76_050.0, 75_900.0, 75_935.57, is_closed=False))
+    store.spot_klines_1h.extend(bars_1h)
+
+    ev = TrendPullbackEngine().evaluate(store, now_ms=run_ms)
+    assert ev.daily_open_time_utc == "2026-11-07 00:00 UTC"
+    assert ev.daily_close_time_utc == "2026-11-08 00:00 UTC"
+    assert ev.daily_forming_excluded is True
+    assert ev.daily_forming_open_utc == "2026-11-08 00:00 UTC"
+    assert ev.candle_4h_open_time_utc == "2026-11-08 08:00 UTC"
+    assert ev.candle_4h_close_time_utc == "2026-11-08 12:00 UTC"
+    assert ev.candle_4h_forming_excluded is True
+    assert ev.candle_4h_forming_open_utc == "2026-11-08 12:00 UTC"
+
+
+def test_20_audit_stop_exact_boundary_precision() -> None:
+    """Audit Section 3: Verifies exact 0.7500 ATR and 3.0000 ATR boundary handling."""
+    cfg = TrendPullbackConfig()
+    atr14 = 1_000.0
+    ref_entry = 80_000.0
+    # buffer = 0.25 * 1000 = 250.00
+
+    # Exact 0.7500 ATR: stop_distance = 750.00 -> stop_price = 79_250.00 -> lowest_low = 79_500.00
+    bars_exact_min = [_make_bar(NOW_MS - (5 - j) * FOUR_H_MS, 79_600, 80_100, 79_500.00, 79_800) for j in range(5)]
+    st_exact_min = calculate_stop(bars_exact_min, atr14, ref_entry, cfg)
+    assert st_exact_min["stop_distance_atr_exact"] == 0.7500
+    assert st_exact_min["valid"] is True
+
+    # Just below 0.7500 ATR (0.7499 ATR -> stop_distance = 749.90 -> lowest_low = 79_500.10)
+    bars_below_min = [_make_bar(NOW_MS - (5 - j) * FOUR_H_MS, 79_600, 80_100, 79_500.10, 79_800) for j in range(5)]
+    st_below_min = calculate_stop(bars_below_min, atr14, ref_entry, cfg)
+    assert st_below_min["stop_distance_atr_exact"] == 0.7499
+    assert st_below_min["valid"] is False
+
+    # Exact 3.0000 ATR: stop_distance = 3_000.00 -> stop_price = 77_000.00 -> lowest_low = 77_250.00
+    bars_exact_max = [_make_bar(NOW_MS - (5 - j) * FOUR_H_MS, 78_000, 80_100, 77_250.00, 79_800) for j in range(5)]
+    st_exact_max = calculate_stop(bars_exact_max, atr14, ref_entry, cfg)
+    assert st_exact_max["stop_distance_atr_exact"] == 3.0000
+    assert st_exact_max["valid"] is True
+
+    # Just above 3.0000 ATR (3.0001 ATR -> stop_distance = 3_000.10 -> lowest_low = 77_249.90)
+    bars_above_max = [_make_bar(NOW_MS - (5 - j) * FOUR_H_MS, 78_000, 80_100, 77_249.90, 79_800) for j in range(5)]
+    st_above_max = calculate_stop(bars_above_max, atr14, ref_entry, cfg)
+    assert st_above_max["stop_distance_atr_exact"] == 3.0001
+    assert st_above_max["valid"] is False
+
+
+def test_21_audit_position_sizing_reconciliation() -> None:
+    """Audit Section 2: Verifies full fee + slippage reconciliation and <= $500.00 risk cap."""
+    cfg = TrendPullbackConfig()
+    sz = calculate_position_size(77_436.05, 75_400.80, cfg)
+    assert sz["equity_usd"] == 100_000.00
+    assert sz["risk_budget_usd"] == 500.00
+    assert sz["sizing_entry_price"] == 77_436.05
+    assert sz["sizing_stop_price"] == 75_400.80
+    assert sz["gross_price_risk_per_btc"] == 2_035.25
+    assert sz["position_size_btc"] == 0.22079
+    assert sz["position_value_usd"] == 17_097.11
+
+    component_sum = round(
+        sz["gross_price_risk_usd"]
+        + sz["entry_fee_usd"]
+        + sz["exit_fee_usd"]
+        + sz["entry_slippage_usd"]
+        + sz["exit_slippage_usd"],
+        2,
+    )
+    assert component_sum == sz["total_estimated_risk_usd"]
+    assert sz["total_estimated_risk_usd"] <= 500.00
+
+    # Zero-fee / zero-slippage verification
+    cfg_zero = TrendPullbackConfig(
+        entry_fee_pct=0.0,
+        exit_fee_pct=0.0,
+        entry_slippage_pct=0.0,
+        exit_slippage_pct=0.0,
+    )
+    sz_zero = calculate_position_size(77_436.05, 75_400.80, cfg_zero)
+    assert sz_zero["cost_allowance_per_btc"] == 0.0
+    assert sz_zero["position_size_btc"] == 0.24567  # floor(500 / 2035.25 = 0.24567006, 5)
+    assert sz_zero["total_estimated_risk_usd"] <= 500.00
+
+
+def test_22_audit_cash_vs_holding_exit_separation() -> None:
+    """Audit Section 4: Verifies CASH never reports active position exit as TRIGGERED."""
+    cfg = TrendPullbackConfig()
+    bars_1d = _build_bullish_1d_bars(230)
+    bars_4h = _build_bullish_4h_bars(220)
+    for idx in (-2, -1):
+        b = bars_4h[idx]
+        bars_4h[idx] = _make_bar(b.timestamp_ms, 72_000.0, 72_200.0, 71_500.0, 71_800.0)
+    reg = calculate_regime(bars_1d, cfg)
+    tr = calculate_trend(bars_4h, cfg)
+
+    ex_cash = evaluate_exit(
+        current_price=71_800.0,
+        stop_price=75_000.0,
+        completed_4h_bars=bars_4h,
+        ema50_4h_series=tr["ema50_series"],
+        completed_1d_bars=bars_1d,
+        sma200_1d_series=reg["sma200_series"],
+        position_status="CASH",
+    )
+    assert ex_cash["exit_conditions_status"] == "NONE (IN CASH)"
+    assert ex_cash["stop_breached"] is False
+    assert ex_cash["two_4h_below_ema50"] is False
+    assert ex_cash["two_1d_below_sma200"] is False
+    assert ex_cash["hypothetical_exit_status"].startswith("HYPOTHETICAL ONLY (No Open Position):")
+    assert ex_cash["hypothetical_two_4h_below_ema50"] is True
+

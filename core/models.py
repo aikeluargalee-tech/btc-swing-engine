@@ -5019,3 +5019,38 @@ class TrendPullbackEvaluation:
     verdict_explanation: str = ""
     summary_markdown: str = ""
 
+    # 7. Implementation Audit & Transparency Fields (Candle Open/Close, Stop & Sizing Breakdown, Cash vs Holding Exit State)
+    daily_open_time_utc: str = ""
+    daily_close_time_utc: str = ""
+    daily_open_completed: float = 0.0
+    daily_high_completed: float = 0.0
+    daily_low_completed: float = 0.0
+    daily_forming_excluded: bool = False
+    daily_forming_open_utc: str = ""
+    candle_4h_open_time_utc: str = ""
+    candle_4h_close_time_utc: str = ""
+    candle_4h_forming_excluded: bool = False
+    candle_4h_forming_open_utc: str = ""
+
+    stop_lowest_low_5bars: float = 0.0
+    stop_buffer_usd: float = 0.0
+    stop_distance_atr_exact: float = 0.0
+
+    sizing_entry_price: float = 0.0
+    sizing_stop_price: float = 0.0
+    gross_price_risk_per_btc: float = 0.0
+    entry_fee_per_btc: float = 0.0
+    exit_fee_per_btc: float = 0.0
+    entry_slippage_per_btc: float = 0.0
+    exit_slippage_per_btc: float = 0.0
+    total_risk_per_btc: float = 0.0
+    gross_price_risk_usd: float = 0.0
+    entry_fee_usd: float = 0.0
+    exit_fee_usd: float = 0.0
+    entry_slippage_usd: float = 0.0
+    exit_slippage_usd: float = 0.0
+    total_estimated_risk_usd: float = 0.0
+
+    entry_eligibility_status: str = "BLOCKED"
+    hypothetical_exit_status: str = ""
+

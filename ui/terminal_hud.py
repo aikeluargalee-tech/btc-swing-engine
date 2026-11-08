@@ -5129,132 +5129,107 @@ def _build_tab16_ssrn_research_hud(
     store: StateStore,
     header_panel: Panel,
 ) -> Group:
-    """Builds the 5-panel layout for Tab 16 [R: SSRN RESEARCH] - Academic quantitative domains & empirical strategies."""
+    """Builds the unified single-screen quantitative cockpit for Tab 16 [R: SSRN RESEARCH]."""
     ssrn = store.ssrn_alpha_evaluation
     if ssrn is None:
         from analytics.ssrn_research_engine import SSRNResearchEngine
         engine = SSRNResearchEngine(config)
         ssrn = engine.evaluate(store)
 
-    view_mode = getattr(store, "ssrn_view_mode", "models")
+    spot_p = ssrn.spot_price or store.binance_spot_price or 0.0
 
-    # Sub-Ribbon with View Toggle (View B Models is Primary Default)
-    mode_b_style = "bold black on bright_cyan" if view_mode == "models" else "dim white"
-    mode_a_style = "bold black on bright_yellow" if view_mode == "domains" else "dim white"
+    # Sub-Ribbon Header: Unified Single Screen
     sub_grid = Table.grid(expand=True)
     sub_grid.add_column(justify="left", no_wrap=True)
     sub_grid.add_column(justify="right", no_wrap=True)
     sub_grid.add_row(
-        f"[bold bright_cyan]DESK [R]: SSRN QUANTITATIVE COCKPIT[/bold bright_cyan]  |  "
-        f"[{mode_b_style}] [PRIMARY] VIEW B: 5 EMPIRICAL STRATEGY MODELS [/{mode_b_style}]   "
-        f"[{mode_a_style}] VIEW A: 5 ACADEMIC DOMAINS (LIVE TELEMETRY) [/{mode_a_style}]",
-        f"[dim]Press [bold yellow]'R'[/bold yellow] to toggle view | [bold yellow]'RR'[/bold yellow] to copy brief[/dim]",
+        "[bold bright_cyan]DESK [R]: SSRN QUANTITATIVE ALPHA DECK[/bold bright_cyan]  |  "
+        "[bold bright_white]UNIFIED 5-ROW QUANTITATIVE MATRIX (THEORY & LIVE EXECUTION)[/bold bright_white]",
+        "[dim]Press [bold yellow]'R'[/bold yellow] (or [bold yellow]'RR'[/bold yellow]) to copy Master Academic Brief[/dim]",
     )
-    verdict_panel = Panel(sub_grid, box=box.ROUNDED, border_style="bright_cyan" if view_mode == "models" else "bright_yellow", padding=(0, 1))
+    sub_panel = Panel(sub_grid, box=box.ROUNDED, border_style="bright_cyan", padding=(0, 1))
 
-    if view_mode == "models":
-        # -------------------------------------------------------------
-        # VIEW B: 5 VERIFIED EMPIRICAL STRATEGY MODELS & LIVE GATES (PRIMARY)
-        # -------------------------------------------------------------
-        models_by_id = {m.id: m for m in ssrn.models}
-        m1 = models_by_id.get("mtf_macd")
-        m2 = models_by_id.get("ensemble_donchian")
-        m3 = models_by_id.get("vol_adaptive_8h")
-        m4 = models_by_id.get("funding_carry_filter")
-        m5 = models_by_id.get("cost_aware_ml")
+    # Top Executive Gating Banner
+    m1_pass = ssrn.mtf_macd_gate_pass
+    m1_badge = "[bold black on green] [OK] PASS: LONG PERMITTED [/bold black on green]" if m1_pass else "[bold white on red] [X] RESTRICTED (HOLD CASH) [/bold white on red]"
+    m2_badge = f"[bold black on green] [OK] ALLOC: {ssrn.target_vol_sizing_pct:.0f}% EQUITY [/bold black on green]"
+    m3_badge = f"[bold black on green] [OK] TRAIL: -${ssrn.atr_trailing_stop_dist:,.0f} [/bold black on green]"
+    m4_locked = ssrn.annualized_funding_pct > 30.0
+    m4_badge = "[bold white on red] [X] LOCKED (> 30% EXHAUSTION) [/bold white on red]" if m4_locked else "[bold black on green] [OK] PASS (< 30% CEILING) [/bold black on green]"
+    m5_badge = f"[bold black on green] [OK] HURDLE: >= +{ssrn.round_trip_friction_bps/100:.2f}% [/bold black on green]"
 
-        # Top Executive Gating Banner
-        top_banner_table = Table.grid(expand=True)
-        top_banner_table.add_column(ratio=1)
-        top_banner_table.add_column(ratio=1)
-        top_banner_table.add_column(ratio=1)
-        top_banner_table.add_column(ratio=1)
-        top_banner_table.add_column(ratio=1)
+    top_banner_table = Table.grid(expand=True)
+    top_banner_table.add_column(ratio=1)
+    top_banner_table.add_column(ratio=1)
+    top_banner_table.add_column(ratio=1)
+    top_banner_table.add_column(ratio=1)
+    top_banner_table.add_column(ratio=1)
+    top_banner_table.add_row(
+        "[dim]1. Momentum Gate:[/dim]\n" + m1_badge,
+        "[dim]2. Vol Target Sizing:[/dim]\n" + m2_badge,
+        "[dim]3. 8H ATR Stop Buffer:[/dim]\n" + m3_badge,
+        "[dim]4. Funding Rate Ceiling:[/dim]\n" + m4_badge,
+        "[dim]5. Round-Trip Hurdle:[/dim]\n" + m5_badge,
+    )
+    banner_panel = Panel(
+        top_banner_table,
+        title="[bold bright_white]EXECUTIVE STRATEGY GATES & POSITION SIZING MATRIX[/bold bright_white]",
+        box=box.ROUNDED,
+        border_style="bright_cyan",
+        padding=(0, 1),
+    )
 
-        def badge_text(m):
-            if not m:
-                return "[dim]STANDBY[/dim]"
-            col = "bold black on green" if m.is_gate_pass else "bold white on red"
-            return f"[{col}] {m.live_status} [/{col}]"
+    # Main Unified 5-Row Quantitative Matrix Table
+    matrix_table = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold cyan", pad_edge=False)
+    matrix_table.add_column("DOMAIN / RESEARCH PAPER", justify="left", no_wrap=False, ratio=3)
+    matrix_table.add_column("TIMEFRAME & QUANTITATIVE RULE LOGIC", justify="left", no_wrap=False, ratio=4)
+    matrix_table.add_column("LIVE INDICATOR TELEMETRY", justify="left", no_wrap=False, ratio=3)
+    matrix_table.add_column("SWING ACTION & SIZING", justify="center", no_wrap=False, ratio=2)
 
-        top_banner_table.add_row(
-            f"[dim]1. MTF MACD (Mesicek):[/dim]\n" + badge_text(m1),
-            f"[dim]2. Vol Target (Zarattini):[/dim]\n" + badge_text(m2),
-            f"[dim]3. 8H ATR Stop (Karassavidis):[/dim]\n" + badge_text(m3),
-            f"[dim]4. Funding Gate (Chan):[/dim]\n" + badge_text(m4),
-            f"[dim]5. Cost Hurdle (Bysik):[/dim]\n" + badge_text(m5),
-        )
-        banner_panel = Panel(
-            top_banner_table,
-            title="[bold bright_white]EXECUTIVE STRATEGY GATES & POSITION SIZING MATRIX[/bold bright_white]",
-            box=box.ROUNDED,
-            border_style="bright_cyan",
-            padding=(0, 1),
-        )
+    # Row 1: Trend Following (Mesicek 1H/1D MACD)
+    r1_col1 = "[bold bright_white]01. Momentum & Macro Trend[/bold bright_white]\n[dim cyan]Mesicek & Vojtko (SSRN 5748642)[/dim cyan]\n[dim]Academic Domain: Time-Series Momentum[/dim]"
+    r1_col2 = "[bold yellow]1H Execution / 1D Trend Filter[/bold yellow]\n[white]Long entry: 1H MACD > Signal ONLY when Daily MACD is positive.\nTrailing exit: Prior 4H swing low or structural close below entry.[/white]"
+    r1_col3 = f"[bright_white]{ssrn.daily_macd_status}[/bright_white]\n[dim]1H MACD: {ssrn.hourly_macd_status}\n1D: {ssrn.live_trend_1d} | 4H: {ssrn.live_trend_4h}[/dim]"
+    r1_col4 = f"{m1_badge}\n[dim]Spot Sizing: {'100% Permitted' if m1_pass else '0% (Cash Capital Defense)'}[/dim]"
+    matrix_table.add_row(r1_col1, r1_col2, r1_col3, r1_col4)
 
-        # Main Detailed Models Table
-        models_table = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold cyan", pad_edge=False)
-        models_table.add_column("Strategy Model & SSRN Citation", justify="left", no_wrap=False, ratio=3)
-        models_table.add_column("Timeframe & Quantitative Rule Logic", justify="left", no_wrap=False, ratio=4)
-        models_table.add_column("Empirical Benchmark", justify="left", no_wrap=False, ratio=2)
-        models_table.add_column("Action State & Live Metric", justify="center", no_wrap=False, ratio=3)
+    # Row 2: Breakouts & Risk (Zarattini Donchian + 25% Vol Target)
+    r2_col1 = "[bold bright_white]02. Breakouts & Dynamic Sizing[/bold bright_white]\n[dim cyan]Zarattini, Pagani & Barbon (SSRN 5209907)[/dim cyan]\n[dim]Academic Domain: Systematic Factor Pricing[/dim]"
+    r2_col2 = "[bold yellow]Daily / Multi-Horizon (5-360 Days)[/bold yellow]\n[white]Aggregates breakout signals across lookback windows (5-360d).\nDynamic sizing: Weight = Target_Vol (25%) / Realized_Vol.[/white]"
+    r2_col3 = f"[bright_white]20D Realized Vol: {ssrn.realized_vol_20d_ann:.1f}% (Tgt: 25.0%)[/bright_white]\n[dim]Realized Variance: {ssrn.live_realized_variance:.4f}\n20D Skew: {ssrn.live_skewness_20d:+.2f} (Fat-Tailed Risk Beta: 1.00x)[/dim]"
+    r2_col4 = f"{m2_badge}\n[dim]Dynamic Volatility Sizing Weight[/dim]"
+    matrix_table.add_row(r2_col1, r2_col2, r2_col3, r2_col4)
 
-        for m in ssrn.models:
-            gate_col = "bold black on green" if m.is_gate_pass else "bold white on red"
-            status_badge = f"[{gate_col}] {m.live_status} [/{gate_col}]\n[bright_white]{m.live_value}[/bright_white]"
-            title_cell = f"[bold bright_white]{m.name}[/bold bright_white]\n[dim cyan]{m.ssrn_citation}[/dim cyan]"
-            rule_cell = f"[bold yellow]{m.timeframe}[/bold yellow]\n[white]{m.logic}[/white]"
-            perf_cell = f"[bold green]{m.performance}[/bold green]"
-            models_table.add_row(title_cell, rule_cell, perf_cell, status_badge)
+    # Row 3: Volatility Stops (Karassavidis 8H ATR Trail)
+    stop_floor = max(0.0, spot_p - ssrn.atr_trailing_stop_dist)
+    stop_pct = (ssrn.atr_trailing_stop_dist / max(spot_p, 1000.0)) * 100.0
+    r3_col1 = "[bold bright_white]03. Dynamic Volatility Stops[/bold bright_white]\n[dim cyan]Karassavidis et al. (SSRN 5821842)[/dim cyan]\n[dim]Academic Domain: Market Microstructure[/dim]"
+    r3_col2 = "[bold yellow]8-Hour Candles[/bold yellow]\n[white]Trend identified across 8H MA slope + RSI momentum filter.\nDynamic stop placement pegged to multiples of 14-period ATR.[/white]"
+    r3_col3 = f"[bright_white]8H ATR(14): ${ssrn.atr_14_8h:,.0f} • Spot: ${spot_p:,.0f}[/bright_white]\n[dim]Trailing Buffer: 2.5x ATR (-${ssrn.atr_trailing_stop_dist:,.0f} / -{stop_pct:.1f}%)\nStructural Stop Floor: ${stop_floor:,.0f}[/dim]"
+    r3_col4 = f"{m3_badge}\n[dim]Trailing Distance: -{stop_pct:.1f}%[/dim]"
+    matrix_table.add_row(r3_col1, r3_col2, r3_col3, r3_col4)
 
-        content_group = Group(
-            banner_panel,
-            Panel(models_table, title="[bold cyan]VIEW B: VERIFIED EMPIRICAL STRATEGY MODELS & LIVE GATES[/bold cyan]", box=box.ROUNDED, border_style="cyan", padding=(0, 1)),
-        )
+    # Row 4: Sentiment Exhaustion (Chan Perp Funding < 30% Gate)
+    r4_col1 = "[bold bright_white]04. Sentiment & Funding Gate[/bold bright_white]\n[dim cyan]Chan (SSRN 5292305)[/dim cyan]\n[dim]Academic Domain: On-Chain & Derivatives Carry[/dim]"
+    r4_col2 = "[bold yellow]8H Funding Settlement Intervals[/bold yellow]\n[white]Spot swing carry filter: When annualized perpetual funding > +30%,\nfreeze new spot entries to avoid long liquidation cascades.[/white]"
+    r4_col3 = f"[bright_white]Perp Funding: {ssrn.annualized_funding_pct:+.2f}% Ann. (Ceil: 30%)[/bright_white]\n[dim]MVRV Ratio: {ssrn.live_mvrv_ratio:.2f} (Floor <1.0 | Cap >3.5)\nSOPR Level: {ssrn.live_sopr_level:.2f} (Bull Support Retest >= 1.0)[/dim]"
+    r4_col4 = f"{m4_badge}\n[dim]{'Retail Leverage Overheated' if m4_locked else 'Healthy Basis Carry'}[/dim]"
+    matrix_table.add_row(r4_col1, r4_col2, r4_col3, r4_col4)
 
-    else:
-        # -------------------------------------------------------------
-        # VIEW A: 5 ACADEMIC DOMAINS (LIVE TELEMETRY COCKPIT)
-        # -------------------------------------------------------------
-        domains_by_id = {d.id: d for d in ssrn.domains}
+    # Row 5: Alpha Hurdle (Bysik Cost Barrier >= 18 bps)
+    r5_col1 = "[bold bright_white]05. Cost-Aware Alpha Hurdle[/bold bright_white]\n[dim cyan]Bysik & Slepaczuk (SSRN 6795938)[/dim cyan]\n[dim]Academic Domain: Alternative Data & ML Friction[/dim]"
+    r5_col2 = "[bold yellow]Hourly / Multi-Hour Execution[/bold yellow]\n[white]Execute long trades ONLY if expected forward return > friction.\nSuppresses churn and fee drag during flat ranges.[/white]"
+    r5_col3 = f"[bright_white]Round-Trip Taker Friction: {ssrn.round_trip_friction_bps:.0f} bps (+{ssrn.round_trip_friction_bps/100:.2f}%)[/bright_white]\n[dim]Min Expected Edge: >= +{ssrn.round_trip_friction_bps*2/100:.2f}% (2x Friction)\nOrder Book Imbalance (OBI): {ssrn.live_obi_ratio_pct:+.1f}% • 4H CVD: {ssrn.live_4h_cvd_delta:+.1f} BTC[/dim]"
+    r5_col4 = f"{m5_badge}\n[dim]Flat Range Churn Filter: ACTIVE[/dim]"
+    matrix_table.add_row(r5_col1, r5_col2, r5_col3, r5_col4)
 
-        def make_live_domain_panel(d, border_col: str = "bright_blue") -> Panel:
-            t = Table.grid(expand=True)
-            t.add_column()
-            
-            # Big Live Telemetry Readout
-            t.add_row(f"[bold bright_white]TELEMETRY:[/bold bright_white] [bold {border_col}]{d.live_metric_val}[/bold {border_col}]  │  [bold]{d.live_status_badge}[/bold]")
-            
-            # Submetrics Grid
-            sub_str = "  •  ".join([f"[dim]{s}[/dim]" for s in d.live_submetrics])
-            t.add_row(sub_str)
-            t.add_row(f"[bold bright_green]SPOT SWING ROLE:[/bold bright_green] [white]{d.spot_swing_role}[/white]")
-            return Panel(t, title=f"[bold {border_col}]{d.title}[/bold {border_col}]", box=box.ROUNDED, border_style=border_col, padding=(0, 1))
-
-        d1 = domains_by_id.get("microstructure")
-        d2 = domains_by_id.get("momentum")
-        d3 = domains_by_id.get("factors")
-        d4 = domains_by_id.get("onchain")
-        d5 = domains_by_id.get("ml_sentiment")
-
-        row1_table = Table.grid(expand=True)
-        row1_table.add_column(ratio=1)
-        row1_table.add_column(ratio=1)
-        row1_table.add_row(
-            make_live_domain_panel(d1, "bright_blue") if d1 else Panel(""),
-            make_live_domain_panel(d2, "bright_magenta") if d2 else Panel(""),
-        )
-
-        row2_table = Table.grid(expand=True)
-        row2_table.add_column(ratio=1)
-        row2_table.add_column(ratio=1)
-        row2_table.add_row(
-            make_live_domain_panel(d3, "cyan") if d3 else Panel(""),
-            make_live_domain_panel(d4, "green") if d4 else Panel(""),
-        )
-
-        p5 = make_live_domain_panel(d5, "yellow") if d5 else Panel("")
-        content_group = Group(row1_table, row2_table, p5)
+    matrix_panel = Panel(
+        matrix_table,
+        title="[bold cyan]UNIFIED EMPIRICAL STRATEGY & ACADEMIC TELEMETRY MATRIX[/bold cyan]",
+        box=box.ROUNDED,
+        border_style="cyan",
+        padding=(0, 1),
+    )
 
     # Bottom clipboard strip with ASCII-safe status
     last_copy_str = ""
@@ -5265,13 +5240,13 @@ def _build_tab16_ssrn_research_hud(
     bottom_grid.add_column(justify="left", no_wrap=True)
     bottom_grid.add_column(justify="right", no_wrap=True)
     bottom_grid.add_row(
-        f"[bold black on bright_yellow] [KEY R / RR] VIEW TOGGLE & CLIPBOARD [/bold black on bright_yellow]  "
-        f"[bright_white]Tap [bold yellow]'R'[/bold yellow] to toggle Models <-> Domains | Tap [bold yellow]'RR'[/bold yellow] to copy SSRN Academic Brief! (0 screenshots needed)[/bright_white]{last_copy_str}",
-        f"[dim]Peer-Reviewed Quantitative Research | Spot-Only Gating[/dim]",
+        "[bold black on bright_yellow] [KEY R / RR] SSRN BRIEF CLIPBOARD [/bold black on bright_yellow]  "
+        "[bright_white]Tap [bold yellow]'R'[/bold yellow] to switch to Desk [R] | Tap [bold yellow]'R'[/bold yellow] again (or [bold yellow]'RR'[/bold yellow]) to copy SSRN Master Brief! (0 screenshots needed)[/bright_white]" + last_copy_str,
+        "[dim]Unified Quantitative Matrix | Spot-Only Gating[/dim]",
     )
     bottom_panel = Panel(bottom_grid, box=box.ROUNDED, border_style="bright_yellow", padding=(0, 1))
 
-    return Group(header_panel, verdict_panel, content_group, bottom_panel)
+    return Group(header_panel, sub_panel, banner_panel, matrix_panel, bottom_panel)
 
 
 def build_dashboard_renderable(

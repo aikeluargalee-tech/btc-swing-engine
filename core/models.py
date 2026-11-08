@@ -4796,4 +4796,11 @@ class GrokQuantEvaluation:
     watch_for_day: str = ""
     grok_master_prompt_text: str = ""
 
+    # 7. Engine Bottomline Verdict
+    bottomline_verdict: str = "STANDBY"
+    bottomline_color: str = "bold white on red"
+    bottomline_rationale: str = ""
+    bottomline_buy_trigger: str = ""
+    bottomline_invalidation_risk: str = ""
+
 

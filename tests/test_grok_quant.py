@@ -194,6 +194,11 @@ class TestGrokQuantDesk(unittest.TestCase):
         self.assertGreater(len(res.grok_master_prompt_text), 100)
         self.assertIn("## GROK BTC MARKET ANALYSIS", res.grok_master_prompt_text)
         self.assertIn("Positioning", res.grok_master_prompt_text)
+        self.assertIn("Engine Bottomline Verdict", res.grok_master_prompt_text)
+        self.assertIsNotNone(res.bottomline_verdict)
+        self.assertGreater(len(res.bottomline_verdict), 3)
+        self.assertGreater(len(res.bottomline_rationale), 10)
+        self.assertGreater(len(res.bottomline_buy_trigger), 5)
 
     def test_tab15_terminal_hud_render(self) -> None:
         """Verify Tab 15 [G: GROK FLOW] builds cleanly without rendering exceptions."""

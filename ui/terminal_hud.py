@@ -209,7 +209,7 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
     nav_grid.add_column(justify="right", no_wrap=True)
     nav_grid.add_row(
         f"[bold white]BTC-USD[/bold white] | Spot: [bold cyan]${spot_px:,.2f}[/bold cyan] | Regime: {regime_str} ({score_str}) | Feeds: Spot {spot_ws_dot} • Perp {perp_ws_dot} • CB {cb_ws_dot}",
-        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: P Structure • B Patterns • G Grok Flow • F Footprint • W Waterfall • 0 Screener • L Master • C Copy • H Guide[/dim]",
+        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: P Structure • B Patterns • G Grok Flow (GG to Copy) • F Footprint • W Waterfall • 0 Screener • L Master • C Packet • H Guide[/dim]",
     )
 
     tab_grid = Table.grid(expand=True)
@@ -5063,7 +5063,33 @@ def _build_tab15_grok_quant_hud(store: StateStore, header_panel: Panel) -> Group
     playbook_grid.add_column(justify="left", no_wrap=False, ratio=1)
     playbook_grid.add_row(swing_panel, day_panel)
 
-    # 5. One-Click Grok Prompt Clipboard Strip
+    # 5. Engine Bottomline Conclusion & Action Verdict
+    bottomline_grid = Table.grid(expand=True)
+    bottomline_grid.add_column(justify="left", no_wrap=False)
+
+    badge_style = grok.bottomline_color or "bold white on red"
+    verdict_badge = f"[{badge_style}] BOTTOMLINE VERDICT: {grok.bottomline_verdict} [/{badge_style}]"
+
+    bottomline_grid.add_row(verdict_badge)
+    bottomline_grid.add_row(
+        f"[bold bright_white]• PRIMARY RATIONALE  :[/bold bright_white] {grok.bottomline_rationale}"
+    )
+    bottomline_grid.add_row(
+        f"[bold bright_green]• TRIGGER TO BUY     :[/bold bright_green] [bright_green]{grok.bottomline_buy_trigger}[/bright_green]"
+    )
+    bottomline_grid.add_row(
+        f"[bold bright_yellow]• INVALIDATION RISK  :[/bold bright_yellow] [bright_yellow]{grok.bottomline_invalidation_risk}[/bright_yellow]"
+    )
+
+    bottomline_panel = Panel(
+        bottomline_grid,
+        title="[bold yellow]5. ENGINE BOTTOMLINE CONCLUSION & ACTION VERDICT[/bold yellow]",
+        box=box.ROUNDED,
+        border_style="yellow",
+        padding=(0, 1),
+    )
+
+    # 6. One-Click Grok Prompt Clipboard Strip (Key G / GG)
     last_copy_str = ""
     if getattr(store, "last_packet_copied_utc", ""):
         last_copy_str = f"  │  [bold green]✓ COPIED AT {store.last_packet_copied_utc} ({getattr(store, 'last_packet_char_count', 0):,} chars)[/bold green]"
@@ -5072,13 +5098,13 @@ def _build_tab15_grok_quant_hud(store: StateStore, header_panel: Panel) -> Group
     bottom_grid.add_column(justify="left", no_wrap=True)
     bottom_grid.add_column(justify="right", no_wrap=True)
     bottom_grid.add_row(
-        f"[bold black on bright_yellow] [KEY C] COPY GROK MASTER PROMPT [/bold black on bright_yellow]  "
-        f"[bright_white]Press [bold yellow]'C'[/bold yellow] to instantly copy full Master Prompt to clipboard! Zero manual screenshots needed.[/bright_white]{last_copy_str}",
+        f"[bold black on bright_yellow] [KEY G / GG] COPY GROK PROMPT [/bold black on bright_yellow]  "
+        f"[bright_white]Press [bold yellow]'G'[/bold yellow] to switch • Press [bold yellow]'G' again (or tap 'GG')[/bold yellow] to copy Grok Master Prompt! (0 screenshots needed)[/bright_white]{last_copy_str}",
         f"[dim]Risk: Strictly Spot-Only (0.75% Equity Risk Cap)[/dim]",
     )
     bottom_panel = Panel(bottom_grid, box=box.ROUNDED, border_style="bright_yellow", padding=(0, 1))
 
-    return Group(header_panel, verdict_panel, mid_grid, flow_panel, playbook_grid, bottom_panel)
+    return Group(header_panel, verdict_panel, mid_grid, flow_panel, playbook_grid, bottomline_panel, bottom_panel)
 
 
 def build_dashboard_renderable(
@@ -5286,6 +5312,13 @@ def _poll_keyboard_tab_switch(
                     if store.active_tab != 15:
                         store.active_tab = 15
                         changed = True
+                    else:
+                        from analytics.grok_quant_engine import copy_grok_prompt_to_clipboard
+                        ok, msg, char_count = copy_grok_prompt_to_clipboard(store)
+                        store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+                        store.last_packet_copied_ts = time.time()
+                        store.last_packet_char_count = char_count
+                        changed = True
                 elif ch in ("t", "T"):
                     store.show_help = False
                     if store.active_tab != 8:
@@ -5300,18 +5333,10 @@ def _poll_keyboard_tab_switch(
                     store.show_help = not getattr(store, "show_help", False)
                     changed = True
                 elif ch in ("c", "C"):
-                    if store.active_tab == 15:
-                        from analytics.grok_quant_engine import copy_grok_prompt_to_clipboard
-                        ok, msg, char_count = copy_grok_prompt_to_clipboard(store)
-                        store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
-                        store.last_packet_copied_ts = time.time()
-                        store.last_packet_char_count = char_count
-                        changed = True
-                    else:
-                        if detector is not None:
-                            detector.evaluate(store)
-                        copy_ai_packet_to_clipboard_and_disk(config, store)
-                        changed = True
+                    if detector is not None:
+                        detector.evaluate(store)
+                    copy_ai_packet_to_clipboard_and_disk(config, store)
+                    changed = True
         except Exception:
             pass
         return changed
@@ -5360,6 +5385,13 @@ def _poll_keyboard_tab_switch(
                     if store.active_tab != 15:
                         store.active_tab = 15
                         changed = True
+                    else:
+                        from analytics.grok_quant_engine import copy_grok_prompt_to_clipboard
+                        ok, msg, char_count = copy_grok_prompt_to_clipboard(store)
+                        store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+                        store.last_packet_copied_ts = time.time()
+                        store.last_packet_char_count = char_count
+                        changed = True
                 elif ch in ("t", "T"):
                     if store.active_tab != 8:
                         store.active_tab = 8
@@ -5369,18 +5401,10 @@ def _poll_keyboard_tab_switch(
                         store.active_tab = 9
                         changed = True
                 elif ch in ("c", "C"):
-                    if store.active_tab == 15:
-                        from analytics.grok_quant_engine import copy_grok_prompt_to_clipboard
-                        ok, msg, char_count = copy_grok_prompt_to_clipboard(store)
-                        store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
-                        store.last_packet_copied_ts = time.time()
-                        store.last_packet_char_count = char_count
-                        changed = True
-                    else:
-                        if detector is not None:
-                            detector.evaluate(store)
-                        copy_ai_packet_to_clipboard_and_disk(config, store)
-                        changed = True
+                    if detector is not None:
+                        detector.evaluate(store)
+                    copy_ai_packet_to_clipboard_and_disk(config, store)
+                    changed = True
                 rlist, _, _ = select.select([sys.stdin], [], [], 0.0)
     except Exception:
         pass

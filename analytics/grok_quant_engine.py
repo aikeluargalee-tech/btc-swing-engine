@@ -361,7 +361,57 @@ class GrokQuantEngine:
             )
             watch_for_day = f"Break and 15m candle close outside ±1.0σ (${vwap_sd1_l:,.0f} or ${vwap_sd1_u:,.0f}) with expanding volume to signal an intraday directional trend."
 
-        # ---------------- 7. Grok Master Prompt Text ----------------
+        # ---------------- 7. Engine Bottomline Verdict ----------------
+        if spot_price < ema_50_1d:
+            if global_account_ls_ratio >= 2.0 or "RETAIL_LONGS_TRAPPED" in crowding_verdict:
+                bottomline_verdict = "STANDBY (NO SPOT ENTRY) • CAPITAL DEFENSE MODE"
+                bottomline_color = "bold white on red"
+                bottomline_rationale = (
+                    f"Trading below Daily 50 EMA (${ema_50_1d:,.0f}). Trapped retail longs "
+                    f"({global_account_ls_ratio:.2f} L/S ratio) create cascade risk into ${downside_long_liq_pool:,.0f}."
+                )
+                bottomline_buy_trigger = (
+                    f"Reclaim Daily 50 EMA (${ema_50_1d:,.0f}) on 1D close with positive Coinbase Premium, "
+                    f"OR deep SFP flush below ${downside_long_liq_pool:,.0f} absorbed by +15m Spot CVD."
+                )
+                bottomline_invalidation_risk = (
+                    f"Breakdown below ${downside_long_liq_pool:,.0f} without aggressive spot delta absorption."
+                )
+            else:
+                bottomline_verdict = "STANDBY • WAITING FOR 50 EMA RECLAIM"
+                bottomline_color = "bold black on yellow"
+                bottomline_rationale = (
+                    f"Bitcoin is consolidating below Daily 50 EMA (${ema_50_1d:,.0f}). Long-only spot rules restrict entries until macro trend is reclaimed."
+                )
+                bottomline_buy_trigger = f"Daily close > ${ema_50_1d:,.0f} with expanding spot volume."
+                bottomline_invalidation_risk = f"Loss of support floor at ${downside_long_liq_pool:,.0f}."
+        elif spot_price >= ema_50_1d and spot_price >= sma_200_1d:
+            if cpi_pct >= 0 and spot_cvd_4h > 0:
+                bottomline_verdict = "ACCUMULATE / ACTIVE EXPANSION"
+                bottomline_color = "bold black on green"
+                bottomline_rationale = f"Macro uptrend confirmed above 50 & 200 EMA with institutional US sponsorship (CPI: {cpi_pct:+.4f}%)."
+                bottomline_buy_trigger = f"Pullbacks into 00:00 UTC VWAP (${vwap_daily:,.0f}) or +1σ band (${vwap_sd1_u:,.0f}) with positive micro delta."
+                bottomline_invalidation_risk = f"Loss of Daily 50 EMA (${ema_50_1d:,.0f}) on 1D close."
+            else:
+                bottomline_verdict = "BULLISH BIAS • CAUTION ON EXPANSION"
+                bottomline_color = "bold black on cyan"
+                bottomline_rationale = f"Above 50 EMA but lagging spot CVD / negative CPI warns of derivative exhaustion into overhead short liquidations (${overhead_short_liq_pool:,.0f})."
+                bottomline_buy_trigger = f"Re-bid at VWAP Value Area Low (${vwap_sd1_l:,.0f}) or confirmed CPI flip positive."
+                bottomline_invalidation_risk = f"SFP rejection at ${overhead_short_liq_pool:,.0f} falling back below 50 EMA."
+        elif vwap_band_status == "EXTREME_OVERSOLD_-2SD" and spot_cvd_15m > 0:
+            bottomline_verdict = "TACTICAL VALUE BOUNCE TRIGGERED"
+            bottomline_color = "bold black on green"
+            bottomline_rationale = f"Intraday price swept extreme -2.0σ VWAP band (${vwap_sd2_l:,.0f}) with immediate spot delta absorption (+{spot_cvd_15m:.1f} BTC)."
+            bottomline_buy_trigger = f"Active bounce targeting mean reversion to 00:00 UTC VWAP (${vwap_daily:,.0f})."
+            bottomline_invalidation_risk = f"New 15m low below ${downside_long_liq_pool:,.0f}."
+        else:
+            bottomline_verdict = "STANDBY / NEUTRAL RANGE"
+            bottomline_color = "bold black on yellow"
+            bottomline_rationale = f"Price is rotating inside range (${downside_long_liq_pool:,.0f}–${overhead_short_liq_pool:,.0f}) without directional edge."
+            bottomline_buy_trigger = f"Reclaim Daily 50 EMA (${ema_50_1d:,.0f}) or clean sweep of -2σ VWAP."
+            bottomline_invalidation_risk = f"Loss of ${downside_long_liq_pool:,.0f}."
+
+        # ---------------- 8. Grok Master Prompt Text ----------------
         prompt_text = f"""## GROK BTC MARKET ANALYSIS (MECHANICAL READOUT)
 Timestamp: {ts_str}
 
@@ -392,6 +442,12 @@ Timestamp: {ts_str}
 
 **Mechanical Read (Swing)**:
 {mechanical_read_swing}
+
+**Engine Bottomline Verdict**:
+- **Action**: {bottomline_verdict}
+- **Rationale**: {bottomline_rationale}
+- **Trigger to Buy**: {bottomline_buy_trigger}
+- **Invalidation**: {bottomline_invalidation_risk}
 
 **Watch For (Swing)**:
 - {watch_for_swing}
@@ -458,6 +514,11 @@ Timestamp: {ts_str}
             mechanical_read_day=mechanical_read_day,
             watch_for_day=watch_for_day,
             grok_master_prompt_text=prompt_text.strip(),
+            bottomline_verdict=bottomline_verdict,
+            bottomline_color=bottomline_color,
+            bottomline_rationale=bottomline_rationale,
+            bottomline_buy_trigger=bottomline_buy_trigger,
+            bottomline_invalidation_risk=bottomline_invalidation_risk,
         )
 
         store.grok_quant_evaluation = evaluation

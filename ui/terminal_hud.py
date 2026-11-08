@@ -5171,28 +5171,29 @@ def _build_tab16_ssrn_research_hud(
         padding=(0, 1),
     )
 
-    # 3. Top Executive Gating Quick-Check Banner
+    # 3. Top Executive Gating Quick-Check Banner (Crystal Clear Beginner Translation)
     m1_pass = ssrn.mtf_macd_gate_pass
-    m1_badge = "[bold black on green] [OK] PASS [/bold black on green]" if m1_pass else "[bold white on red] [X] RESTRICTED (HOLD CASH) [/bold white on red]"
-    m2_badge = f"[bold black on green] [OK] ALLOC: {ssrn.target_vol_sizing_pct:.0f}% EQUITY [/bold black on green]"
-    m3_badge = f"[bold black on green] [OK] TRAIL: -${ssrn.atr_trailing_stop_dist:,.0f} [/bold black on green]"
+    m1_badge = "[bold black on green] [OK] YES: BUY PERMITTED [/bold black on green]\n[dim]Big Trend is Up[/dim]" if m1_pass else "[bold white on red] [X] NO (STAY IN CASH) [/bold white on red]\n[dim]Big Trend is Down (Veto)[/dim]"
+    m2_badge = f"[bold black on yellow] [PLAN] USE {ssrn.target_vol_sizing_pct:.0f}% SIZE [/bold black on yellow]\n[dim]Stormy Market ({ssrn.realized_vol_20d_ann:.0f}% Vol)[/dim]"
+    stop_flr = max(0.0, spot_p - ssrn.atr_trailing_stop_dist)
+    m3_badge = f"[bold black on cyan] [STOP] -${ssrn.atr_trailing_stop_dist:,.0f} BUFFER [/bold black on cyan]\n[dim]Floor: ${stop_flr:,.0f} (Normal Chop)[/dim]"
     m4_locked = ssrn.annualized_funding_pct > 30.0
-    m4_badge = "[bold white on red] [X] LOCKED (> 30%) [/bold white on red]" if m4_locked else "[bold black on green] [OK] PASS (< 30% CEILING) [/bold black on green]"
-    m5_badge = f"[bold black on green] [OK] HURDLE: >= +{ssrn.round_trip_friction_bps/100:.2f}% [/bold black on green]"
+    m4_badge = "[bold white on red] [X] DANGER: BUBBLE [/bold white on red]\n[dim]Funding > +30% Ann.[/dim]" if m4_locked else f"[bold black on green] [OK] SAFE: NO BUBBLE [/bold black on green]\n[dim]Borrow Rate: {ssrn.annualized_funding_pct:+.1f}%/yr (Calm)[/dim]"
+    m5_badge = f"[bold black on green] [OK] SAFE: FEES COVERED [/bold black on green]\n[dim]Toll: {ssrn.round_trip_friction_bps:.0f} bps (Target > 0.36%)[/dim]"
 
     top_banner_table = Table.grid(expand=True)
     for _ in range(5):
         top_banner_table.add_column(ratio=1)
     top_banner_table.add_row(
-        "[dim]1. Trend Police (Mesicek):[/dim]\n" + m1_badge,
-        "[dim]2. Seatbelt Adjuster (Zarattini):[/dim]\n" + m2_badge,
-        "[dim]3. Breathing Room (Karassavidis):[/dim]\n" + m3_badge,
-        "[dim]4. Bubble Alarm (Chan):[/dim]\n" + m4_badge,
-        "[dim]5. Casino Toll Gate (Bysik):[/dim]\n" + m5_badge,
+        "[bold cyan]1. Can We Buy? (Trend)[/bold cyan]\n" + m1_badge,
+        "[bold cyan]2. Future Size (When OK)[/bold cyan]\n" + m2_badge,
+        "[bold cyan]3. Safety Stop (When In)[/bold cyan]\n" + m3_badge,
+        "[bold cyan]4. Crash Threat? (Leverage)[/bold cyan]\n" + m4_badge,
+        "[bold cyan]5. Fee Defense (Exchange)[/bold cyan]\n" + m5_badge,
     )
     banner_panel = Panel(
         top_banner_table,
-        title="[bold bright_white]5-GATE QUICK STATUS STRIP[/bold bright_white]",
+        title="[bold bright_white]5 PRE-FLIGHT SAFETY CHECKS (WHAT EACH BOX MEANS)[/bold bright_white]",
         box=box.ROUNDED,
         border_style="bright_cyan",
         padding=(0, 1),

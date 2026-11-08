@@ -5129,7 +5129,7 @@ def _build_tab16_ssrn_research_hud(
     store: StateStore,
     header_panel: Panel,
 ) -> Group:
-    """Builds the unified single-screen quantitative cockpit for Tab 16 [R: SSRN RESEARCH]."""
+    """Builds the unified single-screen quantitative cockpit for Tab 16 [R: SSRN RESEARCH] with beginner translations."""
     ssrn = store.ssrn_alpha_evaluation
     if ssrn is None:
         from analytics.ssrn_research_engine import SSRNResearchEngine
@@ -5138,100 +5138,195 @@ def _build_tab16_ssrn_research_hud(
 
     spot_p = ssrn.spot_price or store.binance_spot_price or 0.0
 
-    # Sub-Ribbon Header: Unified Single Screen
+    # 1. Sub-Ribbon Header: Unified Single Screen
     sub_grid = Table.grid(expand=True)
     sub_grid.add_column(justify="left", no_wrap=True)
     sub_grid.add_column(justify="right", no_wrap=True)
     sub_grid.add_row(
         "[bold bright_cyan]DESK [R]: SSRN QUANTITATIVE ALPHA DECK[/bold bright_cyan]  |  "
-        "[bold bright_white]UNIFIED 5-ROW QUANTITATIVE MATRIX (THEORY & LIVE EXECUTION)[/bold bright_white]",
+        "[bold bright_white]UNIFIED 5-ROW QUANTITATIVE COCKPIT (THEORY • LIVE MATH • BEGINNER TRANSLATOR)[/bold bright_white]",
         "[dim]Press [bold yellow]'R'[/bold yellow] (or [bold yellow]'RR'[/bold yellow]) to copy Master Academic Brief[/dim]",
     )
     sub_panel = Panel(sub_grid, box=box.ROUNDED, border_style="bright_cyan", padding=(0, 1))
 
-    # Top Executive Gating Banner
+    # 2. Dedicated Beginner Translator & Chief Engineer Bottom Line Box
+    verdict_badge = "[bold white on red] [X] RESTRICTED: 100% CASH [/bold white on red]" if not ssrn.mtf_macd_gate_pass else "[bold black on green] [OK] PASS: BUY PERMITTED [/bold black on green]"
+    verdict_grid = Table.grid(expand=True)
+    verdict_grid.add_column()
+    verdict_grid.add_row(
+        f"[bold bright_white]OVERALL DESK [R] VERDICT:[/bold bright_white] {verdict_badge}  │  "
+        f"[bold bright_yellow]{ssrn.beginner_headline}[/bold bright_yellow]"
+    )
+    verdict_grid.add_row(
+        f"[bold bright_white]WHY FOR BEGINNERS?[/bold bright_white] [white]{ssrn.beginner_reason}[/white]"
+    )
+    verdict_grid.add_row(
+        f"[bold bright_green]EXACT NEXT MOVE:[/bold bright_green] [bright_green]{ssrn.beginner_next_move}[/bright_green]"
+    )
+    bottomline_panel = Panel(
+        verdict_grid,
+        title="[bold bright_yellow]DESK [R] BEGINNER TRANSLATOR & CHIEF ENGINEER BOTTOM LINE[/bold bright_yellow]",
+        box=box.ROUNDED,
+        border_style="bright_yellow",
+        padding=(0, 1),
+    )
+
+    # 3. Top Executive Gating Quick-Check Banner
     m1_pass = ssrn.mtf_macd_gate_pass
-    m1_badge = "[bold black on green] [OK] PASS: LONG PERMITTED [/bold black on green]" if m1_pass else "[bold white on red] [X] RESTRICTED (HOLD CASH) [/bold white on red]"
+    m1_badge = "[bold black on green] [OK] PASS [/bold black on green]" if m1_pass else "[bold white on red] [X] RESTRICTED (HOLD CASH) [/bold white on red]"
     m2_badge = f"[bold black on green] [OK] ALLOC: {ssrn.target_vol_sizing_pct:.0f}% EQUITY [/bold black on green]"
     m3_badge = f"[bold black on green] [OK] TRAIL: -${ssrn.atr_trailing_stop_dist:,.0f} [/bold black on green]"
     m4_locked = ssrn.annualized_funding_pct > 30.0
-    m4_badge = "[bold white on red] [X] LOCKED (> 30% EXHAUSTION) [/bold white on red]" if m4_locked else "[bold black on green] [OK] PASS (< 30% CEILING) [/bold black on green]"
+    m4_badge = "[bold white on red] [X] LOCKED (> 30%) [/bold white on red]" if m4_locked else "[bold black on green] [OK] PASS (< 30% CEILING) [/bold black on green]"
     m5_badge = f"[bold black on green] [OK] HURDLE: >= +{ssrn.round_trip_friction_bps/100:.2f}% [/bold black on green]"
 
     top_banner_table = Table.grid(expand=True)
-    top_banner_table.add_column(ratio=1)
-    top_banner_table.add_column(ratio=1)
-    top_banner_table.add_column(ratio=1)
-    top_banner_table.add_column(ratio=1)
-    top_banner_table.add_column(ratio=1)
+    for _ in range(5):
+        top_banner_table.add_column(ratio=1)
     top_banner_table.add_row(
-        "[dim]1. Momentum Gate:[/dim]\n" + m1_badge,
-        "[dim]2. Vol Target Sizing:[/dim]\n" + m2_badge,
-        "[dim]3. 8H ATR Stop Buffer:[/dim]\n" + m3_badge,
-        "[dim]4. Funding Rate Ceiling:[/dim]\n" + m4_badge,
-        "[dim]5. Round-Trip Hurdle:[/dim]\n" + m5_badge,
+        "[dim]1. Trend Police (Mesicek):[/dim]\n" + m1_badge,
+        "[dim]2. Seatbelt Adjuster (Zarattini):[/dim]\n" + m2_badge,
+        "[dim]3. Breathing Room (Karassavidis):[/dim]\n" + m3_badge,
+        "[dim]4. Bubble Alarm (Chan):[/dim]\n" + m4_badge,
+        "[dim]5. Casino Toll Gate (Bysik):[/dim]\n" + m5_badge,
     )
     banner_panel = Panel(
         top_banner_table,
-        title="[bold bright_white]EXECUTIVE STRATEGY GATES & POSITION SIZING MATRIX[/bold bright_white]",
+        title="[bold bright_white]5-GATE QUICK STATUS STRIP[/bold bright_white]",
         box=box.ROUNDED,
         border_style="bright_cyan",
         padding=(0, 1),
     )
 
-    # Main Unified 5-Row Quantitative Matrix Table
+    # 4. Main Unified 5-Row Quantitative Matrix Table with Beginner Translations
     matrix_table = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold cyan", pad_edge=False)
     matrix_table.add_column("DOMAIN / RESEARCH PAPER", justify="left", no_wrap=False, ratio=3)
-    matrix_table.add_column("TIMEFRAME & QUANTITATIVE RULE LOGIC", justify="left", no_wrap=False, ratio=4)
-    matrix_table.add_column("LIVE INDICATOR TELEMETRY", justify="left", no_wrap=False, ratio=3)
+    matrix_table.add_column("BEGINNER QUESTION & QUANTITATIVE RULE", justify="left", no_wrap=False, ratio=4)
+    matrix_table.add_column("LIVE TELEMETRY & PLAIN-ENGLISH TRANSLATION", justify="left", no_wrap=False, ratio=4)
     matrix_table.add_column("SWING ACTION & SIZING", justify="center", no_wrap=False, ratio=2)
 
     # Row 1: Trend Following (Mesicek 1H/1D MACD)
-    r1_col1 = "[bold bright_white]01. Momentum & Macro Trend[/bold bright_white]\n[dim cyan]Mesicek & Vojtko (SSRN 5748642)[/dim cyan]\n[dim]Academic Domain: Time-Series Momentum[/dim]"
-    r1_col2 = "[bold yellow]1H Execution / 1D Trend Filter[/bold yellow]\n[white]Long entry: 1H MACD > Signal ONLY when Daily MACD is positive.\nTrailing exit: Prior 4H swing low or structural close below entry.[/white]"
-    r1_col3 = f"[bright_white]{ssrn.daily_macd_status}[/bright_white]\n[dim]1H MACD: {ssrn.hourly_macd_status}\n1D: {ssrn.live_trend_1d} | 4H: {ssrn.live_trend_4h}[/dim]"
-    r1_col4 = f"{m1_badge}\n[dim]Spot Sizing: {'100% Permitted' if m1_pass else '0% (Cash Capital Defense)'}[/dim]"
+    r1_col1 = (
+        "[bold bright_white]01. Trend Police (Macro Gate)[/bold bright_white]\n"
+        "[dim cyan]Mesicek & Vojtko (SSRN 5748642)[/dim cyan]\n"
+        "[dim]Academic Domain: Time-Series Momentum[/dim]"
+    )
+    r1_col2 = (
+        "[bold bright_yellow]Q: Is the big overall trend safe to buy?[/bold bright_yellow]\n"
+        "[white]Rule: Long 1H MACD cross ONLY when Daily MACD is positive.\n"
+        "Protects against taking small bounces inside a giant bear fall.[/white]"
+    )
+    r1_col3 = (
+        f"[bright_white]Live: {ssrn.daily_macd_status}[/bright_white]\n"
+        f"[bold red]Beginner Meaning:[/bold red] [white]Big trend is DOWN. Don't buy 1H dips (Bull Trap risk).[/white]\n"
+        f"[dim]1D MACD: {ssrn.live_trend_1d} | 1H MACD: {ssrn.hourly_macd_status}[/dim]"
+    )
+    r1_col4 = (
+        f"{m1_badge}\n"
+        f"[dim]Spot Sizing: {'100% Permitted' if m1_pass else '0% (Cash Defense)'}[/dim]"
+    )
     matrix_table.add_row(r1_col1, r1_col2, r1_col3, r1_col4)
 
     # Row 2: Breakouts & Risk (Zarattini Donchian + 25% Vol Target)
-    r2_col1 = "[bold bright_white]02. Breakouts & Dynamic Sizing[/bold bright_white]\n[dim cyan]Zarattini, Pagani & Barbon (SSRN 5209907)[/dim cyan]\n[dim]Academic Domain: Systematic Factor Pricing[/dim]"
-    r2_col2 = "[bold yellow]Daily / Multi-Horizon (5-360 Days)[/bold yellow]\n[white]Aggregates breakout signals across lookback windows (5-360d).\nDynamic sizing: Weight = Target_Vol (25%) / Realized_Vol.[/white]"
-    r2_col3 = f"[bright_white]20D Realized Vol: {ssrn.realized_vol_20d_ann:.1f}% (Tgt: 25.0%)[/bright_white]\n[dim]Realized Variance: {ssrn.live_realized_variance:.4f}\n20D Skew: {ssrn.live_skewness_20d:+.2f} (Fat-Tailed Risk Beta: 1.00x)[/dim]"
-    r2_col4 = f"{m2_badge}\n[dim]Dynamic Volatility Sizing Weight[/dim]"
+    r2_col1 = (
+        "[bold bright_white]02. Seatbelt Adjuster (Vol Sizing)[/bold bright_white]\n"
+        "[dim cyan]Zarattini, Pagani & Barbon (SSRN 5209907)[/dim cyan]\n"
+        "[dim]Academic Domain: Systematic Factor Pricing[/dim]"
+    )
+    r2_col2 = (
+        "[bold bright_yellow]Q: If we do enter, how much should we buy?[/bold bright_yellow]\n"
+        "[white]Rule: Position Weight = Target_Vol (25%) / Realized_Vol.\n"
+        "Forces you to buy smaller when the ocean is turbulent.[/white]"
+    )
+    r2_col3 = (
+        f"[bright_white]Live: 20D Realized Vol is {ssrn.realized_vol_20d_ann:.1f}% (Normal is 25.0%)[/bright_white]\n"
+        f"[bold green]Beginner Meaning:[/bold green] [white]Market is wilder than normal. Shrink trade to {ssrn.target_vol_sizing_pct:.0f}% size to stay safe.[/white]\n"
+        f"[dim]Realized Variance: {ssrn.live_realized_variance:.4f} | 20D Skew: {ssrn.live_skewness_20d:+.2f}[/dim]"
+    )
+    r2_col4 = (
+        f"{m2_badge}\n"
+        f"[dim]Dynamic Volatility Size[/dim]"
+    )
     matrix_table.add_row(r2_col1, r2_col2, r2_col3, r2_col4)
 
     # Row 3: Volatility Stops (Karassavidis 8H ATR Trail)
     stop_floor = max(0.0, spot_p - ssrn.atr_trailing_stop_dist)
     stop_pct = (ssrn.atr_trailing_stop_dist / max(spot_p, 1000.0)) * 100.0
-    r3_col1 = "[bold bright_white]03. Dynamic Volatility Stops[/bold bright_white]\n[dim cyan]Karassavidis et al. (SSRN 5821842)[/dim cyan]\n[dim]Academic Domain: Market Microstructure[/dim]"
-    r3_col2 = "[bold yellow]8-Hour Candles[/bold yellow]\n[white]Trend identified across 8H MA slope + RSI momentum filter.\nDynamic stop placement pegged to multiples of 14-period ATR.[/white]"
-    r3_col3 = f"[bright_white]8H ATR(14): ${ssrn.atr_14_8h:,.0f} • Spot: ${spot_p:,.0f}[/bright_white]\n[dim]Trailing Buffer: 2.5x ATR (-${ssrn.atr_trailing_stop_dist:,.0f} / -{stop_pct:.1f}%)\nStructural Stop Floor: ${stop_floor:,.0f}[/dim]"
-    r3_col4 = f"{m3_badge}\n[dim]Trailing Distance: -{stop_pct:.1f}%[/dim]"
+    r3_col1 = (
+        "[bold bright_white]03. Breathing Room (Stop Buffer)[/bold bright_white]\n"
+        "[dim cyan]Karassavidis et al. (SSRN 5821842)[/dim cyan]\n"
+        "[dim]Academic Domain: Market Microstructure[/dim]"
+    )
+    r3_col2 = (
+        "[bold bright_yellow]Q: Where do we place our stop loss safety net?[/bold bright_yellow]\n"
+        "[white]Rule: Peg trailing stop distance to 2.5x 14-period ATR.\n"
+        "Stops random market wiggles from prematurely kicking you out.[/white]"
+    )
+    r3_col3 = (
+        f"[bright_white]Live: 8H ATR(14) is ${ssrn.atr_14_8h:,.0f} • Spot: ${spot_p:,.0f}[/bright_white]\n"
+        f"[bold cyan]Beginner Meaning:[/bold cyan] [white]BTC wiggles ${ssrn.atr_14_8h:,.0f} every 8h. Put stop at ${stop_floor:,.0f} (-${ssrn.atr_trailing_stop_dist:,.0f} room).[/white]\n"
+        f"[dim]Structural Stop Floor: ${stop_floor:,.0f} (-{stop_pct:.1f}% distance)[/dim]"
+    )
+    r3_col4 = (
+        f"{m3_badge}\n"
+        f"[dim]Trailing Distance: -{stop_pct:.1f}%[/dim]"
+    )
     matrix_table.add_row(r3_col1, r3_col2, r3_col3, r3_col4)
 
     # Row 4: Sentiment Exhaustion (Chan Perp Funding < 30% Gate)
-    r4_col1 = "[bold bright_white]04. Sentiment & Funding Gate[/bold bright_white]\n[dim cyan]Chan (SSRN 5292305)[/dim cyan]\n[dim]Academic Domain: On-Chain & Derivatives Carry[/dim]"
-    r4_col2 = "[bold yellow]8H Funding Settlement Intervals[/bold yellow]\n[white]Spot swing carry filter: When annualized perpetual funding > +30%,\nfreeze new spot entries to avoid long liquidation cascades.[/white]"
-    r4_col3 = f"[bright_white]Perp Funding: {ssrn.annualized_funding_pct:+.2f}% Ann. (Ceil: 30%)[/bright_white]\n[dim]MVRV Ratio: {ssrn.live_mvrv_ratio:.2f} (Floor <1.0 | Cap >3.5)\nSOPR Level: {ssrn.live_sopr_level:.2f} (Bull Support Retest >= 1.0)[/dim]"
-    r4_col4 = f"{m4_badge}\n[dim]{'Retail Leverage Overheated' if m4_locked else 'Healthy Basis Carry'}[/dim]"
+    r4_col1 = (
+        "[bold bright_white]04. Bubble Alarm (Funding Gate)[/bold bright_white]\n"
+        "[dim cyan]Chan (SSRN 5292305)[/dim cyan]\n"
+        "[dim]Academic Domain: On-Chain & Derivatives Carry[/dim]"
+    )
+    r4_col2 = (
+        "[bold bright_yellow]Q: Are futures degens about to cause a giant crash?[/bold bright_yellow]\n"
+        "[white]Rule: Freeze all new spot buying if Perp Funding > +30% Ann.\n"
+        "Protects you from buying right before a long liquidation waterfall.[/white]"
+    )
+    funding_trans = "Traders are calm (healthy carry). No leverage bubble or crash danger." if not m4_locked else "DANGER: Futures degens are over-borrowing! Liquidation waterfall imminent."
+    r4_col3 = (
+        f"[bright_white]Live: Annualized Funding is {ssrn.annualized_funding_pct:+.2f}% (Ceiling: +30%)[/bright_white]\n"
+        f"[bold green]Beginner Meaning:[/bold green] [white]{funding_trans}[/white]\n"
+        f"[dim]MVRV Ratio: {ssrn.live_mvrv_ratio:.2f} (Floor <1.0 | Top >3.5) • SOPR: {ssrn.live_sopr_level:.2f}[/dim]"
+    )
+    r4_col4 = (
+        f"{m4_badge}\n"
+        f"[dim]{'Overheated Bubble' if m4_locked else 'Healthy Basis Carry'}[/dim]"
+    )
     matrix_table.add_row(r4_col1, r4_col2, r4_col3, r4_col4)
 
     # Row 5: Alpha Hurdle (Bysik Cost Barrier >= 18 bps)
-    r5_col1 = "[bold bright_white]05. Cost-Aware Alpha Hurdle[/bold bright_white]\n[dim cyan]Bysik & Slepaczuk (SSRN 6795938)[/dim cyan]\n[dim]Academic Domain: Alternative Data & ML Friction[/dim]"
-    r5_col2 = "[bold yellow]Hourly / Multi-Hour Execution[/bold yellow]\n[white]Execute long trades ONLY if expected forward return > friction.\nSuppresses churn and fee drag during flat ranges.[/white]"
-    r5_col3 = f"[bright_white]Round-Trip Taker Friction: {ssrn.round_trip_friction_bps:.0f} bps (+{ssrn.round_trip_friction_bps/100:.2f}%)[/bright_white]\n[dim]Min Expected Edge: >= +{ssrn.round_trip_friction_bps*2/100:.2f}% (2x Friction)\nOrder Book Imbalance (OBI): {ssrn.live_obi_ratio_pct:+.1f}% • 4H CVD: {ssrn.live_4h_cvd_delta:+.1f} BTC[/dim]"
-    r5_col4 = f"{m5_badge}\n[dim]Flat Range Churn Filter: ACTIVE[/dim]"
+    r5_col1 = (
+        "[bold bright_white]05. Casino Toll Gate (Fee Hurdle)[/bold bright_white]\n"
+        "[dim cyan]Bysik & Slepaczuk (SSRN 6795938)[/dim cyan]\n"
+        "[dim]Academic Domain: Alternative Data & ML Friction[/dim]"
+    )
+    r5_col2 = (
+        "[bold bright_yellow]Q: Will exchange fees eat up all my profits?[/bold bright_yellow]\n"
+        "[white]Rule: Only trade if expected profit > 2x exchange fees (>= +0.36%).\n"
+        "Prevents the exchange casino from bleeding your balance on tiny wiggles.[/white]"
+    )
+    r5_col3 = (
+        f"[bright_white]Live: Round-Trip Fees = {ssrn.round_trip_friction_bps:.0f} bps (+{ssrn.round_trip_friction_bps/100:.2f}%)[/bright_white]\n"
+        f"[bold green]Beginner Meaning:[/bold green] [white]Protected against fee drag. Only trades targeting >+0.36% profit are authorized.[/white]\n"
+        f"[dim]Order Book Imbalance (OBI): {ssrn.live_obi_ratio_pct:+.1f}% • 4H CVD: {ssrn.live_4h_cvd_delta:+.1f} BTC[/dim]"
+    )
+    r5_col4 = (
+        f"{m5_badge}\n"
+        f"[dim]Fee Bleed Filter: ACTIVE[/dim]"
+    )
     matrix_table.add_row(r5_col1, r5_col2, r5_col3, r5_col4)
 
     matrix_panel = Panel(
         matrix_table,
-        title="[bold cyan]UNIFIED EMPIRICAL STRATEGY & ACADEMIC TELEMETRY MATRIX[/bold cyan]",
+        title="[bold cyan]UNIFIED EMPIRICAL STRATEGY & ACADEMIC TELEMETRY MATRIX (WITH BEGINNER TRANSLATIONS)[/bold cyan]",
         box=box.ROUNDED,
         border_style="cyan",
         padding=(0, 1),
     )
 
-    # Bottom clipboard strip with ASCII-safe status
+    # 5. Bottom clipboard strip
     last_copy_str = ""
     if getattr(store, "last_packet_copied_utc", ""):
         last_copy_str = f"  |  [bold green][OK] COPIED AT {store.last_packet_copied_utc} ({getattr(store, 'last_packet_char_count', 0):,} chars)[/bold green]"
@@ -5246,7 +5341,7 @@ def _build_tab16_ssrn_research_hud(
     )
     bottom_panel = Panel(bottom_grid, box=box.ROUNDED, border_style="bright_yellow", padding=(0, 1))
 
-    return Group(header_panel, sub_panel, banner_panel, matrix_panel, bottom_panel)
+    return Group(header_panel, sub_panel, bottomline_panel, banner_panel, matrix_panel, bottom_panel)
 
 
 def build_dashboard_renderable(

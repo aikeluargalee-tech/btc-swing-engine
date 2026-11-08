@@ -437,6 +437,38 @@ class SSRNResearchEngine:
                 l_val = "OK"
                 g_pass = True
 
+            b_q = ""
+            b_trans = ""
+            b_act = ""
+            if m_id == "mtf_macd":
+                b_q = "Is the big trend safe to buy?"
+                if mtf_macd_gate_pass:
+                    b_trans = "YES: Big trend is UP. 1H dips are safe to buy."
+                    b_act = "Spot buying permitted with macro trend."
+                else:
+                    b_trans = "NO: Big trend is DOWN. Don't buy small 1H bounces (Bull Trap risk)."
+                    b_act = "100% Cash Defense. Wait for Daily MACD green."
+            elif m_id == "ensemble_donchian":
+                b_q = "How much should we buy if we enter?"
+                b_trans = f"BUY SMALLER ({sizing_weight:.0f}% size): Volatility is {realized_vol_ann:.1f}% (above 25% target). Shrink size to keep dollar risk calm."
+                b_act = f"Dynamic sizing throttled to {sizing_weight:.0f}% equity"
+            elif m_id == "vol_adaptive_8h":
+                b_q = "Where should our safety stop loss go?"
+                b_trans = f"SAFETY BUFFER -${atr_trailing_stop_dist:,.0f}: BTC wobbles ${atr_14_8h:,.0f} every 8h. Placing stop below ${max(0.0, spot_price - atr_trailing_stop_dist):,.0f} prevents wick-outs."
+                b_act = f"Structural trailing stop: -${atr_trailing_stop_dist:,.0f} (2.5x ATR)"
+            elif m_id == "funding_carry_filter":
+                b_q = "Are leverage traders about to cause a giant crash?"
+                if not funding_locked:
+                    b_trans = f"CALM: Funding is healthy (+{annualized_funding:.1f}%/yr). No leverage bubble or liquidation cascade danger."
+                    b_act = "Funding gate PASS (normal basis carry)"
+                else:
+                    b_trans = f"DANGER: Funding >+30%/yr. Retail is over-leveraged; severe liquidation cascade imminent!"
+                    b_act = "FREEZE all buys (leverage exhaustion top)"
+            elif m_id == "cost_aware_ml":
+                b_q = "Will exchange fees eat up all our profits?"
+                b_trans = f"PROTECTED: Fees + slippage = 18 bps (+0.18%). Engine requires at least +0.36% profit target before pulling the trigger."
+                b_act = "Suppresses churn and fee bleed in flat chop"
+
             model_items.append(
                 SSRNModelItem(
                     id=m["id"],
@@ -450,6 +482,9 @@ class SSRNResearchEngine:
                     live_status=l_status,
                     live_value=l_val,
                     is_gate_pass=g_pass,
+                    beginner_question=b_q,
+                    beginner_translation=b_trans,
+                    beginner_action_note=b_act,
                 )
             )
 
@@ -484,6 +519,18 @@ class SSRNResearchEngine:
 
         summary_md = "\n".join(md_lines)
 
+        # Beginner Bottomline synthesis
+        overall_v = "RESTRICTED (HOLD CASH)" if not mtf_macd_gate_pass else "GREEN (BUY PERMITTED)"
+        overall_traffic = "RED" if not mtf_macd_gate_pass else "GREEN"
+        if not mtf_macd_gate_pass:
+            b_head = "DO NOT BUY SPOT BTC RIGHT NOW (STAY IN CASH)"
+            b_reason = "The big 1-Day macro trend is pointing down. In academic backtests, buying a 1-hour bounce while the daily trend is down leads to an -80% loss of capital. Gate 1 holds a hard veto!"
+            b_next = f"Stay 100% in cash. Wait for the 1-Day MACD to flip green. When it flips, buy at {sizing_weight:.0f}% position size with a -${atr_trailing_stop_dist:,.0f} safety stop."
+        else:
+            b_head = "SPOT BUYING PERMITTED (TREND CONFIRMED)"
+            b_reason = "1-Day Macro Trend is positive and higher-timeframe momentum is aligned with 1H tactical signals."
+            b_next = f"Execute staged spot limit bids at {sizing_weight:.0f}% sizing with trailing stop at -${atr_trailing_stop_dist:,.0f}."
+
         evaluation = SSRNAlphaEvaluation(
             timestamp_utc=ts_str,
             spot_price=spot_price,
@@ -509,6 +556,11 @@ class SSRNResearchEngine:
             live_skewness_20d=round(skewness_20d, 2),
             live_mvrv_ratio=live_mvrv_ratio,
             live_sopr_level=live_sopr_level,
+            overall_verdict=overall_v,
+            overall_traffic_light=overall_traffic,
+            beginner_headline=b_head,
+            beginner_reason=b_reason,
+            beginner_next_move=b_next,
             active_view_mode=getattr(store, "ssrn_view_mode", "models"),
             ssrn_summary_markdown=summary_md,
         )

@@ -4831,6 +4831,9 @@ class SSRNModelItem:
     live_status: str = "MONITORING"
     live_value: str = ""
     is_gate_pass: bool = True
+    beginner_question: str = ""
+    beginner_translation: str = ""
+    beginner_action_note: str = ""
 
 
 @dataclass
@@ -4868,6 +4871,13 @@ class SSRNAlphaEvaluation:
     live_skewness_20d: float = 0.0
     live_mvrv_ratio: float = 1.0
     live_sopr_level: float = 1.0
+
+    # Beginner-Friendly Translation & Bottom Line
+    overall_verdict: str = "RESTRICTED (HOLD CASH)"
+    overall_traffic_light: str = "RED"
+    beginner_headline: str = "DO NOT BUY SPOT BTC RIGHT NOW (STAY IN CASH)"
+    beginner_reason: str = "The big 1-Day macro trend is pointing down. In academic backtests, buying a 1-hour bounce while the daily trend is down leads to an -80% loss of capital. Gate 1 holds a hard veto!"
+    beginner_next_move: str = "Stay 100% in cash. Wait for the 1-Day MACD to flip green. When it flips, buy at 64% position size with a -$1,667 safety stop."
 
     active_view_mode: str = "models"  # Default to View B ("models")
     ssrn_summary_markdown: str = ""

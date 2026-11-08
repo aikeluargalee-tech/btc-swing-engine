@@ -2010,6 +2010,36 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             badge = "PASS" if r.passed else "WAIT"
             lines.append(f"* **Rule {r.rule_num} ({r.name})**: `[{badge}]` {r.detail}")
 
+    # --- SECTION 18: TAB [A] BTC TREND-PULLBACK v1.0 · RESEARCH / PAPER MODE ---
+    tp_ev = getattr(store, "trend_pullback_evaluation", None)
+    if tp_ev is None:
+        try:
+            from analytics.strategy_trend_pullback import TrendPullbackEngine
+            tp_ev = TrendPullbackEngine(config).evaluate(store)
+        except Exception:
+            tp_ev = None
+
+    if tp_ev is not None:
+        slope_1d_lbl = "RISING" if tp_ev.daily_sma200_rising else "FALLING"
+        slope_4h_lbl = "RISING" if tp_ev.ema50_rising_6bars else "FALLING"
+        lines.extend([
+            "",
+            "---",
+            "",
+            "## SECTION 18: TAB [A] BTC TREND-PULLBACK v1.0 · RESEARCH / PAPER MODE (UNVALIDATED)",
+            "",
+            f"* **Strategy Name**: `{tp_ev.strategy_name}` | **Mode**: `{tp_ev.mode_label}` | **Status**: `STRATEGY STATUS: {tp_ev.strategy_status}`",
+            f"* **Spot BTCUSDT**: `${tp_ev.spot_price:,.2f}` | **MYT Timestamp**: `{tp_ev.timestamp_myt}`",
+            f"* **Market Regime (1D)**: `{tp_ev.daily_regime}` (`1D Close ${tp_ev.daily_close_completed:,.2f}` vs `SMA200 ${tp_ev.daily_sma200:,.2f}` • `20D Slope: {slope_1d_lbl} {tp_ev.daily_sma200_slope_20d:+,.2f}`)",
+            f"* **4H Trend Filter**: `{tp_ev.trend_4h}` (`EMA50 ${tp_ev.ema50_4h:,.2f}` vs `EMA200 ${tp_ev.ema200_4h:,.2f}` • `6-Bar Slope: {slope_4h_lbl} {tp_ev.ema50_4h_slope_6bars:+,.2f}` • `ATR14: ${tp_ev.atr14_4h:,.2f}`)",
+            f"* **Macro Reference Context (Read-Only)**: `1W EMA50 ${tp_ev.ema50_1w:,.2f}` | `1D EMA50 ${tp_ev.ema50_1d:,.2f}`",
+            f"* **Pullback Recovery Setup**: `{tp_ev.recovery_candle}` / `{tp_ev.setup_status}` (Zone `${tp_ev.pullback_zone_lower:,.2f} - ${tp_ev.pullback_zone_upper:,.2f}` • Bars Since Recovery: `{tp_ev.bars_since_recovery}`)",
+            f"* **Trade Plan (`$100,000` Sim Equity • `{tp_ev.risk_per_trade_pct:.2f}%` Risk = `${tp_ev.risk_budget_usd:,.2f}`)**: Entry Zone `${tp_ev.limit_entry_low:,.2f} - ${tp_ev.limit_entry_high:,.2f}` (Ref `${tp_ev.reference_entry_price:,.2f}`) | Stop `${tp_ev.structural_stop:,.2f}` (`{tp_ev.stop_distance_atr:.2f} ATR` • Valid: `{tp_ev.stop_valid}`) | Size `{tp_ev.position_size_btc:.5f} BTC` (`${tp_ev.position_value_usd:,.2f}`)",
+            f"* **Position Management**: Status `{tp_ev.position_status}` | Exit Status `{tp_ev.exit_conditions_status}` | Stop Breach `{tp_ev.exit_stop_breached}` | 4H EMA50 2-Bar Exit `{tp_ev.exit_two_4h_below_ema50}` | 1D SMA200 2-Day Exit `{tp_ev.exit_two_1d_below_sma200}`",
+            f"* **Data Integrity**: `{'OK' if tp_ev.data_integrity_ok else 'DATA UNAVAILABLE'}` (`1D: {tp_ev.daily_candle_status}` • `4H: {tp_ev.candle_4h_status}`)",
+            f"* **Decision State**: **`{tp_ev.decision_state}`** | **Strategy Verdict**: **`{tp_ev.strategy_verdict}`** — {tp_ev.verdict_explanation}",
+        ])
+
     return "\n".join(lines) + "\n"
 
 

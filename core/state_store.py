@@ -18,6 +18,7 @@ from .models import (
     GrokQuantEvaluation,
     SSRNAlphaEvaluation,
     BTCMagnetEvaluation,
+    TrendPullbackEvaluation,
     KlineBar,
     LiquidationDetectorReport,
     MacroRadarEvaluation,
@@ -125,6 +126,10 @@ class StateStore:
         self.ssrn_alpha_evaluation: Optional[SSRNAlphaEvaluation] = None
         self.ssrn_view_mode: str = "models"
         self.btc_magnet_evaluation: Optional[BTCMagnetEvaluation] = None
+        self.trend_pullback_evaluation: Optional[TrendPullbackEvaluation] = None
+        self.trend_pullback_position_status: str = "CASH"
+        self.trend_pullback_entry_price: float = 0.0
+        self.trend_pullback_stop_price: float = 0.0
 
         # --- Connection & System Health ---
         self.warmup_complete: bool = False

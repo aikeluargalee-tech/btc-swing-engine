@@ -1,0 +1,41 @@
+# BTC TREND-PULLBACK STRATEGY v1.0 — RESEARCH / PAPER MODE CONFIGURATION
+# Do not optimize these parameters during initial baseline evaluation.
+
+strategy_name: "BTC TREND-PULLBACK v1.0"
+strategy_status: "UNVALIDATED"
+mode: "RESEARCH / PAPER MODE"
+
+# 1. Daily Regime Filter Parameters
+daily_sma_period: 200
+daily_sma_slope_period: 20
+
+# 2. 4H Trend Filter Parameters
+ema_fast: 50
+ema_slow: 200
+ema_slope_period: 6
+atr_period: 14
+
+# 3. 4H Pullback & Recovery Parameters
+pullback_upper_atr: 0.25
+pullback_lower_atr: 0.50
+recovery_max_extension_atr: 1.00
+limit_entry_upper_atr: 0.10
+setup_expiry_4h_bars: 3
+
+# 4. Stop-Loss & Validation Parameters
+stop_lookback: 5
+stop_buffer_atr: 0.25
+minimum_stop_atr: 0.75
+maximum_stop_atr: 3.00
+
+# 5. Position Sizing & Simulation Assumptions (No Leverage, Spot Only)
+risk_per_trade: 0.005
+initial_simulation_equity: 100000.0
+entry_fee_pct: 0.0010
+exit_fee_pct: 0.0010
+entry_slippage_pct: 0.0005
+exit_slippage_pct: 0.0005
+
+# 6. Data Freshness & Integrity Thresholds
+max_daily_stale_hours: 48.0
+max_4h_stale_hours: 8.5

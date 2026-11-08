@@ -11,6 +11,7 @@ Tabs (switchable instantly via keys `1`, `2`, `3`, `4`, `5` in PowerShell):
 import asyncio
 import select
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -186,6 +187,11 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         if active_tab == 17
         else "[dim white][M: MAGNET][/dim white]"
     )
+    tA = (
+        "[bold black on bright_green] [A: BTC STRATEGY] [/bold black on bright_green]"
+        if active_tab == 18
+        else "[dim white][A: BTC STRATEGY][/dim white]"
+    )
     t0 = (
         "[bold white on blue] [0: SPOT SWING] [/bold white on blue]"
         if active_tab == 0
@@ -217,6 +223,7 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         15: "15: GROK QUANT FLOW [G]",
         16: "16: SSRN RESEARCH [R]",
         17: "17: BTC MAGNET [M]",
+        18: "18: TREND-PULLBACK [A]",
     }
     if active_tab in subdesk_names:
         subdesk_info = f"  │  [bold black on bright_yellow] [DEEP DIVE {subdesk_names[active_tab]}] [/bold black on bright_yellow]"
@@ -232,13 +239,13 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
     nav_grid.add_column(justify="right", no_wrap=True)
     nav_grid.add_row(
         f"[bold white]BTC-USD[/bold white] | Spot: [bold cyan]${spot_px:,.2f}[/bold cyan] | Regime: {regime_str} ({score_str}) | Feeds: Spot {spot_ws_dot} • Perp {perp_ws_dot} • CB {cb_ws_dot}",
-        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: P Structure • B Patterns • G Grok Flow • R SSRN Research • M Magnet • F Footprint • W Waterfall • 0 Screener • L Master • C Packet • H Guide[/dim]",
+        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: P Structure • B Patterns • G Grok Flow • R SSRN Research • M Magnet • A Strategy • F Footprint • W Waterfall • 0 Screener • L Master • C Packet • H Guide[/dim]",
     )
 
     tab_grid = Table.grid(expand=True)
     tab_grid.add_column(justify="left", no_wrap=True)
     tab_grid.add_row(
-        f"{tP}  {tB}  {tG}  {tR}  {tM}  {tF}  {tW}  {t0}  {tL}  │  {tC}  {tH}{subdesk_info}"
+        f"{tP}  {tB}  {tG}  {tR}  {tM}  {tA}  {tF}  {tW}  {t0}  {tL}  │  {tC}  {tH}{subdesk_info}"
     )
     nav_panel = Panel(Group(nav_grid, tab_grid), border_style="bright_blue", box=box.ROUNDED, padding=(0, 1))
 
@@ -5511,13 +5518,215 @@ def _build_tab17_btc_magnet_hud(
     return Group(header_panel, sub_panel, horizon_panel, status_panel, rules_panel, bottom_panel)
 
 
+def _build_tab18_trend_pullback_hud(
+    config: EngineConfig,
+    store: StateStore,
+    header_panel: Panel,
+) -> Group:
+    """Builds Desk 18 [A: BTC STRATEGY] - BTC TREND-PULLBACK v1.0 (Research / Paper Mode)."""
+    tp_eval = getattr(store, "trend_pullback_evaluation", None)
+    if tp_eval is None:
+        from analytics.strategy_trend_pullback import TrendPullbackEngine
+        tp_eval = TrendPullbackEngine(config).evaluate(store)
+
+    spot_p = tp_eval.spot_price or store.binance_spot_price or 0.0
+
+    # 1. Sub-Ribbon Header (with mandatory Section 12 Research Honesty labels)
+    sub_grid = Table.grid(expand=True)
+    sub_grid.add_column(justify="left", no_wrap=True)
+    sub_grid.add_column(justify="right", no_wrap=True)
+    sub_grid.add_row(
+        f"[bold bright_green]{tp_eval.strategy_name} | SPOT SWING | LONG ONLY | {tp_eval.mode_label}[/bold bright_green]  │  "
+        f"[bold black on bright_yellow] STRATEGY STATUS: {tp_eval.strategy_status} [/bold black on bright_yellow]",
+        f"[bold white]Spot Price: [cyan]${spot_p:,.2f}[/cyan]   •   Last Update: [bright_cyan]{tp_eval.timestamp_myt}[/bright_cyan][/bold white]",
+    )
+    sub_panel = Panel(sub_grid, box=box.ROUNDED, border_style="bright_green", padding=(0, 1))
+
+    # 2. Row 1 Grid: MARKET REGIME (Left) + 4H TREND FILTER (Center) + PULLBACK ANALYSIS (Right)
+    reg_col = "bright_green" if tp_eval.daily_regime == "BULLISH" else "bright_red"
+    slope_1d_lbl = "RISING" if tp_eval.daily_sma200_rising else "FALLING"
+    slope_1d_col = "green" if tp_eval.daily_sma200_rising else "red"
+    w50_status = "ABOVE" if (tp_eval.ema50_1w > 0 and spot_p > tp_eval.ema50_1w) else ("BELOW" if tp_eval.ema50_1w > 0 else "N/A")
+    regime_lines = [
+        f"[bold white]Daily Regime:[/bold white]     [bold {reg_col}]{tp_eval.daily_regime}[/bold {reg_col}]",
+        f"[bold white]1D Close (Closed):[/bold white] [cyan]${tp_eval.daily_close_completed:,.2f}[/cyan]",
+        f"[bold white]Daily SMA200:[/bold white]     [cyan]${tp_eval.daily_sma200:,.2f}[/cyan]",
+        f"[bold white]SMA200 20D Slope:[/bold white] [{slope_1d_col}]{slope_1d_lbl} ({tp_eval.daily_sma200_slope_20d:+,.2f})[/{slope_1d_col}]",
+        f"[dim]Macro Context: 1W EMA50 ${tp_eval.ema50_1w:,.0f} ({w50_status}) • 1D EMA50 ${tp_eval.ema50_1d:,.0f}[/dim]",
+    ]
+    regime_panel = Panel(
+        "\n".join(regime_lines),
+        title="[bold bright_white]MARKET REGIME (1D GATEKEEPER)[/bold bright_white]",
+        box=box.ROUNDED,
+        border_style=reg_col,
+        padding=(0, 1),
+    )
+
+    tr_col = "bright_green" if tp_eval.trend_4h == "CONFIRMED" else "yellow"
+    slope_4h_lbl = "RISING" if tp_eval.ema50_rising_6bars else "FALLING"
+    slope_4h_col = "green" if tp_eval.ema50_rising_6bars else "red"
+    trend_lines = [
+        f"[bold white]4H Trend:[/bold white]             [bold {tr_col}]{tp_eval.trend_4h}[/bold {tr_col}]",
+        f"[bold white]4H Close (Closed):[/bold white]    [cyan]${tp_eval.close_4h_completed:,.2f}[/cyan]",
+        f"[bold white]4H EMA50:[/bold white]             [cyan]${tp_eval.ema50_4h:,.2f}[/cyan]",
+        f"[bold white]4H EMA200:[/bold white]            [cyan]${tp_eval.ema200_4h:,.2f}[/cyan]",
+        f"[bold white]4H EMA50 6-Bar Slope:[/bold white] [{slope_4h_col}]{slope_4h_lbl} ({tp_eval.ema50_4h_slope_6bars:+,.2f})[/{slope_4h_col}]",
+        f"[bold white]4H ATR14:[/bold white]             [cyan]${tp_eval.atr14_4h:,.2f}[/cyan]",
+    ]
+    trend_panel = Panel(
+        "\n".join(trend_lines),
+        title="[bold bright_white]4H TREND FILTER[/bold bright_white]",
+        box=box.ROUNDED,
+        border_style=tr_col,
+        padding=(0, 1),
+    )
+
+    pb_valid = tp_eval.recovery_candle == "CONFIRMED"
+    pb_valid_str = "[bold bright_green]CONFIRMED[/bold bright_green]" if pb_valid else "[bold yellow]NOT CONFIRMED[/bold yellow]"
+    pb_col = "bright_green" if pb_valid else "bright_blue"
+    age_str = f"{tp_eval.bars_since_recovery} / 3 4H bars" if tp_eval.bars_since_recovery >= 0 else "No active recovery candle"
+    pullback_lines = [
+        f"[bold white]Pullback Zone:[/bold white]   [cyan]${tp_eval.pullback_zone_lower:,.2f} - ${tp_eval.pullback_zone_upper:,.2f}[/cyan]",
+        f"[bold white]Recovery Candle:[/bold white] {pb_valid_str}",
+        f"[bold white]Setup Status:[/bold white]    [bold white]{tp_eval.setup_status}[/bold white] [dim]({age_str})[/dim]",
+        f"[bold white]Max Extension:[/bold white]   [cyan]${tp_eval.max_extension_price:,.2f}[/cyan] [dim](EMA50 + 1.0 ATR)[/dim]",
+        f"[dim]{tp_eval.pullback_rejection_reason}[/dim]",
+    ]
+    pullback_panel = Panel(
+        "\n".join(pullback_lines),
+        title="[bold bright_white]PULLBACK ANALYSIS[/bold bright_white]",
+        box=box.ROUNDED,
+        border_style=pb_col,
+        padding=(0, 1),
+    )
+
+    top_row_grid = Table.grid(expand=True)
+    top_row_grid.add_column(ratio=1)
+    top_row_grid.add_column(ratio=1)
+    top_row_grid.add_column(ratio=1)
+    top_row_grid.add_row(regime_panel, trend_panel, pullback_panel)
+
+    # 3. Row 2 Grid: TRADE PLAN (Left) + POSITION MANAGEMENT (Center) + DATA INTEGRITY (Right)
+    stop_badge = "[green]VALID[/green]" if tp_eval.stop_valid else f"[yellow]REJECTED[/yellow]"
+    trade_lines = [
+        f"[bold white]Decision:[/bold white]            [bold bright_white]{tp_eval.trade_decision}[/bold bright_white]",
+        f"[bold white]Reference Equity:[/bold white]    [cyan]US${tp_eval.simulation_equity_usd:,.0f} (Simulation / Paper Mode)[/cyan]",
+        f"[bold white]Limit Entry Zone:[/bold white]    [cyan]${tp_eval.limit_entry_low:,.2f} - ${tp_eval.limit_entry_high:,.2f}[/cyan]",
+        f"[bold white]Structural Stop:[/bold white]     [cyan]${tp_eval.structural_stop:,.2f}[/cyan] ({stop_badge})",
+        f"[bold white]Stop Distance:[/bold white]       [white]{tp_eval.stop_distance_atr:.2f} ATR (-${tp_eval.stop_distance_usd:,.2f})[/white]",
+        f"[bold white]Risk Per Trade:[/bold white]      [cyan]{tp_eval.risk_per_trade_pct:.2f}% (${tp_eval.risk_budget_usd:,.0f})[/cyan]",
+        f"[bold white]Position Size:[/bold white]       [bold bright_cyan]{tp_eval.position_size_btc:.5f} BTC[/bold bright_cyan]",
+        f"[bold white]Position Value:[/bold white]      [cyan]${tp_eval.position_value_usd:,.2f}[/cyan]",
+        f"[bold white]Risk / Reward:[/bold white]       [dim]{tp_eval.risk_reward_label}[/dim]",
+    ]
+    trade_panel = Panel(
+        "\n".join(trade_lines),
+        title="[bold bright_white]TRADE PLAN (SPOT ONLY • NO LEVERAGE)[/bold bright_white]",
+        box=box.ROUNDED,
+        border_style="bright_cyan",
+        padding=(0, 1),
+    )
+
+    pos_col = "bright_green" if tp_eval.position_status == "HOLDING" else "white"
+    sb_str = "[bold bright_red]TRIGGERED[/bold bright_red]" if tp_eval.exit_stop_breached else "[green]CLEAR[/green]"
+    e4h_str = "[bold bright_red]TRIGGERED[/bold bright_red]" if tp_eval.exit_two_4h_below_ema50 else "[green]CLEAR[/green]"
+    s1d_str = "[bold bright_red]TRIGGERED[/bold bright_red]" if tp_eval.exit_two_1d_below_sma200 else "[green]CLEAR[/green]"
+    pos_lines = [
+        f"[bold white]Current Status:[/bold white]   [bold {pos_col}]{tp_eval.position_status}[/bold {pos_col}]",
+        f"[bold white]Exit Conditions:[/bold white]  [bold white]{tp_eval.exit_conditions_status}[/bold white]",
+        f"[bold white]Stop Breach:[/bold white]      {sb_str}",
+        f"[bold white]2x 4H < EMA50:[/bold white]    {e4h_str}",
+        f"[bold white]2x 1D < SMA200:[/bold white]   {s1d_str}",
+        f"[dim]Invalidation: {tp_eval.invalidation_reason}[/dim]",
+    ]
+    pos_panel = Panel(
+        "\n".join(pos_lines),
+        title="[bold bright_white]POSITION MANAGEMENT[/bold bright_white]",
+        box=box.ROUNDED,
+        border_style="bright_blue",
+        padding=(0, 1),
+    )
+
+    di_col = "bright_green" if tp_eval.data_integrity_ok else "bright_red"
+    di_label = "OK (CLOSED CANDLES ONLY)" if tp_eval.data_integrity_ok else "DATA UNAVAILABLE"
+    data_lines = [
+        f"[bold white]Daily Candle:[/bold white]      [cyan]{tp_eval.daily_candle_status}[/cyan]",
+        f"[bold white]4H Candle:[/bold white]         [cyan]{tp_eval.candle_4h_status}[/cyan]",
+        f"[bold white]Last Update:[/bold white]       [white]{tp_eval.timestamp_myt}[/white]",
+        f"[bold white]Integrity Gate:[/bold white]    [bold {di_col}]{di_label}[/bold {di_col}]",
+        f"[dim]{tp_eval.integrity_failure_reason or 'All required spot OHLCV series verified & fresh.'}[/dim]",
+    ]
+    data_panel = Panel(
+        "\n".join(data_lines),
+        title="[bold bright_white]DATA INTEGRITY (FAIL-CLOSED)[/bold bright_white]",
+        box=box.ROUNDED,
+        border_style=di_col,
+        padding=(0, 1),
+    )
+
+    mid_row_grid = Table.grid(expand=True)
+    mid_row_grid.add_column(ratio=1)
+    mid_row_grid.add_column(ratio=1)
+    mid_row_grid.add_column(ratio=1)
+    mid_row_grid.add_row(trade_panel, pos_panel, data_panel)
+
+    # 4. STRATEGY VERDICT Panel
+    verdict_badge_map = {
+        "ENTRY READY": "[bold black on bright_green] ENTRY READY [/bold black on bright_green]",
+        "WAIT": "[bold black on bright_yellow] WAIT [/bold black on bright_yellow]",
+        "HOLD": "[bold black on bright_cyan] HOLD [/bold black on bright_cyan]",
+        "EXIT ALERT": "[bold white on red] EXIT ALERT [/bold white on red]",
+        "NO TRADE": "[bold white on bright_black] NO TRADE [/bold white on bright_black]",
+    }
+    v_badge = verdict_badge_map.get(tp_eval.strategy_verdict, f"[bold white]{tp_eval.strategy_verdict}[/bold white]")
+    v_border = (
+        "bright_green"
+        if tp_eval.strategy_verdict == "ENTRY READY"
+        else ("bright_red" if tp_eval.strategy_verdict == "EXIT ALERT" or not tp_eval.data_integrity_ok else "bright_yellow")
+    )
+    verdict_grid = Table.grid(expand=True)
+    verdict_grid.add_column()
+    verdict_grid.add_row(
+        f"[bold bright_white]STRATEGY VERDICT:[/bold bright_white] {v_badge}  │  "
+        f"[bold bright_cyan]DECISION STATE:[/bold bright_cyan] [bold white]{tp_eval.decision_state}[/bold white]  │  "
+        f"[bold yellow]STRATEGY STATUS: {tp_eval.strategy_status}[/bold yellow]  │  "
+        f"[dim]{tp_eval.mode_label}[/dim]"
+    )
+    verdict_grid.add_row(f"[bold bright_cyan]EXPLANATION:[/bold bright_cyan] [white]{tp_eval.verdict_explanation}[/white]")
+
+    verdict_panel = Panel(
+        verdict_grid,
+        title="[bold bright_white]STRATEGY VERDICT (DETERMINISTIC SPOT SWING PROTOCOL)[/bold bright_white]",
+        box=box.ROUNDED,
+        border_style=v_border,
+        padding=(0, 1),
+    )
+
+    # 5. Bottom Clipboard Bar
+    last_copy_str = ""
+    if getattr(store, "last_packet_copied_utc", ""):
+        last_copy_str = f"  │  [bold green]Last Brief Copied: {store.last_packet_copied_utc} ({getattr(store, 'last_packet_char_count', 0):,} chars)[/bold green]"
+
+    bottom_grid = Table.grid(expand=True)
+    bottom_grid.add_column(justify="left", no_wrap=True)
+    bottom_grid.add_column(justify="right", no_wrap=True)
+    bottom_grid.add_row(
+        "[bold black on bright_green] [KEY A] BTC TREND-PULLBACK v1.0 [/bold black on bright_green]  "
+        "[bright_white]Tap [bold green]'A'[/bold green] to open Desk [A] │ Tap [bold green]'A'[/bold green] again to copy Strategy Brief to Clipboard![/bright_white]" + last_copy_str,
+        "[dim]config/trend_pullback_config.yaml • Independent Calculation[/dim]",
+    )
+    bottom_panel = Panel(bottom_grid, box=box.ROUNDED, border_style="bright_green", padding=(0, 1))
+
+    return Group(header_panel, sub_panel, top_row_grid, mid_row_grid, verdict_panel, bottom_panel)
+
+
 def build_dashboard_renderable(
     config: EngineConfig,
     store: StateStore,
     tab_override: Optional[int] = None,
 ) -> Group:
     """Builds the active tab's 5-panel Rich renderable for the live terminal HUD."""
-    valid_tabs = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17)
+    valid_tabs = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18)
     if tab_override is not None:
         if isinstance(tab_override, int) and tab_override in valid_tabs:
             active_tab = tab_override
@@ -5527,6 +5736,8 @@ def build_dashboard_renderable(
             active_tab = 16
         elif str(tab_override).lower() in ("m", "magnet", "btc_magnet", "17"):
             active_tab = 17
+        elif str(tab_override).lower() in ("a", "k", "strategy", "trend_pullback", "btc_strategy", "18"):
+            active_tab = 18
         elif str(tab_override).lower() in ("b", "pattern", "patterns", "chart", "14"):
             active_tab = 14
         elif str(tab_override).lower() in ("l", "master", "10"):
@@ -5563,6 +5774,8 @@ def build_dashboard_renderable(
     if getattr(store, "show_help", False):
         return _build_help_overlay(store, header_panel)
 
+    if active_tab == 18:
+        return _build_tab18_trend_pullback_hud(config, store, header_panel)
     if active_tab == 17:
         return _build_tab17_btc_magnet_hud(config, store, header_panel)
     if active_tab == 16:
@@ -5628,14 +5841,16 @@ def print_dry_run_report(
             14: "TAB [B: CLASSIC CHART PATTERN RADAR & CANDLESTICK GEOMETRY]",
             15: "TAB [G: GROK DUAL-HORIZON FLOW & VWAP SD MATRIX]",
             16: "TAB [R: SSRN QUANTITATIVE ALPHA DECK & EMPIRICAL RESEARCH]",
+            17: "TAB [M: BTC MAGNET · LIQUIDATION GRAVITY DECK]",
+            18: "TAB [A: BTC TREND-PULLBACK v1.0 · RESEARCH / PAPER MODE]",
         }
-        for t in (0, 16, 15, 12, 11, 14, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13):
+        for t in (0, 18, 17, 16, 15, 12, 11, 14, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13):
             title = tab_titles.get(t, f"TAB [{t}]")
             console.print(f"\n[bold cyan]=== VERIFICATION SNAPSHOT: {title} ===[/bold cyan]")
             console.print(build_dashboard_renderable(config, store, tab_override=t))
     else:
         tab_lower = tab_arg.strip().lower()
-        if tab_lower in ("l", "master", "m", "10"):
+        if tab_lower in ("l", "master", "10"):
             t_num = 10
         elif tab_lower in ("w", "waterfall", "wf", "12"):
             t_num = 12
@@ -5659,6 +5874,10 @@ def print_dry_run_report(
             t_num = 15
         elif tab_lower in ("r", "ssrn", "research", "alpha", "16"):
             t_num = 16
+        elif tab_lower in ("m", "magnet", "btc_magnet", "17"):
+            t_num = 17
+        elif tab_lower in ("a", "k", "strategy", "trend_pullback", "btc_strategy", "18"):
+            t_num = 18
         elif tab_lower in ("p", "structure", "slsp", "pa", "13"):
             t_num = 13
         else:
@@ -5666,7 +5885,7 @@ def print_dry_run_report(
                 t_num = int(tab_arg)
             except ValueError:
                 t_num = 0
-        store.active_tab = t_num if t_num in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16) else 0
+        store.active_tab = t_num if t_num in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18) else 0
         console.print(build_dashboard_renderable(config, store, tab_override=store.active_tab))
 
 
@@ -5686,6 +5905,18 @@ def _poll_keyboard_tab_switch(
                     store.show_help = False
                     if store.active_tab != new_tab:
                         store.active_tab = new_tab
+                        changed = True
+                elif ch in ("a", "A", "k", "K"):
+                    store.show_help = False
+                    if store.active_tab != 18:
+                        store.active_tab = 18
+                        changed = True
+                    else:
+                        from analytics.strategy_trend_pullback import copy_trend_pullback_to_clipboard
+                        ok, msg, char_count = copy_trend_pullback_to_clipboard(store)
+                        store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+                        store.last_packet_copied_ts = time.time()
+                        store.last_packet_char_count = char_count
                         changed = True
                 elif ch in ("p", "P"):
                     store.show_help = False
@@ -5788,6 +6019,20 @@ def _poll_keyboard_tab_switch(
             rlist, _, _ = select.select([sys.stdin], [], [], 0.0)
             while rlist:
                 ch = sys.stdin.read(1)
+                if ch in ("a", "A", "k", "K"):
+                    store.show_help = False
+                    if store.active_tab != 18:
+                        store.active_tab = 18
+                        changed = True
+                    else:
+                        from analytics.strategy_trend_pullback import copy_trend_pullback_to_clipboard
+                        ok, msg, char_count = copy_trend_pullback_to_clipboard(store)
+                        store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+                        store.last_packet_copied_ts = time.time()
+                        store.last_packet_char_count = char_count
+                        changed = True
+                    rlist, _, _ = select.select([sys.stdin], [], [], 0.0)
+                    continue
                 if ch in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9"):
                     new_tab = int(ch)
                     if new_tab == 7:

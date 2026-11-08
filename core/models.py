@@ -4928,3 +4928,94 @@ class BTCMagnetEvaluation:
     rule_checks: List[BTCMagnetRuleCheck] = field(default_factory=list)
     magnet_summary_markdown: str = ""
 
+
+@dataclass
+class TrendPullbackEvaluation:
+    """State for Tab [A: BTC STRATEGY] — BTC Trend-Pullback v1.0 (Research / Paper Mode)."""
+    strategy_name: str = "BTC TREND-PULLBACK v1.0"
+    strategy_status: str = "UNVALIDATED"
+    mode_label: str = "RESEARCH / PAPER MODE"
+
+    timestamp_utc: str = ""
+    timestamp_myt: str = ""
+    spot_price: float = 0.0
+
+    # 1. Market Regime & 4H Trend
+    daily_regime: str = "NOT BULLISH"  # "BULLISH" | "NOT BULLISH" | "DATA UNAVAILABLE"
+    daily_close_completed: float = 0.0
+    daily_sma200: float = 0.0
+    daily_sma200_prev20: float = 0.0
+    daily_sma200_slope_20d: float = 0.0
+    daily_close_above_sma200: bool = False
+    daily_sma200_rising: bool = False
+
+    trend_4h: str = "NOT CONFIRMED"  # "CONFIRMED" | "NOT CONFIRMED" | "DATA UNAVAILABLE"
+    close_4h_completed: float = 0.0
+    open_4h_completed: float = 0.0
+    high_4h_completed: float = 0.0
+    low_4h_completed: float = 0.0
+    ema50_4h: float = 0.0
+    ema50_4h_prev6: float = 0.0
+    ema50_4h_slope_6bars: float = 0.0
+    ema200_4h: float = 0.0
+    atr14_4h: float = 0.0
+    ema50_above_ema200: bool = False
+    ema50_rising_6bars: bool = False
+    close_4h_above_ema200: bool = False
+
+    # Supplementary Macro 1W / 1D EMA50 Context (Read-Only)
+    ema50_1d: float = 0.0
+    ema50_1w: float = 0.0
+
+    # 2. Pullback Analysis
+    pullback_zone_lower: float = 0.0
+    pullback_zone_upper: float = 0.0
+    max_extension_price: float = 0.0
+    recovery_candle: str = "NOT CONFIRMED"  # "CONFIRMED" | "NOT CONFIRMED"
+    setup_status: str = "WAIT"  # "WAIT" | "CONFIRMED" | "WAIT FOR RETEST" | "EXPIRED"
+    bars_since_recovery: int = -1
+    pullback_rejection_reason: str = ""
+
+    # 3. Trade Plan & Position Sizing
+    decision_state: str = "DATA UNAVAILABLE"  # 9 priority states from Section 7
+    trade_decision: str = "NO TRADE"  # "NO TRADE" | "ENTRY READY" | "WAIT FOR RETEST" | "HOLD" | "EXIT ALERT"
+    limit_entry_low: float = 0.0
+    limit_entry_high: float = 0.0
+    reference_entry_price: float = 0.0
+    structural_stop: float = 0.0
+    stop_distance_usd: float = 0.0
+    stop_distance_atr: float = 0.0
+    stop_valid: bool = False
+    stop_rejection_reason: str = ""
+
+    simulation_equity_usd: float = 100_000.0
+    risk_per_trade_pct: float = 0.50
+    risk_budget_usd: float = 500.0
+    cost_allowance_per_btc: float = 0.0
+    position_size_btc: float = 0.0
+    position_value_usd: float = 0.0
+    risk_reward_label: str = "DATA UNAVAILABLE (No fixed target - trend-continuation research model)"
+
+    # 4. Position Management & Exit Rules
+    position_status: str = "CASH"  # "CASH" | "HOLDING"
+    holding_entry_price: float = 0.0
+    holding_stop_price: float = 0.0
+    exit_conditions_status: str = "CLEAR"  # "CLEAR" | "WARNING" | "TRIGGERED"
+    exit_stop_breached: bool = False
+    exit_two_4h_below_ema50: bool = False
+    exit_two_1d_below_sma200: bool = False
+    invalidation_reason: str = "None - In Cash (Default: NO TRADE)"
+
+    # 5. Data Integrity
+    data_integrity_ok: bool = False
+    daily_candle_status: str = "UNAVAILABLE"  # "LAST CLOSE" | "STALE" | "UNAVAILABLE"
+    daily_last_close_utc: str = ""
+    candle_4h_status: str = "UNAVAILABLE"  # "LAST CLOSE" | "STALE" | "UNAVAILABLE"
+    candle_4h_last_close_utc: str = ""
+    integrity_failure_reason: str = ""
+
+    # 6. Final Strategy Verdict
+    strategy_verdict: str = "NO TRADE"  # "NO TRADE" | "WAIT" | "ENTRY READY" | "HOLD" | "EXIT ALERT"
+    verdict_explanation: str = ""
+    summary_markdown: str = ""
+

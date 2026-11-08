@@ -183,6 +183,38 @@ async def fetch_initial_oi_and_funding(
                     buy_v = float(latest.get("buyVol", 0.0))
                     sell_v = float(latest.get("sellVol", 0.0))
                     store.perp_5m_delta_btc = buy_v - sell_v
+
+        # 5. Top Trader Long/Short Position Ratio
+        try:
+            async with session.get(
+                f"{base_url}/futures/data/topLongShortPositionRatio",
+                params={"symbol": config.binance_symbol, "period": "1h", "limit": 1},
+                timeout=aiohttp.ClientTimeout(total=8),
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if isinstance(data, list) and len(data) > 0:
+                        latest = data[0]
+                        store.top_trader_ls_ratio = float(latest.get("longShortRatio", 1.0))
+                        store.top_trader_long_pct = float(latest.get("longAccount", 0.5)) * 100.0
+                        store.top_trader_short_pct = float(latest.get("shortAccount", 0.5)) * 100.0
+        except Exception:
+            pass
+
+        # 6. Global Account Long/Short Ratio
+        try:
+            async with session.get(
+                f"{base_url}/futures/data/globalLongShortAccountRatio",
+                params={"symbol": config.binance_symbol, "period": "1h", "limit": 1},
+                timeout=aiohttp.ClientTimeout(total=8),
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if isinstance(data, list) and len(data) > 0:
+                        latest = data[0]
+                        store.global_account_ls_ratio = float(latest.get("longShortRatio", 1.0))
+        except Exception:
+            pass
     except Exception as exc:
         logger.debug("Primary Binance futures OI/Funding warmup failed: %s", exc)
 

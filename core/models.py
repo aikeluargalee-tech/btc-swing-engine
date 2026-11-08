@@ -4726,3 +4726,74 @@ class PatternEvaluation:
     tactical_playbook: str = ""
     html_chart_path: str = ""
 
+
+@dataclass
+class GrokQuantEvaluation:
+    """Full evaluation state for Grok Dual-Horizon Flow & VWAP SD Matrix (Tab G)."""
+
+    timestamp_utc: str = ""
+    spot_price: float = 0.0
+
+    # 1. Anchored VWAP & Standard Deviation Bands (Daily 00:00 UTC Anchor)
+    vwap_daily: float = 0.0
+    vwap_sd1_upper: float = 0.0
+    vwap_sd2_upper: float = 0.0
+    vwap_sd1_lower: float = 0.0
+    vwap_sd2_lower: float = 0.0
+    vwap_sigma: float = 0.0
+    vwap_stretch_z: float = 0.0
+    vwap_band_status: str = "FAIR_VALUE_ROTATION"
+
+    # 2. Key Moving Averages & Session Levels
+    ema_9: float = 0.0
+    ema_21: float = 0.0
+    ema_50_1d: float = 0.0
+    sma_200_1d: float = 0.0
+    day_high: float = 0.0
+    day_low: float = 0.0
+    prev_day_high: float = 0.0
+    prev_day_low: float = 0.0
+
+    # 3. CoinGlass Positioning & Crowding
+    open_interest_btc: float = 0.0
+    open_interest_usd: float = 0.0
+    oi_change_1h_pct: float = 0.0
+    oi_change_4h_pct: float = 0.0
+    oi_trend: str = "FLAT"
+    funding_rate_pct: float = 0.0
+    funding_status: str = "NEUTRAL"
+    top_trader_long_pct: float = 50.0
+    top_trader_short_pct: float = 50.0
+    top_trader_ls_ratio: float = 1.0
+    global_account_ls_ratio: float = 1.0
+    crowding_verdict: str = "BALANCED"
+
+    # 4. Flow Quality & CVD Divergence
+    spot_cvd_24h: float = 0.0
+    futures_cvd_24h: float = 0.0
+    spot_cvd_4h: float = 0.0
+    futures_cvd_4h: float = 0.0
+    spot_cvd_15m: float = 0.0
+    futures_cvd_15m: float = 0.0
+    cvd_divergence: str = "BALANCED"
+    coinbase_premium_usd: float = 0.0
+    coinbase_premium_pct: float = 0.0
+    coinbase_premium_zscore: float = 0.0
+    coinbase_premium_status: str = "NEUTRAL"
+
+    # 5. Liquidation Heatmap Clusters
+    overhead_short_liq_pool: float = 0.0
+    overhead_short_liq_usd: float = 0.0
+    downside_long_liq_pool: float = 0.0
+    downside_long_liq_usd: float = 0.0
+
+    # 6. Grok Dual-Horizon Analysis & Mechanical Read
+    swing_regime: str = "Ranging"
+    day_regime: str = "Ranging"
+    mechanical_read_swing: str = ""
+    watch_for_swing: str = ""
+    mechanical_read_day: str = ""
+    watch_for_day: str = ""
+    grok_master_prompt_text: str = ""
+
+

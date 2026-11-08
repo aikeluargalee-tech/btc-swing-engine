@@ -15,6 +15,7 @@ from .models import (
     FlowSnapshot,
     FootprintEvaluation,
     Gartley5StrategyEvaluation,
+    GrokQuantEvaluation,
     KlineBar,
     LiquidationDetectorReport,
     MacroRadarEvaluation,
@@ -79,6 +80,10 @@ class StateStore:
         self.open_interest_usd: float = 0.0
         self.funding_rate_pct: float = 0.0
         self.taker_long_short_ratio_5m: float = 1.0
+        self.top_trader_long_pct: float = 50.0
+        self.top_trader_short_pct: float = 50.0
+        self.top_trader_ls_ratio: float = 1.0
+        self.global_account_ls_ratio: float = 1.0
         self.perp_5m_delta_btc: float = 0.0
         self.perp_source: str = "Binance USD-M"
         # interval -> number of candle-body-estimated perp bars excluded from analytics
@@ -114,6 +119,7 @@ class StateStore:
         self.ema_strategy: Optional[EMAStrategySnapshot] = None
         self.macro_intermarket: Any = None
         self.protocol_dossier: Optional[Dict[str, Any]] = None
+        self.grok_quant_evaluation: Optional[GrokQuantEvaluation] = None
 
         # --- Connection & System Health ---
         self.warmup_complete: bool = False

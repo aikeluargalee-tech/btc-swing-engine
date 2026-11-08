@@ -39,6 +39,7 @@ from .sweep_retest_fsm import (
 )
 from .pattern_detector import PatternEngine
 from .slsp_engine import SLSPEngine
+from .grok_quant_engine import GrokQuantEngine
 from .trap_engine import TrapEngine
 from .exhaustion_engine import ExhaustionEngine
 from .volatility_cone_engine import VolatilityConeEngine
@@ -62,6 +63,7 @@ class SignalDetector:
         self.ema_strategy_engine = EMAStrategyEngine(config)
         self.pattern_engine = PatternEngine(config)
         self.slsp_engine = SLSPEngine(config, read_only=True)
+        self.grok_engine = GrokQuantEngine()
         # Side-effect free by default (no state writes / alerts). Only the live HUD opts in via set_read_only(False).
         self.spot_swing_engine = SpotSwingEngine(config, read_only=True)
         fsm_db_path = os.path.join(
@@ -377,6 +379,12 @@ class SignalDetector:
             )
         except Exception:
             logging.getLogger("pattern").exception("Pattern geometry evaluation failed")
+
+        # 2h. Evaluate Tab [15: G]: Grok Dual-Horizon Flow & VWAP SD Matrix
+        try:
+            self.grok_engine.evaluate(store)
+        except Exception:
+            logging.getLogger("grok_quant").exception("Grok quant matrix evaluation failed")
 
         c_vah = active_vp.c_vah
         c_poc = active_vp.c_poc

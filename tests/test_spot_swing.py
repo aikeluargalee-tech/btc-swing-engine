@@ -681,7 +681,7 @@ class TestHudRouting(SpotSwingBase):
 
     def test_hotkeys(self) -> None:
         store = StateStore()
-        for keys, expected in (("l", 10), ("L", 10), ("m", 10), ("0", 0), ("5", 5), ("g", 7), ("e", 9), ("f", 11), ("F", 11), ("b", 14), ("B", 14)):
+        for keys, expected in (("l", 10), ("L", 10), ("m", 10), ("0", 0), ("5", 5), ("7", 7), ("g", 15), ("G", 15), ("e", 9), ("f", 11), ("F", 11), ("b", 14), ("B", 14)):
             store.active_tab = 3
             with mock.patch.object(terminal_hud, "msvcrt", _FakeMsvcrt(keys)):
                 terminal_hud._poll_keyboard_tab_switch(CONFIG, store)

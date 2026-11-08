@@ -73,6 +73,38 @@ async def _poll_binance_futures_metrics(
     except Exception as exc:
         logger.debug("Taker ratio poll error: %s", exc)
 
+    # 4. Top Trader Long/Short Position Ratio
+    try:
+        async with session.get(
+            f"{base_url}/futures/data/topLongShortPositionRatio",
+            params={"symbol": config.binance_symbol, "period": "1h", "limit": 1},
+            timeout=aiohttp.ClientTimeout(total=8),
+        ) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                if isinstance(data, list) and len(data) > 0:
+                    latest = data[0]
+                    store.top_trader_ls_ratio = float(latest.get("longShortRatio", 1.0))
+                    store.top_trader_long_pct = float(latest.get("longAccount", 0.5)) * 100.0
+                    store.top_trader_short_pct = float(latest.get("shortAccount", 0.5)) * 100.0
+    except Exception as exc:
+        logger.debug("Top trader ratio poll error: %s", exc)
+
+    # 5. Global Account Long/Short Ratio
+    try:
+        async with session.get(
+            f"{base_url}/futures/data/globalLongShortAccountRatio",
+            params={"symbol": config.binance_symbol, "period": "1h", "limit": 1},
+            timeout=aiohttp.ClientTimeout(total=8),
+        ) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                if isinstance(data, list) and len(data) > 0:
+                    latest = data[0]
+                    store.global_account_ls_ratio = float(latest.get("longShortRatio", 1.0))
+    except Exception as exc:
+        logger.debug("Global account ratio poll error: %s", exc)
+
     return success
 
 

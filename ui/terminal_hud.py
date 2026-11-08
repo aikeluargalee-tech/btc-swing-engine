@@ -160,6 +160,11 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         if active_tab == 12
         else "[dim white][W: WATERFALL][/dim white]"
     )
+    tG = (
+        "[bold black on bright_yellow] [G: GROK FLOW] [/bold black on bright_yellow]"
+        if active_tab == 15
+        else "[dim white][G: GROK FLOW][/dim white]"
+    )
     t0 = (
         "[bold white on blue] [0: SPOT SWING] [/bold white on blue]"
         if active_tab == 0
@@ -188,6 +193,7 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         8: "8: SFP LIQ TRAP",
         9: "9: TD EXHAUSTION",
         14: "14: PATTERNS & CHART",
+        15: "15: GROK QUANT FLOW [G]",
     }
     if active_tab in subdesk_names:
         subdesk_info = f"  │  [bold black on bright_yellow] [DEEP DIVE {subdesk_names[active_tab]}] [/bold black on bright_yellow]"
@@ -203,13 +209,13 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
     nav_grid.add_column(justify="right", no_wrap=True)
     nav_grid.add_row(
         f"[bold white]BTC-USD[/bold white] | Spot: [bold cyan]${spot_px:,.2f}[/bold cyan] | Regime: {regime_str} ({score_str}) | Feeds: Spot {spot_ws_dot} • Perp {perp_ws_dot} • CB {cb_ws_dot}",
-        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: P Structure • B Patterns • F Footprint • W Waterfall • 0 Screener • L Master • C Copy • H Guide • 1-9 Desks[/dim]",
+        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: P Structure • B Patterns • G Grok Flow • F Footprint • W Waterfall • 0 Screener • L Master • C Copy • H Guide[/dim]",
     )
 
     tab_grid = Table.grid(expand=True)
     tab_grid.add_column(justify="left", no_wrap=True)
     tab_grid.add_row(
-        f"{tP}  {tB}  {tF}  {tW}  {t0}  {tL}  │  {tC}  {tH}{subdesk_info}"
+        f"{tP}  {tB}  {tG}  {tF}  {tW}  {t0}  {tL}  │  {tC}  {tH}{subdesk_info}"
     )
     nav_panel = Panel(Group(nav_grid, tab_grid), border_style="bright_blue", box=box.ROUNDED, padding=(0, 1))
 
@@ -4814,16 +4820,279 @@ def _build_tab14_pattern_chart_hud(store: StateStore, header_panel: Panel) -> Gr
     return Group(header_panel, verdict_panel, mid_grid, chart_panel)
 
 
+def _build_tab15_grok_quant_hud(store: StateStore, header_panel: Panel) -> Group:
+    """Renders Tab [15: G]: Grok Dual-Horizon Flow & VWAP SD Matrix HUD."""
+    grok = getattr(store, "grok_quant_evaluation", None)
+    sig = store.latest_signal
+    spot_px = store.binance_spot_price or (sig.current_price if sig else 0.0)
+
+    if grok is None:
+        return Group(
+            header_panel,
+            Panel(
+                "Warming up Tab [15: G]: Grok Dual-Horizon Flow & VWAP SD Matrix...\n"
+                "Computing 00:00 UTC Anchored VWAP, ±1.0σ/±2.0σ Bands, Top Trader L/S Ratios, and Flow Divergence...",
+                title="[bold bright_yellow]DESK [G]: GROK DUAL-HORIZON FLOW & VWAP SD MATRIX[/bold bright_yellow]",
+                box=box.ROUNDED,
+                border_style="bright_yellow",
+            ),
+        )
+
+    # 1. Top Status & Regime Banner
+    band_badge_map = {
+        "EXTREME_OVERBOUGHT_+2SD": "[bold white on red] +2.0σ EXTREME FADE STRETCH [/bold white on red]",
+        "STRETCHED_BULLISH_+1SD": "[bold black on yellow] +1.0σ VALUE HIGH EXPANSION [/bold black on yellow]",
+        "FAIR_VALUE_ROTATION": "[bold black on green] FAIR VALUE ROTATION (±1.0σ) [/bold black on green]",
+        "DISCOUNT_BEARISH_-1SD": "[bold black on yellow] -1.0σ VALUE LOW SUPPORT [/bold black on yellow]",
+        "EXTREME_OVERSOLD_-2SD": "[bold white on red] -2.0σ EXTREME SWEEP DISCOUNT [/bold white on red]",
+    }
+    band_badge = band_badge_map.get(grok.vwap_band_status, f"[bold white]{grok.vwap_band_status}[/bold white]")
+
+    top_grid = Table.grid(expand=True)
+    top_grid.add_column(justify="left", no_wrap=True)
+    top_grid.add_column(justify="right", no_wrap=True)
+    top_grid.add_row(
+        f"[bold bright_white]SWING BIAS (1D/4H):[/bold bright_white] [bold cyan]{grok.swing_regime}[/bold cyan]  │  "
+        f"[bold bright_white]DAY BIAS (15m/1H):[/bold bright_white] [bold cyan]{grok.day_regime}[/bold cyan]",
+        f"VWAP Stretch: {band_badge} [bold white]({grok.vwap_stretch_z:+.2f}σ)[/bold white]",
+    )
+
+    verdict_panel = Panel(
+        top_grid,
+        title="[bold bright_yellow]DESK [G]: GROK DUAL-HORIZON FLOW & VWAP SD MATRIX (COINGLASS & TRADINGVIEW SYNTHESIS)[/bold bright_yellow]",
+        box=box.ROUNDED,
+        border_style="bright_yellow",
+        padding=(0, 1),
+    )
+
+    # 2. Panels 1 & 2 Side-by-Side: CoinGlass Positioning (Left) + Anchored VWAP SD Bands (Right)
+    # --- Left: CoinGlass Matrix ---
+    cg_table = Table(box=box.SIMPLE_HEAD, expand=True, padding=(0, 1))
+    cg_table.add_column("CoinGlass Indicator", style="bold white", ratio=3, no_wrap=True)
+    cg_table.add_column("Current Metric", style="cyan", ratio=3, no_wrap=True)
+    cg_table.add_column("Diagnostic / Skew", style="yellow", ratio=4, no_wrap=True)
+
+    oi_col = "green" if grok.oi_change_4h_pct > 1.0 else ("red" if grok.oi_change_4h_pct < -1.0 else "white")
+    cg_table.add_row(
+        "Open Interest (OI)",
+        f"${grok.open_interest_usd/1e9:.2f}B ({grok.open_interest_btc:,.0f} BTC)",
+        f"[{oi_col}]{grok.oi_trend}[/{oi_col}]",
+    )
+    fund_col = "red" if grok.funding_rate_pct > 0.02 else ("green" if grok.funding_rate_pct < 0 else "white")
+    cg_table.add_row(
+        "Funding Rate (8H)",
+        f"[{fund_col}]{grok.funding_rate_pct:+.4f}%[/] ({grok.funding_rate_pct*3*365:.1f}%/yr)",
+        f"[{fund_col}]{grok.funding_status}[/]",
+    )
+    cpi_col = "green" if grok.coinbase_premium_pct > 0.01 else ("red" if grok.coinbase_premium_pct < -0.03 else "white")
+    cg_table.add_row(
+        "Coinbase Premium Index",
+        f"[{cpi_col}]${grok.coinbase_premium_usd:+,.2f} ({grok.coinbase_premium_pct:+.4f}%)[/]",
+        f"[{cpi_col}]{grok.coinbase_premium_status}[/]",
+    )
+    top_col = "cyan" if grok.top_trader_ls_ratio > 1.5 else ("yellow" if grok.top_trader_ls_ratio < 0.9 else "white")
+    cg_table.add_row(
+        "Top Trader L/S Ratio",
+        f"[{top_col}]{grok.top_trader_ls_ratio:.2f}[/] ({grok.top_trader_long_pct:.1f}% L / {grok.top_trader_short_pct:.1f}% S)",
+        "Smart Money / Whale Positions",
+    )
+    glob_col = "red" if grok.global_account_ls_ratio > 2.5 else "white"
+    cg_table.add_row(
+        "Global Account L/S Ratio",
+        f"[{glob_col}]{grok.global_account_ls_ratio:.2f}[/]",
+        f"[{glob_col}]{grok.crowding_verdict}[/]",
+    )
+    cg_table.add_row(
+        "Overhead Short Liq Magnet",
+        f"[bold magenta]${grok.overhead_short_liq_pool:,.0f}[/bold magenta]",
+        f"[dim]~${grok.overhead_short_liq_usd/1e6:.0f}M short stop cluster[/dim]",
+    )
+    cg_table.add_row(
+        "Downside Long Liq Trap",
+        f"[bold red]${grok.downside_long_liq_pool:,.0f}[/bold red]",
+        f"[dim]~${grok.downside_long_liq_usd/1e6:.0f}M long stop cluster[/dim]",
+    )
+
+    cg_panel = Panel(
+        cg_table,
+        title="[bold cyan]1. CoinGlass Positioning, Crowding & Liquidation Heatmap[/bold cyan]",
+        box=box.ROUNDED,
+        border_style="bright_blue",
+    )
+
+    # --- Right: Anchored VWAP SD Bands Matrix ---
+    vwap_table = Table(box=box.SIMPLE_HEAD, expand=True, padding=(0, 1))
+    vwap_table.add_column("Level / Band", style="bold white", ratio=3, no_wrap=True)
+    vwap_table.add_column("Price (USD)", style="bold cyan", ratio=3, no_wrap=True)
+    vwap_table.add_column("Interpretation & Execution Zone", style="yellow", ratio=4, no_wrap=True)
+
+    vwap_table.add_row(
+        "Upper +2.0σ Band",
+        f"[bold red]${grok.vwap_sd2_upper:,.2f}[/bold red]",
+        "[bold red]Extreme Stretch Fade Zone (Take Profit / Sell)[/bold red]",
+    )
+    vwap_table.add_row(
+        "Upper +1.0σ Band",
+        f"[cyan]${grok.vwap_sd1_upper:,.2f}[/cyan]",
+        "[cyan]Value Area High (Breakout / Bull Expansion Gate)[/cyan]",
+    )
+    vwap_table.add_row(
+        "00:00 UTC Anchored VWAP",
+        f"[bold bright_white]${grok.vwap_daily:,.2f}[/bold bright_white]",
+        "[bold white]Mean Fair Value Pivot Anchor[/bold white]",
+    )
+    spot_col = "green" if grok.spot_price >= grok.vwap_daily else "red"
+    vwap_table.add_row(
+        "Current Spot Price",
+        f"[{spot_col}]${grok.spot_price:,.2f}[/{spot_col}]",
+        f"[{spot_col}]Z-Score: {grok.vwap_stretch_z:+.2f}σ ({grok.vwap_band_status})[/{spot_col}]",
+    )
+    vwap_table.add_row(
+        "Lower -1.0σ Band",
+        f"[cyan]${grok.vwap_sd1_lower:,.2f}[/cyan]",
+        "[cyan]Value Area Low (Initial Support Shelf)[/cyan]",
+    )
+    vwap_table.add_row(
+        "Lower -2.0σ Band",
+        f"[bold green]${grok.vwap_sd2_lower:,.2f}[/bold green]",
+        "[bold green]Extreme Sweep Discount Zone (High-RRR Bounce)[/bold green]",
+    )
+    vwap_table.add_row(
+        "Day Range & EMAs",
+        f"[dim]H:${grok.day_high:,.0f} L:${grok.day_low:,.0f}[/dim]",
+        f"[dim]9 EMA:${grok.ema_9:,.0f} • 21 EMA:${grok.ema_21:,.0f} • 50 EMA:${grok.ema_50_1d:,.0f}[/dim]",
+    )
+
+    vwap_panel = Panel(
+        vwap_table,
+        title="[bold magenta]2. TradingView 00:00 UTC Anchored VWAP +/- SD Bands[/bold magenta]",
+        box=box.ROUNDED,
+        border_style="magenta",
+    )
+
+    mid_grid = Table.grid(expand=True)
+    mid_grid.add_column(justify="left", no_wrap=False, ratio=1)
+    mid_grid.add_column(justify="left", no_wrap=False, ratio=1)
+    mid_grid.add_row(cg_panel, vwap_panel)
+
+    # 3. Flow Quality & Multi-Horizon CVD Divergence (Full-Width)
+    cvd_table = Table(box=box.SIMPLE_HEAD, expand=True, padding=(0, 1))
+    cvd_table.add_column("Horizon", style="bold white", ratio=2, no_wrap=True)
+    cvd_table.add_column("Spot CVD (BTC)", style="green", ratio=2, no_wrap=True)
+    cvd_table.add_column("Futures CVD (BTC)", style="yellow", ratio=2, no_wrap=True)
+    cvd_table.add_column("Spot-Perp Spread", style="cyan", ratio=2, no_wrap=True)
+    cvd_table.add_column("Flow Diagnosis / Divergence Signature", style="bold white", ratio=5, no_wrap=True)
+
+    s24 = grok.spot_cvd_24h
+    f24 = grok.futures_cvd_24h
+    diff24 = s24 - f24
+    s24_col = "green" if s24 > 0 else "red"
+    f24_col = "green" if f24 > 0 else "red"
+    diff24_col = "green" if diff24 > 0 else "red"
+    cvd_table.add_row(
+        "24H Macro",
+        f"[{s24_col}]{s24:+,.1f} BTC[/{s24_col}]",
+        f"[{f24_col}]{f24:+,.1f} BTC[/{f24_col}]",
+        f"[{diff24_col}]{diff24:+,.1f} BTC[/{diff24_col}]",
+        f"[bold]{grok.cvd_divergence}[/bold]",
+    )
+
+    s4 = grok.spot_cvd_4h
+    f4 = grok.futures_cvd_4h
+    diff4 = s4 - f4
+    s4_col = "green" if s4 > 0 else "red"
+    f4_col = "green" if f4 > 0 else "red"
+    diff4_col = "green" if diff4 > 0 else "red"
+    cvd_table.add_row(
+        "4H Tactical",
+        f"[{s4_col}]{s4:+,.1f} BTC[/{s4_col}]",
+        f"[{f4_col}]{f4:+,.1f} BTC[/{f4_col}]",
+        f"[{diff4_col}]{diff4:+,.1f} BTC[/{diff4_col}]",
+        "[dim]Tactical swing lead-lag indicator[/dim]",
+    )
+
+    s15 = grok.spot_cvd_15m
+    f15 = grok.futures_cvd_15m
+    diff15 = s15 - f15
+    s15_col = "green" if s15 > 0 else "red"
+    f15_col = "green" if f15 > 0 else "red"
+    diff15_col = "green" if diff15 > 0 else "red"
+    cvd_table.add_row(
+        "15m Micro",
+        f"[{s15_col}]{s15:+,.1f} BTC[/{s15_col}]",
+        f"[{f15_col}]{f15:+,.1f} BTC[/{f15_col}]",
+        f"[{diff15_col}]{diff15:+,.1f} BTC[/{diff15_col}]",
+        "[dim]Intraday execution & sweep absorption trigger[/dim]",
+    )
+
+    flow_panel = Panel(
+        cvd_table,
+        title="[bold green]3. Flow Quality & Multi-Horizon Spot vs Futures CVD Divergence[/bold green]",
+        box=box.ROUNDED,
+        border_style="green",
+        padding=(0, 1),
+    )
+
+    # 4. Dual-Horizon Mechanical Context (Swing vs Day Trading)
+    swing_text = (
+        f"[bold bright_cyan]REGIME:[/bold bright_cyan] {grok.swing_regime}\n"
+        f"[bold bright_white]MECHANICAL READ:[/bold bright_white]\n{grok.mechanical_read_swing}\n\n"
+        f"[bold bright_yellow]WATCH FOR:[/bold bright_yellow]\n{grok.watch_for_swing}"
+    )
+    swing_panel = Panel(
+        swing_text,
+        title="[bold cyan]4A. SWING TRADING CONTEXT (DAILY + 4H)[/bold cyan]",
+        box=box.ROUNDED,
+        border_style="bright_blue",
+    )
+
+    day_text = (
+        f"[bold bright_magenta]REGIME:[/bold bright_magenta] {grok.day_regime}\n"
+        f"[bold bright_white]MECHANICAL READ:[/bold bright_white]\n{grok.mechanical_read_day}\n\n"
+        f"[bold bright_yellow]WATCH FOR:[/bold bright_yellow]\n{grok.watch_for_day}"
+    )
+    day_panel = Panel(
+        day_text,
+        title="[bold magenta]4B. DAY TRADING CONTEXT (1H + 15M + 5M)[/bold magenta]",
+        box=box.ROUNDED,
+        border_style="magenta",
+    )
+
+    playbook_grid = Table.grid(expand=True)
+    playbook_grid.add_column(justify="left", no_wrap=False, ratio=1)
+    playbook_grid.add_column(justify="left", no_wrap=False, ratio=1)
+    playbook_grid.add_row(swing_panel, day_panel)
+
+    # 5. One-Click Grok Prompt Clipboard Strip
+    last_copy_str = ""
+    if getattr(store, "last_packet_copied_utc", ""):
+        last_copy_str = f"  │  [bold green]✓ COPIED AT {store.last_packet_copied_utc} ({getattr(store, 'last_packet_char_count', 0):,} chars)[/bold green]"
+
+    bottom_grid = Table.grid(expand=True)
+    bottom_grid.add_column(justify="left", no_wrap=True)
+    bottom_grid.add_column(justify="right", no_wrap=True)
+    bottom_grid.add_row(
+        f"[bold black on bright_yellow] [KEY C] COPY GROK MASTER PROMPT [/bold black on bright_yellow]  "
+        f"[bright_white]Press [bold yellow]'C'[/bold yellow] to instantly copy full Master Prompt to clipboard! Zero manual screenshots needed.[/bright_white]{last_copy_str}",
+        f"[dim]Risk: Strictly Spot-Only (0.75% Equity Risk Cap)[/dim]",
+    )
+    bottom_panel = Panel(bottom_grid, box=box.ROUNDED, border_style="bright_yellow", padding=(0, 1))
+
+    return Group(header_panel, verdict_panel, mid_grid, flow_panel, playbook_grid, bottom_panel)
+
+
 def build_dashboard_renderable(
     config: EngineConfig,
     store: StateStore,
     tab_override: Optional[int] = None,
 ) -> Group:
     """Builds the active tab's 5-panel Rich renderable for the live terminal HUD."""
-    valid_tabs = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14)
+    valid_tabs = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
     if tab_override is not None:
         if isinstance(tab_override, int) and tab_override in valid_tabs:
             active_tab = tab_override
+        elif str(tab_override).lower() in ("g", "grok", "grok_flow", "15"):
+            active_tab = 15
         elif str(tab_override).lower() in ("b", "pattern", "patterns", "chart", "14"):
             active_tab = 14
         elif str(tab_override).lower() in ("l", "master", "m", "10"):
@@ -4860,6 +5129,8 @@ def build_dashboard_renderable(
     if getattr(store, "show_help", False):
         return _build_help_overlay(store, header_panel)
 
+    if active_tab == 15:
+        return _build_tab15_grok_quant_hud(store, header_panel)
     if active_tab == 14:
         return _build_tab14_pattern_chart_hud(store, header_panel)
     if active_tab == 13:
@@ -4917,8 +5188,9 @@ def print_dry_run_report(
             10: "TAB [L: MASTER SYNTHESIS & SUPREME COMMAND CENTER]",
             13: "TAB [P: PRICE ACTION & STRUCTURE PROTOCOL (SLSP v1.0 + 3-EMA + SENSORS)]",
             14: "TAB [B: CLASSIC CHART PATTERN RADAR & CANDLESTICK GEOMETRY]",
+            15: "TAB [G: GROK DUAL-HORIZON FLOW & VWAP SD MATRIX]",
         }
-        for t in (0, 12, 11, 14, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13):
+        for t in (0, 15, 12, 11, 14, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13):
             title = tab_titles.get(t, f"TAB [{t}]")
             console.print(f"\n[bold cyan]=== VERIFICATION SNAPSHOT: {title} ===[/bold cyan]")
             console.print(build_dashboard_renderable(config, store, tab_override=t))
@@ -4936,7 +5208,7 @@ def print_dry_run_report(
             t_num = 5
         elif tab_lower in ("6", "s2", "v", "cone", "vol"):
             t_num = 6
-        elif tab_lower in ("7", "s3", "g", "gartley"):
+        elif tab_lower in ("7", "s3", "gartley"):
             t_num = 7
         elif tab_lower in ("8", "s4", "t", "trap", "sfp"):
             t_num = 8
@@ -4944,6 +5216,8 @@ def print_dry_run_report(
             t_num = 9
         elif tab_lower in ("b", "pattern", "patterns", "chart", "14"):
             t_num = 14
+        elif tab_lower in ("g", "grok", "grok_flow", "15"):
+            t_num = 15
         elif tab_lower in ("p", "structure", "slsp", "pa", "13"):
             t_num = 13
         else:
@@ -4951,7 +5225,7 @@ def print_dry_run_report(
                 t_num = int(tab_arg)
             except ValueError:
                 t_num = 0
-        store.active_tab = t_num if t_num in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14) else 0
+        store.active_tab = t_num if t_num in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15) else 0
         console.print(build_dashboard_renderable(config, store, tab_override=store.active_tab))
 
 
@@ -5009,8 +5283,8 @@ def _poll_keyboard_tab_switch(
                         changed = True
                 elif ch in ("g", "G"):
                     store.show_help = False
-                    if store.active_tab != 7:
-                        store.active_tab = 7
+                    if store.active_tab != 15:
+                        store.active_tab = 15
                         changed = True
                 elif ch in ("t", "T"):
                     store.show_help = False
@@ -5026,10 +5300,18 @@ def _poll_keyboard_tab_switch(
                     store.show_help = not getattr(store, "show_help", False)
                     changed = True
                 elif ch in ("c", "C"):
-                    if detector is not None:
-                        detector.evaluate(store)
-                    copy_ai_packet_to_clipboard_and_disk(config, store)
-                    changed = True
+                    if store.active_tab == 15:
+                        from analytics.grok_quant_engine import copy_grok_prompt_to_clipboard
+                        ok, msg, char_count = copy_grok_prompt_to_clipboard(store)
+                        store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+                        store.last_packet_copied_ts = time.time()
+                        store.last_packet_char_count = char_count
+                        changed = True
+                    else:
+                        if detector is not None:
+                            detector.evaluate(store)
+                        copy_ai_packet_to_clipboard_and_disk(config, store)
+                        changed = True
         except Exception:
             pass
         return changed
@@ -5074,8 +5356,9 @@ def _poll_keyboard_tab_switch(
                         store.active_tab = 6
                         changed = True
                 elif ch in ("g", "G"):
-                    if store.active_tab != 7:
-                        store.active_tab = 7  # Option B: G maps to Desk [B: PATTERNS & HARMONICS]
+                    store.show_help = False
+                    if store.active_tab != 15:
+                        store.active_tab = 15
                         changed = True
                 elif ch in ("t", "T"):
                     if store.active_tab != 8:
@@ -5086,10 +5369,18 @@ def _poll_keyboard_tab_switch(
                         store.active_tab = 9
                         changed = True
                 elif ch in ("c", "C"):
-                    if detector is not None:
-                        detector.evaluate(store)
-                    copy_ai_packet_to_clipboard_and_disk(config, store)
-                    changed = True
+                    if store.active_tab == 15:
+                        from analytics.grok_quant_engine import copy_grok_prompt_to_clipboard
+                        ok, msg, char_count = copy_grok_prompt_to_clipboard(store)
+                        store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+                        store.last_packet_copied_ts = time.time()
+                        store.last_packet_char_count = char_count
+                        changed = True
+                    else:
+                        if detector is not None:
+                            detector.evaluate(store)
+                        copy_ai_packet_to_clipboard_and_disk(config, store)
+                        changed = True
                 rlist, _, _ = select.select([sys.stdin], [], [], 0.0)
     except Exception:
         pass

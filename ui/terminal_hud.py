@@ -12,6 +12,17 @@ import asyncio
 import select
 import sys
 from datetime import datetime, timedelta, timezone
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+if hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 from typing import Any, Optional, Tuple
 
 try:
@@ -5125,33 +5136,99 @@ def _build_tab16_ssrn_research_hud(
         engine = SSRNResearchEngine(config)
         ssrn = engine.evaluate(store)
 
-    view_mode = getattr(store, "ssrn_view_mode", "domains")
+    view_mode = getattr(store, "ssrn_view_mode", "models")
 
-    # Sub-Ribbon with View Toggle
-    mode_a_style = "bold black on bright_yellow" if view_mode == "domains" else "dim white"
+    # Sub-Ribbon with View Toggle (View B Models is Primary Default)
     mode_b_style = "bold black on bright_cyan" if view_mode == "models" else "dim white"
+    mode_a_style = "bold black on bright_yellow" if view_mode == "domains" else "dim white"
     sub_grid = Table.grid(expand=True)
     sub_grid.add_column(justify="left", no_wrap=True)
     sub_grid.add_column(justify="right", no_wrap=True)
     sub_grid.add_row(
-        f"[bold bright_yellow]DESK [R]: SSRN QUANTITATIVE ALPHA DECK[/bold bright_yellow]  │  "
-        f"[{mode_a_style}] VIEW A: 5 ACADEMIC DOMAINS [/{mode_a_style}]   "
-        f"[{mode_b_style}] VIEW B: 5 EMPIRICAL STRATEGIES [/{mode_b_style}]",
-        f"[dim]Press [bold yellow]'R'[/bold yellow] to toggle view • [bold yellow]'RR'[/bold yellow] to copy brief[/dim]",
+        f"[bold bright_cyan]DESK [R]: SSRN QUANTITATIVE COCKPIT[/bold bright_cyan]  |  "
+        f"[{mode_b_style}] [PRIMARY] VIEW B: 5 EMPIRICAL STRATEGY MODELS [/{mode_b_style}]   "
+        f"[{mode_a_style}] VIEW A: 5 ACADEMIC DOMAINS (LIVE TELEMETRY) [/{mode_a_style}]",
+        f"[dim]Press [bold yellow]'R'[/bold yellow] to toggle view | [bold yellow]'RR'[/bold yellow] to copy brief[/dim]",
     )
-    verdict_panel = Panel(sub_grid, box=box.ROUNDED, border_style="bright_yellow", padding=(0, 1))
+    verdict_panel = Panel(sub_grid, box=box.ROUNDED, border_style="bright_cyan" if view_mode == "models" else "bright_yellow", padding=(0, 1))
 
-    if view_mode == "domains":
-        # Render 5 Academic Domains
+    if view_mode == "models":
+        # -------------------------------------------------------------
+        # VIEW B: 5 VERIFIED EMPIRICAL STRATEGY MODELS & LIVE GATES (PRIMARY)
+        # -------------------------------------------------------------
+        models_by_id = {m.id: m for m in ssrn.models}
+        m1 = models_by_id.get("mtf_macd")
+        m2 = models_by_id.get("ensemble_donchian")
+        m3 = models_by_id.get("vol_adaptive_8h")
+        m4 = models_by_id.get("funding_carry_filter")
+        m5 = models_by_id.get("cost_aware_ml")
+
+        # Top Executive Gating Banner
+        top_banner_table = Table.grid(expand=True)
+        top_banner_table.add_column(ratio=1)
+        top_banner_table.add_column(ratio=1)
+        top_banner_table.add_column(ratio=1)
+        top_banner_table.add_column(ratio=1)
+        top_banner_table.add_column(ratio=1)
+
+        def badge_text(m):
+            if not m:
+                return "[dim]STANDBY[/dim]"
+            col = "bold black on green" if m.is_gate_pass else "bold white on red"
+            return f"[{col}] {m.live_status} [/{col}]"
+
+        top_banner_table.add_row(
+            f"[dim]1. MTF MACD (Mesicek):[/dim]\n" + badge_text(m1),
+            f"[dim]2. Vol Target (Zarattini):[/dim]\n" + badge_text(m2),
+            f"[dim]3. 8H ATR Stop (Karassavidis):[/dim]\n" + badge_text(m3),
+            f"[dim]4. Funding Gate (Chan):[/dim]\n" + badge_text(m4),
+            f"[dim]5. Cost Hurdle (Bysik):[/dim]\n" + badge_text(m5),
+        )
+        banner_panel = Panel(
+            top_banner_table,
+            title="[bold bright_white]EXECUTIVE STRATEGY GATES & POSITION SIZING MATRIX[/bold bright_white]",
+            box=box.ROUNDED,
+            border_style="bright_cyan",
+            padding=(0, 1),
+        )
+
+        # Main Detailed Models Table
+        models_table = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold cyan", pad_edge=False)
+        models_table.add_column("Strategy Model & SSRN Citation", justify="left", no_wrap=False, ratio=3)
+        models_table.add_column("Timeframe & Quantitative Rule Logic", justify="left", no_wrap=False, ratio=4)
+        models_table.add_column("Empirical Benchmark", justify="left", no_wrap=False, ratio=2)
+        models_table.add_column("Action State & Live Metric", justify="center", no_wrap=False, ratio=3)
+
+        for m in ssrn.models:
+            gate_col = "bold black on green" if m.is_gate_pass else "bold white on red"
+            status_badge = f"[{gate_col}] {m.live_status} [/{gate_col}]\n[bright_white]{m.live_value}[/bright_white]"
+            title_cell = f"[bold bright_white]{m.name}[/bold bright_white]\n[dim cyan]{m.ssrn_citation}[/dim cyan]"
+            rule_cell = f"[bold yellow]{m.timeframe}[/bold yellow]\n[white]{m.logic}[/white]"
+            perf_cell = f"[bold green]{m.performance}[/bold green]"
+            models_table.add_row(title_cell, rule_cell, perf_cell, status_badge)
+
+        content_group = Group(
+            banner_panel,
+            Panel(models_table, title="[bold cyan]VIEW B: VERIFIED EMPIRICAL STRATEGY MODELS & LIVE GATES[/bold cyan]", box=box.ROUNDED, border_style="cyan", padding=(0, 1)),
+        )
+
+    else:
+        # -------------------------------------------------------------
+        # VIEW A: 5 ACADEMIC DOMAINS (LIVE TELEMETRY COCKPIT)
+        # -------------------------------------------------------------
         domains_by_id = {d.id: d for d in ssrn.domains}
 
-        def make_domain_panel(d, border_col: str = "bright_blue") -> Panel:
+        def make_live_domain_panel(d, border_col: str = "bright_blue") -> Panel:
             t = Table.grid(expand=True)
             t.add_column()
-            metrics_str = " • ".join([f"[bold cyan]{m}[/bold cyan]" for m in d.core_metrics])
-            t.add_row(f"[dim]Core Metrics:[/dim] {metrics_str}")
-            t.add_row(f"[bright_white]{d.key_finding}[/bright_white]")
-            t.add_row(f"[bold bright_green]SPOT SWING ROLE:[/bold bright_green] [green]{d.spot_swing_role}[/green]")
+            
+            # Big Live Telemetry Readout
+            t.add_row(f"[bold bright_white]TELEMETRY:[/bold bright_white] [bold {border_col}]{d.live_metric_val}[/bold {border_col}]  │  [bold]{d.live_status_badge}[/bold]")
+            
+            # Submetrics Grid
+            sub_str = "  •  ".join([f"[dim]{s}[/dim]" for s in d.live_submetrics])
+            t.add_row(sub_str)
+            t.add_row(f"[bold bright_green]SPOT SWING ROLE:[/bold bright_green] [white]{d.spot_swing_role}[/white]")
             return Panel(t, title=f"[bold {border_col}]{d.title}[/bold {border_col}]", box=box.ROUNDED, border_style=border_col, padding=(0, 1))
 
         d1 = domains_by_id.get("microstructure")
@@ -5164,51 +5241,33 @@ def _build_tab16_ssrn_research_hud(
         row1_table.add_column(ratio=1)
         row1_table.add_column(ratio=1)
         row1_table.add_row(
-            make_domain_panel(d1, "bright_blue") if d1 else Panel(""),
-            make_domain_panel(d2, "bright_magenta") if d2 else Panel(""),
+            make_live_domain_panel(d1, "bright_blue") if d1 else Panel(""),
+            make_live_domain_panel(d2, "bright_magenta") if d2 else Panel(""),
         )
 
         row2_table = Table.grid(expand=True)
         row2_table.add_column(ratio=1)
         row2_table.add_column(ratio=1)
         row2_table.add_row(
-            make_domain_panel(d3, "cyan") if d3 else Panel(""),
-            make_domain_panel(d4, "green") if d4 else Panel(""),
+            make_live_domain_panel(d3, "cyan") if d3 else Panel(""),
+            make_live_domain_panel(d4, "green") if d4 else Panel(""),
         )
 
-        p5 = make_domain_panel(d5, "yellow") if d5 else Panel("")
+        p5 = make_live_domain_panel(d5, "yellow") if d5 else Panel("")
         content_group = Group(row1_table, row2_table, p5)
 
-    else:
-        # Render View B: 5 Empirical Operational Models
-        models_table = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold cyan", pad_edge=False)
-        models_table.add_column("Strategy Model & Citation", justify="left", no_wrap=False, ratio=3)
-        models_table.add_column("Timeframe & Rule Logic", justify="left", no_wrap=False, ratio=4)
-        models_table.add_column("Empirical Performance", justify="center", no_wrap=False, ratio=2)
-        models_table.add_column("Live Market Condition", justify="center", no_wrap=False, ratio=2)
-
-        for m in ssrn.models:
-            gate_col = "bold black on green" if m.is_gate_pass else "bold white on red"
-            status_badge = f"[{gate_col}] {m.live_status} [/{gate_col}]\n[dim]{m.live_value}[/dim]"
-            title_cell = f"[bold bright_white]{m.name}[/bold bright_white]\n[dim cyan]{m.ssrn_citation}[/dim cyan]"
-            rule_cell = f"[bold yellow]{m.timeframe}[/bold yellow]\n[white]{m.logic}[/white]"
-            perf_cell = f"[bold green]{m.performance}[/bold green]"
-            models_table.add_row(title_cell, rule_cell, perf_cell, status_badge)
-
-        content_group = Group(Panel(models_table, title="[bold cyan]VIEW B: VERIFIED EMPIRICAL STRATEGY MODELS & LIVE GATES[/bold cyan]", box=box.ROUNDED, border_style="cyan", padding=(0, 1)))
-
-    # Bottom clipboard strip
+    # Bottom clipboard strip with ASCII-safe status
     last_copy_str = ""
     if getattr(store, "last_packet_copied_utc", ""):
-        last_copy_str = f"  │  [bold green]✓ COPIED AT {store.last_packet_copied_utc} ({getattr(store, 'last_packet_char_count', 0):,} chars)[/bold green]"
+        last_copy_str = f"  |  [bold green][OK] COPIED AT {store.last_packet_copied_utc} ({getattr(store, 'last_packet_char_count', 0):,} chars)[/bold green]"
 
     bottom_grid = Table.grid(expand=True)
     bottom_grid.add_column(justify="left", no_wrap=True)
     bottom_grid.add_column(justify="right", no_wrap=True)
     bottom_grid.add_row(
         f"[bold black on bright_yellow] [KEY R / RR] VIEW TOGGLE & CLIPBOARD [/bold black on bright_yellow]  "
-        f"[bright_white]Tap [bold yellow]'R'[/bold yellow] to toggle Domains ⟷ Models • Tap [bold yellow]'RR'[/bold yellow] to copy SSRN Academic Brief! (0 screenshots needed)[/bright_white]{last_copy_str}",
-        f"[dim]Peer-Reviewed Quantitative Research • Spot-Only Gating[/dim]",
+        f"[bright_white]Tap [bold yellow]'R'[/bold yellow] to toggle Models <-> Domains | Tap [bold yellow]'RR'[/bold yellow] to copy SSRN Academic Brief! (0 screenshots needed)[/bright_white]{last_copy_str}",
+        f"[dim]Peer-Reviewed Quantitative Research | Spot-Only Gating[/dim]",
     )
     bottom_panel = Panel(bottom_grid, box=box.ROUNDED, border_style="bright_yellow", padding=(0, 1))
 

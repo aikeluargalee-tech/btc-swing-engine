@@ -4811,6 +4811,10 @@ class SSRNDomainItem:
     core_metrics: List[str]
     key_finding: str
     spot_swing_role: str
+    live_metric_label: str = ""
+    live_metric_val: str = ""
+    live_status_badge: str = ""
+    live_submetrics: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -4854,6 +4858,17 @@ class SSRNAlphaEvaluation:
     round_trip_friction_bps: float = 18.0
     cost_hurdle_pass: bool = True
 
-    active_view_mode: str = "domains"  # "domains" or "models"
+    # View A Live Telemetry Metrics
+    live_obi_ratio_pct: float = 0.0
+    live_4h_cvd_delta: float = 0.0
+    live_trend_1d: str = "CHOP"
+    live_trend_4h: str = "CHOP"
+    live_trend_1h: str = "CHOP"
+    live_realized_variance: float = 0.0
+    live_skewness_20d: float = 0.0
+    live_mvrv_ratio: float = 1.0
+    live_sopr_level: float = 1.0
+
+    active_view_mode: str = "models"  # Default to View B ("models")
     ssrn_summary_markdown: str = ""
 

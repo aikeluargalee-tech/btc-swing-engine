@@ -60,7 +60,7 @@
     {
       "id": "mtf_macd",
       "name": "Multi-Timeframe Trend Following",
-      "ssrn_citation": "Mesíček & Vojtko (SSRN 5748642)",
+      "ssrn_citation": "Mesicek & Vojtko (SSRN 5748642)",
       "timeframe": "1H Execution / 1D Trend Filter",
       "indicators": "MACD(12,26,9) 1H & Daily, Price Action Trailing Exit",
       "logic": "Long entry: 1H MACD line crosses above Signal ONLY when Daily MACD is positive. Exit: Trailing stop at prior 4H swing low or structural close below entry.",
@@ -71,7 +71,7 @@
       "id": "ensemble_donchian",
       "name": "Ensemble Donchian + Volatility Target",
       "ssrn_citation": "Zarattini, Pagani & Barbon (SSRN 5209907)",
-      "timeframe": "Daily / Multi-Horizon (5–360 Days)",
+      "timeframe": "Daily / Multi-Horizon (5-360 Days)",
       "indicators": "Ensemble N-day Highs/Lows, 20-day Realized Volatility",
       "logic": "Aggregates breakout signals across multiple lookback windows (5 to 360d). Position size scaled dynamically: Weight = Target_Vol (25%) / Realized_Vol.",
       "performance": "Sharpe: >1.50 | Max Drawdown: ~19% on BTC",
@@ -100,7 +100,7 @@
     {
       "id": "cost_aware_ml",
       "name": "Cost-Aware Alpha Hurdle Filter",
-      "ssrn_citation": "Bysik & Ślepaczuk (SSRN 6795938)",
+      "ssrn_citation": "Bysik & Slepaczuk (SSRN 6795938)",
       "timeframe": "Hourly / Multi-Hour",
       "indicators": "Expected Return Model vs. Round-Trip Taker Fees & Slippage",
       "logic": "Execute long trades ONLY if expected forward return > (Taker Fee + Slippage + Spread + Margin Hurdle). Suppresses churn during flat ranges.",

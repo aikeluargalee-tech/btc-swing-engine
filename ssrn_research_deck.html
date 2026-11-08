@@ -3,54 +3,89 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>SSRN Quantitative Research Deck — BTC Swing Engine</title>
+  <title>SSRN Quantitative Research Deck - BTC Swing Engine</title>
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background-color: #020617;
-      color: #f8fafc;
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            slate: {
+              950: '#020617',
+              900: '#0f172a',
+              800: '#1e293b',
+              700: '#334155'
+            }
+          }
+        }
+      }
     }
-    .font-mono {
-      font-family: 'JetBrains Mono', monospace;
-    }
-  </style>
+  </script>
 </head>
-<body class="p-3 sm:p-6 bg-slate-950 min-h-screen text-slate-100 flex flex-col justify-between">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between p-4 md:p-8 font-sans antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
 
-  <!-- Main Container -->
   <div class="max-w-7xl mx-auto w-full space-y-6">
 
     <!-- Header & Toggle Bar -->
     <header class="p-5 bg-slate-900/80 rounded-2xl border border-slate-800/80 backdrop-blur-md shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
         <div class="flex items-center space-x-2">
-          <span class="px-2.5 py-0.5 rounded text-[11px] font-mono font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 uppercase tracking-wider">Tab [R] Academic Desk</span>
-          <span class="text-xs text-slate-400 font-mono">Peer-Reviewed Empirical Literature</span>
+          <span class="px-2.5 py-0.5 rounded text-[11px] font-mono font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 uppercase tracking-wider">Tab [R] Academic Desk</span>
+          <span class="text-xs text-slate-400 font-mono">Peer-Reviewed Quantitative Research & Live Gating</span>
         </div>
-        <h1 class="text-2xl font-black tracking-tight text-white mt-1">SSRN Quantitative Research Deck</h1>
-        <p class="text-xs text-slate-400 mt-0.5">Empirical market microstructure, factor pricing models, and walk-forward spot strategies on Bitcoin</p>
+        <h1 class="text-2xl font-black tracking-tight text-white mt-1">SSRN Quantitative Cockpit</h1>
+        <p class="text-xs text-slate-400 mt-0.5">Empirical market microstructure, factor pricing models, and walk-forward spot swing gates on Bitcoin</p>
       </div>
 
-      <!-- Segmented Pill Button Toggle -->
+      <!-- Segmented Pill Button Toggle (View B Models is Primary Default) -->
       <div class="flex bg-slate-950/80 p-1.5 rounded-xl border border-slate-800/80 self-start md:self-auto w-full md:w-auto">
-        <button id="btn-domains" onclick="switchView('domains')" class="flex-1 md:flex-none px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm">
-          5 Academic Domains
+        <button id="btn-models" onclick="switchView('models')" class="flex-1 md:flex-none px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm">
+          [PRIMARY] 5 Empirical Models
         </button>
-        <button id="btn-models" onclick="switchView('models')" class="flex-1 md:flex-none px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 text-slate-400 hover:text-slate-200">
-          Empirical Model Deck
+        <button id="btn-domains" onclick="switchView('domains')" class="flex-1 md:flex-none px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 text-slate-400 hover:text-slate-200">
+          5 Academic Domains (Live Telemetry)
         </button>
       </div>
     </header>
 
-    <!-- VIEW A: 5 Academic Domains Grid -->
-    <main id="view-domains" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <!-- Top Executive Strategy Gates & Position Sizing Matrix (Live Cockpit Header) -->
+    <section id="executive-banner" class="p-4 bg-slate-900/90 rounded-2xl border border-cyan-500/30 backdrop-blur-md shadow-xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 font-mono">
+      <div class="p-3 bg-slate-950/70 rounded-xl border border-slate-800/80">
+        <div class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">1. MTF Trend (Mesicek)</div>
+        <div class="mt-1 text-xs font-bold text-red-400 bg-red-950/40 px-2 py-0.5 rounded border border-red-800/50 inline-block">[X] RESTRICTED: HOLD CASH</div>
+        <div class="text-[11px] text-slate-400 mt-1">1D MACD: Negative Whipsaw Veto</div>
+      </div>
+      <div class="p-3 bg-slate-950/70 rounded-xl border border-slate-800/80">
+        <div class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">2. Vol Target (Zarattini)</div>
+        <div class="mt-1 text-xs font-bold text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/50 inline-block">[OK] ALLOC: 64% EQUITY</div>
+        <div class="text-[11px] text-slate-400 mt-1">20D Vol: 39.2% (Tgt: 25.0%)</div>
+      </div>
+      <div class="p-3 bg-slate-950/70 rounded-xl border border-slate-800/80">
+        <div class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">3. 8H ATR Stop (Karassavidis)</div>
+        <div class="mt-1 text-xs font-bold text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-800/50 inline-block">[OK] TRAIL: -$1,667</div>
+        <div class="text-[11px] text-slate-400 mt-1">8H ATR(14): $667 (Buffer: 2.5x)</div>
+      </div>
+      <div class="p-3 bg-slate-950/70 rounded-xl border border-slate-800/80">
+        <div class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">4. Funding Gate (Chan)</div>
+        <div class="mt-1 text-xs font-bold text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800/50 inline-block">[OK] PASS (&lt; 30% CEILING)</div>
+        <div class="text-[11px] text-slate-400 mt-1">Perp Funding: +6.32% Ann.</div>
+      </div>
+      <div class="p-3 bg-slate-950/70 rounded-xl border border-slate-800/80">
+        <div class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">5. Cost Hurdle (Bysik)</div>
+        <div class="mt-1 text-xs font-bold text-amber-400 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-800/50 inline-block">[OK] HURDLE: &gt;= +0.18%</div>
+        <div class="text-[11px] text-slate-400 mt-1">Fee Hurdle: 18 bps round-trip</div>
+      </div>
+    </section>
+
+    <!-- VIEW B: Empirical Operational Models List (PRIMARY DEFAULT) -->
+    <main id="view-models" class="space-y-4">
       <!-- Populated dynamically -->
     </main>
 
-    <!-- VIEW B: Empirical Operational Models List -->
-    <main id="view-models" class="hidden space-y-4">
+    <!-- VIEW A: 5 Academic Domains Grid (LIVE TELEMETRY) -->
+    <main id="view-domains" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       <!-- Populated dynamically -->
     </main>
 
@@ -68,36 +103,71 @@
         {
           "id": "microstructure",
           "title": "01. Market Microstructure & Order Flow",
-          "core_metrics": ["Order Book Imbalance (OBI)", "Cumulative Volume Delta (CVD)", "Spread Dynamics"],
-          "key_finding": "Multi-level book depth imbalance has statistically significant predictive power for short-horizon mid-price jumps; Level 1 top-of-book is contaminated by spoofing noise.",
+          "live_val": "OBI: +4.8% | 4H CVD: -142.5 BTC",
+          "live_badge": "[OK] ABSORPTION DETECTED",
+          "live_badge_color": "text-emerald-400 bg-emerald-950/40 border-emerald-800/50",
+          "submetrics": [
+            "Order Book Imbalance (OBI): +4.8%",
+            "4H Spot CVD Delta: -142.5 BTC",
+            "L2 Depth Spoofing Noise Gate: ACTIVE",
+            "Aggressor Flow Initiator: ABSORPTION"
+          ],
           "spot_swing_role": "Confirms limit-order absorption at 4H/1D swing lows prior to triggering long spot entries."
         },
         {
           "id": "momentum",
           "title": "02. Time-Series Momentum & Technical Rules",
-          "core_metrics": ["Variable Moving Averages (VMA)", "Time-Series Momentum (TSMOM)", "Breakout Ensembles"],
-          "key_finding": "Single lookback moving averages suffer rapid alpha decay; higher-timeframe trend filters prevent whipsaws and preserve capital by holding cash in macro bear regimes.",
+          "live_val": "1D: BEAR | 4H: CHOP | 1H: BEAR CHOP",
+          "live_badge": "[X] RESTRICTED (HOLD CASH)",
+          "live_badge_color": "text-red-400 bg-red-950/40 border-red-800/50",
+          "submetrics": [
+            "1D Macro Regime: BEAR (Close < EMA50 < EMA200)",
+            "4H Tactical Alignment: CHOP / CONSOLIDATION",
+            "1H MACD Line: -180 vs Sig: -210",
+            "Whipsaw Capital Defense: ARMED"
+          ],
           "spot_swing_role": "Primary trend engine. Enforces 100% cash/stablecoin allocation when higher-timeframe momentum is negative."
         },
         {
           "id": "factors",
           "title": "03. Systematic Factor Pricing (Liu-Tsyvinski)",
-          "core_metrics": ["Crypto Market Factor (MKT_crypto)", "Size/Illiquidity Premium", "Downside Risk Semi-Variance"],
-          "key_finding": "Bitcoin carries the primary systemic market beta; returns exhibit fat-tailed positive skewness during bull expansions and downside volatility clustering during liquidations.",
+          "live_val": "Var: 0.1537 | 20D Skew: -0.15",
+          "live_badge": "[OK] SYSTEMIC BETA: 1.00x",
+          "live_badge_color": "text-cyan-400 bg-cyan-950/40 border-cyan-800/50",
+          "submetrics": [
+            "20D Annualized Volatility: 39.2% (Target: 25.0%)",
+            "Realized Variance (Var): 0.1537",
+            "Return Skewness: -0.15 (Fat-Tailed Distribution)",
+            "MKT_crypto Systematic Load: 1.00x"
+          ],
           "spot_swing_role": "Normalizes position risk against aggregate crypto market volatility; prevents over-allocation during volatility spikes."
         },
         {
           "id": "onchain",
           "title": "04. On-Chain Structural Metrics",
-          "core_metrics": ["MVRV Ratio", "Spent Output Profit Ratio (SOPR)", "Entity-Adjusted Realized Price"],
-          "key_finding": "MVRV < 1.0 identifies generational macro accumulation; SOPR retests of 1.0 act as structural support during secular bull trends.",
+          "live_val": "MVRV: 1.63 | SOPR: 1.02",
+          "live_badge": "[OK] STRUCTURAL EXPANSION",
+          "live_badge_color": "text-emerald-400 bg-emerald-950/40 border-emerald-800/50",
+          "submetrics": [
+            "MVRV Ratio: 1.63 (Floor <1.0 | Top >3.5)",
+            "SOPR Level: 1.02 (Bull Support Retest >= 1.0)",
+            "Estimated Cost Basis: $46,500",
+            "Generational Floor Anchor: $46,500"
+          ],
           "spot_swing_role": "Macro floor/ceiling filter to prevent buying into exhausted on-chain distribution regimes."
         },
         {
           "id": "ml_sentiment",
           "title": "05. Alternative Data & Machine Learning Hurdles",
-          "core_metrics": ["Search Volume Index (SVI)", "Cost-Aware Gradient Boosted Trees", "Regime Classifiers"],
-          "key_finding": "Direct price regression models consistently overfit; directional classification conditioned on transaction cost hurdles preserves real-world alpha.",
+          "live_val": "Hurdle: 18 bps (+0.18%) | Min Edge: >= +0.36%",
+          "live_badge": "[OK] CHOP FILTER ACTIVE",
+          "live_badge_color": "text-amber-400 bg-amber-950/40 border-amber-800/50",
+          "submetrics": [
+            "Round-Trip Taker Friction: 18 bps (+0.18%)",
+            "Required Forward Edge (2x Cost): >= +0.36%",
+            "Friction Drag Churn Filter: ACTIVE",
+            "Classification vs Regression Gate: ENFORCED"
+          ],
           "spot_swing_role": "Binary execution filter: signal magnitude must exceed 2x round-trip trading friction (fees + slippage + spread) before firing."
         }
       ],
@@ -105,52 +175,57 @@
         {
           "id": "mtf_macd",
           "name": "Multi-Timeframe Trend Following",
-          "ssrn_citation": "Mesíček & Vojtko (SSRN 5748642)",
+          "ssrn_citation": "Mesicek & Vojtko (SSRN 5748642)",
           "timeframe": "1H Execution / 1D Trend Filter",
-          "indicators": "MACD(12,26,9) 1H & Daily, Price Action Trailing Exit",
           "logic": "Long entry: 1H MACD line crosses above Signal ONLY when Daily MACD is positive. Exit: Trailing stop at prior 4H swing low or structural close below entry.",
           "performance": "Sharpe: 1.07 | Max Drawdown: -12.4% (vs -80% Buy & Hold)",
-          "live_rule": "1D MACD must be Bullish to permit 1H long entries"
+          "live_status": "[X] RESTRICTED: HOLD CASH",
+          "live_badge_color": "text-red-400 bg-red-950/40 border-red-800/50",
+          "live_value": "1D MACD: -1522 / -1220 | 1H MACD: -180 / -210"
         },
         {
           "id": "ensemble_donchian",
           "name": "Ensemble Donchian + Volatility Target",
           "ssrn_citation": "Zarattini, Pagani & Barbon (SSRN 5209907)",
-          "timeframe": "Daily / Multi-Horizon (5–360 Days)",
-          "indicators": "Ensemble N-day Highs/Lows, 20-day Realized Volatility",
+          "timeframe": "Daily / Multi-Horizon (5-360 Days)",
           "logic": "Aggregates breakout signals across multiple lookback windows (5 to 360d). Position size scaled dynamically: Weight = Target_Vol (25%) / Realized_Vol.",
           "performance": "Sharpe: >1.50 | Max Drawdown: ~19% on BTC",
-          "live_rule": "Scale position inversely to 20-Day Annualized Volatility"
+          "live_status": "[OK] ALLOC: 64% EQUITY",
+          "live_badge_color": "text-emerald-400 bg-emerald-950/40 border-emerald-800/50",
+          "live_value": "20D Realized Vol: 39.2% | Target Vol: 25.0%"
         },
         {
           "id": "vol_adaptive_8h",
           "name": "Volatility-Adaptive Multi-Horizon Trend",
           "ssrn_citation": "Karassavidis et al. (SSRN 5821842)",
           "timeframe": "8-Hour Candles",
-          "indicators": "Multi-horizon MA, Multi-timeframe RSI, ATR Risk Trailing",
           "logic": "Trend identified across 8H MA slope + RSI momentum filter. Dynamic position sizing and stop placement pegged to multiples of 14-period ATR.",
           "performance": "Sharpe: 1.54 | CAGR: ~20% | Max Drawdown: ~12.5%",
-          "live_rule": "Peg trailing stop distance to 2.5x 14-Period ATR"
+          "live_status": "[OK] TRAIL: -$1,667",
+          "live_badge_color": "text-cyan-400 bg-cyan-950/40 border-cyan-800/50",
+          "live_value": "8H ATR(14): $667 | Trailing Stop Buffer: -$1,667"
         },
         {
           "id": "funding_carry_filter",
           "name": "Funding Rate Exhaustion Gate",
           "ssrn_citation": "Chan (SSRN 5292305)",
           "timeframe": "8H Funding Settlement Intervals",
-          "indicators": "Perpetual Funding Rate Percentile, Annualized Basis",
           "logic": "Spot swing risk gate: When annualized perpetual funding rate exceeds +30% (extreme retail leverage), freeze new spot swing entries to avoid long liquidation cascades.",
           "performance": "Regime Protection: Filters out severe local market tops and leverage flushes",
-          "live_rule": "Freeze new longs when Annualized Funding > +30.0%"
+          "live_status": "[OK] PASS (< 30% CEILING)",
+          "live_badge_color": "text-emerald-400 bg-emerald-950/40 border-emerald-800/50",
+          "live_value": "Perp Funding: +6.32% Ann. | Ceiling: 30.0%"
         },
         {
           "id": "cost_aware_ml",
           "name": "Cost-Aware Alpha Hurdle Filter",
-          "ssrn_citation": "Bysik & Ślepaczuk (SSRN 6795938)",
+          "ssrn_citation": "Bysik & Slepaczuk (SSRN 6795938)",
           "timeframe": "Hourly / Multi-Hour",
-          "indicators": "Expected Return Model vs. Round-Trip Taker Fees & Slippage",
           "logic": "Execute long trades ONLY if expected forward return > (Taker Fee + Slippage + Spread + Margin Hurdle). Suppresses churn during flat ranges.",
           "performance": "Sharpe: >1.0 | Eliminates overtrading fee drag",
-          "live_rule": "Required minimum forward target: >= +0.18% (18 bps)"
+          "live_status": "[OK] HURDLE: >= +0.18%",
+          "live_badge_color": "text-amber-400 bg-amber-950/40 border-amber-800/50",
+          "live_value": "Fee Hurdle: 18 bps round-trip | Min Edge: >= +0.36%"
         }
       ]
     };
@@ -160,14 +235,23 @@
       container.innerHTML = registryData.domains.map(d => `
         <div class="p-5 bg-slate-900/70 rounded-xl border border-slate-800 hover:border-slate-700 transition duration-150 flex flex-col justify-between shadow-lg">
           <div>
-            <h3 class="text-sm font-bold text-amber-400 mb-2.5">${d.title}</h3>
-            <div class="flex flex-wrap gap-1.5 mb-3">
-              ${d.core_metrics.map(m => `<span class="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-950/60 text-cyan-300 border border-cyan-800/50">${m}</span>`).join('')}
+            <div class="flex items-center justify-between gap-2 mb-2">
+              <h3 class="text-sm font-bold text-amber-400">${d.title}</h3>
+              <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${d.live_badge_color}">${d.live_badge}</span>
             </div>
-            <p class="text-xs text-slate-300 leading-relaxed mb-4">${d.key_finding}</p>
+            
+            <!-- Live Telemetry Banner -->
+            <div class="p-2.5 bg-slate-950/80 rounded-lg border border-slate-800/80 font-mono text-xs text-cyan-300 font-bold mb-3">
+              ${d.live_val}
+            </div>
+
+            <!-- Submetrics -->
+            <ul class="text-[11px] text-slate-400 font-mono space-y-1 mb-4 pl-1">
+              ${d.submetrics.map(s => `<li>• ${s}</li>`).join('')}
+            </ul>
           </div>
           <div class="text-[11px] font-mono text-emerald-400 bg-emerald-950/40 p-2.5 rounded-lg border border-emerald-900/50">
-            <span class="font-bold text-emerald-200">Spot Swing Application:</span> ${d.spot_swing_role}
+            <span class="font-bold text-emerald-200">Spot Swing Law:</span> ${d.spot_swing_role}
           </div>
         </div>
       `).join('');
@@ -180,15 +264,16 @@
           <div class="space-y-1.5 lg:w-3/5">
             <div class="flex items-center space-x-2.5 flex-wrap gap-y-1">
               <span class="text-base font-bold text-white">${m.name}</span>
-              <span class="text-[11px] font-mono bg-amber-500/20 text-amber-300 px-2.5 py-0.5 rounded border border-amber-500/30">${m.timeframe}</span>
+              <span class="text-[11px] font-mono bg-cyan-500/20 text-cyan-300 px-2.5 py-0.5 rounded border border-cyan-500/30">${m.timeframe}</span>
             </div>
             <p class="text-xs text-slate-400 font-mono">${m.ssrn_citation}</p>
             <p class="text-xs text-slate-300 pt-1 leading-relaxed"><span class="text-slate-500 font-semibold uppercase">Rule Logic:</span> ${m.logic}</p>
-            <p class="text-[11px] font-mono text-emerald-400 pt-0.5"><span class="text-slate-500">Live Guardrail:</span> ${m.live_rule}</p>
+            <p class="text-xs text-slate-400"><span class="text-slate-500 font-semibold uppercase">Empirical Benchmark:</span> <span class="text-emerald-400 font-mono font-bold">${m.performance}</span></p>
           </div>
-          <div class="lg:w-2/5 w-full flex flex-col justify-center bg-slate-950/90 p-4 rounded-xl border border-slate-800/80">
-            <span class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Empirical Performance Benchmark</span>
-            <span class="text-sm font-mono font-bold text-cyan-400 mt-1">${m.performance}</span>
+          <div class="lg:w-2/5 w-full flex flex-col justify-center bg-slate-950/90 p-4 rounded-xl border border-slate-800/80 font-mono">
+            <div class="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">Live Quantitative Action State</div>
+            <div class="text-sm font-bold px-2.5 py-1 rounded border inline-block ${m.live_badge_color} mb-1.5">${m.live_status}</div>
+            <div class="text-xs text-slate-300">${m.live_value}</div>
           </div>
         </div>
       `).join('');
@@ -211,6 +296,7 @@
     document.addEventListener('DOMContentLoaded', () => {
       renderDomains();
       renderModels();
+      switchView('models');
     });
   </script>
 </body>

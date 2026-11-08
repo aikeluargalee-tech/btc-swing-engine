@@ -122,7 +122,7 @@ class StateStore:
         self.protocol_dossier: Optional[Dict[str, Any]] = None
         self.grok_quant_evaluation: Optional[GrokQuantEvaluation] = None
         self.ssrn_alpha_evaluation: Optional[SSRNAlphaEvaluation] = None
-        self.ssrn_view_mode: str = "domains"
+        self.ssrn_view_mode: str = "models"
 
         # --- Connection & System Health ---
         self.warmup_complete: bool = False

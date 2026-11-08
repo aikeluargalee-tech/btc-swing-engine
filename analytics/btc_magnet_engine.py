@@ -1,4 +1,4 @@
-"""BTC Magnet — Mechanics-First Liquidation Gravity & Swing Edge Detector Engine.
+"""BTC Magnet - Mechanics-First Liquidation Gravity & Swing Edge Detector Engine.
 
 Implements the locked product definition, speaking rules, and status templates
 from the BTC Magnet handoff specification (docs/one-pager.md, docs/speaking-rules.md,
@@ -7,7 +7,7 @@ docs/status-templates.md).
 Answers one question only:
   "What is currently pulling Bitcoin, and is there a clear swing edge or not?"
 
-Defaults to "No clear edge — wait." and only speaks when strict internal conditions align.
+Defaults to "No clear edge - wait." and only speaks when strict internal conditions align.
 """
 
 import json
@@ -118,7 +118,7 @@ class BTCMagnetEngine:
         )
 
         passed_count = sum(1 for r in rule_checks if r.passed)
-        verdict_badge = "SWING EDGE PRESENT" if verdict == "SPEAK" else "NO CLEAR EDGE — WAIT"
+        verdict_badge = "SWING EDGE PRESENT" if verdict == "SPEAK" else "NO CLEAR EDGE - WAIT"
 
         # 8. Build Markdown Brief
         summary_md = self._build_markdown_brief(
@@ -322,22 +322,22 @@ class BTCMagnetEngine:
             verdict = "SPEAK"
             headline = f"Strong magnet above at ${upper.price:,.0f}."
             body = f"Short liquidations clustered (${upper.usd_volume/1e6:.0f}M), OI rising, funding elevated. Range regime. Spot flow supportive. Watch for sweep."
-            rule_subtitle = f"Locked Pattern: Range Regime · Magnet Above ({upper.dist_pct:+.1f}%)"
+            rule_subtitle = f"Locked Pattern: Range Regime | Magnet Above ({upper.dist_pct:+.1f}%)"
         elif cond7 and target_side == "BELOW" and regime == "Range":
             verdict = "SPEAK"
             headline = f"Strong magnet below at ${lower.price:,.0f}."
             body = f"Long liquidations clustered (${lower.usd_volume/1e6:.0f}M), OI rising, funding elevated. Range regime. Spot flow supportive. Watch for sweep."
-            rule_subtitle = f"Locked Pattern: Range Regime · Magnet Below ({lower.dist_pct:+.1f}%)"
+            rule_subtitle = f"Locked Pattern: Range Regime | Magnet Below ({lower.dist_pct:+.1f}%)"
         elif cond7 and (regime in ("TrendUp", "TrendDown")):
             verdict = "SPEAK"
             headline = f"Magnet at ${target_magnet.price:,.0f} aligns with trend."
-            body = f"OI and funding confirm. Structure supportive. Edge present — monitor for entry zone."
+            body = f"OI and funding confirm. Structure supportive. Edge present - monitor for entry zone."
             rule_subtitle = f"Locked Pattern: Trend-Aligned Acceleration ({regime})"
         else:
             verdict = "WAIT"
-            headline = "No clear edge — wait."
+            headline = "No clear edge - wait."
             if cond1:
-                body = f"Magnet present at ${target_magnet.price:,.0f} but conditions incomplete. No clear edge — wait."
+                body = f"Magnet present at ${target_magnet.price:,.0f} but conditions incomplete. No clear edge - wait."
             else:
                 body = "Liquidation density dispersed. No high-probability gravitational pull. Default to cash."
             rule_subtitle = "Locked Principle: The engine spends most days correctly saying 'wait.'"
@@ -364,15 +364,15 @@ class BTCMagnetEngine:
     ) -> str:
         """Constructs shareable clipboard text and AI packet section."""
         lines = [
-            "# BTC MAGNET · LIQUIDATION GRAVITY & SWING EDGE READOUT",
+            "# BTC MAGNET | LIQUIDATION GRAVITY & SWING EDGE READOUT",
             f"**Timestamp:** `{now_utc}`",
             f"**Spot Price:** `${spot_price:,.2f}` (`{price_change_24h:+.2f}% 24h`)  |  **Regime:** `{regime}`",
             f"**Perpetual Funding:** `{funding_ann:+.1f}%/yr`  |  **4h OI Velocity:** `{oi_delta:+.1f}%`",
             "",
             "## 1. LIQUIDATION GRAVITATIONAL HORIZON",
-            f"- **Upper Magnet (Short Liquidations):** `${upper.price:,.0f}` (`{upper.dist_pct:+.1f}%` / `+${upper.price - spot_price:,.0f}`) — `${upper.usd_volume/1e6:.1f}M` cluster",
+            f"- **Upper Magnet (Short Liquidations):** `${upper.price:,.0f}` (`{upper.dist_pct:+.1f}%` / `+${upper.price - spot_price:,.0f}`) - `${upper.usd_volume/1e6:.1f}M` cluster",
             f"- **Center Spot Horizon:** `${spot_price:,.2f}`",
-            f"- **Lower Support (Long Liquidations):** `${lower.price:,.0f}` (`{lower.dist_pct:+.1f}%` / `-${spot_price - lower.price:,.0f}`) — `${lower.usd_volume/1e6:.1f}M` cluster",
+            f"- **Lower Support (Long Liquidations):** `${lower.price:,.0f}` (`{lower.dist_pct:+.1f}%` / `-${spot_price - lower.price:,.0f}`) - `${lower.usd_volume/1e6:.1f}M` cluster",
             f"- **Dominant Pull:** `{pull_dir}` (Upper-to-Lower liquidity ratio: `{pull_ratio:.2f}x`)",
             "",
             f"## 2. MECHANICAL VERDICT: [{verdict}]",

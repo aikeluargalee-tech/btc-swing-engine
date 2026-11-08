@@ -545,16 +545,16 @@ def build_tab_l_data_only_report(config: Optional[EngineConfig], store: StateSto
     sw = getattr(store, "spot_swing_evaluation", None)
 
     lines = [
-        "# TAB [L: MASTER] | 9-FLAGSHIP DESK DATA-ONLY METRICS REPORT",
+        "# TAB [L: MASTER] | 8-FLAGSHIP DESK DATA-ONLY METRICS REPORT",
         f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (MYT):** `{ts_myt}`",
         f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}`",
-        "**Desk Purpose & Scope:** `Single-screen 9-Flagship-Desk Telemetry Matrix (P, B, G, R, M, A, F, W, 0) & 4-Domain Readiness Overview. Keeps each strategy's reference entry, stop, and sizing calculations strictly unblended.`",
+        "**Desk Purpose & Scope:** `Single-screen 8-Flagship-Desk Telemetry Matrix (P, G, R, M, A, F, W, 0) & 4-Domain Readiness Overview. Keeps each strategy's reference entry, stop, and sizing calculations strictly unblended.`",
         "",
-        "## 1. 9-FLAGSHIP TOP-RIBBON DESK READINESS METRICS (`P, B, G, R, M, A, F, W, 0`)",
+        "## 1. 8-FLAGSHIP TOP-RIBBON DESK READINESS METRICS (`P, G, R, M, A, F, W, 0`)",
     ]
     if ms is not None:
         lines.extend([
-            f"- **9-Desk Readiness Index (`0.0 - 100.0`):** `{ms.master_alignment_score:.1f}`",
+            f"- **8-Desk Readiness Index (`0.0 - 100.0`):** `{ms.master_alignment_score:.1f}`",
             f"- **Readiness Index >= 70.0:** `{bool(ms.master_alignment_score >= 70.0)}`",
             f"- **Hard Veto Active Across Desks:** `{bool(ms.supreme_veto_active)}`",
             "",
@@ -571,7 +571,7 @@ def build_tab_l_data_only_report(config: Optional[EngineConfig], store: StateSto
             )
         lines.extend([
             "",
-            "## 3. 9-FLAGSHIP DESK TELEMETRY MATRIX (`P, B, G, R, M, A, F, W, 0`)",
+            "## 3. 8-FLAGSHIP DESK TELEMETRY MATRIX (`P, G, R, M, A, F, W, 0`)",
         ])
         for r in getattr(ms, "tab_rows", []) or []:
             r_name = getattr(r, "tab_name", "Desk")
@@ -653,10 +653,6 @@ def build_global_data_only_packet(config: Optional[EngineConfig], store: StateSt
         "---",
         "",
         build_tab_p_data_only_report(cfg, store),
-        "",
-        "---",
-        "",
-        build_tab_b_data_only_report(cfg, store),
         "",
         "---",
         "",
@@ -754,7 +750,6 @@ def copy_tab_data_only_report_to_clipboard(
     cfg = config or DEFAULT_CONFIG
     dispatch: Dict[int, Tuple[str, str]] = {
         13: (build_tab_p_data_only_report(cfg, store), "btc_structure_latest.md"),
-        14: (build_tab_b_data_only_report(cfg, store), "btc_patterns_latest.md"),
         15: (build_tab_g_data_only_report(cfg, store), "grok_master_prompt_latest.md"),
         16: (build_tab_r_data_only_report(cfg, store), "ssrn_research_brief_latest.md"),
         17: (build_tab_m_data_only_report(cfg, store), "btc_magnet_latest.md"),

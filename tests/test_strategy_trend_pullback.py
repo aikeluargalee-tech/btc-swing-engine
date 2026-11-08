@@ -748,7 +748,6 @@ def test_24_all_tabs_and_global_ai_packet_data_only_acceptance() -> None:
         build_global_data_only_packet,
         build_tab_0_data_only_report,
         build_tab_a_data_only_report,
-        build_tab_b_data_only_report,
         build_tab_f_data_only_report,
         build_tab_g_data_only_report,
         build_tab_l_data_only_report,
@@ -772,7 +771,6 @@ def test_24_all_tabs_and_global_ai_packet_data_only_acceptance() -> None:
 
     builders = [
         ("Tab P", build_tab_p_data_only_report),
-        ("Tab B", build_tab_b_data_only_report),
         ("Tab G", build_tab_g_data_only_report),
         ("Tab R", build_tab_r_data_only_report),
         ("Tab M", build_tab_m_data_only_report),

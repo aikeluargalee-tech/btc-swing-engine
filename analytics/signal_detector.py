@@ -37,7 +37,6 @@ from .sweep_retest_fsm import (
     SweepInstance,
     SweepRetestFSM,
 )
-from .pattern_detector import PatternEngine
 from .slsp_engine import SLSPEngine
 from .grok_quant_engine import GrokQuantEngine
 from .ssrn_research_engine import SSRNResearchEngine
@@ -64,7 +63,6 @@ class SignalDetector:
         self.trap_engine = TrapEngine(config)
         self.exhaustion_engine = ExhaustionEngine(config)
         self.ema_strategy_engine = EMAStrategyEngine(config)
-        self.pattern_engine = PatternEngine(config)
         self.slsp_engine = SLSPEngine(config, read_only=True)
         self.grok_engine = GrokQuantEngine()
         self.ssrn_engine = SSRNResearchEngine(config)
@@ -376,15 +374,6 @@ class SignalDetector:
         except Exception:
             logging.getLogger("slsp").exception("Tab [13] SLSP evaluation failed")
 
-        # 2g. Evaluate Geometric Chart Patterns & Candlestick Structure
-        try:
-            self.pattern_engine.evaluate(
-                store=store,
-                spot_1h=spot_1h,
-                spot_4h=bars_4h,
-            )
-        except Exception:
-            logging.getLogger("pattern").exception("Pattern geometry evaluation failed")
 
         # 2h. Evaluate Tab [15: G]: Grok Dual-Horizon Flow & VWAP SD Matrix
         try:

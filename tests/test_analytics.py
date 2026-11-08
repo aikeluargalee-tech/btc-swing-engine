@@ -427,7 +427,7 @@ class TestBTCAnalyticsEngine(unittest.TestCase):
         msev = store.master_synthesis_evaluation
         self.assertIsNotNone(msev)
         assert msev is not None
-        self.assertEqual(len(msev.tab_rows), 9)
+        self.assertEqual(len(msev.tab_rows), 8)
         self.assertEqual(len(msev.hierarchy_rows), 4)
         self.assertGreaterEqual(msev.master_alignment_score, 0.0)
         self.assertLessEqual(msev.master_alignment_score, 100.0)

@@ -157,11 +157,6 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         if active_tab == 13
         else "[dim white][P: STRUCTURE][/dim white]"
     )
-    tB = (
-        "[bold black on bright_cyan] [B: PATTERNS] [/bold black on bright_cyan]"
-        if active_tab == 14
-        else "[dim white][B: PATTERNS][/dim white]"
-    )
     tF = (
         "[bold black on bright_cyan] [F: FOOTPRINT] [/bold black on bright_cyan]"
         if active_tab == 11
@@ -219,7 +214,6 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         7: "7: PATTERNS & HARMONICS [B]",
         8: "8: SFP LIQ TRAP",
         9: "9: TD EXHAUSTION",
-        14: "14: PATTERNS & CHART",
         15: "15: GROK QUANT FLOW [G]",
         16: "16: SSRN RESEARCH [R]",
         17: "17: BTC MAGNET [M]",
@@ -239,13 +233,13 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
     nav_grid.add_column(justify="right", no_wrap=True)
     nav_grid.add_row(
         f"[bold white]BTC-USD[/bold white] | Spot: [bold cyan]${spot_px:,.2f}[/bold cyan] | Regime: {regime_str} ({score_str}) | Feeds: Spot {spot_ws_dot} • Perp {perp_ws_dot} • CB {cb_ws_dot}",
-        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: P Structure • B Patterns • G Grok Flow • R SSRN Research • M Magnet • A Strategy • F Footprint • W Waterfall • 0 Screener • L Master • C Packet • H Guide[/dim]",
+        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: P Structure • G Grok Flow • R SSRN Research • M Magnet • A Strategy • F Footprint • W Waterfall • 0 Screener • L Master • C Packet • H Guide[/dim]",
     )
 
     tab_grid = Table.grid(expand=True)
     tab_grid.add_column(justify="left", no_wrap=True)
     tab_grid.add_row(
-        f"{tP}  {tB}  {tG}  {tR}  {tM}  {tA}  {tF}  {tW}  {t0}  {tL}  │  {tC}  {tH}{subdesk_info}"
+        f"{tP}  {tG}  {tR}  {tM}  {tA}  {tF}  {tW}  {t0}  {tL}  │  {tC}  {tH}{subdesk_info}"
     )
     nav_panel = Panel(Group(nav_grid, tab_grid), border_style="bright_blue", box=box.ROUNDED, padding=(0, 1))
 
@@ -1771,13 +1765,13 @@ def _layer_status_badge(status: str) -> str:
 
 
 def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> Group:
-    """Renders Tab [L]: 9-Flagship Top-Ribbon Command Matrix ([P, B, G, R, M, A, F, W, 0])."""
+    """Renders Tab [L]: 8-Flagship Top-Ribbon Command Matrix ([P, G, R, M, A, F, W, 0])."""
     msev = store.master_synthesis_evaluation
     if msev is None:
         return Group(
             header_panel,
             Panel(
-                "Warming up 9-Flagship Top-Ribbon Command Matrix...",
+                "Warming up 8-Flagship Top-Ribbon Command Matrix...",
                 title="Tab [L]: Master Conclusion",
                 box=box.ROUNDED,
             ),
@@ -1785,12 +1779,12 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
 
     # --- Short Introduction & Purpose Banner ---
     intro_lines = [
-        "[bold cyan]▶ PURPOSE OF TAB [L: MASTER]:[/bold cyan] Single-screen [bold yellow]9-Flagship Top-Ribbon Command Matrix ([P, B, G, R, M, A, F, W, 0])[/bold yellow] — see all 9 primary desks at a glance without flipping through 9 tabs.",
-        "[bold cyan]▶ STRICT NON-BLENDING RULE:[/bold cyan] Groups the 9 desks into [bold magenta]4 Orthogonal Domains[/bold magenta] (D1 Crash/Veto Guards • D2 1D/4H Trend • D3 Shelves/Magnets • D4 Flow/Triggers) and lists each strategy's [bold green]exact, unblended reference entry/stop/size[/bold green] in Panel 4.",
+        "[bold cyan]▶ PURPOSE OF TAB [L: MASTER]:[/bold cyan] Single-screen [bold yellow]8-Flagship Top-Ribbon Command Matrix ([P, G, R, M, A, F, W, 0])[/bold yellow] — see all 8 primary desks at a glance without flipping through tabs.",
+        "[bold cyan]▶ STRICT NON-BLENDING RULE:[/bold cyan] Groups the 8 desks into [bold magenta]4 Orthogonal Domains[/bold magenta] (D1 Crash/Veto Guards • D2 1D/4H Trend • D3 Shelves/Magnets • D4 Flow/Triggers) and lists each strategy's [bold green]exact, unblended reference entry/stop/size[/bold green] in Panel 4.",
     ]
     intro_panel = Panel(
         "\n".join(intro_lines),
-        title="[bold cyan]TAB [L: MASTER] · 9-FLAGSHIP DESK COMMAND MATRIX & INDEPENDENT STRATEGY LEDGER[/bold cyan]",
+        title="[bold cyan]TAB [L: MASTER] · 8-FLAGSHIP DESK COMMAND MATRIX & INDEPENDENT STRATEGY LEDGER[/bold cyan]",
         box=box.ROUNDED,
         border_style="cyan",
         padding=(0, 1),
@@ -1829,7 +1823,7 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
         )
 
     p1_footer = (
-        f"[bold white]9-Desk Scoreboard:[/bold white] [bold green]{msev.tabs_green_count} GREEN[/bold green] • "
+        f"[bold white]8-Desk Scoreboard:[/bold white] [bold green]{msev.tabs_green_count} GREEN[/bold green] • "
         f"[bold cyan]{msev.tabs_blue_count} BLUE[/bold cyan] • "
         f"[bold yellow]{msev.tabs_yellow_count} YELLOW[/bold yellow] • "
         f"[bold red]{msev.tabs_red_count} RED[/bold red]  |  "
@@ -1981,18 +1975,18 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
         )
     else:
         copy_btn_badge = (
-            "[bold cyan][Press L again: Copy 9-Desk DATA-ONLY Report -> logs/btc_master_latest.md  |  Press C: Global AI Packet][/bold cyan]"
+            "[bold cyan][Press L again: Copy 8-Desk DATA-ONLY Report -> logs/btc_master_latest.md  |  Press C: Global AI Packet][/bold cyan]"
         )
 
     p5_lines = [
         f"{headline}  {copy_btn_badge}",
-        f"  [bold white]9-Desk Summary  :[/bold white] {msev.master_what_is_happening}",
+        f"  [bold white]8-Desk Summary  :[/bold white] {msev.master_what_is_happening}",
         f"  [bold white]Domain Diagnostic:[/bold white] {msev.master_why_resolution}",
         f"  [bold white]Operator Summary :[/bold white] [bold]{msev.master_final_command}[/bold]",
     ]
     bottom_panel = Panel(
         "\n".join(p5_lines),
-        title="[bold white]5. Executive Bottom Line — 9-Flagship Desk Command Matrix (Screen: Operator View • Double-Tap L: DATA-ONLY Clipboard)[/bold white]",
+        title="[bold white]5. Executive Bottom Line — 8-Flagship Desk Command Matrix (Screen: Operator View • Double-Tap L: DATA-ONLY Clipboard)[/bold white]",
         border_style=border_style,
         box=box.ROUNDED,
     )
@@ -4652,9 +4646,9 @@ def _build_help_overlay(store: StateStore, header_panel: Panel) -> Group:
             ]
         ),
         10: (
-            "DESK [L: MASTER COMMAND] — Supreme 9-Desk Rollup & Capital Allocation Verdict",
+            "DESK [L: MASTER COMMAND] — Supreme 8-Desk Rollup & Capital Allocation Verdict",
             [
-                "[bold bright_cyan]1. 9-Desk Rollup Matrix:[/bold bright_cyan] Harmonizes signals across all specialist quant algorithms into one synchronized dashboard.",
+                "[bold bright_cyan]1. 8-Desk Rollup Matrix:[/bold bright_cyan] Harmonizes signals across all specialist quant algorithms into one synchronized dashboard.",
                 "[bold bright_yellow]2. 4-Layer Decision Funnel:[/bold bright_yellow] L1 Hard Veto -> L2 Macro Risk -> L3 Position Sizing -> L4 Tactical Entry Timing.",
                 "[bold bright_green]3. The Supreme Signal Lights:[/bold bright_green]",
                 "   • [bold green]GREEN (Full Aggression):[/bold green] High multi-desk confluence (100% target position size).",
@@ -5730,8 +5724,6 @@ def build_dashboard_renderable(
             active_tab = 17
         elif str(tab_override).lower() in ("a", "k", "strategy", "trend_pullback", "btc_strategy", "18"):
             active_tab = 18
-        elif str(tab_override).lower() in ("b", "pattern", "patterns", "chart", "14"):
-            active_tab = 14
         elif str(tab_override).lower() in ("l", "master", "10"):
             active_tab = 10
         elif str(tab_override).lower() in ("w", "waterfall", "wf", "12"):
@@ -5836,7 +5828,7 @@ def print_dry_run_report(
             17: "TAB [M: BTC MAGNET · LIQUIDATION GRAVITY DECK]",
             18: "TAB [A: BTC TREND-PULLBACK v1.0 · RESEARCH / PAPER MODE]",
         }
-        for t in (0, 18, 17, 16, 15, 12, 11, 14, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13):
+        for t in (0, 18, 17, 16, 15, 12, 11, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13):
             title = tab_titles.get(t, f"TAB [{t}]")
             console.print(f"\n[bold cyan]=== VERIFICATION SNAPSHOT: {title} ===[/bold cyan]")
             console.print(build_dashboard_renderable(config, store, tab_override=t))
@@ -5860,8 +5852,6 @@ def print_dry_run_report(
             t_num = 8
         elif tab_lower in ("9", "s5", "e", "exhaust", "td"):
             t_num = 9
-        elif tab_lower in ("b", "pattern", "patterns", "chart", "14"):
-            t_num = 14
         elif tab_lower in ("g", "grok", "grok_flow", "15"):
             t_num = 15
         elif tab_lower in ("r", "ssrn", "research", "alpha", "16"):
@@ -5928,15 +5918,6 @@ def _poll_keyboard_tab_switch(
                     else:
                         from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
                         copy_tab_data_only_report_to_clipboard(13, config, store)
-                        changed = True
-                elif ch in ("b", "B"):
-                    store.show_help = False
-                    if store.active_tab != 14:
-                        store.active_tab = 14
-                        changed = True
-                    else:
-                        from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
-                        copy_tab_data_only_report_to_clipboard(14, config, store)
                         changed = True
                 elif ch in ("f", "F"):
                     store.show_help = False
@@ -6100,15 +6081,6 @@ def _poll_keyboard_tab_switch(
                     else:
                         from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
                         copy_tab_data_only_report_to_clipboard(12, config, store)
-                        changed = True
-                elif ch in ("b", "B"):
-                    store.show_help = False
-                    if store.active_tab != 14:
-                        store.active_tab = 14
-                        changed = True
-                    else:
-                        from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
-                        copy_tab_data_only_report_to_clipboard(14, config, store)
                         changed = True
                 elif ch in ("f", "F"):
                     if store.active_tab != 11:

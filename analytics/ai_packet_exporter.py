@@ -246,7 +246,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
 
         "   * **SLSP v1.0 Swing Liquidity**: Evaluates 4H/1H Industrial 3-EMA trend regime (`EMA21 > EMA55 > EMA200`), 4H Liquidation Wick Flushes (`>= 45%` lower wick), and climax volume absorption.",
 
-        "13. **Section 14 Audit (`Tab [B] Classic Chart Patterns & Candlestick Geometry`)**:",
+        "13. **Section 14 Audit (`Tab [B] - DEPRECATED & PRUNED`)**:",
 
         "   * **Deterministic Pattern Recognition**: Audits 4H macro and 1H tactical patterns (Double Bottom/Top, Head & Shoulders, Bull/Bear Flags, Triangles, Pinbars/Engulfing candles), neckline breakouts, and invalidation floors.",
 
@@ -1895,22 +1895,13 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             "* **Status**: Engine initializing higher-timeframe swing pivots, 4H rejection candles, and liquidation sensor streams.",
         ])
 
-    # --- SECTION 14: TAB [B] CLASSIC CHART PATTERNS & CANDLESTICK GEOMETRY ---
-    pat = getattr(store, "pattern_evaluation", None)
-    top_p = pat.top_pattern if pat else None
+    # --- SECTION 14: TAB [B] DEPRECATED ---
     lines.extend([
         "",
         "---",
         "",
-        "## SECTION 14: TAB [B] CLASSIC CHART PATTERNS & CANDLESTICK GEOMETRY (4H MACRO & 1H BREAKOUT)",
-        "",
-        f"* **Top Geometric Pattern**: `{top_p.pattern if top_p else 'None'}` ({f'{top_p.confidence:.0%}' if top_p else '0%'})",
-        f"* **Pattern Bias**: `{pat.active_bias if pat else 'Neutral'}` | **Trigger State**: `{pat.trigger_status if pat else 'STANDBY'}`",
-        f"* **Neckline Breakout Price**: `{f'${pat.neckline_trigger:,.2f}' if pat and pat.neckline_trigger else 'N/A'}`",
-        f"* **Invalidation Floor/Roof**: `{f'${pat.invalidation_level:,.2f}' if pat and pat.invalidation_level else 'N/A'}`",
-        f"* **Multi-Timeframe Aligned**: `{'YES (4H + 1H CONFLUENCE)' if pat and pat.multi_timeframe_aligned else 'NO (1H ONLY)'}`",
-        f"* **Tactical Playbook**: {pat.tactical_playbook if pat else 'Awaiting geometric setup.'}",
-        "* **Interactive Chart**: `chart.html` (TradingView Lightweight Chart auto-synced)",
+        "## SECTION 14: TAB [B] DEPRECATED (Classical Chart Pattern Detection Removed)",
+        "* **Status**: Pragmatically pruned from engine in favor of quantitative flow, volume profiling, and structural levels.",
     ])
 
     # --- SECTION 15: TAB [G] GROK DUAL-HORIZON FLOW & VWAP SD MATRIX ---
@@ -2118,7 +2109,7 @@ def copy_ai_packet_to_clipboard_and_disk(config: EngineConfig, store: StateStore
                 "multi_timeframe_aligned": pat_ev.multi_timeframe_aligned,
             }
         footprint_metrics = {
-            "pattern_radar": pat_radar_json,
+            "pattern_radar": {"status": "DEPRECATED"},
 
             "order_flow": {
 

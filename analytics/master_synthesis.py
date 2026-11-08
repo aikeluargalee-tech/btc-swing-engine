@@ -87,7 +87,7 @@ class MasterSynthesisEvaluator:
         )
 
         # =====================================================================
-        # 1. BUILD PANEL 1: 9-FLAGSHIP TOP-RIBBON DESK MATRIX (P, B, G, R, M, A, F, W, 0)
+        # 1. BUILD PANEL 1: 8-FLAGSHIP TOP-RIBBON DESK MATRIX (P, G, R, M, A, F, W, 0)
         # =====================================================================
         # --- Desk [P] Structure & SLSP v1.0 (Tab 13) ---
         slsp = getattr(store, "slsp_evaluation", None)
@@ -119,41 +119,6 @@ class MasterSynthesisEvaluator:
             score_or_status=p_status,
             primary_driver=p_driver,
             tab_conclusion=p_conc,
-        )
-
-        # --- Desk [B] Classic Chart Patterns & Geometry (Tab 14) ---
-        pat = getattr(store, "pattern_evaluation", None)
-        tp_pat = getattr(pat, "top_pattern", None) if pat is not None else None
-        if tp_pat is not None:
-            p_name = str(getattr(tp_pat, "pattern", "RANGE_SCAN"))
-            p_tf = str(getattr(tp_pat, "timeframe", "4H"))
-            p_conf = float(getattr(tp_pat, "confidence", 0.0) or 0.0) * 100.0
-            p_neck = float(getattr(tp_pat, "neckline", 0.0) or 0.0)
-            p_dir = str(getattr(tp_pat, "direction", "NEUTRAL")).upper()
-            if "BULL" in p_dir and p_conf >= 65.0:
-                b_light = "GREEN"
-            elif "BEAR" in p_dir and p_conf >= 65.0:
-                b_light = "RED"
-            elif p_conf >= 50.0:
-                b_light = "BLUE"
-            else:
-                b_light = "YELLOW"
-            b_status = f"{p_tf} Fit:{p_conf:.0f}% • MTF:{bool(getattr(pat, 'multi_timeframe_aligned', False))}"
-            b_driver = f"{p_name[:22]} | Neckline ${p_neck:,.0f}"
-            b_conc = f"{p_tf} {p_name[:18]} (Neck ${p_neck:,.0f})"
-        else:
-            b_light = "YELLOW"
-            b_status = "0 ACTIVE PATTERNS"
-            b_driver = "4H / 1H Pivot & Neckline Scan"
-            b_conc = "NO GEOMETRIC BREAKOUT"
-
-        row_b = TabVerdictRow(
-            tab_num=14,
-            tab_name="[B] Patterns",
-            traffic_light=b_light,
-            score_or_status=b_status,
-            primary_driver=b_driver,
-            tab_conclusion=b_conc,
         )
 
         # --- Desk [G] Grok Dual-Horizon Flow & VWAP SD Matrix (Tab 15) ---
@@ -382,7 +347,7 @@ class MasterSynthesisEvaluator:
         )
 
         regime_mult = _CONFIG_MULTIPLIER_MAP.get(active_cfg.code, 0.50)
-        tab_rows = [row_p, row_b, row_g, row_r, row_m, row_a, row_f, row_w, row_0]
+        tab_rows = [row_p, row_g, row_r, row_m, row_a, row_f, row_w, row_0]
         lights = [r.traffic_light for r in tab_rows]
         g_cnt = lights.count("GREEN")
         b_cnt = lights.count("BLUE")
@@ -479,7 +444,7 @@ class MasterSynthesisEvaluator:
             ),
             HierarchyLayerRow(
                 layer_num=3,
-                layer_name="D3: Shelves & Magnets [P,M,B]",
+                layer_name="D3: Shelves & Magnets [P,M]",
                 status=l3_status,
                 authority_rule="SLSP Shelf & Liq Magnets",
                 live_ruling=l3_ruling,
@@ -493,7 +458,7 @@ class MasterSynthesisEvaluator:
             ),
         ]
 
-        # Compute 9-Desk Top-Ribbon Readiness Percentage (0-100%)
+        # Compute 8-Desk Top-Ribbon Readiness Percentage (0-100%)
         desk_pts = {"GREEN": 100.0, "BLUE": 75.0, "YELLOW": 45.0, "RED": 10.0}
         raw_alignment = sum(desk_pts.get(r.traffic_light, 45.0) for r in tab_rows) / max(len(tab_rows), 1)
         if supreme_veto:
@@ -589,7 +554,7 @@ class MasterSynthesisEvaluator:
 
         if not conflict_points:
             conflict_points.append(
-                f"All 9 Top-Ribbon Flagship Desks Synchronized: {g_cnt} Green • {b_cnt} Blue • {y_cnt} Yellow • {r_cnt} Red ({master_alignment_score:.1f}% readiness)."
+                f"All 8 Top-Ribbon Flagship Desks Synchronized: {g_cnt} Green • {b_cnt} Blue • {y_cnt} Yellow • {r_cnt} Red ({master_alignment_score:.1f}% readiness)."
             )
 
         upgrade_catalysts.append(

@@ -28,6 +28,8 @@ FORBIDDEN_WORDS_REPLACEMENTS: Tuple[Tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"verdict", re.IGNORECASE), "status"),
     (re.compile(r"trader", re.IGNORECASE), "participant"),
     (re.compile(r"trade", re.IGNORECASE), "position"),
+    (re.compile(r"awaiting", re.IGNORECASE), "pending"),
+    (re.compile(r"await", re.IGNORECASE), "pending"),
     (re.compile(r"waiting", re.IGNORECASE), "pending"),
     (re.compile(r"wait", re.IGNORECASE), "standby"),
     (re.compile(r"bullish", re.IGNORECASE), "positive_slope"),
@@ -544,6 +546,7 @@ def build_tab_l_data_only_report(config: Optional[EngineConfig], store: StateSto
         "# TAB [L: MASTER] | 9-FLAGSHIP DESK DATA-ONLY METRICS REPORT",
         f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (MYT):** `{ts_myt}`",
         f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}`",
+        "**Desk Purpose & Scope:** `Single-screen 9-Flagship-Desk Telemetry Matrix (P, B, G, R, M, A, F, W, 0) & 4-Domain Readiness Overview. Keeps each strategy's reference entry, stop, and sizing calculations strictly unblended.`",
         "",
         "## 1. 9-FLAGSHIP TOP-RIBBON DESK READINESS METRICS (`P, B, G, R, M, A, F, W, 0`)",
     ]

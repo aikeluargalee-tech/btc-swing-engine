@@ -1783,6 +1783,19 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
             ),
         )
 
+    # --- Short Introduction & Purpose Banner ---
+    intro_lines = [
+        "[bold cyan]▶ PURPOSE OF TAB [L: MASTER]:[/bold cyan] Single-screen [bold yellow]9-Flagship Top-Ribbon Command Matrix ([P, B, G, R, M, A, F, W, 0])[/bold yellow] — see all 9 primary desks at a glance without flipping through 9 tabs.",
+        "[bold cyan]▶ STRICT NON-BLENDING RULE:[/bold cyan] Groups the 9 desks into [bold magenta]4 Orthogonal Domains[/bold magenta] (D1 Crash/Veto Guards • D2 1D/4H Trend • D3 Shelves/Magnets • D4 Flow/Triggers) and lists each strategy's [bold green]exact, unblended reference entry/stop/size[/bold green] in Panel 4.",
+    ]
+    intro_panel = Panel(
+        "\n".join(intro_lines),
+        title="[bold cyan]TAB [L: MASTER] · 9-FLAGSHIP DESK COMMAND MATRIX & INDEPENDENT STRATEGY LEDGER[/bold cyan]",
+        box=box.ROUNDED,
+        border_style="cyan",
+        padding=(0, 1),
+    )
+
     # --- Panel 1: 9-Flagship Top-Ribbon Desk Matrix (P, B, G, R, M, A, F, W, 0) ---
     p1_table = Table(
         box=box.SIMPLE_HEAVY,
@@ -1984,7 +1997,7 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
         box=box.ROUNDED,
     )
 
-    return Group(header_panel, top_row, mid_row, bottom_panel)
+    return Group(header_panel, intro_panel, top_row, mid_row, bottom_panel)
 
 
 # ============================================================================
@@ -2184,7 +2197,7 @@ def _build_tab5_mm_btc_hud(store: StateStore, header_panel: Panel) -> Group:
         box=box.ROUNDED,
     )
 
-    return Group(header_panel, top_row, mid_row, bottom_panel)
+    return Group(header_panel, intro_panel, top_row, mid_row, bottom_panel)
 
 
 # ============================================================================

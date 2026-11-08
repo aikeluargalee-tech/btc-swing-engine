@@ -123,27 +123,29 @@ class MasterSynthesisEvaluator:
 
         # --- Desk [B] Classic Chart Patterns & Geometry (Tab 14) ---
         pat = getattr(store, "pattern_evaluation", None)
-        if pat is not None:
-            top_p = getattr(pat, "primary_pattern", None) or getattr(pat, "active_pattern", None)
-            p_name = str(getattr(top_p, "pattern_name", None) or getattr(pat, "dominant_pattern", "RANGE_SCAN"))
-            p_bias = str(getattr(top_p, "direction", None) or getattr(pat, "overall_bias", "NEUTRAL")).upper()
-            p_score = float(getattr(pat, "confluence_score", 0.0) or getattr(pat, "pattern_score", 50.0) or 50.0)
-            if "BULL" in p_bias and p_score >= 65.0:
+        tp_pat = getattr(pat, "top_pattern", None) if pat is not None else None
+        if tp_pat is not None:
+            p_name = str(getattr(tp_pat, "pattern", "RANGE_SCAN"))
+            p_tf = str(getattr(tp_pat, "timeframe", "4H"))
+            p_conf = float(getattr(tp_pat, "confidence", 0.0) or 0.0) * 100.0
+            p_neck = float(getattr(tp_pat, "neckline", 0.0) or 0.0)
+            p_dir = str(getattr(tp_pat, "direction", "NEUTRAL")).upper()
+            if "BULL" in p_dir and p_conf >= 65.0:
                 b_light = "GREEN"
-            elif "BEAR" in p_bias and p_score >= 65.0:
+            elif "BEAR" in p_dir and p_conf >= 65.0:
                 b_light = "RED"
-            elif "BULL" in p_bias:
+            elif p_conf >= 50.0:
                 b_light = "BLUE"
             else:
                 b_light = "YELLOW"
-            b_status = f"{p_score:.0f}/100 • {p_bias[:8]}"
-            b_driver = f"Pattern: {p_name[:28]}"
-            b_conc = f"{p_name[:22]} ({p_bias[:4]})"
+            b_status = f"{p_tf} Fit:{p_conf:.0f}% • MTF:{bool(getattr(pat, 'multi_timeframe_aligned', False))}"
+            b_driver = f"{p_name[:22]} | Neckline ${p_neck:,.0f}"
+            b_conc = f"{p_tf} {p_name[:18]} (Neck ${p_neck:,.0f})"
         else:
             b_light = "YELLOW"
-            b_status = "GEOMETRY SCAN"
+            b_status = "0 ACTIVE PATTERNS"
             b_driver = "4H / 1H Pivot & Neckline Scan"
-            b_conc = "NO BREAKOUT ARMED"
+            b_conc = "NO GEOMETRIC BREAKOUT"
 
         row_b = TabVerdictRow(
             tab_num=14,
@@ -155,21 +157,24 @@ class MasterSynthesisEvaluator:
         )
 
         # --- Desk [G] Grok Dual-Horizon Flow & VWAP SD Matrix (Tab 15) ---
-        grk = getattr(store, "grok_evaluation", None)
+        grk = getattr(store, "grok_quant_evaluation", None)
         if grk is not None:
-            g_score = float(getattr(grk, "composite_score", 0.0) or getattr(grk, "grok_score", 50.0) or 50.0)
-            vwap_sd = float(getattr(grk, "vwap_zscore", 0.0) or 0.0)
-            if g_score >= 65.0 and flow.w_4h.spot_delta_btc > 0:
+            vwap_px = float(getattr(grk, "vwap_daily", 0.0) or 0.0)
+            vwap_sd = float(getattr(grk, "vwap_stretch_z", 0.0) or 0.0)
+            s_4h = float(getattr(grk, "spot_cvd_4h", flow.w_4h.spot_delta_btc))
+            p_4h = float(getattr(grk, "futures_cvd_4h", flow.w_4h.perp_delta_btc))
+            cpi_pct = float(getattr(grk, "coinbase_premium_pct", deriv.coinbase_premium_pct))
+            if s_4h > 0 and cpi_pct > 0 and -1.5 <= vwap_sd <= 1.5:
                 g_light = "GREEN"
-            elif g_score <= 35.0:
+            elif s_4h < 0 and vwap_sd < -1.5:
                 g_light = "RED"
-            elif flow.w_4h.spot_delta_btc > 0:
+            elif s_4h > 0:
                 g_light = "BLUE"
             else:
                 g_light = "YELLOW"
-            g_status = f"{g_score:.0f}/100 • VWAP {vwap_sd:+.2f}SD"
-            g_driver = f"4H S:{flow.w_4h.spot_delta_btc:+,.0f} P:{flow.w_4h.perp_delta_btc:+,.0f} BTC"
-            g_conc = f"4H Spot {flow.w_4h.spot_delta_btc:+,.0f} BTC | Abs {flow.w_1h.absorption_index:.2f}"
+            g_status = f"VWAP ${vwap_px:,.0f} ({vwap_sd:+.2f}SD)"
+            g_driver = f"4H S:{s_4h:+,.0f} P:{p_4h:+,.0f} BTC | CPI:{cpi_pct:+.3f}%"
+            g_conc = f"4H Spot {s_4h:+,.0f} BTC | VWAP {vwap_sd:+.2f}SD"
         else:
             g_light = "BLUE" if flow.w_4h.spot_delta_btc > 0 else "YELLOW"
             g_status = f"4H Spot Z:{flow.w_4h.spot_zscore:+.2f}"
@@ -186,24 +191,28 @@ class MasterSynthesisEvaluator:
         )
 
         # --- Desk [R] SSRN Quantitative Alpha Deck (Tab 16) ---
-        ssrn = getattr(store, "ssrn_evaluation", None)
+        ssrn = getattr(store, "ssrn_alpha_evaluation", None)
         if ssrn is not None:
-            r_score = float(getattr(ssrn, "composite_alpha_score", 0.0) or getattr(ssrn, "overall_score", 0.0) or 0.0)
-            r_reg = str(getattr(ssrn, "dominant_regime", None) or getattr(ssrn, "regime_label", "NEUTRAL"))
-            if r_score >= 25.0:
+            models_list = getattr(ssrn, "models", []) or []
+            m_pass = sum(1 for m in models_list if getattr(m, "is_gate_pass", False))
+            m_tot = max(len(models_list), 5)
+            rvol = float(getattr(ssrn, "realized_vol_20d_ann", 0.0) or 0.0)
+            vt_wt = float(getattr(ssrn, "target_vol_sizing_pct", 0.0) or 0.0)
+            macd_ok = bool(getattr(ssrn, "mtf_macd_gate_pass", False))
+            if m_pass >= 4 and macd_ok:
                 r_light = "GREEN"
-            elif r_score <= -25.0:
+            elif m_pass <= 1 and not macd_ok:
                 r_light = "RED"
-            elif r_score > 0.0:
+            elif m_pass >= 3 or macd_ok:
                 r_light = "BLUE"
             else:
                 r_light = "YELLOW"
-            r_status = f"Alpha {r_score:+.1f} • {r_reg[:10]}"
-            r_driver = f"SSRN Composite Alpha: {r_score:+.1f}"
-            r_conc = f"Alpha {r_score:+.1f} ({r_reg[:18]})"
+            r_status = f"{m_pass}/{m_tot} Models • 1D MACD:{macd_ok}"
+            r_driver = f"20D RVol:{rvol:.1f}% | VolTarget:{vt_wt:.0f}% | MVRV:{ssrn.live_mvrv_ratio:.2f}"
+            r_conc = f"{m_pass}/{m_tot} SSRN Gates | VolTarget {vt_wt:.0f}%"
         else:
             r_light = "YELLOW"
-            r_status = "SSRN 6-MODEL"
+            r_status = "SSRN 5-MODEL"
             r_driver = "OFI • Jump Risk • Volatility"
             r_conc = "NEUTRAL ALPHA BASELINE"
 
@@ -218,23 +227,32 @@ class MasterSynthesisEvaluator:
 
         # --- Desk [M] BTC Magnet Liquidation Gravity Deck (Tab 17) ---
         bmag = getattr(store, "btc_magnet_evaluation", None)
-        up_mag = float(getattr(bmag, "upper_magnet_price", 0.0) or pev.short_liq_magnet_usd)
-        dn_mag = float(getattr(bmag, "lower_magnet_price", 0.0) or pev.long_liq_magnet_usd)
-        up_dist_pct = ((up_mag - price) / price * 100.0) if price > 0 and up_mag > 0 else 0.0
-        dn_dist_pct = ((price - dn_mag) / price * 100.0) if price > 0 and dn_mag > 0 else 0.0
-        if bmag is not None:
-            m_bias = str(getattr(bmag, "dominant_pull", None) or getattr(bmag, "net_bias", "BALANCED")).upper()
-            if "UP" in m_bias or "SHORT" in m_bias:
+        if bmag is not None and getattr(bmag, "upper_magnet", None) is not None and getattr(bmag, "lower_magnet", None) is not None:
+            up_mag = float(bmag.upper_magnet.price or pev.short_liq_magnet_usd)
+            dn_mag = float(bmag.lower_magnet.price or pev.long_liq_magnet_usd)
+            up_dist_pct = abs(float(bmag.upper_magnet.dist_pct))
+            dn_dist_pct = abs(float(bmag.lower_magnet.dist_pct))
+            m_rules = sum(1 for r in getattr(bmag, "rule_checks", [])[:6] if getattr(r, "passed", False))
+            pull_dir = str(getattr(bmag, "pull_direction", "BALANCED"))
+            pull_rat = float(getattr(bmag, "pull_ratio", 1.0) or 1.0)
+            if m_rules >= 5:
+                m_light = "GREEN"
+            elif m_rules >= 3 or "UPPER" in pull_dir.upper() or "UP" in pull_dir.upper():
                 m_light = "BLUE"
-            elif "DOWN" in m_bias or "LONG" in m_bias:
-                m_light = "YELLOW"
             else:
                 m_light = "YELLOW"
+            m_status = f"{m_rules}/6 Rules • Pull {pull_rat:.2f}x ({pull_dir[:6]})"
+            m_driver = f"Up:${up_mag:,.0f} (+{up_dist_pct:.1f}%) | Low:${dn_mag:,.0f} (-{dn_dist_pct:.1f}%)"
+            m_conc = f"Up ${up_mag:,.0f} (+{up_dist_pct:.1f}%) | Low ${dn_mag:,.0f} (-{dn_dist_pct:.1f}%)"
         else:
+            up_mag = float(pev.short_liq_magnet_usd)
+            dn_mag = float(pev.long_liq_magnet_usd)
+            up_dist_pct = ((up_mag - price) / price * 100.0) if price > 0 and up_mag > 0 else 0.0
+            dn_dist_pct = ((price - dn_mag) / price * 100.0) if price > 0 and dn_mag > 0 else 0.0
             m_light = "BLUE" if abs(up_dist_pct) <= abs(dn_dist_pct) else "YELLOW"
-        m_status = f"↑+{up_dist_pct:.1f}% • ↓-{dn_dist_pct:.1f}%"
-        m_driver = f"S-Liq:${up_mag:,.0f} | L-Liq:${dn_mag:,.0f}"
-        m_conc = f"Up ${up_mag:,.0f} (+{up_dist_pct:.1f}%) | Low ${dn_mag:,.0f} (-{dn_dist_pct:.1f}%)"
+            m_status = f"↑+{up_dist_pct:.1f}% • ↓-{dn_dist_pct:.1f}%"
+            m_driver = f"S-Liq:${up_mag:,.0f} | L-Liq:${dn_mag:,.0f}"
+            m_conc = f"Up ${up_mag:,.0f} (+{up_dist_pct:.1f}%) | Low ${dn_mag:,.0f} (-{dn_dist_pct:.1f}%)"
 
         row_m = TabVerdictRow(
             tab_num=17,
@@ -439,10 +457,10 @@ class MasterSynthesisEvaluator:
             l4_ruling = f"Trigger Fired | 4H Spot CVD {flow.w_4h.spot_delta_btc:+,.0f} BTC"
         elif flow.w_4h.spot_delta_btc > 0 and row_g.traffic_light in ("GREEN", "BLUE"):
             l4_status = "ARMED"
-            l4_ruling = f"4H Spot {flow.w_4h.spot_delta_btc:+,.0f} BTC | Await Desk P/A/0 Trigger"
+            l4_ruling = f"4H Spot {flow.w_4h.spot_delta_btc:+,.0f} BTC | Pending Desk P/A/0 Trigger"
         else:
             l4_status = "STANDBY"
-            l4_ruling = f"4H Spot {flow.w_4h.spot_delta_btc:+,.0f} BTC | Await Pullback & Trigger"
+            l4_ruling = f"4H Spot {flow.w_4h.spot_delta_btc:+,.0f} BTC | Pending Pullback & Trigger"
 
         hierarchy_rows = [
             HierarchyLayerRow(

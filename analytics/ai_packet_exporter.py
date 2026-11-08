@@ -2044,9 +2044,10 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
 
 def copy_ai_packet_to_clipboard_and_disk(config: EngineConfig, store: StateStore) -> Tuple[bool, str, int]:
 
-    """Builds the AI telemetry packet, copies it to the Windows clipboard, and writes it to Downloads & logs/."""
+    """Builds the DATA-ONLY AI telemetry packet, copies it to the clipboard, and writes it to Downloads & logs/."""
+    from analytics.data_only_reports import build_global_data_only_packet
 
-    packet_text = build_ai_telemetry_packet(config, store)
+    packet_text = build_global_data_only_packet(config, store)
 
     char_count = len(packet_text)
 

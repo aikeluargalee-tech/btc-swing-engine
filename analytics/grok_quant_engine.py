@@ -526,60 +526,16 @@ Timestamp: {ts_str}
 
 
 def copy_grok_prompt_to_clipboard(store: StateStore) -> Tuple[bool, str, int]:
-    """Copies Grok's Master Prompt text directly to the system clipboard and saves to logs/."""
-    eval_data = store.grok_quant_evaluation
-    if eval_data is None or not eval_data.grok_master_prompt_text:
-        return False, "Grok quant evaluation not yet available", 0
+    """Copies Tab [G] Grok Flow DATA-ONLY report directly to the system clipboard and saves to logs/."""
+    from analytics.data_only_reports import build_tab_g_data_only_report, copy_text_to_clipboard_and_log
 
-    import os
-    import subprocess
-
-    prompt_str = eval_data.grok_master_prompt_text
-    char_count = len(prompt_str)
-    copied_ok = False
-
-    if os.name == "nt":
-        try:
-            subprocess.run(
-                ["clip.exe"],
-                input=prompt_str.encode("utf-16le"),
-                check=True,
-                timeout=3.0,
-            )
-            copied_ok = True
-        except Exception:
-            try:
-                subprocess.run(
-                    ["powershell", "-NoProfile", "-Command", "Set-Clipboard -Value $input"],
-                    input=prompt_str.encode("utf-8"),
-                    check=True,
-                    timeout=4.0,
-                )
-                copied_ok = True
-            except Exception:
-                copied_ok = False
-    else:
-        for cmd in (["wl-copy"], ["xclip", "-selection", "clipboard"]):
-            try:
-                subprocess.run(cmd, input=prompt_str.encode("utf-8"), check=True, timeout=3.0)
-                copied_ok = True
-                break
-            except Exception:
-                pass
-
-    try:
-        log_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "logs",
-            "grok_master_prompt_latest.md",
-        )
-        os.makedirs(os.path.dirname(log_path), exist_ok=True)
-        with open(log_path, "w", encoding="utf-8") as f:
-            f.write(prompt_str)
-    except Exception:
-        pass
-
-    msg = f"Copied Grok Master Prompt ({char_count:,} chars) to clipboard!" if copied_ok else f"Saved Grok prompt ({char_count:,} chars) to disk"
+    prompt_str = build_tab_g_data_only_report(None, store)
+    copied_ok, log_path, char_count = copy_text_to_clipboard_and_log(prompt_str, "grok_master_prompt_latest.md", store)
+    msg = (
+        f"Copied Grok Flow DATA-ONLY Report ({char_count:,} chars) to clipboard!"
+        if copied_ok
+        else f"Saved Grok Flow DATA-ONLY Report ({char_count:,} chars) to {log_path}"
+    )
     return copied_ok, msg, char_count
 
 

@@ -570,47 +570,14 @@ class SSRNResearchEngine:
 
 
 def copy_ssrn_deck_to_clipboard(store: StateStore) -> Tuple[bool, str, int]:
-    """Copies SSRN Alpha Research Brief to clipboard and writes to logs/."""
-    eval_data = store.ssrn_alpha_evaluation
-    if eval_data is None or not eval_data.ssrn_summary_markdown:
-        engine = SSRNResearchEngine()
-        eval_data = engine.evaluate(store)
+    """Copies SSRN Research DATA-ONLY report to clipboard and writes to logs/."""
+    from analytics.data_only_reports import build_tab_r_data_only_report, copy_text_to_clipboard_and_log
 
-    text = eval_data.ssrn_summary_markdown
-    char_count = len(text)
-    copied_ok = False
-
-    try:
-        import pyperclip  # type: ignore
-        pyperclip.copy(text)
-        copied_ok = True
-    except Exception:
-        pass
-
-    if not copied_ok and os.name == "nt":
-        for cmd in (["clip"], ["powershell.exe", "-Command", "Set-Clipboard"]):
-            try:
-                subprocess.run(cmd, input=text.encode("utf-8"), check=True, timeout=3.0)
-                copied_ok = True
-                break
-            except Exception:
-                pass
-
-    try:
-        log_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "logs",
-            "ssrn_research_brief_latest.md",
-        )
-        os.makedirs(os.path.dirname(log_path), exist_ok=True)
-        with open(log_path, "w", encoding="utf-8") as f:
-            f.write(text)
-    except Exception:
-        pass
-
+    text = build_tab_r_data_only_report(None, store)
+    copied_ok, log_path, char_count = copy_text_to_clipboard_and_log(text, "ssrn_research_brief_latest.md", store)
     msg = (
-        f"Copied SSRN Research Brief ({char_count:,} chars) to clipboard!"
+        f"Copied SSRN DATA-ONLY Report ({char_count:,} chars) to clipboard!"
         if copied_ok
-        else f"Saved SSRN Research Brief ({char_count:,} chars) to logs/"
+        else f"Saved SSRN DATA-ONLY Report ({char_count:,} chars) to {log_path}"
     )
     return copied_ok, msg, char_count

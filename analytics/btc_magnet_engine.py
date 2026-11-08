@@ -484,43 +484,11 @@ class BTCMagnetEngine:
 
 
 def copy_btc_magnet_card_to_clipboard(store: StateStore) -> Tuple[bool, str, int]:
-    """Copies BTC Magnet Status Card brief to clipboard and writes to logs/."""
-    eval_data = store.btc_magnet_evaluation
-    if eval_data is None:
-        engine = BTCMagnetEngine()
-        eval_data = engine.evaluate(store)
+    """Copies BTC Magnet DATA-ONLY report to clipboard and writes to logs/btc_magnet_latest.md."""
+    from analytics.data_only_reports import build_tab_m_data_only_report, copy_text_to_clipboard_and_log
 
-    text = eval_data.magnet_summary_markdown
-    char_count = len(text)
-
-    # Save to logs/btc_magnet_latest.md
-    try:
-        os.makedirs("logs", exist_ok=True)
-        with open(os.path.join("logs", "btc_magnet_latest.md"), "w", encoding="utf-8") as f:
-            f.write(text)
-    except Exception:
-        pass
-
-    # Copy to system clipboard
-    copied = False
-    if os.name == "nt":
-        try:
-            proc = subprocess.Popen(
-                ["powershell", "-NoProfile", "-Command", "Set-Clipboard -Value $input"],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            proc.communicate(input=text.encode("utf-8"), timeout=3.0)
-            copied = proc.returncode == 0
-        except Exception:
-            copied = False
-
-    now_str = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
-    store.last_packet_copied_utc = now_str
-    store.last_packet_copied_ts = time.time()
-    store.last_packet_char_count = char_count
-
+    text = build_tab_m_data_only_report(None, store)
+    copied, log_path, char_count = copy_text_to_clipboard_and_log(text, "btc_magnet_latest.md", store)
     if copied:
-        return True, f"BTC Magnet Card copied to clipboard ({char_count:,} chars)", char_count
-    return False, f"Saved BTC Magnet Card to logs/btc_magnet_latest.md ({char_count:,} chars)", char_count
+        return True, f"BTC Magnet DATA-ONLY report copied to clipboard ({char_count:,} chars)", char_count
+    return False, f"Saved BTC Magnet DATA-ONLY report to {log_path} ({char_count:,} chars)", char_count

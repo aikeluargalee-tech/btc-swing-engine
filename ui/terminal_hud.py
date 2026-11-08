@@ -5848,10 +5848,10 @@ def print_dry_run_report(
                 t_num = 0
         store.active_tab = t_num if t_num in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18) else 0
         console.print(build_dashboard_renderable(config, store, tab_override=store.active_tab))
-        if store.active_tab == 18:
+        if store.active_tab in (0, 10, 11, 12, 13, 14, 15, 16, 17, 18):
             try:
-                from analytics.strategy_trend_pullback import copy_trend_pullback_to_clipboard
-                copy_trend_pullback_to_clipboard(store)
+                from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
+                copy_tab_data_only_report_to_clipboard(store.active_tab, config, store)
             except Exception:
                 pass
 
@@ -5873,6 +5873,10 @@ def _poll_keyboard_tab_switch(
                     if store.active_tab != new_tab:
                         store.active_tab = new_tab
                         changed = True
+                    elif new_tab == 0:
+                        from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
+                        copy_tab_data_only_report_to_clipboard(0, config, store)
+                        changed = True
                 elif ch in ("a", "A", "k", "K"):
                     store.show_help = False
                     if store.active_tab != 18:
@@ -5890,20 +5894,36 @@ def _poll_keyboard_tab_switch(
                     if store.active_tab != 13:
                         store.active_tab = 13
                         changed = True
+                    else:
+                        from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
+                        copy_tab_data_only_report_to_clipboard(13, config, store)
+                        changed = True
                 elif ch in ("b", "B"):
                     store.show_help = False
                     if store.active_tab != 14:
                         store.active_tab = 14
+                        changed = True
+                    else:
+                        from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
+                        copy_tab_data_only_report_to_clipboard(14, config, store)
                         changed = True
                 elif ch in ("f", "F"):
                     store.show_help = False
                     if store.active_tab != 11:
                         store.active_tab = 11
                         changed = True
+                    else:
+                        from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
+                        copy_tab_data_only_report_to_clipboard(11, config, store)
+                        changed = True
                 elif ch in ("w", "W"):
                     store.show_help = False
                     if store.active_tab != 12:
                         store.active_tab = 12
+                        changed = True
+                    else:
+                        from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
+                        copy_tab_data_only_report_to_clipboard(12, config, store)
                         changed = True
                 elif ch in ("m", "M"):
                     store.show_help = False
@@ -5921,6 +5941,10 @@ def _poll_keyboard_tab_switch(
                     store.show_help = False
                     if store.active_tab != 10:
                         store.active_tab = 10
+                        changed = True
+                    else:
+                        from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
+                        copy_tab_data_only_report_to_clipboard(10, config, store)
                         changed = True
                 elif ch in ("s", "S"):
                     store.show_help = False

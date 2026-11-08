@@ -738,3 +738,67 @@ def test_23_acceptance_data_only_forbidden_words_and_reconciliation() -> None:
     assert round(ev.stop_distance_usd / ev.atr14_4h, 4) == ev.stop_distance_atr_exact
 
 
+def test_24_all_tabs_and_global_ai_packet_data_only_acceptance() -> None:
+    """Verifies that all 10 primary top-ribbon tab DATA-ONLY reports and the global [C: AI PACKET]
+    contain zero forbidden interpretive words ('verdict', 'trade', 'wait', 'bullish', 'bearish',
+    'confirmed', 'rejected', 'recommend').
+    """
+    from analytics.data_only_reports import (
+        build_global_data_only_packet,
+        build_tab_0_data_only_report,
+        build_tab_a_data_only_report,
+        build_tab_b_data_only_report,
+        build_tab_f_data_only_report,
+        build_tab_g_data_only_report,
+        build_tab_l_data_only_report,
+        build_tab_m_data_only_report,
+        build_tab_p_data_only_report,
+        build_tab_r_data_only_report,
+        build_tab_w_data_only_report,
+    )
+    from analytics.signal_detector import SignalDetector
+
+    config = EngineConfig()
+    store = StateStore()
+    store.binance_spot_price = 76_024.01
+    store.spot_klines_1d.extend(_build_bullish_1d_bars(230, now_ms=NOW_MS))
+    store.spot_klines_4h.extend(_build_bullish_4h_bars(220, now_ms=NOW_MS))
+    store.spot_klines_1h.extend(_build_1h_bars(800, now_ms=NOW_MS, base_px=76_024.01))
+    store.perp_klines_1h.extend(_build_1h_bars(800, now_ms=NOW_MS, base_px=76_024.01))
+    store.spot_klines_15m.extend(_build_1h_bars(120, now_ms=NOW_MS, base_px=76_024.01))
+
+    SignalDetector(config).evaluate(store)
+
+    builders = [
+        ("Tab P", build_tab_p_data_only_report),
+        ("Tab B", build_tab_b_data_only_report),
+        ("Tab G", build_tab_g_data_only_report),
+        ("Tab R", build_tab_r_data_only_report),
+        ("Tab M", build_tab_m_data_only_report),
+        ("Tab A", build_tab_a_data_only_report),
+        ("Tab F", build_tab_f_data_only_report),
+        ("Tab W", build_tab_w_data_only_report),
+        ("Tab 0", build_tab_0_data_only_report),
+        ("Tab L", build_tab_l_data_only_report),
+        ("Global Packet", build_global_data_only_packet),
+    ]
+    forbidden_words = (
+        "verdict",
+        "trade",
+        "wait",
+        "bullish",
+        "bearish",
+        "confirmed",
+        "rejected",
+        "recommend",
+    )
+
+    for label, fn in builders:
+        report = fn(config, store)
+        assert len(report) > 150
+        report_lower = report.lower()
+        for word in forbidden_words:
+            assert word not in report_lower, f"Forbidden word '{word}' found in {label} DATA-ONLY report!"
+
+
+

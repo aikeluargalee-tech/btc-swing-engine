@@ -260,6 +260,10 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
 
         "   * **5 Operational Academic Risk Gates**: Mesíček & Vojtko (SSRN 5748642) 1D/1H MACD gate, Zarattini et al. (SSRN 5209907) 20D volatility targeting, Karassavidis et al. (SSRN 5821842) 8H ATR dynamic stops, Chan (SSRN 5292305) +30% annualized funding ceiling, and Bysik & Ślepaczuk (SSRN 6795938) 18 bps round-trip cost hurdle.",
 
+        "16. **Section 17 Audit (`Tab [M] BTC Magnet · Liquidation Gravity & Swing Edge Detector`)**:",
+
+        "   * **Liquidation Gravitational Horizon & Speaking Rules**: Real-time upper short liquidation cluster vs. lower long support cluster, dominant pull ratio, and the 7 locked internal speaking rules (defaults to 'wait').",
+
         "",
 
         "### 3. Mandatory 5-Part Response Format",
@@ -1970,6 +1974,41 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
                 f"* **{m.name}** (`{m.ssrn_citation}` • `{m.timeframe}`): {m.logic} | "
                 f"**Benchmark:** `{m.performance}` | **Live Condition:** `[{gate_badge}: {m.live_status}]` ({m.live_value})"
             )
+
+
+    # --- SECTION 17: TAB [M] BTC MAGNET · LIQUIDATION GRAVITY & SWING EDGE DETECTOR ---
+    magnet = getattr(store, "btc_magnet_evaluation", None)
+    if magnet is None:
+        try:
+            from analytics.btc_magnet_engine import BTCMagnetEngine
+            magnet = BTCMagnetEngine(config).evaluate(store)
+        except Exception:
+            magnet = None
+
+    if magnet is not None:
+        lines.extend([
+            "",
+            "---",
+            "",
+            "## SECTION 17: TAB [M] BTC MAGNET · LIQUIDATION GRAVITY & SWING EDGE DETECTOR",
+            "",
+            f"* **Mechanical Status Verdict**: `[{magnet.verdict_badge}]`",
+            f"* **Status Headline**: {magnet.headline}",
+            f"* **Explanation Readout**: {magnet.body}",
+            f"* **Rule Subtitle**: *{magnet.rule_subtitle}*",
+            "",
+            "### 17A. Liquidation Gravitational Horizon",
+            f"* **Upper Magnet (Short Liquidations)**: `${magnet.upper_magnet.price:,.0f}` (`{magnet.upper_magnet.dist_pct:+.1f}%`) — `${magnet.upper_magnet.usd_volume/1e6:.1f}M` cluster",
+            f"* **Center Spot Horizon**: `${magnet.spot_price:,.2f}` (`{magnet.price_change_24h_pct:+.2f}% 24h`)",
+            f"* **Lower Support (Long Liquidations)**: `${magnet.lower_magnet.price:,.0f}` (`{magnet.lower_magnet.dist_pct:+.1f}%`) — `${magnet.lower_magnet.usd_volume/1e6:.1f}M` cluster",
+            f"* **Gravitational Pull**: `{magnet.pull_direction} MAGNET` (Ratio: `{magnet.pull_ratio:.2f}x` upper-to-lower volume)",
+            f"* **Perpetual Funding**: `{magnet.funding_rate_annual_pct:+.1f}%/yr` | **4h OI Velocity**: `{magnet.oi_delta_4h_pct:+.1f}%` | **Regime**: `{magnet.market_regime}`",
+            "",
+            "### 17B. 7 Internal Speaking Rules Audit",
+        ])
+        for r in magnet.rule_checks:
+            badge = "PASS" if r.passed else "WAIT"
+            lines.append(f"* **Rule {r.rule_num} ({r.name})**: `[{badge}]` {r.detail}")
 
     return "\n".join(lines) + "\n"
 

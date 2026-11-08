@@ -669,10 +669,14 @@ class TestHudRouting(SpotSwingBase):
 
     def test_master_moved_to_tab_l(self) -> None:
         store = StateStore()
-        for override in (10, "l", "L", "m", "master"):
+        for override in (10, "l", "L", "master"):
             text = _render(build_dashboard_renderable(CONFIG, store, tab_override=override))
             self.assertIn("Tab [L]: Master Conclusion", text, override)
         self.assertNotIn("Tab [L]: Master Conclusion", _render(build_dashboard_renderable(CONFIG, store, tab_override=0)))
+        # Verify Tab 17 (BTC Magnet) is wired to 'm'
+        for override in (17, "m", "M", "magnet"):
+            text_m = _render(build_dashboard_renderable(CONFIG, store, tab_override=override))
+            self.assertIn("BTC MAGNET", text_m, override)
 
     def test_default_active_tab_is_spot_swing(self) -> None:
         store = StateStore()
@@ -681,7 +685,7 @@ class TestHudRouting(SpotSwingBase):
 
     def test_hotkeys(self) -> None:
         store = StateStore()
-        for keys, expected in (("l", 10), ("L", 10), ("m", 10), ("0", 0), ("5", 5), ("7", 7), ("g", 15), ("G", 15), ("e", 9), ("f", 11), ("F", 11), ("b", 14), ("B", 14)):
+        for keys, expected in (("l", 10), ("L", 10), ("m", 17), ("M", 17), ("0", 0), ("5", 5), ("7", 7), ("g", 15), ("G", 15), ("e", 9), ("f", 11), ("F", 11), ("b", 14), ("B", 14)):
             store.active_tab = 3
             with mock.patch.object(terminal_hud, "msvcrt", _FakeMsvcrt(keys)):
                 terminal_hud._poll_keyboard_tab_switch(CONFIG, store)

@@ -181,6 +181,11 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         if active_tab == 16
         else "[dim white][R: SSRN RESEARCH][/dim white]"
     )
+    tM = (
+        "[bold black on bright_cyan] [M: MAGNET] [/bold black on bright_cyan]"
+        if active_tab == 17
+        else "[dim white][M: MAGNET][/dim white]"
+    )
     t0 = (
         "[bold white on blue] [0: SPOT SWING] [/bold white on blue]"
         if active_tab == 0
@@ -211,6 +216,7 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         14: "14: PATTERNS & CHART",
         15: "15: GROK QUANT FLOW [G]",
         16: "16: SSRN RESEARCH [R]",
+        17: "17: BTC MAGNET [M]",
     }
     if active_tab in subdesk_names:
         subdesk_info = f"  │  [bold black on bright_yellow] [DEEP DIVE {subdesk_names[active_tab]}] [/bold black on bright_yellow]"
@@ -226,13 +232,13 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
     nav_grid.add_column(justify="right", no_wrap=True)
     nav_grid.add_row(
         f"[bold white]BTC-USD[/bold white] | Spot: [bold cyan]${spot_px:,.2f}[/bold cyan] | Regime: {regime_str} ({score_str}) | Feeds: Spot {spot_ws_dot} • Perp {perp_ws_dot} • CB {cb_ws_dot}",
-        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: P Structure • B Patterns • G Grok Flow • R SSRN Research • F Footprint • W Waterfall • 0 Screener • L Master • C Packet • H Guide[/dim]",
+        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: P Structure • B Patterns • G Grok Flow • R SSRN Research • M Magnet • F Footprint • W Waterfall • 0 Screener • L Master • C Packet • H Guide[/dim]",
     )
 
     tab_grid = Table.grid(expand=True)
     tab_grid.add_column(justify="left", no_wrap=True)
     tab_grid.add_row(
-        f"{tP}  {tB}  {tG}  {tR}  {tF}  {tW}  {t0}  {tL}  │  {tC}  {tH}{subdesk_info}"
+        f"{tP}  {tB}  {tG}  {tR}  {tM}  {tF}  {tW}  {t0}  {tL}  │  {tC}  {tH}{subdesk_info}"
     )
     nav_panel = Panel(Group(nav_grid, tab_grid), border_style="bright_blue", box=box.ROUNDED, padding=(0, 1))
 
@@ -5345,13 +5351,157 @@ def _build_tab16_ssrn_research_hud(
     return Group(header_panel, sub_panel, bottomline_panel, banner_panel, matrix_panel, bottom_panel)
 
 
+def _build_tab17_btc_magnet_hud(
+    config: EngineConfig,
+    store: StateStore,
+    header_panel: Panel,
+) -> Group:
+    """Builds Desk 17 [M: BTC MAGNET] - Mechanics-First Liquidation Gravity & Edge Detector."""
+    magnet_eval = store.btc_magnet_evaluation
+    if magnet_eval is None:
+        from analytics.btc_magnet_engine import BTCMagnetEngine
+        engine = BTCMagnetEngine(config)
+        magnet_eval = engine.evaluate(store)
+
+    spot_p = magnet_eval.spot_price or store.binance_spot_price or 76000.0
+    up = magnet_eval.upper_magnet
+    lo = magnet_eval.lower_magnet
+
+    # 1. Sub-Ribbon Header
+    sub_grid = Table.grid(expand=True)
+    sub_grid.add_column(justify="left", no_wrap=True)
+    sub_grid.add_column(justify="right", no_wrap=True)
+    sub_grid.add_row(
+        "[bold bright_cyan]DESK [M]: BTC MAGNET | LIQUIDATION GRAVITY DECK[/bold bright_cyan]  |  "
+        "[bold bright_white]MECHANICS-FIRST SWING INTELLIGENCE (DEFAULTS TO WAIT)[/bold bright_white]",
+        "[dim]Press [bold cyan]'M'[/bold cyan] (or [bold cyan]'MM'[/bold cyan]) to copy Shareable Magnet Card brief[/dim]",
+    )
+    sub_panel = Panel(sub_grid, box=box.ROUNDED, border_style="bright_cyan", padding=(0, 1))
+
+    # 2. Liquidation Gravitational Horizon Box (3-Column Strip)
+    horizon_table = Table(box=box.ROUNDED, expand=True, show_header=True, header_style="bold bright_white", pad_edge=False)
+    horizon_table.add_column("▲ UPPER MAGNET (SHORT LIQUIDATIONS)", justify="center", ratio=3)
+    horizon_table.add_column("◆ SPOT HORIZON (CENTER ZERO)", justify="center", ratio=4)
+    horizon_table.add_column("▼ LOWER SUPPORT (LONG LIQUIDATIONS)", justify="center", ratio=3)
+
+    up_dist_usd = up.price - spot_p
+    lo_dist_usd = spot_p - lo.price
+
+    col_up = (
+        f"[bold bright_cyan]${up.price:,.0f}[/bold bright_cyan]  "
+        f"[cyan]({up.dist_pct:+.1f}% / +${up_dist_usd:,.0f})[/cyan]\n"
+        f"[dim]Density: ${up.usd_volume/1e6:,.1f}M Cluster (Binance/Exchanges)[/dim]"
+    )
+
+    pull_color = "bright_cyan" if magnet_eval.pull_direction == "UPPER" else ("bright_yellow" if magnet_eval.pull_direction == "LOWER" else "white")
+    col_center = (
+        f"[bold bright_white]SPOT: ${spot_p:,.2f}[/bold bright_white]  "
+        f"[{'green' if magnet_eval.price_change_24h_pct >= 0 else 'red'}]({magnet_eval.price_change_24h_pct:+.2f}% 24h)[/{'green' if magnet_eval.price_change_24h_pct >= 0 else 'red'}]\n"
+        f"[bold {pull_color}]PULL DIRECTION: {magnet_eval.pull_direction} MAGNET ({magnet_eval.pull_ratio:.2f}x RATIO)[/bold {pull_color}]\n"
+        f"[dim]24h Range: ${magnet_eval.low_24h:,.0f} - ${magnet_eval.high_24h:,.0f} • Perp Funding: {magnet_eval.funding_rate_annual_pct:+.1f}%/yr • 4h OI: {magnet_eval.oi_delta_4h_pct:+.1f}% • Regime: {magnet_eval.market_regime}[/dim]"
+    )
+
+    col_lo = (
+        f"[bold bright_yellow]${lo.price:,.0f}[/bold bright_yellow]  "
+        f"[yellow]({lo.dist_pct:+.1f}% / -${lo_dist_usd:,.0f})[/yellow]\n"
+        f"[dim]Density: ${lo.usd_volume/1e6:,.1f}M Cluster (Binance/Exchanges)[/dim]"
+    )
+
+    horizon_table.add_row(col_up, col_center, col_lo)
+    horizon_panel = Panel(
+        horizon_table,
+        title="[bold bright_white]LIQUIDATION GRAVITATIONAL HORIZON[/bold bright_white]",
+        box=box.ROUNDED,
+        border_style="bright_cyan",
+        padding=(0, 1),
+    )
+
+    # 3. Status Report Card (Locked Templates from docs/status-templates.md)
+    is_edge = magnet_eval.verdict == "SPEAK"
+    verdict_badge = "[bold black on bright_cyan] SWING EDGE PRESENT [/bold black on bright_cyan]" if is_edge else "[bold black on bright_yellow] NO CLEAR EDGE - WAIT [/bold black on bright_yellow]"
+    verdict_border = "bright_cyan" if is_edge else "bright_yellow"
+
+    status_grid = Table.grid(expand=True)
+    status_grid.add_column()
+    status_grid.add_row(
+        f"[bold bright_white]>_ MECHANICAL STATUS VERDICT:[/bold bright_white] {verdict_badge}  |  "
+        f"[bold bright_white]{magnet_eval.headline}[/bold bright_white]"
+    )
+    status_grid.add_row(
+        f"[bold bright_cyan]EXPLANATION READOUT:[/bold bright_cyan] [white]{magnet_eval.body}[/white]"
+    )
+    status_grid.add_row(
+        f"[dim]Rule Reference: {magnet_eval.rule_subtitle}[/dim]"
+    )
+
+    status_panel = Panel(
+        status_grid,
+        title="[bold bright_white]>_ STATUS REPORT (ONE-QUESTION READOUT)[/bold bright_white]",
+        box=box.ROUNDED,
+        border_style=verdict_border,
+        padding=(0, 1),
+    )
+
+    # 4. 7 Internal Speaking Rules Audit Table
+    rules_table = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold cyan", pad_edge=False)
+    rules_table.add_column("RULE # & FILTER NAME", justify="left", ratio=3)
+    rules_table.add_column("LOCKED SPECIFICATION REQUIREMENT", justify="left", ratio=4)
+    rules_table.add_column("LIVE MARKET TELEMETRY & AUDIT DETAIL", justify="left", ratio=5)
+    rules_table.add_column("STATUS", justify="center", ratio=2)
+
+    specs = [
+        "Meaningful liquidation cluster within 0.8% - 4.5% reach (>= $100M)",
+        "Open interest expanding or stable into magnet (4h velocity >= -0.5%)",
+        "Borrow carry not contradictory (-10.0% to +28.0% annual funding)",
+        "Range regime (primary) or Trend-aligned in direction of magnet",
+        "Basic structure & spot-flow alignment (no extreme opposite momentum)",
+        "Target liquidation cluster intact and not already swept",
+        "At least 5 of 6 cleanly met with 0 direct conflicts (otherwise: WAIT)",
+    ]
+
+    for i, r in enumerate(magnet_eval.rule_checks):
+        status_str = "[bold black on green] [OK] PASS [/bold black on green]" if r.passed else "[bold white on red] [X] WAIT [/bold white on red]"
+        spec_text = specs[i] if i < len(specs) else "Strict internal condition"
+        rules_table.add_row(
+            f"[bold bright_white]Rule {r.rule_num}:[/bold bright_white] {r.name}",
+            f"[dim]{spec_text}[/dim]",
+            f"[white]{r.detail}[/white]",
+            status_str,
+        )
+
+    rules_panel = Panel(
+        rules_table,
+        title="[bold bright_white]7 INTERNAL SPEAKING RULES AUDIT CHECKLIST[/bold bright_white]",
+        box=box.ROUNDED,
+        border_style="bright_blue",
+        padding=(0, 1),
+    )
+
+    # 5. Bottom Clipboard & Sharing Panel
+    last_copy_str = ""
+    if getattr(store, "last_packet_copied_utc", ""):
+        last_copy_str = f"  |  [bold green]Last Brief Copied: {store.last_packet_copied_utc} ({getattr(store, 'last_packet_char_count', 0):,} chars)[/bold green]"
+
+    bottom_grid = Table.grid(expand=True)
+    bottom_grid.add_column(justify="left", no_wrap=True)
+    bottom_grid.add_column(justify="right", no_wrap=True)
+    bottom_grid.add_row(
+        "[bold black on bright_cyan] [KEY M / MM] BTC MAGNET CLIPBOARD [/bold black on bright_cyan]  "
+        "[bright_white]Tap [bold cyan]'M'[/bold cyan] to switch to Desk [M] | Tap [bold cyan]'M'[/bold cyan] again (or [bold cyan]'MM'[/bold cyan]) to copy Shareable Magnet Card brief![/bright_white]" + last_copy_str,
+        "[dim]BTC Magnet Engine | btc-magnet.netlify.app[/dim]",
+    )
+    bottom_panel = Panel(bottom_grid, box=box.ROUNDED, border_style="bright_cyan", padding=(0, 1))
+
+    return Group(header_panel, sub_panel, horizon_panel, status_panel, rules_panel, bottom_panel)
+
+
 def build_dashboard_renderable(
     config: EngineConfig,
     store: StateStore,
     tab_override: Optional[int] = None,
 ) -> Group:
     """Builds the active tab's 5-panel Rich renderable for the live terminal HUD."""
-    valid_tabs = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)
+    valid_tabs = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17)
     if tab_override is not None:
         if isinstance(tab_override, int) and tab_override in valid_tabs:
             active_tab = tab_override
@@ -5359,9 +5509,11 @@ def build_dashboard_renderable(
             active_tab = 15
         elif str(tab_override).lower() in ("r", "ssrn", "research", "alpha", "16"):
             active_tab = 16
+        elif str(tab_override).lower() in ("m", "magnet", "btc_magnet", "17"):
+            active_tab = 17
         elif str(tab_override).lower() in ("b", "pattern", "patterns", "chart", "14"):
             active_tab = 14
-        elif str(tab_override).lower() in ("l", "master", "m", "10"):
+        elif str(tab_override).lower() in ("l", "master", "10"):
             active_tab = 10
         elif str(tab_override).lower() in ("w", "waterfall", "wf", "12"):
             active_tab = 12
@@ -5395,6 +5547,8 @@ def build_dashboard_renderable(
     if getattr(store, "show_help", False):
         return _build_help_overlay(store, header_panel)
 
+    if active_tab == 17:
+        return _build_tab17_btc_magnet_hud(config, store, header_panel)
     if active_tab == 16:
         return _build_tab16_ssrn_research_hud(config, store, header_panel)
     if active_tab == 15:
@@ -5537,7 +5691,19 @@ def _poll_keyboard_tab_switch(
                     if store.active_tab != 12:
                         store.active_tab = 12
                         changed = True
-                elif ch in ("m", "M", "l", "L"):
+                elif ch in ("m", "M"):
+                    store.show_help = False
+                    if store.active_tab != 17:
+                        store.active_tab = 17
+                        changed = True
+                    else:
+                        from analytics.btc_magnet_engine import copy_btc_magnet_card_to_clipboard
+                        ok, msg, char_count = copy_btc_magnet_card_to_clipboard(store)
+                        store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+                        store.last_packet_copied_ts = time.time()
+                        store.last_packet_char_count = char_count
+                        changed = True
+                elif ch in ("l", "L"):
                     store.show_help = False
                     if store.active_tab != 10:
                         store.active_tab = 10
@@ -5614,7 +5780,18 @@ def _poll_keyboard_tab_switch(
                     if store.active_tab != new_tab:
                         store.active_tab = new_tab
                         changed = True
-                elif ch in ("m", "M", "l", "L"):
+                elif ch in ("m", "M"):
+                    if store.active_tab != 17:
+                        store.active_tab = 17
+                        changed = True
+                    else:
+                        from analytics.btc_magnet_engine import copy_btc_magnet_card_to_clipboard
+                        ok, msg, char_count = copy_btc_magnet_card_to_clipboard(store)
+                        store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+                        store.last_packet_copied_ts = time.time()
+                        store.last_packet_char_count = char_count
+                        changed = True
+                elif ch in ("l", "L"):
                     if store.active_tab != 10:
                         store.active_tab = 10
                         changed = True

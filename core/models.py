@@ -4882,3 +4882,49 @@ class SSRNAlphaEvaluation:
     active_view_mode: str = "models"  # Default to View B ("models")
     ssrn_summary_markdown: str = ""
 
+@dataclass
+class BTCMagnetLevel:
+    """A liquidation cluster magnet level with target price, distance, and USD volume."""
+    price: float = 0.0
+    dist_pct: float = 0.0
+    usd_volume: float = 0.0
+
+
+@dataclass
+class BTCMagnetRuleCheck:
+    """Status check for one of the 7 locked internal speaking rules."""
+    rule_num: int
+    name: str
+    passed: bool
+    detail: str
+
+
+@dataclass
+class BTCMagnetEvaluation:
+    """State for Tab [M: BTC MAGNET] - Mechanics-first liquidation gravity & swing edge detector."""
+    timestamp_utc: str = ""
+    spot_price: float = 0.0
+    price_change_24h_pct: float = 0.0
+    high_24h: float = 0.0
+    low_24h: float = 0.0
+
+    upper_magnet: BTCMagnetLevel = field(default_factory=BTCMagnetLevel)
+    lower_magnet: BTCMagnetLevel = field(default_factory=BTCMagnetLevel)
+    pull_direction: str = "NEUTRAL"  # "UPPER", "LOWER", "NEUTRAL"
+    pull_ratio: float = 1.0
+
+    funding_rate_annual_pct: float = 0.0
+    oi_delta_4h_pct: float = 0.0
+    market_regime: str = "Range"  # "Range", "TrendUp", "TrendDown"
+
+    # Evaluation verdict & locked status templates (from docs/status-templates.md)
+    verdict: str = "WAIT"  # "WAIT" | "SPEAK"
+    verdict_badge: str = "NO CLEAR EDGE — WAIT"
+    headline: str = "No clear edge — wait."
+    body: str = "Magnet present but conditions incomplete. No clear edge — wait."
+    rule_subtitle: str = "Locked Principle: The engine spends most days correctly saying 'wait.'"
+
+    rules_passed_count: int = 0
+    rule_checks: List[BTCMagnetRuleCheck] = field(default_factory=list)
+    magnet_summary_markdown: str = ""
+

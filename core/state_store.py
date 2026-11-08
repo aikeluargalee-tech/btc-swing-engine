@@ -17,6 +17,7 @@ from .models import (
     Gartley5StrategyEvaluation,
     GrokQuantEvaluation,
     SSRNAlphaEvaluation,
+    BTCMagnetEvaluation,
     KlineBar,
     LiquidationDetectorReport,
     MacroRadarEvaluation,
@@ -123,6 +124,7 @@ class StateStore:
         self.grok_quant_evaluation: Optional[GrokQuantEvaluation] = None
         self.ssrn_alpha_evaluation: Optional[SSRNAlphaEvaluation] = None
         self.ssrn_view_mode: str = "models"
+        self.btc_magnet_evaluation: Optional[BTCMagnetEvaluation] = None
 
         # --- Connection & System Health ---
         self.warmup_complete: bool = False

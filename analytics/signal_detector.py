@@ -41,6 +41,7 @@ from .pattern_detector import PatternEngine
 from .slsp_engine import SLSPEngine
 from .grok_quant_engine import GrokQuantEngine
 from .ssrn_research_engine import SSRNResearchEngine
+from .btc_magnet_engine import BTCMagnetEngine
 from .trap_engine import TrapEngine
 from .exhaustion_engine import ExhaustionEngine
 from .volatility_cone_engine import VolatilityConeEngine
@@ -66,6 +67,7 @@ class SignalDetector:
         self.slsp_engine = SLSPEngine(config, read_only=True)
         self.grok_engine = GrokQuantEngine()
         self.ssrn_engine = SSRNResearchEngine(config)
+        self.btc_magnet_engine = BTCMagnetEngine(config)
         # Side-effect free by default (no state writes / alerts). Only the live HUD opts in via set_read_only(False).
         self.spot_swing_engine = SpotSwingEngine(config, read_only=True)
         fsm_db_path = os.path.join(
@@ -393,6 +395,12 @@ class SignalDetector:
             self.ssrn_engine.evaluate(store)
         except Exception:
             logging.getLogger("ssrn_research").exception("SSRN research evaluation failed")
+
+        # 2j. Evaluate Tab [17: M]: BTC Magnet Liquidation Gravity Deck
+        try:
+            self.btc_magnet_engine.evaluate(store)
+        except Exception:
+            logging.getLogger("btc_magnet").exception("BTC Magnet evaluation failed")
 
         c_vah = active_vp.c_vah
         c_poc = active_vp.c_poc

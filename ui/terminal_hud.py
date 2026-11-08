@@ -1771,33 +1771,19 @@ def _layer_status_badge(status: str) -> str:
 
 
 def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> Group:
-    """Renders Tab [5]: Master Synthesis & Supreme Order of Battle across Tabs [1]-[4]."""
+    """Renders Tab [L]: 9-Flagship Top-Ribbon Command Matrix ([P, B, G, R, M, A, F, W, 0])."""
     msev = store.master_synthesis_evaluation
     if msev is None:
         return Group(
             header_panel,
             Panel(
-                "Warming up 10-Desk Master Synthesis Engine...",
+                "Warming up 9-Flagship Top-Ribbon Command Matrix...",
                 title="Tab [L]: Master Conclusion",
                 box=box.ROUNDED,
             ),
         )
 
-    # --- Introduction Card: Beginner Context & Methodology ---
-    intro_lines = [
-        "[bold cyan]▶ PURPOSE & SCOPE:[/bold cyan] Supreme command center harmonizing all 9 specialist desks (Tabs 1–9) into an institutional capital allocation verdict.",
-        "[bold cyan]▶ CORE MODELS & FEEDS:[/bold cyan] 9-Desk Rollup Matrix • Confluence Scoring Engine (0–100) • 4-Layer Hierarchy Gatekeeper • Dual-Track Allocation.",
-        "[bold cyan]▶ EXECUTION MANDATE:[/bold cyan] [bold green]The Supreme Signal Light[/bold green]: GREEN (Full Aggression), BLUE (Accumulate Support), AMBER (Caution / Tight Stops), RED (Risk-Off Liquidation).",
-    ]
-    intro_panel = Panel(
-        "\n".join(intro_lines),
-        title="[bold cyan]WELCOME TO TAB [L]: MASTER SYNTHESIS & SUPREME COMMAND CENTER[/bold cyan]",
-        box=box.ROUNDED,
-        border_style="cyan",
-        padding=(0, 1),
-    )
-
-    # --- Panel 1: 4-Tab Executive Verdict Rollup Matrix ---
+    # --- Panel 1: 9-Flagship Top-Ribbon Desk Matrix (P, B, G, R, M, A, F, W, 0) ---
     p1_table = Table(
         box=box.SIMPLE_HEAVY,
         expand=True,
@@ -1805,10 +1791,11 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
         header_style="bold cyan",
         pad_edge=False,
     )
-    p1_table.add_column("Tab", style="bold white", no_wrap=True)
+    p1_table.add_column("Flagship Desk", style="bold white", no_wrap=True)
     p1_table.add_column("Light", justify="center", no_wrap=True)
-    p1_table.add_column("Score / State", no_wrap=True)
-    p1_table.add_column("Executive Conclusion", justify="right", no_wrap=True)
+    p1_table.add_column("State / Score", no_wrap=True)
+    p1_table.add_column("Key Telemetry", style="dim white", no_wrap=True)
+    p1_table.add_column("Desk Status", justify="right", no_wrap=True)
 
     for row in msev.tab_rows:
         conc_color = (
@@ -1824,20 +1811,21 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
             row.tab_name,
             _light_badge(row.traffic_light),
             row.score_or_status,
+            row.primary_driver,
             f"[{conc_color}]{row.tab_conclusion}[/{conc_color}]",
         )
 
     p1_footer = (
-        f"[bold white]Scoreboard:[/bold white] [bold green]{msev.tabs_green_count} GREEN[/bold green] • "
+        f"[bold white]9-Desk Scoreboard:[/bold white] [bold green]{msev.tabs_green_count} GREEN[/bold green] • "
         f"[bold cyan]{msev.tabs_blue_count} BLUE[/bold cyan] • "
         f"[bold yellow]{msev.tabs_yellow_count} YELLOW[/bold yellow] • "
         f"[bold red]{msev.tabs_red_count} RED[/bold red]  |  "
-        f"[bold white]Alignment:[/bold white] [bold cyan]{msev.master_alignment_score:.1f}%[/bold cyan] "
+        f"[bold white]Readiness:[/bold white] [bold cyan]{msev.master_alignment_score:.1f}%[/bold cyan] "
         f"([bold yellow]{msev.alignment_status}[/bold yellow])"
     )
     p1_group = Group(p1_table, p1_footer)
 
-    # --- Panel 2: 4-Layer Institutional Decision Funnel & Conflict Resolver ---
+    # --- Panel 2: 4 Orthogonal Top-Ribbon Domain Pillars ---
     p2_table = Table(
         box=box.SIMPLE_HEAVY,
         expand=True,
@@ -1845,9 +1833,9 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
         header_style="bold magenta",
         pad_edge=False,
     )
-    p2_table.add_column("Hierarchy Layer", style="white", no_wrap=True)
+    p2_table.add_column("Domain Pillar", style="white", no_wrap=True)
     p2_table.add_column("Gate", justify="center", no_wrap=True)
-    p2_table.add_column("Live Hierarchical Ruling", justify="right", no_wrap=True)
+    p2_table.add_column("Live Domain Telemetry", justify="right", no_wrap=True)
 
     for h_row in msev.hierarchy_rows:
         p2_table.add_row(
@@ -1857,47 +1845,47 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
         )
 
     p2_footer = (
-        "[dim]Precedence: L1 Hard Veto overrides all -> L2 sets Base Risk (1.0% vs 0.5%) "
-        "-> L3 scales Size (0.0x–1.0x) -> L4 times Entry.[/dim]"
+        "[dim]Domains: D1 Crash/Veto Guards [P,W] • D2 1D/4H Trend [A,0,W] "
+        "• D3 Shelves & Magnets [P,M,B] • D4 Flow & Triggers [G,F,R,A].[/dim]"
     )
     p2_group = Group(p2_table, p2_footer)
 
     top_row = Table.grid(expand=True)
-    top_row.add_column(ratio=5)
-    top_row.add_column(ratio=5)
+    top_row.add_column(ratio=6)
+    top_row.add_column(ratio=4)
     top_row.add_row(
         Panel(
             p1_group,
-            title="[bold cyan]1. 4-Tab Executive Verdict Rollup Matrix (Specialist Desks [1]–[4])[/bold cyan]",
+            title="[bold cyan]1. 9-Flagship Top-Ribbon Desk Matrix ([P, B, G, R, M, A, F, W, 0])[/bold cyan]",
             box=box.ROUNDED,
         ),
         Panel(
             p2_group,
-            title="[bold magenta]2. 4-Layer Institutional Decision Funnel & Conflict Resolver[/bold magenta]",
+            title="[bold magenta]2. 4 Orthogonal Domain Pillars (Guards • Trend • Structure • Flow)[/bold magenta]",
             box=box.ROUNDED,
         ),
     )
 
-    # --- Panel 3: Cross-Tab Agreement & Divergence Audit (Detailed Narrative) ---
+    # --- Panel 3: Cross-Desk Agreement & Divergence Audit ---
     p3_lines = [
-        "[bold green]✔ CROSS-TAB CONFLUENCE (WHERE THE 4 TABS AGREE RIGHT NOW):[/bold green]"
+        "[bold green]✔ CROSS-DESK CONFLUENCE (9 TOP-RIBBON FLAGSHIP DESKS):[/bold green]"
     ]
     for pt in msev.confluence_points[:3]:
         p3_lines.append(f"  • {pt}")
 
     p3_lines.append(
-        "[bold yellow]⚡ CROSS-TAB CONFLICT DIAGNOSTIC & HIERARCHICAL RESOLUTION:[/bold yellow]"
+        "[bold yellow]⚡ CROSS-DESK DIVERGENCE & INDEPENDENT STRATEGY SEPARATION:[/bold yellow]"
     )
     for cpt in msev.conflict_points[:2]:
         p3_lines.append(f"  • {cpt}")
 
     p3_lines.append(
-        "[bold cyan]🎯 CATALYSTS THAT FLIP THE MASTER CONCLUSION (UPGRADE / DOWNGRADE):[/bold cyan]"
+        "[bold cyan]🎯 CATALYSTS & INVALIDATION THRESHOLDS:[/bold cyan]"
     )
     for ucat in msev.upgrade_catalysts[:2]:
         p3_lines.append(f"  • {ucat}")
 
-    # --- Panel 4: Reconciled Master Playbook (If Flat in Cash vs. If Holding Spot BTC) ---
+    # --- Panel 4: Independent Strategy Reference Ledger (No Strategy Blending) ---
     p4_table = Table(
         box=box.SIMPLE_HEAVY,
         expand=True,
@@ -1905,8 +1893,29 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
         header_style="bold yellow",
         pad_edge=False,
     )
-    p4_table.add_column("Playbook Track", style="bold white", no_wrap=True)
-    p4_table.add_column("Reconciled Master Specification", justify="right", no_wrap=True)
+    p4_table.add_column("Independent Strategy / Track", style="bold white", no_wrap=True)
+    p4_table.add_column("Unblended Reference Calculation (Not an Order)", justify="right", no_wrap=True)
+
+    tpb = getattr(store, "trend_pullback_evaluation", None)
+    if tpb is not None:
+        p4_table.add_row(
+            "[bold cyan]DESK [A] TREND-PULLBACK v1.0[/bold cyan]",
+            f"Ref Entry ${tpb.reference_entry_price:,.2f} • Stop ${tpb.structural_stop:,.2f} (-${tpb.stop_distance_usd:,.2f} / {tpb.stop_distance_atr:.2f} ATR) • Size {tpb.position_size_btc:.5f} BTC",
+        )
+    slsp = getattr(store, "slsp_evaluation", None)
+    if slsp is not None and slsp.active_setup is not None:
+        st = slsp.active_setup
+        p4_table.add_row(
+            "[bold bright_blue]DESK [P] SLSP v1.0 STRUCTURE[/bold bright_blue]",
+            f"Ref Entry ${st.entry_price:,.2f} • Stop ${st.stop_loss:,.2f} • TP1 ${st.tp1_price:,.2f} (1.5R) • Size {st.position_size_btc:.4f} BTC",
+        )
+    sw_ev = getattr(store, "spot_swing_evaluation", None)
+    if sw_ev is not None and sw_ev.risk is not None:
+        rk = sw_ev.risk
+        p4_table.add_row(
+            "[bold magenta]DESK [0] SPOT SWING (1:3 RRR)[/bold magenta]",
+            f"Ref Entry ${rk.entry:,.2f} • Stop ${rk.stop:,.2f} • TP1 ${rk.tp1:,.2f} (2.0R) • Size {rk.qty_btc:.4f} BTC",
+        )
 
     perm_col = (
         "bold green"
@@ -1914,44 +1923,12 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
         else ("bold red" if "FORBIDDEN" in msev.cash_permission else "bold cyan")
     )
     p4_table.add_row(
-        "[bold cyan]TRACK A: IF FLAT IN CASH[/bold cyan]",
-        f"[{perm_col}]{msev.cash_permission}[/{perm_col}]",
+        "[bold white]DESK [W/1] AUCTION cVAL TRACK[/bold white]",
+        f"[{perm_col}]{msev.cash_permission}[/{perm_col}] • Zone {msev.cash_entry_zone_str}",
     )
     p4_table.add_row(
-        "  ├─ Reconciled Bid Zone",
-        f"[bold white]{msev.cash_entry_zone_str}[/bold white]",
-    )
-    p4_table.add_row(
-        "  ├─ Reconciled Size Math",
-        f"{msev.cash_base_risk_pct:.2f}% [T3] × {msev.cash_regime_multiplier:.2f}x [T4] -> "
-        f"[bold cyan]{msev.cash_edge_size_btc:.4f} BTC (${msev.cash_edge_notional_usd:,.0f})[/bold cyan]",
-    )
-    p4_table.add_row(
-        "  └─ Execution Rule",
-        msev.cash_trigger_instruction,
-    )
-
-    hold_col = (
-        "bold red"
-        if "EXIT" in msev.holder_action
-        else ("bold yellow" if "SCALE" in msev.holder_action else "bold green")
-    )
-    p4_table.add_row(
-        "[bold green]TRACK B: IF HOLDING SPOT[/bold green]",
-        f"[{hold_col}]{msev.holder_action}[/{hold_col}]",
-    )
-    p4_table.add_row(
-        "  ├─ Reconciled Hard Stop",
-        f"[bold red]${msev.holder_hard_stop_usd:,.0f}[/bold red] ({msev.holder_hard_stop_source})",
-    )
-    p4_table.add_row(
-        "  ├─ Profit Targets (1/2)",
-        f"TP1 (40%): [bold cyan]${msev.holder_tp1_usd:,.0f}[/bold cyan] ({msev.holder_tp1_source}) • "
-        f"TP2 (60%): [bold magenta]${msev.holder_tp2_usd:,.0f}[/bold magenta]",
-    )
-    p4_table.add_row(
-        "  └─ Management Rule",
-        msev.holder_management_note,
+        "[bold green]SPOT HOLDER REFERENCE LEVELS[/bold green]",
+        f"Hard Stop [bold red]${msev.holder_hard_stop_usd:,.0f}[/bold red] • TP1 [bold cyan]${msev.holder_tp1_usd:,.0f}[/bold cyan] • TP2 [bold magenta]${msev.holder_tp2_usd:,.0f}[/bold magenta]",
     )
 
     mid_row = Table.grid(expand=True)
@@ -1960,12 +1937,12 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
     mid_row.add_row(
         Panel(
             "\n".join(p3_lines),
-            title="[bold green]3. Cross-Tab Agreement & Divergence Audit (Why This Conclusion Was Reached)[/bold green]",
+            title="[bold green]3. Cross-Desk Agreement & Divergence Audit (9 Top-Ribbon Desks)[/bold green]",
             box=box.ROUNDED,
         ),
         Panel(
             p4_table,
-            title="[bold yellow]4. Unified Master Order of Battle (Track A: In Cash vs. Track B: Holding Spot BTC)[/bold yellow]",
+            title="[bold yellow]4. Independent Strategy Reference Ledger (Desk [A] • Desk [P] • Desk [0] • Desk [W])[/bold yellow]",
             box=box.ROUNDED,
         ),
     )
@@ -1984,25 +1961,25 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
         headline = f"[bold white on red] {msev.master_headline} [/bold white on red]"
         border_style = "red"
 
-    if store.last_packet_copied_ts > 0:
+    copied_age = time.time() - float(getattr(store, "last_packet_copied_ts", 0.0) or 0.0)
+    if copied_age < 6.0:
         copy_btn_badge = (
-            f"[bold black on green] [✔ COPIED TO CLIPBOARD ({store.last_packet_char_count:,} chars @ {store.last_packet_copied_utc}) "
-            f"— PRESS CTRL+V IN GEMINI ARGON AI! (Press 'C' to Copy Fresh Snapshot)] [/bold black on green]"
+            f"[bold black on bright_green] ✓ DATA-ONLY COPIED ({getattr(store, 'last_packet_char_count', 0):,} chars -> logs/btc_master_latest.md) [/bold black on bright_green]"
         )
     else:
         copy_btn_badge = (
-            "[bold black on yellow] [PRESS 'C' KEY: COPY 10-DESK TELEMETRY PACKET TO CLIPBOARD FOR GEMINI ARGON AI AUDITOR] [/bold black on yellow]"
+            "[bold cyan][Press L again: Copy 9-Desk DATA-ONLY Report -> logs/btc_master_latest.md  |  Press C: Global AI Packet][/bold cyan]"
         )
 
     p5_lines = [
         f"{headline}  {copy_btn_badge}",
-        f"  [bold white]Master Synthesis :[/bold white] {msev.master_what_is_happening}",
-        f"  [bold white]Conflict Ruling  :[/bold white] {msev.master_why_resolution}",
-        f"  [bold white]Final Command    :[/bold white] [bold]{msev.master_final_command}[/bold]",
+        f"  [bold white]9-Desk Summary  :[/bold white] {msev.master_what_is_happening}",
+        f"  [bold white]Domain Diagnostic:[/bold white] {msev.master_why_resolution}",
+        f"  [bold white]Operator Summary :[/bold white] [bold]{msev.master_final_command}[/bold]",
     ]
     bottom_panel = Panel(
         "\n".join(p5_lines),
-        title="[bold white]5. Executive Bottom Line — Supreme Master Conclusion (Press 0: Master • 1–9: Desks • Press C to Copy AI Data Packet)[/bold white]",
+        title="[bold white]5. Executive Bottom Line — 9-Flagship Desk Command Matrix (Screen: Operator View • Double-Tap L: DATA-ONLY Clipboard)[/bold white]",
         border_style=border_style,
         box=box.ROUNDED,
     )

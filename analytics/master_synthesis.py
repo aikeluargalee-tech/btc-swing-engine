@@ -87,290 +87,284 @@ class MasterSynthesisEvaluator:
         )
 
         # =====================================================================
-        # 1. BUILD PANEL 1: 4-TAB EXECUTIVE VERDICT ROLLUP MATRIX
+        # 1. BUILD PANEL 1: 9-FLAGSHIP TOP-RIBBON DESK MATRIX (P, B, G, R, M, A, F, W, 0)
         # =====================================================================
-        # --- Tab [1] Swing Engine Verdict ---
-        if len(true_tab1_vetoes) > 0 or sig.gate_state == ExecutionGateState.CASH_MARKDOWN:
-            t1_light = "RED"
-            t1_conc = "HARD VETO — NO NEW BUYS"
-        elif sig.gate_state == ExecutionGateState.GATE3_RECLAIM_TRIGGERED and not sig.hard_veto_triggered:
-            t1_light = "GREEN"
-            t1_conc = f"BUY TRIGGERED (${target_support:,.0f} RECLAIM)"
-        elif sig.gate_state == ExecutionGateState.GATE4_PENDING_RETEST:
-            t1_light = "YELLOW"
-            bars_txt = f"Bar {sig.fsm_bars_elapsed}/{sig.fsm_max_bars}" if sig.fsm_bars_elapsed > 0 else "ARMED"
-            t1_conc = f"FSM PENDING RETEST ({bars_txt} @ ${target_support:,.0f})"
-        elif (
-            sig.gate_state in (ExecutionGateState.GATE1_ZONE_ALERT, ExecutionGateState.GATE2_MICROSTRUCTURE_ARMED)
-            and not sig.is_mid_range_chop
-        ):
-            t1_light = "BLUE"
-            t1_conc = f"AT SUPPORT — WAIT RECLAIM (${target_support:,.0f})"
-        else:
-            t1_light = "YELLOW"
-            if sig.is_mid_range_chop:
-                t1_conc = f"CHOP ({sig.va_position_pct:.0f}% VA) — WAIT ${target_support:,.0f}"
+        # --- Desk [P] Structure & SLSP v1.0 (Tab 13) ---
+        slsp = getattr(store, "slsp_evaluation", None)
+        if slsp is not None:
+            supp_px = slsp.nearest_support.center_price if slsp.nearest_support else 0.0
+            res_px = slsp.nearest_resistance.center_price if slsp.nearest_resistance else 0.0
+            if slsp.tell_tale_veto or slsp.trade_state in ("STAND_ASIDE", "CIRCUIT_BREAKER_LOCKOUT"):
+                p_light = "RED"
+            elif slsp.trade_state in ("TRIGGER_FIRED", "IN_POSITION"):
+                p_light = "GREEN"
+            elif slsp.trade_state in ("REJECTION_ARMED", "VALUE_ZONE_WATCH") or slsp.ema_3_value_zone_active:
+                p_light = "BLUE"
             else:
-                t1_conc = f"STAND ASIDE — BID ${target_support:,.0f}"
-
-        ema_tag = f" | 3-EMA: {sig.ema_strategy.daily_regime}" if sig.ema_strategy else ""
-        t1_driver = (
-            f"VA Pos: {sig.va_position_pct:.0f}% [{'CHOP' if sig.is_mid_range_chop else 'EDGE'}] "
-            f"| cVAL ${sig.c_val:,.0f}{ema_tag}"
-        )
-        score_state_str = f"{sig.confluence_score:.0f}/100"
-        if sig.ema_strategy:
-            score_state_str += f" • {sig.ema_strategy.daily_regime}"
+                p_light = "YELLOW"
+            p_status = f"{slsp.regime} • 3EMA:{slsp.ema_3_regime}"
+            p_driver = f"Sup:${supp_px:,.0f} Res:${res_px:,.0f} | TT:{'VETO' if slsp.tell_tale_veto else 'PASS'}"
+            obs_r = slsp.active_setup.obstacle_r if slsp.active_setup else 0.0
+            p_conc = f"{slsp.trade_state} | Sup ${supp_px:,.0f} ({obs_r:.1f}R)"
         else:
-            score_state_str += f" ({sig.regime.value[:10]})"
+            p_light = "YELLOW"
+            p_status = "SLSP + 3-EMA"
+            p_driver = f"cVAL ${sig.c_val:,.0f} | cVAH ${sig.c_vah:,.0f}"
+            p_conc = f"WATCH SUPPORT ${target_support:,.0f}"
 
-        t1_row = TabVerdictRow(
-            tab_num=1,
-            tab_name="[1] Swing Engine",
-            traffic_light=t1_light,
-            score_or_status=score_state_str,
-            primary_driver=t1_driver,
-            tab_conclusion=t1_conc,
+        row_p = TabVerdictRow(
+            tab_num=13,
+            tab_name="[P] Structure",
+            traffic_light=p_light,
+            score_or_status=p_status,
+            primary_driver=p_driver,
+            tab_conclusion=p_conc,
         )
 
-        # --- Tab [2] Protocol v1.3 & Liquidation Magnet Verdict ---
+        # --- Desk [B] Classic Chart Patterns & Geometry (Tab 14) ---
+        pat = getattr(store, "pattern_evaluation", None)
+        if pat is not None:
+            top_p = getattr(pat, "primary_pattern", None) or getattr(pat, "active_pattern", None)
+            p_name = str(getattr(top_p, "pattern_name", None) or getattr(pat, "dominant_pattern", "RANGE_SCAN"))
+            p_bias = str(getattr(top_p, "direction", None) or getattr(pat, "overall_bias", "NEUTRAL")).upper()
+            p_score = float(getattr(pat, "confluence_score", 0.0) or getattr(pat, "pattern_score", 50.0) or 50.0)
+            if "BULL" in p_bias and p_score >= 65.0:
+                b_light = "GREEN"
+            elif "BEAR" in p_bias and p_score >= 65.0:
+                b_light = "RED"
+            elif "BULL" in p_bias:
+                b_light = "BLUE"
+            else:
+                b_light = "YELLOW"
+            b_status = f"{p_score:.0f}/100 • {p_bias[:8]}"
+            b_driver = f"Pattern: {p_name[:28]}"
+            b_conc = f"{p_name[:22]} ({p_bias[:4]})"
+        else:
+            b_light = "YELLOW"
+            b_status = "GEOMETRY SCAN"
+            b_driver = "4H / 1H Pivot & Neckline Scan"
+            b_conc = "NO BREAKOUT ARMED"
+
+        row_b = TabVerdictRow(
+            tab_num=14,
+            tab_name="[B] Patterns",
+            traffic_light=b_light,
+            score_or_status=b_status,
+            primary_driver=b_driver,
+            tab_conclusion=b_conc,
+        )
+
+        # --- Desk [G] Grok Dual-Horizon Flow & VWAP SD Matrix (Tab 15) ---
+        grk = getattr(store, "grok_evaluation", None)
+        if grk is not None:
+            g_score = float(getattr(grk, "composite_score", 0.0) or getattr(grk, "grok_score", 50.0) or 50.0)
+            vwap_sd = float(getattr(grk, "vwap_zscore", 0.0) or 0.0)
+            if g_score >= 65.0 and flow.w_4h.spot_delta_btc > 0:
+                g_light = "GREEN"
+            elif g_score <= 35.0:
+                g_light = "RED"
+            elif flow.w_4h.spot_delta_btc > 0:
+                g_light = "BLUE"
+            else:
+                g_light = "YELLOW"
+            g_status = f"{g_score:.0f}/100 • VWAP {vwap_sd:+.2f}SD"
+            g_driver = f"4H S:{flow.w_4h.spot_delta_btc:+,.0f} P:{flow.w_4h.perp_delta_btc:+,.0f} BTC"
+            g_conc = f"4H Spot {flow.w_4h.spot_delta_btc:+,.0f} BTC | Abs {flow.w_1h.absorption_index:.2f}"
+        else:
+            g_light = "BLUE" if flow.w_4h.spot_delta_btc > 0 else "YELLOW"
+            g_status = f"4H Spot Z:{flow.w_4h.spot_zscore:+.2f}"
+            g_driver = f"4H S:{flow.w_4h.spot_delta_btc:+,.0f} P:{flow.w_4h.perp_delta_btc:+,.0f} BTC"
+            g_conc = f"Spot CVD {flow.w_4h.spot_delta_btc:+,.0f} BTC (Abs {flow.w_1h.absorption_index:.2f})"
+
+        row_g = TabVerdictRow(
+            tab_num=15,
+            tab_name="[G] Grok Flow",
+            traffic_light=g_light,
+            score_or_status=g_status,
+            primary_driver=g_driver,
+            tab_conclusion=g_conc,
+        )
+
+        # --- Desk [R] SSRN Quantitative Alpha Deck (Tab 16) ---
+        ssrn = getattr(store, "ssrn_evaluation", None)
+        if ssrn is not None:
+            r_score = float(getattr(ssrn, "composite_alpha_score", 0.0) or getattr(ssrn, "overall_score", 0.0) or 0.0)
+            r_reg = str(getattr(ssrn, "dominant_regime", None) or getattr(ssrn, "regime_label", "NEUTRAL"))
+            if r_score >= 25.0:
+                r_light = "GREEN"
+            elif r_score <= -25.0:
+                r_light = "RED"
+            elif r_score > 0.0:
+                r_light = "BLUE"
+            else:
+                r_light = "YELLOW"
+            r_status = f"Alpha {r_score:+.1f} • {r_reg[:10]}"
+            r_driver = f"SSRN Composite Alpha: {r_score:+.1f}"
+            r_conc = f"Alpha {r_score:+.1f} ({r_reg[:18]})"
+        else:
+            r_light = "YELLOW"
+            r_status = "SSRN 6-MODEL"
+            r_driver = "OFI • Jump Risk • Volatility"
+            r_conc = "NEUTRAL ALPHA BASELINE"
+
+        row_r = TabVerdictRow(
+            tab_num=16,
+            tab_name="[R] SSRN Alpha",
+            traffic_light=r_light,
+            score_or_status=r_status,
+            primary_driver=r_driver,
+            tab_conclusion=r_conc,
+        )
+
+        # --- Desk [M] BTC Magnet Liquidation Gravity Deck (Tab 17) ---
+        bmag = getattr(store, "btc_magnet_evaluation", None)
+        up_mag = float(getattr(bmag, "upper_magnet_price", 0.0) or pev.short_liq_magnet_usd)
+        dn_mag = float(getattr(bmag, "lower_magnet_price", 0.0) or pev.long_liq_magnet_usd)
+        up_dist_pct = ((up_mag - price) / price * 100.0) if price > 0 and up_mag > 0 else 0.0
+        dn_dist_pct = ((price - dn_mag) / price * 100.0) if price > 0 and dn_mag > 0 else 0.0
+        if bmag is not None:
+            m_bias = str(getattr(bmag, "dominant_pull", None) or getattr(bmag, "net_bias", "BALANCED")).upper()
+            if "UP" in m_bias or "SHORT" in m_bias:
+                m_light = "BLUE"
+            elif "DOWN" in m_bias or "LONG" in m_bias:
+                m_light = "YELLOW"
+            else:
+                m_light = "YELLOW"
+        else:
+            m_light = "BLUE" if abs(up_dist_pct) <= abs(dn_dist_pct) else "YELLOW"
+        m_status = f"↑+{up_dist_pct:.1f}% • ↓-{dn_dist_pct:.1f}%"
+        m_driver = f"S-Liq:${up_mag:,.0f} | L-Liq:${dn_mag:,.0f}"
+        m_conc = f"Up ${up_mag:,.0f} (+{up_dist_pct:.1f}%) | Low ${dn_mag:,.0f} (-{dn_dist_pct:.1f}%)"
+
+        row_m = TabVerdictRow(
+            tab_num=17,
+            tab_name="[M] Magnet",
+            traffic_light=m_light,
+            score_or_status=m_status,
+            primary_driver=m_driver,
+            tab_conclusion=m_conc,
+        )
+
+        # --- Desk [A] BTC Trend-Pullback v1.0 Strategy (Tab 18) ---
+        tpb = getattr(store, "trend_pullback_evaluation", None)
+        if tpb is not None:
+            c_1d = bool(tpb.daily_close_above_sma200 and tpb.daily_sma200_rising)
+            c_4h = bool(tpb.ema50_above_ema200 and tpb.ema50_rising_6bars and tpb.close_4h_above_ema200)
+            c_rec = bool(tpb.rec_all_conditions_met and not tpb.candle_4h_low_below_zone_lower)
+            if tpb.strategy_verdict in ("ENTRY READY", "LONG ENTRY"):
+                a_light = "GREEN"
+            elif c_1d and c_4h:
+                a_light = "BLUE"
+            elif not c_1d:
+                a_light = "RED"
+            else:
+                a_light = "YELLOW"
+            a_status = f"1D:{c_1d} • 4H:{c_4h} • Rec:{c_rec}"
+            a_driver = f"Zone ${tpb.pullback_zone_lower:,.0f}–${tpb.pullback_zone_upper:,.0f} | Stop ${tpb.structural_stop:,.0f}"
+            a_conc = f"{tpb.strategy_verdict} ({tpb.decision_state[:22]})"
+        else:
+            a_light = "YELLOW"
+            a_status = "1D/4H PULLBACK"
+            a_driver = f"1D 200SMA ${mev.sma_200_1d:,.0f}"
+            a_conc = "WARMING UP 1D/4H BARS"
+
+        row_a = TabVerdictRow(
+            tab_num=18,
+            tab_name="[A] BTC Strategy",
+            traffic_light=a_light,
+            score_or_status=a_status,
+            primary_driver=a_driver,
+            tab_conclusion=a_conc,
+        )
+
+        # --- Desk [F] Footprint Swing & 3-Variant Forward Test (Tab 11) ---
+        fp = getattr(store, "footprint_evaluation", None)
+        if fp is not None:
+            fp_sig = str(getattr(fp, "signal_state", None) or getattr(fp, "verdict", "OBSERVING")).upper()
+            fp_delta = float(getattr(fp, "current_bar_delta", 0.0) or 0.0)
+            if "BUY" in fp_sig or "LONG" in fp_sig or "TRIGGER" in fp_sig:
+                f_light = "GREEN"
+            elif "VETO" in fp_sig or "LOCKED" in fp_sig:
+                f_light = "RED"
+            elif fp_delta > 0:
+                f_light = "BLUE"
+            else:
+                f_light = "YELLOW"
+            f_status = f"15m Δ:{fp_delta:+.1f} BTC"
+            f_driver = f"Delta {fp_delta:+.1f} BTC | State: {fp_sig[:18]}"
+            f_conc = f"{fp_sig[:24]} (Δ {fp_delta:+.1f} BTC)"
+        else:
+            f_light = "BLUE" if flow.w_15m.spot_delta_btc > 0 else "YELLOW"
+            f_status = f"15m Δ:{flow.w_15m.spot_delta_btc:+.1f} BTC"
+            f_driver = f"15m Spot {flow.w_15m.spot_delta_btc:+.1f} BTC"
+            f_conc = f"15m Spot Δ {flow.w_15m.spot_delta_btc:+.1f} BTC"
+
+        row_f = TabVerdictRow(
+            tab_num=11,
+            tab_name="[F] Footprint",
+            traffic_light=f_light,
+            score_or_status=f_status,
+            primary_driver=f_driver,
+            tab_conclusion=f_conc,
+        )
+
+        # --- Desk [W] 5-Pillar Institutional Decision Waterfall (Tab 12) ---
         active_sells = sum(1 for s in pev.sell_triggers if s.status == "CONFIRMED")
-        if pev.any_sell_confirmed:
-            t2_light = "RED"
-            t2_conc = f"SELL CONFIRMED ({active_sells}/4) — EXIT"
-        elif pev.non_trade_zone_status == "YES":
-            t2_light = "RED"
-            t2_conc = "NON-TRADE ZONE (8A–8F) LOCKED"
-        elif pev.buy_allowed == "YES" and pev.entry_status == "READY":
-            t2_light = "GREEN"
-            t2_conc = "PROTOCOL READY — BUY ALLOWED"
-        elif "LONG-LIQ SWEEP" in pev.liq_magnet_verdict or "HOLD SPOT" in pev.liq_magnet_verdict:
-            t2_light = "BLUE" if pev.non_trade_zone_status == "NO" else "YELLOW"
-            t2_conc = "HOLD SPOT • WAIT MAGNET SWEEP"
+        p1_pass = not mev.gatekeeper_veto
+        p2_pass = not sig.is_mid_range_chop and sig.location_score >= 15.0
+        p3_pass = sig.flow_score >= 15.0
+        p4_pass = pev.non_trade_zone_status == "NO" and not pev.any_sell_confirmed
+        p5_pass = sig.gate_state == ExecutionGateState.GATE3_RECLAIM_TRIGGERED and not sig.hard_veto_triggered
+        w_passes = sum([p1_pass, p2_pass, p3_pass, p4_pass, p5_pass])
+        if not p4_pass or len(true_tab1_vetoes) > 0:
+            w_light = "RED"
+            w_conc = f"VETO LOCKED ({w_passes}/5 Pillars) • {active_cfg.code}"
+        elif w_passes == 5:
+            w_light = "GREEN"
+            w_conc = f"ALL 5/5 PILLARS PASS • {active_cfg.code}"
+        elif w_passes >= 3:
+            w_light = "BLUE"
+            w_conc = f"{w_passes}/5 Pillars Pass • {active_cfg.code} ({sig. confluence_score:.0f}/100)"
         else:
-            t2_light = "YELLOW"
-            t2_conc = f"BUY:{pev.buy_allowed} ({pev.entry_status}) • DO NOTHING"
+            w_light = "YELLOW"
+            w_conc = f"{w_passes}/5 Pillars Pass • Bid ${target_support:,.0f}"
+        w_status = f"{w_passes}/5 Gates • {active_cfg.code}"
+        w_driver = f"Conf {sig.confluence_score:.0f}/100 | VA {sig.va_position_pct:.0f}% | NTZ:{pev.non_trade_zone_status}"
 
-        t2_driver = (
-            f"1D:{pev.daily_bias} | S:${pev.short_liq_magnet_usd:,.0f} L:${pev.long_liq_magnet_usd:,.0f}"
-        )
-        t2_row = TabVerdictRow(
-            tab_num=2,
-            tab_name="[2] Protocol 1.3",
-            traffic_light=t2_light,
-            score_or_status=f"NTZ:{pev.non_trade_zone_status} • Sell:{active_sells}/4",
-            primary_driver=t2_driver,
-            tab_conclusion=t2_conc,
+        row_w = TabVerdictRow(
+            tab_num=12,
+            tab_name="[W] Waterfall",
+            traffic_light=w_light,
+            score_or_status=w_status,
+            primary_driver=w_driver,
+            tab_conclusion=w_conc,
         )
 
-        # --- Tab [3] Macro Quant & Cycle Radar Verdict ---
-        if not mev.gatekeeper_veto and mev.macro_confidence_pct >= 65.0:
-            t3_light = "GREEN"
-            t3_conc = "BULL EXPANSION (75–100% SPOT)"
-        elif not mev.gatekeeper_veto:
-            t3_light = "BLUE"
-            t3_conc = "CONSTRUCTIVE BULL (50–75% SPOT)"
-        elif mev.crash_rung_override_active:
-            t3_light = "BLUE"
-            t3_conc = f"SNIPER VALUE ({mev.active_crash_rung[:10]})"
-        elif mev.macro_confidence_pct >= 35.0:
-            t3_light = "YELLOW"
-            t3_conc = "REPAIR (<200D • 0.5% RISK CAP)"
+        # --- Desk [0] BTC Spot Swing 1:3 RRR Screener (Tab 0) ---
+        sw_ev = store.spot_swing_evaluation
+        if sw_ev is not None and sw_ev.data_ready and sw_ev.macro is not None:
+            sw_light = sw_ev.traffic_light if sw_ev.traffic_light in ("GREEN", "BLUE", "YELLOW", "RED") else "YELLOW"
+            rrr_val = sw_ev.magnet.rrr_to_magnet if sw_ev.magnet else 0.0
+            sw_status = f"1D:{'PASS' if sw_ev.macro.macro_approved else 'WAIT'} • R:R {rrr_val:.2f}R"
+            sw_driver = f"50D:${pev.sma_50_1d:,.0f} | RRR:{rrr_val:.2f}R (req >=3.0R)"
+            sw_conc = f"{sw_ev.verdict} (R:R {rrr_val:.2f}R)"
         else:
-            t3_light = "RED"
-            t3_conc = "MACRO BEAR VETO (100% CASH)"
+            sw_light = "YELLOW"
+            sw_status = f"NTZ:{pev.non_trade_zone_status} • Sell:{active_sells}/4"
+            sw_driver = f"1D:{pev.daily_bias} | S:${pev.short_liq_magnet_usd:,.0f} L:${pev.long_liq_magnet_usd:,.0f}"
+            sw_conc = f"BUY:{pev.buy_allowed} ({pev.entry_status})"
 
-        t3_driver = (
-            f"200D ${mev.sma_200_1d:,.0f} | PowerLaw {mev.power_law_discount_pct:+.1f}%"
+        row_0 = TabVerdictRow(
+            tab_num=0,
+            tab_name="[0] Spot Swing",
+            traffic_light=sw_light,
+            score_or_status=sw_status,
+            primary_driver=sw_driver,
+            tab_conclusion=sw_conc,
         )
-        t3_row = TabVerdictRow(
-            tab_num=3,
-            tab_name="[3] Macro Radar",
-            traffic_light=t3_light,
-            score_or_status=f"{mev.macro_confidence_pct:.1f}% ({'BULL >200D' if not mev.gatekeeper_veto else 'BELOW 200D'})",
-            primary_driver=t3_driver,
-            tab_conclusion=t3_conc,
-        )
-
-        # --- Tab [4] Regime Matrix A–J Verdict ---
-        if active_cfg.category == "BULL_LONG":
-            t4_light = "GREEN"
-        elif active_cfg.category == "ACCUMULATE":
-            t4_light = "BLUE"
-        elif active_cfg.category == "HARVEST_WAIT":
-            t4_light = "YELLOW"
-        else:
-            t4_light = "RED"
 
         regime_mult = _CONFIG_MULTIPLIER_MAP.get(active_cfg.code, 0.50)
-        t4_driver = f"{active_cfg.short_title} ({active_cfg.key_live_facts})"
-        t4_conc = f"{active_cfg.action_headline} | Stop ${active_cfg.computed_stop_usd:,.0f}"
-        t4_row = TabVerdictRow(
-            tab_num=4,
-            tab_name="[4] Regime A–J",
-            traffic_light=t4_light,
-            score_or_status=f"{active_cfg.code} ({active_cfg.match_pct:.0f}% Match)",
-            primary_driver=t4_driver,
-            tab_conclusion=t4_conc,
-        )
-
-        # --- Tab [5] MM-BTC Rough Path Arbitrator Verdict ---
-        mm_ev = store.mm_btc_evaluation
-        if mm_ev is not None:
-            if "CLEAR" in mm_ev.signature.arbiter_gate_status and mm_ev.agreeing_models_count >= 3:
-                t5_light = "GREEN"
-            elif "VETO" in mm_ev.signature.arbiter_gate_status or mm_ev.signature.roughness > 4.5:
-                t5_light = "RED"
-            elif mm_ev.agreeing_models_count >= 2:
-                t5_light = "BLUE"
-            else:
-                t5_light = "YELLOW"
-            t5_driver = f"R={mm_ev.signature.roughness:.2f} | Consensus: {mm_ev.agreeing_models_count}/5"
-            w_tag = f"{mm_ev.final_weight:.2f}x"
-            t5_conc = mm_ev.action_plan_cash if w_tag in mm_ev.action_plan_cash else f"{mm_ev.action_plan_cash} ({w_tag})"
-            t5_status = f"{mm_ev.microstructure_pattern} • H={mm_ev.hurst.hurst:.2f}"
-        else:
-            t5_light = "YELLOW"
-            t5_driver = "Scanning path signatures..."
-            t5_conc = "WARMING UP"
-            t5_status = "INITIALIZING"
-
-        t5_row = TabVerdictRow(
-            tab_num=5,
-            tab_name="[5] MM-BTC",
-            traffic_light=t5_light,
-            score_or_status=t5_status,
-            primary_driver=t5_driver,
-            tab_conclusion=t5_conc,
-        )
-
-        # --- Tab [6] 72H Forward Volatility Cone Verdict ---
-        vc_ev = store.volatility_cone_evaluation
-        if vc_ev is not None:
-            if vc_ev.coiled_spring_alert:
-                t6_light = "YELLOW"
-                t6_conc = "COILED SPRING (BREAKOUT IMMINENT)"
-            elif "COMPRESSION" in vc_ev.vcr_status:
-                t6_light = "BLUE"
-                t6_conc = "COMPRESSING VOL (ACCUMULATION)"
-            else:
-                t6_light = "GREEN"
-                t6_conc = "IN-CONE VOLATILITY DISPERSION"
-            t6_driver = f"GK Vol: {vc_ev.garman_klass_annualized_vol * 100:.1f}% | H={vc_ev.hurst_exponent:.2f}"
-            t6_status = f"VCR: {vc_ev.vcr_72h:.2f} • {vc_ev.vcr_status}"
-        else:
-            t6_light = "YELLOW"
-            t6_driver = "Computing Garman-Klass volatility..."
-            t6_conc = "WARMING UP"
-            t6_status = "INITIALIZING"
-
-        t6_row = TabVerdictRow(
-            tab_num=6,
-            tab_name="[6] 72H Cone",
-            traffic_light=t6_light,
-            score_or_status=t6_status,
-            primary_driver=t6_driver,
-            tab_conclusion=t6_conc,
-        )
-
-        # --- Tab [7] Gartley 222 & Confluence Radar Verdict ---
-        gy_ev = store.gartley_evaluation
-        if gy_ev is not None:
-            if "BUY" in gy_ev.overall_verdict or "CONFLUENCE" in gy_ev.overall_verdict:
-                t7_light = "GREEN"
-            elif "SELL" in gy_ev.overall_verdict or "USDT" in gy_ev.overall_verdict:
-                t7_light = "RED"
-            elif "HOLD" in gy_ev.overall_verdict:
-                t7_light = "BLUE"
-            else:
-                t7_light = "YELLOW"
-            t7_driver = f"1D:{gy_ev.res_1d.verdict} | 4H:{gy_ev.res_4h.verdict}"
-            t7_conc = gy_ev.overall_verdict
-            t7_status = f"Spot: ${gy_ev.close_price:,.0f} • Parity: ON"
-        else:
-            t7_light = "YELLOW"
-            t7_driver = "Scanning harmonic pivots..."
-            t7_conc = "WARMING UP"
-            t7_status = "INITIALIZING"
-
-        t7_row = TabVerdictRow(
-            tab_num=7,
-            tab_name="[7] Gartley 222",
-            traffic_light=t7_light,
-            score_or_status=t7_status,
-            primary_driver=t7_driver,
-            tab_conclusion=t7_conc,
-        )
-
-        # --- Tab [8] Pattern Invalidation & SFP Trap Radar Verdict ---
-        tp_ev = store.trap_evaluation
-        if tp_ev is not None:
-            if "BEAR TRAP" in tp_ev.active_trap_signal:
-                t8_light = "GREEN"
-                t8_conc = "BEAR TRAP RECLAIM"
-            elif "BULL TRAP" in tp_ev.active_trap_signal:
-                t8_light = "RED"
-                t8_conc = "BULL TRAP BREAKOUT FAILURE"
-            elif "SWEEP" in tp_ev.active_trap_signal:
-                t8_light = "YELLOW"
-                t8_conc = "LIQUIDITY SWEEP IN PROGRESS"
-            else:
-                t8_light = "GREEN"
-                t8_conc = "NO ACTIVE TRAP (STRUCTURE CLEAN)"
-            t8_driver = f"Trap: {tp_ev.active_trap_signal} | Abs: {'YES' if tp_ev.passive_absorption_flag else 'NO'}"
-            t8_status = f"{tp_ev.active_trap_state.value}"
-        else:
-            t8_light = "YELLOW"
-            t8_driver = "Scanning fractal pivots..."
-            t8_conc = "WARMING UP"
-            t8_status = "INITIALIZING"
-
-        t8_row = TabVerdictRow(
-            tab_num=8,
-            tab_name="[8] SFP Trap",
-            traffic_light=t8_light,
-            score_or_status=t8_status,
-            primary_driver=t8_driver,
-            tab_conclusion=t8_conc,
-        )
-
-        # --- Tab [9] Terminal Exhaustion & Delta Divergence Radar Verdict ---
-        ex_ev = store.exhaustion_evaluation
-        if ex_ev is not None:
-            if ex_ev.exhaustion_score >= 80.0:
-                t9_light = "RED"
-                t9_conc = f"TERMINAL EXHAUSTION ({ex_ev.exhaustion_score:.1f}/100)"
-            elif ex_ev.exhaustion_score >= 60.0:
-                t9_light = "YELLOW"
-                t9_conc = f"ELEVATED FATIGUE ({ex_ev.exhaustion_score:.1f}/100)"
-            elif ex_ev.exhaustion_score >= 35.0:
-                t9_light = "BLUE"
-                t9_conc = f"MODERATE MOMENTUM ({ex_ev.exhaustion_score:.1f}/100)"
-            else:
-                t9_light = "GREEN"
-                t9_conc = (
-                    "MOMENTUM HEALTHY (NO TERMINAL EXHAUSTION)"
-                    if ex_ev.divergences
-                    else "MOMENTUM HEALTHY (NO DIVERGENCE)"
-                )
-            t9_driver = f"Score: {ex_ev.exhaustion_score:.1f} | TD 1H:{ex_ev.td_1h.setup_count}/9 4H:{ex_ev.td_4h.setup_count}/9"
-            t9_status = f"{ex_ev.active_exhaustion_signal}"
-        else:
-            t9_light = "YELLOW"
-            t9_driver = "Scanning TD setups..."
-            t9_conc = "WARMING UP"
-            t9_status = "INITIALIZING"
-
-        t9_row = TabVerdictRow(
-            tab_num=9,
-            tab_name="[9] Exhaustion",
-            traffic_light=t9_light,
-            score_or_status=t9_status,
-            primary_driver=t9_driver,
-            tab_conclusion=t9_conc,
-        )
-
-        tab_rows = [t1_row, t2_row, t3_row, t4_row, t5_row, t6_row, t7_row, t8_row, t9_row]
+        tab_rows = [row_p, row_b, row_g, row_r, row_m, row_a, row_f, row_w, row_0]
         lights = [r.traffic_light for r in tab_rows]
         g_cnt = lights.count("GREEN")
         b_cnt = lights.count("BLUE")
@@ -378,19 +372,22 @@ class MasterSynthesisEvaluator:
         r_cnt = lights.count("RED")
 
         # =====================================================================
-        # 2. BUILD PANEL 2: 4-LAYER HIERARCHICAL DECISION FUNNEL & CONFLICT RESOLVER
+        # 2. BUILD PANEL 2: 4 ORTHOGONAL TOP-RIBBON DOMAIN PILLARS
         # =====================================================================
         supreme_veto = False
         supreme_veto_reasons: List[str] = []
+        if slsp is not None and slsp.tell_tale_veto:
+            supreme_veto = True
+            supreme_veto_reasons.append("Desk [P] Tell-Tale 5x Volume Climax Veto")
         if pev.any_sell_confirmed:
             supreme_veto = True
-            supreme_veto_reasons.append(f"Tab [2] Sell Trigger ({active_sells}/4)")
+            supreme_veto_reasons.append(f"Desk [W/2] Sell Trigger ({active_sells}/4)")
         if pev.non_trade_zone_status == "YES":
             supreme_veto = True
-            supreme_veto_reasons.append("Tab [2] Non-Trade Zone (8A–8F)")
+            supreme_veto_reasons.append("Desk [W/2] Non-Trade Zone (8A–8F)")
         if active_cfg.category == "DEFENSIVE_CASH":
             supreme_veto = True
-            supreme_veto_reasons.append(f"Tab [4] {active_cfg.code} ({active_cfg.short_title})")
+            supreme_veto_reasons.append(f"Desk [W/4] {active_cfg.code} ({active_cfg.short_title})")
         for vr in true_tab1_vetoes:
             supreme_veto = True
             supreme_veto_reasons.append(vr.split(":")[0])
@@ -401,120 +398,98 @@ class MasterSynthesisEvaluator:
             supreme_veto_reason_str = "; ".join(supreme_veto_reasons)
         elif pev.non_trade_zone_status == "UNVERIFIED":
             l1_status = "CAUTION"
-            l1_ruling = "8A–8E CLEAR; 8F Event Window UNVERIFIED"
+            l1_ruling = "Tell-Tale PASS; 8A–8E CLEAR; 8F UNVERIFIED"
             supreme_veto_reason_str = "8F Event Schedule Unverified"
         else:
             l1_status = "PASS"
-            l1_ruling = "8A–8F CLEAR • 0/4 Sells • No Squeeze Veto"
+            l1_ruling = "Tell-Tale PASS • Liq Flush NORMAL • 8A–8F CLEAR"
             supreme_veto_reason_str = "NONE"
 
-        # Layer 2: Macro Structural Regime & Base Risk Budget (Tab [3])
+        # Domain Pillar 2: Macro & 4H Trend Filter (Desks A, 0, W)
         has_macro_bars = len(store.spot_klines_1d) >= 50
-        if not has_macro_bars or not mev.gatekeeper_veto:
+        a_4h_ok = bool(tpb and tpb.ema50_above_ema200 and tpb.ema50_rising_6bars and tpb.close_4h_above_ema200)
+        if not has_macro_bars or (not mev.gatekeeper_veto and a_4h_ok):
             l2_status = "PASS"
             base_risk_pct = self.config.risk_per_trade_pct  # 1.0%
-            l2_ruling = f"Bull >200D (${mev.sma_200_1d:,.0f}, +Slope) -> {base_risk_pct:.2f}% Risk"
+            l2_ruling = f"1D >200SMA (${mev.sma_200_1d:,.0f}) & 4H EMA50>200 -> PASS"
+        elif not mev.gatekeeper_veto and not a_4h_ok:
+            l2_status = "STANDBY"
+            base_risk_pct = self.config.risk_per_trade_pct
+            l2_ruling = f"1D >200SMA (${mev.sma_200_1d:,.0f}) TRUE | 4H EMA50>200 FALSE"
         elif mev.crash_rung_override_active:
             l2_status = "ARMED"
             base_risk_pct = self.config.counter_trend_risk_pct  # 0.5%
-            l2_ruling = f"{mev.active_crash_rung[:12]} Active -> {base_risk_pct:.2f}% Sniper Risk"
+            l2_ruling = f"{mev.active_crash_rung[:12]} Active -> {base_risk_pct:.2f}% Risk Cap"
         else:
             l2_status = "CAUTION"
             base_risk_pct = self.config.counter_trend_risk_pct  # 0.5%
-            l2_ruling = f"Below 200D (${mev.sma_200_1d:,.0f}) -> {base_risk_pct:.2f}% Risk Cap"
+            l2_ruling = f"1D Below 200SMA (${mev.sma_200_1d:,.0f}) -> {base_risk_pct:.2f}% Cap"
 
-        # Layer 3: Microstructure Sizing Multiplier & Liquidation Magnet (Tab [4] + Tab [2])
-        if regime_mult >= 0.75:
-            l3_status = "PASS"
-        elif regime_mult >= 0.25:
-            l3_status = "ARMED"
+        # Domain Pillar 3: Structure Shelves & Liquidation Magnets (Desks P, M, B)
+        p_shelf_px = slsp.nearest_support.center_price if (slsp and slsp.nearest_support) else target_support
+        if row_p.traffic_light in ("GREEN", "BLUE") and not sig.is_mid_range_chop:
+            l3_status = "PASS" if row_p.traffic_light == "GREEN" else "ARMED"
         else:
             l3_status = "STANDBY"
-        l3_ruling = (
-            f"{active_cfg.code} ({regime_mult:.2f}x) | Mag S:${pev.short_liq_magnet_usd:,.0f} L:${pev.long_liq_magnet_usd:,.0f}"
-        )
+        l3_ruling = f"Shelf ${p_shelf_px:,.0f} | Mag ↑${up_mag:,.0f} ↓${dn_mag:,.0f}"
 
-        # Layer 4: Tactical Auction Location, Chop Filter & Entry Trigger (Tab [1])
-        if sig.gate_state == ExecutionGateState.GATE3_RECLAIM_TRIGGERED and not sig.hard_veto_triggered:
+        # Domain Pillar 4: Order Flow, Footprint, SSRN & Strategy Triggers (Desks G, F, R, A)
+        if (row_a.traffic_light == "GREEN" or row_p.traffic_light == "GREEN") and not supreme_veto:
             l4_status = "PASS"
-            l4_ruling = f"Gate 3/4 Triggered >=${target_support:,.0f} (+Spot CVD)"
-        elif sig.gate_state == ExecutionGateState.GATE4_PENDING_RETEST:
+            l4_ruling = f"Trigger Fired | 4H Spot CVD {flow.w_4h.spot_delta_btc:+,.0f} BTC"
+        elif flow.w_4h.spot_delta_btc > 0 and row_g.traffic_light in ("GREEN", "BLUE"):
             l4_status = "ARMED"
-            bars_txt = f"Bar {sig.fsm_bars_elapsed}/{sig.fsm_max_bars}" if sig.fsm_bars_elapsed > 0 else "ARMED"
-            l4_ruling = f"FSM Retest Window ({bars_txt}) -> Band ${sig.fsm_retest_band_low:,.0f}–${sig.fsm_retest_band_high:,.0f}"
-        elif sig.is_mid_range_chop:
-            l4_status = "STANDBY"
-            l4_ruling = f"Mid-Range Chop ({sig.va_position_pct:.0f}% VA) -> Bid ${target_support:,.0f}"
-        elif rr_veto_only:
-            l4_status = "ARMED"
-            l4_ruling = f"Support ${target_support:,.0f} -> Wait Dip for >=1.3R"
-        elif sig.gate_state in (ExecutionGateState.GATE1_ZONE_ALERT, ExecutionGateState.GATE2_MICROSTRUCTURE_ARMED):
-            l4_status = "ARMED"
-            l4_ruling = f"At Support (${target_support:,.0f}) -> Wait 15m/1H Reclaim"
+            l4_ruling = f"4H Spot {flow.w_4h.spot_delta_btc:+,.0f} BTC | Await Desk P/A/0 Trigger"
         else:
             l4_status = "STANDBY"
-            l4_ruling = f"Price ${price:,.0f} -> Wait for ${target_support:,.0f} Test"
+            l4_ruling = f"4H Spot {flow.w_4h.spot_delta_btc:+,.0f} BTC | Await Pullback & Trigger"
 
         hierarchy_rows = [
             HierarchyLayerRow(
                 layer_num=1,
-                layer_name="L1: Veto Gate (Tab 2+4)",
+                layer_name="D1: Crash/Veto Guards [P,W]",
                 status=l1_status,
-                authority_rule="Supreme Veto Power",
+                authority_rule="Tell-Tale 5x & NTZ 8A–8F",
                 live_ruling=l1_ruling,
             ),
             HierarchyLayerRow(
                 layer_num=2,
-                layer_name="L2: Macro Risk (Tab 3)",
+                layer_name="D2: 1D/4H Trend [A,0,W]",
                 status=l2_status,
-                authority_rule="Base Risk (1.0% vs 0.5%)",
+                authority_rule="1D SMA200 & 4H EMA50/200",
                 live_ruling=l2_ruling,
             ),
             HierarchyLayerRow(
                 layer_num=3,
-                layer_name="L3: Size & Mag (Tab 4+2)",
+                layer_name="D3: Shelves & Magnets [P,M,B]",
                 status=l3_status,
-                authority_rule="Size (0.0–1.0x) & Magnet",
+                authority_rule="SLSP Shelf & Liq Magnets",
                 live_ruling=l3_ruling,
             ),
             HierarchyLayerRow(
                 layer_num=4,
-                layer_name="L4: Entry Timing (Tab 1)",
+                layer_name="D4: Flow & Triggers [G,F,R,A]",
                 status=l4_status,
-                authority_rule="Controls Entry Trigger",
+                authority_rule="CVD, Footprint & Triggers",
                 live_ruling=l4_ruling,
             ),
         ]
 
-        # Compute Master Alignment Score (0-100%)
-        t2_num_score = (
-            0.0
-            if (pev.any_sell_confirmed or pev.non_trade_zone_status == "YES")
-            else (95.0 if (pev.buy_allowed == "YES" and pev.entry_status == "READY") else (72.0 if t2_light == "BLUE" else 50.0))
-        )
-        t4_num_score = (
-            95.0
-            if active_cfg.category == "BULL_LONG"
-            else (82.0 if active_cfg.category == "ACCUMULATE" else (48.0 if active_cfg.category == "HARVEST_WAIT" else 10.0))
-        )
-        raw_alignment = (
-            0.30 * sig.confluence_score
-            + 0.25 * t2_num_score
-            + 0.25 * mev.macro_confidence_pct
-            + 0.20 * t4_num_score
-        )
+        # Compute 9-Desk Top-Ribbon Readiness Percentage (0-100%)
+        desk_pts = {"GREEN": 100.0, "BLUE": 75.0, "YELLOW": 45.0, "RED": 10.0}
+        raw_alignment = sum(desk_pts.get(r.traffic_light, 45.0) for r in tab_rows) / max(len(tab_rows), 1)
         if supreme_veto:
             master_alignment_score = round(min(raw_alignment, 25.0), 1)
             alignment_status = "DEFENSIVE VETO ACTIVE"
-        elif g_cnt >= 2 and r_cnt == 0 and not sig.is_mid_range_chop:
+        elif g_cnt >= 3 and r_cnt == 0:
             master_alignment_score = round(max(raw_alignment, 75.0), 1)
-            alignment_status = "MULTI-TAB BULLISH CONFLUENCE"
-        elif (g_cnt + b_cnt) >= 2 and r_cnt == 0:
+            alignment_status = "MULTI-DESK ALIGNMENT"
+        elif (g_cnt + b_cnt) >= 4 and r_cnt == 0:
             master_alignment_score = round(raw_alignment, 1)
             alignment_status = "CONSTRUCTIVE — AWAITING TRIGGER"
         else:
             master_alignment_score = round(raw_alignment, 1)
-            alignment_status = "SELECTIVE / PATIENCE REQUIRED"
+            alignment_status = "SELECTIVE / STANDBY"
 
         # =====================================================================
         # 3. BUILD PANEL 3: CROSS-TAB AGREEMENT & CONFLICT DIAGNOSTIC
@@ -525,27 +500,33 @@ class MasterSynthesisEvaluator:
 
         if flow.w_4h.spot_delta_btc > 0 and rmev.spot_buy_sell_ratio_4h >= 1.0:
             confluence_points.append(
-                f"Spot Order Flow Alignment [Tabs 1, 2, 4]: 4H Spot CVD is positive ({flow.w_4h.spot_delta_btc:+,.1f} BTC) "
+                f"Spot Order Flow Alignment [Desks G, F, W]: 4H Spot CVD is positive ({flow.w_4h.spot_delta_btc:+,.1f} BTC) "
                 f"with 4H Buy/Sell Ratio at {rmev.spot_buy_sell_ratio_4h:.2f} (>1.00 real spot demand)."
             )
         else:
             confluence_points.append(
-                f"Order Flow Restraint [Tabs 1, 2, 4]: 4H Spot CVD is {flow.w_4h.spot_delta_btc:+,.1f} BTC "
-                f"(B/S Ratio {rmev.spot_buy_sell_ratio_4h:.2f}), confirming why all tabs avoid chasing green candles."
+                f"Order Flow Restraint [Desks G, F, W]: 4H Spot CVD is {flow.w_4h.spot_delta_btc:+,.1f} BTC "
+                f"(B/S Ratio {rmev.spot_buy_sell_ratio_4h:.2f}), confirming why desks avoid chasing mid-range candles."
             )
 
         if deriv.funding_rate_pct <= self.config.funding_neutral_max_pct:
             confluence_points.append(
-                f"Derivatives Hygiene [Tabs 1, 2, 4]: Perp funding is uncrowded ({deriv.funding_rate_pct:+.4f}%) "
-                f"and Annualized Basis is {rmev.annualized_basis_pct:+.2f}%, eliminating long-crowding veto risk."
+                f"Derivatives & Magnet Hygiene [Desks M, G, W]: Perp funding is uncrowded ({deriv.funding_rate_pct:+.4f}%) "
+                f"with Upper Short-Liq Magnet at ${up_mag:,.0f} and Lower Long-Liq Magnet at ${dn_mag:,.0f}."
             )
 
-        # Tab [0] Spot Swing Protocol Confluence
-        sw_ev = store.spot_swing_evaluation
+        if tpb is not None:
+            confluence_points.append(
+                f"BTC Trend-Pullback Strategy [Desk A]: 1D Close>SMA200={bool(tpb.daily_close_above_sma200)} | "
+                f"4H EMA50>EMA200={bool(tpb.ema50_above_ema200)} | Pullback Zone ${tpb.pullback_zone_lower:,.0f}–${tpb.pullback_zone_upper:,.0f} "
+                f"(Ref Entry ${tpb.reference_entry_price:,.0f}, Ref Stop ${tpb.structural_stop:,.0f}, Size {tpb.position_size_btc:.5f} BTC)."
+            )
+
+        # Desk [0] Spot Swing Protocol Confluence
         if sw_ev and sw_ev.data_ready and sw_ev.macro:
             if sw_ev.trade is not None:
                 confluence_points.append(
-                    f"Spot Swing Protocol [Tab 0]: Active trade in progress from ${sw_ev.trade.entry:,.0f} "
+                    f"Spot Swing Protocol [Tab 0]: Active position from ${sw_ev.trade.entry:,.0f} "
                     f"(Stop ${sw_ev.trade.current_stop:,.0f}, TP1 ${sw_ev.trade.tp1:,.0f}, PWH ${sw_ev.trade.tp2:,.0f})."
                 )
             elif sw_ev.verdict == "NEW LONG SETUP" and sw_ev.risk:
@@ -554,63 +535,52 @@ class MasterSynthesisEvaluator:
                     f"(Stop ${sw_ev.risk.stop:,.0f}, 1% Size: {sw_ev.risk.qty_btc:.4f} BTC, +2.0R Target ${sw_ev.risk.tp1:,.0f})."
                 )
 
-        if sig.ema_strategy and sig.ema_strategy.daily_regime in ("STRONG_BULL", "WEAK_BULL"):
-            es = sig.ema_strategy
+        if slsp is not None and slsp.nearest_support is not None:
             confluence_points.append(
-                f"Trend & EMA Alignment [Tabs 1, 3]: Daily 3-EMA is {es.daily_regime} (200 EMA ${es.daily_ema_200:,.0f}, ADX {es.daily_adx:.1f}) "
-                f"with 4H 50-EMA support at ${es.ema_4h_50:,.0f} (Setup: {es.setup_status})."
+                f"Structure & Level Protocol [Desk P]: Nearest Support Shelf at ${slsp.nearest_support.center_price:,.0f} "
+                f"({slsp.nearest_support.strength}/5 stars, {slsp.nearest_support.touch_count}x touches) | "
+                f"3-EMA Regime: {slsp.ema_3_regime} | Tell-Tale Veto: {'ACTIVE' if slsp.tell_tale_veto else 'CLEAR'}."
             )
 
-        if mev.power_law_discount_pct <= 0:
-            confluence_points.append(
-                f"Valuation & Structural Floor [Tab 3 + Tab 1]: BTC (${price:,.0f}) trades at a {mev.power_law_discount_pct:+.1f}% "
-                f"discount to Power-Law Fair Value (${mev.power_law_fair_usd:,.0f}) with 30D Support HVN at ${sig.support_hvn or sig.c_val:,.0f}."
+        if tpb is not None and tpb.daily_close_above_sma200 and not tpb.ema50_above_ema200:
+            conflict_points.append(
+                f"1D Macro Regime [Desk A/0 TRUE] vs. 4H Trend Structure [Desk A FALSE]: "
+                f"1D Close (${tpb.daily_close_completed:,.0f}) is above 1D SMA200 (${tpb.daily_sma200:,.0f}), "
+                f"BUT 4H EMA50 (${tpb.ema50_4h:,.0f}) is below 4H EMA200 (${tpb.ema200_4h:,.0f}). "
+                f"Resolution -> Keep each strategy independent; Desk A requires 4H EMA50 > EMA200 before arming pullbacks."
             )
-        else:
-            confluence_points.append(
-                f"Structural Value Anchors [Tab 1 + Tab 3]: 30D Composite POC sits at ${mev.poc_30d:,.0f} "
-                f"with active Value Area bounds at ${sig.c_val:,.0f} (cVAL) to ${sig.c_vah:,.0f} (cVAH)."
+        elif not mev.gatekeeper_veto and sig.is_mid_range_chop:
+            conflict_points.append(
+                f"1D Macro Gate [Desk W/0] vs. Mid-Range Location [Desk P/W]: Price is above 1D 200 SMA (${mev.sma_200_1d:,.0f}), "
+                f"BUT trading at {sig.va_position_pct:.0f}% of 30D Value Area. "
+                f"Resolution -> Do not chase mid-range; monitor support shelf at ${target_support:,.0f}."
+            )
+        elif mev.gatekeeper_veto and (row_w.traffic_light in ("GREEN", "BLUE") or sig.flow_score >= 15.0):
+            conflict_points.append(
+                f"Short-Horizon Flow [Desks G, F] vs. 1D 200 SMA Gatekeeper [Desks A, 0, W]: "
+                f"Short-term flow is constructive, BUT price is below 1D 200 SMA (${mev.sma_200_1d:,.0f}). "
+                f"Resolution -> Cap counter-trend risk at {self.config.counter_trend_risk_pct:.1f}%."
             )
 
-        if not mev.gatekeeper_veto and sig.is_mid_range_chop:
+        if sig.gate_state != ExecutionGateState.GATE3_RECLAIM_TRIGGERED and (pev.buy_allowed == "YES" or row_w.traffic_light in ("GREEN", "BLUE")):
             conflict_points.append(
-                f"Macro Bull [Tab 3] vs. Mid-Range Chop [Tab 1]: Tab [3] is Bullish (>200D SMA ${mev.sma_200_1d:,.0f}), "
-                f"BUT Tab [1] blocks mid-range entry at {sig.va_position_pct:.0f}% of VA. "
-                f"Resolution -> Keep Bullish bias, but only bid at ${target_support:,.0f}."
-            )
-        elif mev.gatekeeper_veto and (t4_light in ("GREEN", "BLUE") or sig.flow_score >= 15.0):
-            conflict_points.append(
-                f"Microstructure Accumulation [Tab 4 {active_cfg.code}] vs. Macro 200D Gatekeeper [Tab 3]: "
-                f"Short-term flow shows {active_cfg.short_title}, BUT price is below 1D 200 SMA (${mev.sma_200_1d:,.0f}). "
-                f"Resolution -> Cap tactical risk at {self.config.counter_trend_risk_pct:.1f}% and harvest into 21D EMA (${mev.ema_21_1d:,.0f})."
-            )
-
-        if sig.gate_state != ExecutionGateState.GATE3_RECLAIM_TRIGGERED and (pev.buy_allowed == "YES" or t4_light in ("GREEN", "BLUE")):
-            conflict_points.append(
-                f"Protocol/Regime Readiness [Tabs 2, 3, 4] vs. Candle Reclaim Trigger [Tab 1]: "
-                f"Tabs [2–4] authorize {regime_mult:.2f}x spot accumulation ({active_cfg.code}), while Tab [1] awaits a 15m/1H reclaim close above ${target_support:,.0f} "
-                f"with +1H Spot Z-Score ({flow.w_1h.spot_zscore:+.2f}). Resolution -> Stage limit bid at ${target_support:,.0f}."
-            )
-        elif sig.gate_state == ExecutionGateState.GATE3_RECLAIM_TRIGGERED and t2_light == "YELLOW":
-            conflict_points.append(
-                f"Tactical Reclaim [Tab 1 GREEN] vs. 4H Base Consolidation [Tab 2 YELLOW]: "
-                f"Tab [1] triggered a 15m/1H HVN reclaim (${target_support:,.0f}), while Tab [2] flags 4H base consolidation "
-                f"with Long-Liq Magnet at ${pev.long_liq_magnet_usd:,.0f}. Resolution -> Execute {regime_mult:.2f}x ({active_cfg.code}) via limit bids in ${target_support:,.0f} zone (protect below ${pev.long_liq_magnet_usd:,.0f})."
+                f"Support Zone Proximity [Desks P, M] vs. Candle Trigger [Desks A, P, 0]: "
+                f"Price is near structural support (${target_support:,.0f}), while execution desks await a closed 4H/1H trigger candle "
+                f"with +1H Spot Z-Score ({flow.w_1h.spot_zscore:+.2f})."
             )
 
         if not conflict_points:
             conflict_points.append(
-                f"All 4 Specialist Tabs Aligned: Unified under {active_cfg.code} ({active_cfg.short_title}) with {master_alignment_score:.1f}% alignment."
+                f"All 9 Top-Ribbon Flagship Desks Synchronized: {g_cnt} Green • {b_cnt} Blue • {y_cnt} Yellow • {r_cnt} Red ({master_alignment_score:.1f}% readiness)."
             )
 
         upgrade_catalysts.append(
-            f"To Trigger Full GREEN Execution: 15m/1H candle reclaim close >= ${target_support:,.0f} "
-            f"(or sweep of Long-Liq Magnet ${pev.long_liq_magnet_usd:,.0f}) with +1H Spot CVD."
+            f"Desk [P] / [A] / [0] Trigger Conditions: Closed 4H/1H reclaim candle above support (${target_support:,.0f}) "
+            f"or sweep of Lower Long-Liq Magnet (${dn_mag:,.0f}) with +Spot CVD."
         )
         upgrade_catalysts.append(
-            f"To Trigger RED Hard Exit: Daily close below 1D Support (${pev.daily_support:,.0f}) "
-            f"/ Tab 1 Tactical Stop (${tp.stop_loss if tp else pev.downside_ref_1d_atr:,.0f}) "
-            f"or Track B Macro Liquidation Floor (${pev.long_liq_magnet_usd:,.0f}) with expanding Spot selling."
+            f"Invalidation / Hard Veto Conditions: Daily close below 1D Support (${pev.daily_support:,.0f}), "
+            f"Desk [P] Tell-Tale 5x selling climax, or breach of Lower Long-Liq Magnet (${dn_mag:,.0f})."
         )
 
         # =====================================================================

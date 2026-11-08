@@ -530,55 +530,83 @@ def build_tab_0_data_only_report(config: Optional[EngineConfig], store: StateSto
 
 
 # ==============================================================================
-# 10. TAB [L: MASTER] DATA-ONLY REPORT
+# 10. TAB [L: MASTER] DATA-ONLY REPORT (9-FLAGSHIP TOP-RIBBON MATRIX)
 # ==============================================================================
 def build_tab_l_data_only_report(config: Optional[EngineConfig], store: StateStore) -> str:
     ts_utc, ts_myt = _timestamps_utc_myt()
     spot_px = _spot_price(store)
     ms = getattr(store, "master_synthesis_evaluation", None)
+    tpb = getattr(store, "trend_pullback_evaluation", None)
+    slsp = getattr(store, "slsp_evaluation", None)
+    sw = getattr(store, "spot_swing_evaluation", None)
 
     lines = [
-        "# TAB [L: MASTER] | DATA-ONLY METRICS REPORT",
+        "# TAB [L: MASTER] | 9-FLAGSHIP DESK DATA-ONLY METRICS REPORT",
         f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (MYT):** `{ts_myt}`",
         f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}`",
         "",
-        "## 1. MULTI-DESK ALIGNMENT METRICS",
+        "## 1. 9-FLAGSHIP TOP-RIBBON DESK READINESS METRICS (`P, B, G, R, M, A, F, W, 0`)",
     ]
     if ms is not None:
         lines.extend([
-            f"- **Master Alignment Score (`0.0 - 100.0`):** `{ms.master_alignment_score:.1f}`",
-            f"- **Alignment Score >= 70.0:** `{bool(ms.master_alignment_score >= 70.0)}`",
+            f"- **9-Desk Readiness Index (`0.0 - 100.0`):** `{ms.master_alignment_score:.1f}`",
+            f"- **Readiness Index >= 70.0:** `{bool(ms.master_alignment_score >= 70.0)}`",
+            f"- **Hard Veto Active Across Desks:** `{bool(ms.supreme_veto_active)}`",
             "",
-            "## 2. 4-TIER HIERARCHY SCORES",
+            "## 2. 4 ORTHOGONAL DOMAIN PILLAR MEASUREMENTS",
         ])
         for h in getattr(ms, "hierarchy_rows", []) or []:
-            h_name = getattr(h, "tier_name", None) or getattr(h, "pillar_name", None) or getattr(h, "level_name", "Tier")
-            h_score = float(getattr(h, "score", 0.0) or getattr(h, "alignment_pct", 0.0) or 0.0)
-            h_metric = getattr(h, "key_metric", None) or getattr(h, "primary_driver", "")
+            h_name = getattr(h, "layer_name", "Domain")
+            h_status = str(getattr(h, "status", "STANDBY"))
+            h_rule = getattr(h, "authority_rule", "")
+            h_ruling = getattr(h, "live_ruling", "")
             lines.append(
-                f"- **{h_name}:** Score `{h_score:.1f}/100` | "
-                f"`Score >= 60.0`: `{bool(h_score >= 60.0)}` | Primary Metric: `{h_metric}`"
+                f"- **{h_name} (`{h_rule}`):** Pass=`{bool(h_status == 'PASS')}` | "
+                f"Armed=`{bool(h_status in ('PASS', 'ARMED'))}` | Telemetry: `{h_ruling}`"
             )
         lines.extend([
             "",
-            "## 3. SUB-DESK NUMERIC SCORES & PASS BOOLEANS",
+            "## 3. 9-FLAGSHIP DESK TELEMETRY MATRIX (`P, B, G, R, M, A, F, W, 0`)",
         ])
         for r in getattr(ms, "tab_rows", []) or []:
-            r_code = getattr(r, "tab_code", None) or getattr(r, "tab_label", "Desk")
-            r_name = getattr(r, "desk_name", None) or getattr(r, "title", "")
-            r_score = float(getattr(r, "score", 0.0) or 0.0)
-            r_metric = getattr(r, "primary_metric", None) or getattr(r, "key_metric", "")
+            r_name = getattr(r, "tab_name", "Desk")
+            r_light = str(getattr(r, "traffic_light", "YELLOW"))
+            r_state = getattr(r, "score_or_status", "")
+            r_driver = getattr(r, "primary_driver", "")
             lines.append(
-                f"- **{r_code} ({r_name}):** Score `{r_score:.1f}/100` | "
-                f"`Score >= 60.0`: `{bool(r_score >= 60.0)}` | Metric: `{r_metric}`"
+                f"- **{r_name}:** Pass=`{bool(r_light == 'GREEN')}` | "
+                f"Constructive=`{bool(r_light in ('GREEN', 'BLUE'))}` | "
+                f"State=`{r_state}` | Telemetry=`{r_driver}`"
             )
         lines.extend([
             "",
-            f"## 4. REFERENCE LEVELS (Reference calculation if entered at ${spot_px:,.2f}. Not an order.)",
+            f"## 4. INDEPENDENT STRATEGY REFERENCE LEVELS (Reference calculation if entered at ${spot_px:,.2f}. Not an order.)",
             f"- **Reference Spot Price:** `${spot_px:,.2f}`",
-            f"- **Reference Hard Stop Level:** `${ms.holder_hard_stop_usd:,.2f}`",
-            f"- **Reference Upper Level 1:** `${ms.holder_tp1_usd:,.2f}`",
-            f"- **Reference Upper Level 2:** `${ms.holder_tp2_usd:,.2f}`",
+        ])
+        if tpb is not None:
+            lines.append(
+                f"- **Desk [A] Trend-Pullback v1.0 Reference:** Entry `${tpb.reference_entry_price:,.2f}` | "
+                f"Stop `${tpb.structural_stop:,.2f}` (`-${tpb.stop_distance_usd:,.2f}` / `{tpb.stop_distance_atr:.2f} ATR`) | "
+                f"Size `{tpb.position_size_btc:.6f} BTC` | Reconciled Risk `${tpb.total_estimated_risk_usd:,.2f}`"
+            )
+        if slsp is not None and slsp.active_setup is not None:
+            st = slsp.active_setup
+            lines.append(
+                f"- **Desk [P] SLSP v1.0 Reference:** Entry `${st.entry_price:,.2f}` | "
+                f"Stop `${st.stop_loss:,.2f}` | Level 1 (`1.5R`) `${st.tp1_price:,.2f}` | "
+                f"Size `{st.position_size_btc:.4f} BTC`"
+            )
+        if sw is not None and sw.risk is not None:
+            rk = sw.risk
+            lines.append(
+                f"- **Desk [0] Spot Swing (1:3 RRR) Reference:** Entry `${rk.entry:,.2f}` | "
+                f"Stop `${rk.stop:,.2f}` | Level 1 (`2.0R`) `${rk.tp1:,.2f}` | "
+                f"Size `{rk.qty_btc:.6f} BTC`"
+            )
+        lines.extend([
+            f"- **Spot Holder Reference Hard Stop Level:** `${ms.holder_hard_stop_usd:,.2f}`",
+            f"- **Spot Holder Reference Upper Level 1:** `${ms.holder_tp1_usd:,.2f}`",
+            f"- **Spot Holder Reference Upper Level 2:** `${ms.holder_tp2_usd:,.2f}`",
         ])
     else:
         lines.append("- **Master Synthesis Evaluation Available:** `False`")

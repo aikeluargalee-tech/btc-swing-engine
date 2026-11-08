@@ -4576,8 +4576,17 @@ def _build_tab13_slsp_price_action_hud(store: StateStore, header_panel: Panel) -
 
     p5_checklist = Table.grid(expand=True)
     p5_checklist.add_column(justify="left", no_wrap=True)
+    p5_checklist.add_column(justify="right", no_wrap=True)
+    copied_age = time.time() - float(getattr(store, "last_packet_copied_ts", 0.0) or 0.0)
+    if copied_age < 6.0:
+        copy_badge = (
+            f"[bold black on bright_green] ✓ DATA-ONLY COPIED ({getattr(store, 'last_packet_char_count', 0):,} chars -> logs/btc_structure_latest.md) [/bold black on bright_green]"
+        )
+    else:
+        copy_badge = "[bold cyan][Press P again: Copy DATA-ONLY Report -> logs/btc_structure_latest.md][/bold cyan]"
     p5_checklist.add_row(
-        f"[bold white]4-Pillar Checklist:[/bold white]  {c1} │ {c2} │ {c3} │ {c4} │ {c5}  [dim][All required to arm execution][/dim]"
+        f"[bold white]4-Pillar Checklist:[/bold white]  {c1} │ {c2} │ {c3} │ {c4} │ {c5}",
+        copy_badge,
     )
 
     bottomline_panel = Panel(
@@ -6058,11 +6067,22 @@ def _poll_keyboard_tab_switch(
                     continue
                 if ch in ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9"):
                     new_tab = int(ch)
-                    if new_tab == 7:
-                        new_tab = 14  # Option B: Map 7 to Dedicated Pattern & Harmonics Desk
                     store.show_help = False
                     if store.active_tab != new_tab:
                         store.active_tab = new_tab
+                        changed = True
+                    elif new_tab == 0:
+                        from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
+                        copy_tab_data_only_report_to_clipboard(0, config, store)
+                        changed = True
+                elif ch in ("p", "P"):
+                    store.show_help = False
+                    if store.active_tab != 13:
+                        store.active_tab = 13
+                        changed = True
+                    else:
+                        from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
+                        copy_tab_data_only_report_to_clipboard(13, config, store)
                         changed = True
                 elif ch in ("m", "M"):
                     if store.active_tab != 17:
@@ -6079,18 +6099,34 @@ def _poll_keyboard_tab_switch(
                     if store.active_tab != 10:
                         store.active_tab = 10
                         changed = True
+                    else:
+                        from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
+                        copy_tab_data_only_report_to_clipboard(10, config, store)
+                        changed = True
                 elif ch in ("w", "W"):
                     if store.active_tab != 12:
                         store.active_tab = 12
+                        changed = True
+                    else:
+                        from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
+                        copy_tab_data_only_report_to_clipboard(12, config, store)
                         changed = True
                 elif ch in ("b", "B"):
                     store.show_help = False
                     if store.active_tab != 14:
                         store.active_tab = 14
                         changed = True
+                    else:
+                        from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
+                        copy_tab_data_only_report_to_clipboard(14, config, store)
+                        changed = True
                 elif ch in ("f", "F"):
                     if store.active_tab != 11:
                         store.active_tab = 11
+                        changed = True
+                    else:
+                        from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
+                        copy_tab_data_only_report_to_clipboard(11, config, store)
                         changed = True
                 elif ch in ("s", "S"):
                     if store.active_tab != 5:

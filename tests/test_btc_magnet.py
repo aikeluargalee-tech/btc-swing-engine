@@ -42,6 +42,14 @@ class TestBTCMagnetEngine(unittest.TestCase):
     def setUp(self) -> None:
         self.config = DEFAULT_CONFIG
         self.engine = BTCMagnetEngine(self.config)
+        # Seed deterministic liqmap cache so unit tests are fast and offline-safe
+        self.engine._last_fetch_ts = 1e12
+        self.engine._cached_liq_data = {
+            "levels": {
+                "above": [{"price": 78_422.0, "dist_pct": 3.19, "usd": 215_400_000}],
+                "below": [{"price": 74_525.0, "dist_pct": -1.94, "usd": 354_300_000}],
+            }
+        }
         self.store = StateStore()
         self.store.binance_spot_price = 76_000.0
         self.store.funding_rate_pct = 0.0055  # ~6.0% annual
@@ -69,19 +77,63 @@ class TestBTCMagnetEngine(unittest.TestCase):
         self.assertIn("7 INTERNAL SPEAKING RULES AUDIT", res.magnet_summary_markdown)
 
     def test_speaking_rules_locked_templates(self) -> None:
-        """Verify locked text templates from docs/status-templates.md."""
+        """Verify locked text templates from docs/status-templates.md for both SPEAK and WAIT."""
+        res = self.engine.evaluate(self.store)
+        self.assertEqual(res.verdict, "SPEAK")
+        self.assertEqual(res.pull_direction, "LOWER")
+        self.assertTrue(res.headline.startswith("Strong magnet below at $74,525."))
+        self.assertIn("Watch for sweep.", res.body)
+
+        # Now force WAIT condition (opposing trend / sharp move)
+        self.store.high_24h = 82_000.0
+        self.store.low_24h = 74_000.0
+        self.store.price_change_24h_pct = 8.5  # Fails Rule 5 & Regime is TrendUp while magnet is below
+        res_wait = self.engine.evaluate(self.store)
+        self.assertEqual(res_wait.verdict, "WAIT")
+        self.assertEqual(res_wait.headline, "No clear edge - wait.")
+        self.assertIn("conditions incomplete. No clear edge - wait.", res_wait.body)
+        self.assertIn("spends most days correctly saying 'wait.'", res_wait.rule_subtitle)
+
+    def test_exhaustion_pattern_template(self) -> None:
+        """Verify Pattern #4 (Exhaustion) triggers on dense magnet + extreme funding + declining OI."""
+        self.store.funding_rate_pct = 0.04  # ~43.8% annual (> 28% limit)
+        self.store.oi_delta_4h_pct = -1.8   # Declining OI (< -0.5% limit)
         res = self.engine.evaluate(self.store)
 
-        if res.verdict == "SPEAK":
-            self.assertTrue(
-                res.headline.startswith("Strong magnet")
-                or res.headline.startswith("Magnet at")
-            )
-            self.assertTrue("Watch for sweep" in res.body or "Edge present" in res.body)
-        else:
-            self.assertEqual(res.headline, "No clear edge — wait.")
-            self.assertIn("wait", res.body.lower())
-            self.assertIn("spends most days correctly saying 'wait'", res.rule_subtitle)
+        self.assertEqual(res.verdict, "WAIT")
+        self.assertIn("with extreme funding and declining OI.", res.headline)
+        self.assertEqual(res.body, "Possible exhaustion. High caution - wait for confirmation.")
+
+    def test_trend_aligned_pattern_template(self) -> None:
+        """Verify Pattern #3 (Trend-aligned) triggers when regime is TrendUp and magnet is above."""
+        self.engine._cached_liq_data = {
+            "levels": {
+                "above": [{"price": 78_200.0, "dist_pct": 2.89, "usd": 420_000_000}],
+                "below": [{"price": 74_200.0, "dist_pct": -2.37, "usd": 150_000_000}],
+            }
+        }
+        self.store.high_24h = 78_000.0
+        self.store.low_24h = 73_500.0  # > 4.8% range spread
+        self.store.price_change_24h_pct = 3.8  # TrendUp, < 6.5%
+        res = self.engine.evaluate(self.store)
+
+        self.assertEqual(res.verdict, "SPEAK")
+        self.assertEqual(res.market_regime, "TrendUp")
+        self.assertEqual(res.pull_direction, "UPPER")
+        self.assertEqual(res.headline, "Magnet at $78,200 aligns with trend.")
+        self.assertIn("Edge present - monitor for entry zone.", res.body)
+
+    def test_small_funding_and_live_oi_history_accuracy(self) -> None:
+        """Verify small 8h funding rates (e.g. 0.0005%) do not get multiplied by 100x and live OI history works."""
+        self.store.funding_rate_pct = 0.0005  # 0.0005% per 8h -> +0.5475%/yr
+        self.store.record_oi_sample(80_000.0, ts_sec=1000.0)
+        self.store.record_oi_sample(78_400.0, ts_sec=15400.0)  # -2.0% over 4h
+        self.store.derivatives_snapshot.oi_change_4h_pct = -2.0
+
+        res = self.engine.evaluate(self.store)
+        self.assertAlmostEqual(res.funding_rate_annual_pct, 0.5475, places=2)
+        self.assertAlmostEqual(res.oi_delta_4h_pct, -2.0, places=2)
+        self.assertFalse(res.rule_checks[1].passed)  # Rule 2 (OI) fails on -2.0%
 
     def test_tab17_tui_render(self) -> None:
         """Verify Desk 17 renders cleanly without errors in the terminal HUD."""

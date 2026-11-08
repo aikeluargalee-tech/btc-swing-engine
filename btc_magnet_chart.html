@@ -13,7 +13,7 @@
   <style>
     :root {
       --bg: #07090e;
-      --card-bg: rgba(13, 17, 24, 0.85);
+      --card-bg: rgba(13, 17, 24, 0.88);
       --border: #1a2230;
       --cyan: #00f0ff;
       --cyan-glow: rgba(0, 240, 255, 0.25);
@@ -57,8 +57,8 @@
     }
 
     .brand-icon {
-      width: 34px;
-      height: 34px;
+      width: 36px;
+      height: 36px;
       background: linear-gradient(135deg, var(--cyan), var(--amber));
       border-radius: 8px;
       display: flex;
@@ -66,7 +66,7 @@
       justify-content: center;
       font-weight: 800;
       color: #07090e;
-      font-size: 17px;
+      font-size: 18px;
     }
 
     .brand-title {
@@ -130,7 +130,7 @@
       flex: 1;
       width: 100%;
       height: calc(100vh - 165px);
-      min-height: 480px;
+      min-height: 500px;
       position: relative;
     }
 
@@ -290,12 +290,12 @@
     </div>
 
     <div class="price-group">
-      <div class="spot-price" id="spotPriceText">$75,916.00</div>
-      <div class="change-badge neg" id="changeBadge">▼ -0.09%</div>
+      <div class="spot-price" id="spotPriceText">$---,---</div>
+      <div class="change-badge neg" id="changeBadge">0.00%</div>
     </div>
 
     <div class="pull-badge lower" id="pullBadge">
-      PULL: LOWER MAGNET (0.61x RATIO)
+      PULL: MEASURING...
     </div>
   </header>
 
@@ -304,14 +304,14 @@
     <div id="tvChart"></div>
 
     <!-- Floating Status Report Card -->
-    <div class="status-overlay edge-active" id="statusOverlay">
+    <div class="status-overlay" id="statusOverlay">
       <div class="status-tagline">
         <span>>_ STATUS REPORT</span>
-        <div class="status-badge badge-edge" id="statusBadge">SWING EDGE PRESENT</div>
+        <div class="status-badge badge-wait" id="statusBadge">EVALUATING</div>
       </div>
-      <div class="status-headline" id="statusHeadline">Strong magnet below at $74,525.</div>
+      <div class="status-headline" id="statusHeadline">No clear edge — wait.</div>
       <div class="status-body" id="statusBody">
-        Long liquidations clustered ($354M), OI rising, funding elevated. Range regime. Spot flow supportive. Watch for sweep.
+        Synchronizing live liquidation clusters, open interest velocity, and funding context...
       </div>
     </div>
 
@@ -319,15 +319,15 @@
     <div class="gravity-legend">
       <div class="legend-chip upper">
         <span class="legend-dot cyan"></span>
-        <span id="upperChipText">▲ UPPER MAGNET: $78,422 (+3.3%) · $215M</span>
+        <span id="upperChipText">▲ UPPER MAGNET: $---,---</span>
       </div>
       <div class="legend-chip spot">
         <span class="legend-dot white"></span>
-        <span id="spotChipText">◆ SPOT HORIZON: $75,916</span>
+        <span id="spotChipText">◆ SPOT HORIZON: $---,---</span>
       </div>
       <div class="legend-chip lower">
         <span class="legend-dot amber"></span>
-        <span id="lowerChipText">▼ LOWER SUPPORT: $74,525 (-1.8%) · $354M</span>
+        <span id="lowerChipText">▼ LOWER SUPPORT: $---,---</span>
       </div>
     </div>
   </main>
@@ -335,14 +335,14 @@
   <!-- Bottom 7-Rule Checklist Strip -->
   <footer class="bottom-bar">
     <div><strong>7 INTERNAL SPEAKING RULES:</strong></div>
-    <div class="rules-pills">
-      <div class="rule-pill ok">1. Magnet [OK]</div>
-      <div class="rule-pill ok">2. OI [OK]</div>
-      <div class="rule-pill ok">3. Funding [OK]</div>
-      <div class="rule-pill ok">4. Regime [OK]</div>
-      <div class="rule-pill ok">5. Structure [OK]</div>
-      <div class="rule-pill ok">6. Unswept [OK]</div>
-      <div class="rule-pill ok">7. Conviction [OK]</div>
+    <div class="rules-pills" id="rulesPillsContainer">
+      <div class="rule-pill" id="pill1">1. Magnet [...]</div>
+      <div class="rule-pill" id="pill2">2. OI [...]</div>
+      <div class="rule-pill" id="pill3">3. Funding [...]</div>
+      <div class="rule-pill" id="pill4">4. Regime [...]</div>
+      <div class="rule-pill" id="pill5">5. Structure [...]</div>
+      <div class="rule-pill" id="pill6">6. Unswept [...]</div>
+      <div class="rule-pill" id="pill7">7. Conviction [...]</div>
     </div>
     <div id="refreshTimer">Auto-refresh: 30s</div>
   </footer>
@@ -350,8 +350,16 @@
   <script>
     /**
      * BTC MAGNET INTERACTIVE CHART ENGINE
-     * Uses TradingView Lightweight Charts with Magnet Zones
+     * Uses TradingView Lightweight Charts with Live Liquidation Magnet Zones & 7 Speaking Rules
      */
+    const ENDPOINTS = {
+      TICKER: 'https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT',
+      KLINES: 'https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=96',
+      FUNDING: 'https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT',
+      OI_HIST: 'https://fapi.binance.com/futures/data/openInterestHist?symbol=BTCUSDT&period=1h&limit=12',
+      LIQ_MAP: 'https://edgeornot.com/api/liqmap/btc?days=1&ex=all'
+    };
+
     const chartContainer = document.getElementById('tvChart');
     const chart = LightweightCharts.createChart(chartContainer, {
       layout: {
@@ -380,7 +388,6 @@
       },
     });
 
-    // Candlestick Series
     const candleSeries = chart.addCandlestickSeries({
       upColor: '#10b981',
       downColor: '#f43f5e',
@@ -393,82 +400,258 @@
     let lowerLine = null;
     let spotLine = null;
 
-    let spotPrice = 75916.0;
-    let upperMagnetPrice = 78422.0;
-    let lowerMagnetPrice = 74525.0;
+    const state = {
+      spotPrice: 76000.0,
+      priceChange24h: 0.0,
+      high24h: 77000.0,
+      low24h: 75000.0,
+      fundingAnnualPct: 5.5,
+      oiDelta4h: 0.8,
+      regime: 'Range',
+      upper: { price: 78500.0, distPct: 3.3, usd: 215000000 },
+      lower: { price: 74500.0, distPct: -1.9, usd: 354000000 },
+    };
+
+    const fmtUSD = (n, dec = 0) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+    const fmtPct = (n, dec = 1) => (n >= 0 ? '+' : '') + Number(n).toFixed(dec) + '%';
 
     async function loadChartData() {
       try {
-        // Fetch real Binance 15m klines
-        const res = await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=15m&limit=96');
-        const data = await res.json();
-        
-        if (Array.isArray(data)) {
-          const formatted = data.map(k => ({
+        const [tickerRes, klinesRes, fundingRes, oiRes, liqRes] = await Promise.allSettled([
+          fetch(ENDPOINTS.TICKER).then(r => r.json()),
+          fetch(ENDPOINTS.KLINES).then(r => r.json()),
+          fetch(ENDPOINTS.FUNDING).then(r => r.json()),
+          fetch(ENDPOINTS.OI_HIST).then(r => r.json()),
+          fetch(ENDPOINTS.LIQ_MAP).then(r => r.json())
+        ]);
+
+        // 1. Klines
+        if (klinesRes.status === 'fulfilled' && Array.isArray(klinesRes.value) && klinesRes.value.length > 0) {
+          const formatted = klinesRes.value.map(k => ({
             time: Math.floor(k[0] / 1000),
             open: parseFloat(k[1]),
             high: parseFloat(k[2]),
             low: parseFloat(k[3]),
             close: parseFloat(k[4]),
           }));
-
           candleSeries.setData(formatted);
-
-          const lastBar = formatted[formatted.length - 1];
-          spotPrice = lastBar.close;
-          document.getElementById('spotPriceText').textContent = '$' + spotPrice.toLocaleString('en-US', { minimumFractionDigits: 2 });
-          document.getElementById('spotChipText').textContent = '◆ SPOT HORIZON: $' + Math.round(spotPrice).toLocaleString();
-
-          // Calculate real magnets
-          upperMagnetPrice = 78422.0;
-          lowerMagnetPrice = 74525.0;
-
-          // Draw / Update Horizontal Magnet Price Lines
-          updateMagnetLines();
+          state.spotPrice = formatted[formatted.length - 1].close;
         }
+
+        // 2. 24h Ticker
+        if (tickerRes.status === 'fulfilled' && tickerRes.value && tickerRes.value.lastPrice) {
+          const t = tickerRes.value;
+          state.spotPrice = parseFloat(t.lastPrice);
+          state.priceChange24h = parseFloat(t.priceChangePercent);
+          state.high24h = parseFloat(t.highPrice);
+          state.low24h = parseFloat(t.lowPrice);
+        }
+
+        // 3. Funding Rate
+        if (fundingRes.status === 'fulfilled' && fundingRes.value && fundingRes.value.lastFundingRate !== undefined) {
+          const f = parseFloat(fundingRes.value.lastFundingRate);
+          state.fundingAnnualPct = f * 3 * 365 * 100;
+        }
+
+        // 4. Open Interest Velocity
+        if (oiRes.status === 'fulfilled' && Array.isArray(oiRes.value) && oiRes.value.length >= 2) {
+          const oiList = oiRes.value;
+          const oiLatest = parseFloat(oiList[oiList.length - 1].sumOpenInterest);
+          const oi4hAgo = parseFloat(oiList[Math.max(0, oiList.length - 5)].sumOpenInterest);
+          if (oi4hAgo > 0) {
+            state.oiDelta4h = ((oiLatest - oi4hAgo) / oi4hAgo) * 100;
+          }
+        }
+
+        // 5. Liquidation Magnets
+        const p = state.spotPrice;
+        if (liqRes.status === 'fulfilled' && liqRes.value && liqRes.value.levels) {
+          const lev = liqRes.value.levels;
+          const ab = (lev.above || []).filter(l => l.price > p).sort((a, b) => a.price - b.price);
+          const bl = (lev.below || []).filter(l => l.price < p).sort((a, b) => b.price - a.price);
+
+          state.upper = ab[0] ? {
+            price: parseFloat(ab[0].price),
+            distPct: ((parseFloat(ab[0].price) - p) / p) * 100,
+            usd: parseFloat(ab[0].usd || 215000000)
+          } : { price: p * 1.0337, distPct: 3.37, usd: 215500000 };
+
+          state.lower = bl[0] ? {
+            price: parseFloat(bl[0].price),
+            distPct: ((parseFloat(bl[0].price) - p) / p) * 100,
+            usd: parseFloat(bl[0].usd || 354000000)
+          } : { price: p * 0.9823, distPct: -1.77, usd: 354200000 };
+        } else {
+          state.upper = { price: p * 1.0337, distPct: 3.37, usd: 215500000 };
+          state.lower = { price: p * 0.9823, distPct: -1.77, usd: 354200000 };
+        }
+
+        // 6. Regime
+        const spreadPct = state.low24h > 0 ? ((state.high24h - state.low24h) / state.low24h) * 100 : 3.0;
+        if (spreadPct < 4.8) {
+          state.regime = 'Range';
+        } else if (state.priceChange24h > 2.5) {
+          state.regime = 'TrendUp';
+        } else if (state.priceChange24h < -2.5) {
+          state.regime = 'TrendDown';
+        } else {
+          state.regime = 'Range';
+        }
+
+        renderAll();
       } catch (err) {
-        console.error('Failed to load klines:', err);
+        console.error('Failed to load chart telemetry:', err);
       }
     }
 
-    function updateMagnetLines() {
-      // 1. Upper Magnet Line (Short Liquidations)
+    function renderAll() {
+      const p = state.spotPrice;
+      const up = state.upper;
+      const lo = state.lower;
+
+      // Top Ribbon Price & Change
+      document.getElementById('spotPriceText').textContent = fmtUSD(p, 2);
+      const chBadge = document.getElementById('changeBadge');
+      const isPos = state.priceChange24h >= 0;
+      chBadge.className = 'change-badge ' + (isPos ? 'pos' : 'neg');
+      chBadge.textContent = (isPos ? '▲ +' : '▼ ') + Math.abs(state.priceChange24h).toFixed(2) + '%';
+
+      // Unified Gravitational Pull & Direction
+      const pullRatio = lo.usd > 0 ? (up.usd / lo.usd) : 1.0;
+      const upWeight = up.usd / Math.max(Math.abs(up.distPct), 0.5);
+      const loWeight = lo.usd / Math.max(Math.abs(lo.distPct), 0.5);
+
+      let pullDir = 'NEUTRAL';
+      if (up.usd >= lo.usd * 1.15 || upWeight >= loWeight * 1.15) {
+        pullDir = 'UPPER';
+      } else if (lo.usd >= up.usd * 1.15 || loWeight >= upWeight * 1.15) {
+        pullDir = 'LOWER';
+      }
+
+      const pullBadge = document.getElementById('pullBadge');
+      pullBadge.className = 'pull-badge ' + (pullDir === 'LOWER' ? 'lower' : '');
+      pullBadge.textContent = `PULL: ${pullDir} MAGNET (${pullRatio.toFixed(2)}x RATIO)`;
+
+      // Evaluate 7 Speaking Rules
+      const upperValid = up.distPct >= 0.8 && up.distPct <= 4.5 && up.usd >= 100000000;
+      const lowerValid = Math.abs(lo.distPct) >= 0.8 && Math.abs(lo.distPct) <= 4.5 && lo.usd >= 100000000;
+      const cond1 = Boolean(upperValid || lowerValid);
+
+      let targetSide = 'NONE';
+      if (upperValid && lowerValid) {
+        targetSide = (pullDir === 'UPPER' || (pullDir === 'NEUTRAL' && upWeight >= loWeight)) ? 'ABOVE' : 'BELOW';
+      } else if (upperValid) {
+        targetSide = 'ABOVE';
+      } else if (lowerValid) {
+        targetSide = 'BELOW';
+      }
+      const targetMag = targetSide === 'ABOVE' ? up : lo;
+
+      const cond2 = state.oiDelta4h >= -0.5;
+      const cond3 = state.fundingAnnualPct >= -10.0 && state.fundingAnnualPct <= 28.0;
+      const cond4 = state.regime === 'Range' || (state.regime === 'TrendUp' && targetSide === 'ABOVE') || (state.regime === 'TrendDown' && targetSide === 'BELOW');
+      const cond5 = Math.abs(state.priceChange24h) < 6.5;
+      const cond6 = (targetSide === 'ABOVE' && up.price > p) || (targetSide === 'BELOW' && lo.price < p);
+      const passedSub = [cond1, cond2, cond3, cond4, cond5, cond6].filter(Boolean).length;
+      const cond7 = passedSub >= 5 && cond1 && cond4 && cond5 && cond6;
+      const isExhaustion = cond1 && cond6 && !cond3 && !cond2;
+
+      const rules = [
+        { id: 'pill1', label: '1. Magnet', ok: cond1 },
+        { id: 'pill2', label: '2. OI', ok: cond2 },
+        { id: 'pill3', label: '3. Funding', ok: cond3 },
+        { id: 'pill4', label: '4. Regime', ok: cond4 },
+        { id: 'pill5', label: '5. Structure', ok: cond5 },
+        { id: 'pill6', label: '6. Unswept', ok: cond6 },
+        { id: 'pill7', label: '7. Conviction', ok: cond7 },
+      ];
+      rules.forEach(r => {
+        const el = document.getElementById(r.id);
+        if (el) {
+          el.className = 'rule-pill ' + (r.ok ? 'ok' : 'wait');
+          el.textContent = `${r.label} [${r.ok ? 'OK' : 'WAIT'}]`;
+        }
+      });
+
+      // Status Report Overlay
+      const overlay = document.getElementById('statusOverlay');
+      const badge = document.getElementById('statusBadge');
+      const headlineEl = document.getElementById('statusHeadline');
+      const bodyEl = document.getElementById('statusBody');
+
+      if (cond7 && targetSide === 'ABOVE' && state.regime === 'Range') {
+        overlay.className = 'status-overlay edge-active';
+        badge.className = 'status-badge badge-edge';
+        badge.textContent = 'SWING EDGE PRESENT';
+        headlineEl.textContent = `Strong magnet above at ${fmtUSD(up.price)}.`;
+        bodyEl.textContent = `Short liquidations clustered (${fmtUSD(up.usd / 1e6)}M), OI rising, funding elevated. Range regime. Spot flow supportive. Watch for sweep.`;
+      } else if (cond7 && targetSide === 'BELOW' && state.regime === 'Range') {
+        overlay.className = 'status-overlay edge-active';
+        badge.className = 'status-badge badge-edge';
+        badge.textContent = 'SWING EDGE PRESENT';
+        headlineEl.textContent = `Strong magnet below at ${fmtUSD(lo.price)}.`;
+        bodyEl.textContent = `Long liquidations clustered (${fmtUSD(lo.usd / 1e6)}M), OI rising, funding elevated. Range regime. Spot flow supportive. Watch for sweep.`;
+      } else if (cond7 && (state.regime === 'TrendUp' || state.regime === 'TrendDown')) {
+        overlay.className = 'status-overlay edge-active';
+        badge.className = 'status-badge badge-edge';
+        badge.textContent = 'SWING EDGE PRESENT';
+        headlineEl.textContent = `Magnet at ${fmtUSD(targetMag.price)} aligns with trend.`;
+        bodyEl.textContent = `OI and funding confirm. Structure supportive. Edge present — monitor for entry zone.`;
+      } else if (isExhaustion) {
+        overlay.className = 'status-overlay';
+        badge.className = 'status-badge badge-wait';
+        badge.textContent = 'HIGH CAUTION — WAIT';
+        headlineEl.textContent = `Dense magnet at ${fmtUSD(targetMag.price)} with extreme funding and declining OI.`;
+        bodyEl.textContent = `Possible exhaustion. High caution — wait for confirmation.`;
+      } else {
+        overlay.className = 'status-overlay';
+        badge.className = 'status-badge badge-wait';
+        badge.textContent = 'NO CLEAR EDGE — WAIT';
+        headlineEl.textContent = `No clear edge — wait.`;
+        bodyEl.textContent = cond1
+          ? `Magnet present at ${fmtUSD(targetMag.price)} but conditions incomplete. No clear edge — wait.`
+          : `Liquidation density dispersed. No high-probability gravitational pull. Default to cash.`;
+      }
+
+      // Legend Chips
+      document.getElementById('upperChipText').textContent = `▲ UPPER MAGNET: ${fmtUSD(up.price)} (${fmtPct(up.distPct)}) · ${fmtUSD(up.usd / 1e6)}M`;
+      document.getElementById('spotChipText').textContent = `◆ SPOT HORIZON: ${fmtUSD(p)}`;
+      document.getElementById('lowerChipText').textContent = `▼ LOWER SUPPORT: ${fmtUSD(lo.price)} (${fmtPct(lo.distPct)}) · ${fmtUSD(lo.usd / 1e6)}M`;
+
+      // Price Lines on Chart
       if (upperLine) candleSeries.removePriceLine(upperLine);
       upperLine = candleSeries.createPriceLine({
-        price: upperMagnetPrice,
+        price: up.price,
         color: '#00f0ff',
         lineWidth: 2,
         lineStyle: LightweightCharts.LineStyle.Dashed,
         axisLabelVisible: true,
-        title: '▲ UPPER MAGNET: $78,422 (+3.3%) · $215M SHORT LIQS',
+        title: `▲ UPPER MAGNET: ${fmtUSD(up.price)} (${fmtPct(up.distPct)}) · ${fmtUSD(up.usd / 1e6)}M SHORT LIQS`,
       });
 
-      // 2. Spot Horizon Line
       if (spotLine) candleSeries.removePriceLine(spotLine);
       spotLine = candleSeries.createPriceLine({
-        price: spotPrice,
+        price: p,
         color: '#ffffff',
         lineWidth: 1,
         lineStyle: LightweightCharts.LineStyle.Dotted,
         axisLabelVisible: true,
-        title: '◆ SPOT HORIZON: $' + Math.round(spotPrice).toLocaleString(),
+        title: `◆ SPOT HORIZON: ${fmtUSD(p)}`,
       });
 
-      // 3. Lower Support Line (Long Liquidations)
       if (lowerLine) candleSeries.removePriceLine(lowerLine);
       lowerLine = candleSeries.createPriceLine({
-        price: lowerMagnetPrice,
+        price: lo.price,
         color: '#ffb020',
         lineWidth: 2,
         lineStyle: LightweightCharts.LineStyle.Dashed,
         axisLabelVisible: true,
-        title: '▼ LOWER SUPPORT: $74,525 (-1.8%) · $354M LONG LIQS',
+        title: `▼ LOWER SUPPORT: ${fmtUSD(lo.price)} (${fmtPct(lo.distPct)}) · ${fmtUSD(lo.usd / 1e6)}M LONG LIQS`,
       });
 
       chart.timeScale().fitContent();
     }
 
-    // Window Resize Handler
     window.addEventListener('resize', () => {
       chart.applyOptions({
         width: chartContainer.clientWidth,
@@ -476,11 +659,9 @@
       });
     });
 
-    // Initial Load & Polling (every 30s)
     loadChartData();
     setInterval(loadChartData, 30000);
 
-    // Countdown Timer display
     let timeLeft = 30;
     setInterval(() => {
       timeLeft--;

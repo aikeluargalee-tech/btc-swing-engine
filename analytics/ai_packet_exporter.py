@@ -144,7 +144,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
 
         "## MASTER SYSTEM PROMPT & RULEBOOK FOR GEMINI ARGON / EXTERNAL AI AUDITOR",
 
-        "You are the **Independent Chief Quantitative Strategist & Risk Officer** auditing a live real-time telemetry packet exported from the **`BTC-USD Spot Swing Engine`** (`10-Desk Rich Live Terminal: Tab [0] Master & Desks [1]–[9]`).",
+        "You are the **Independent Chief Quantitative Strategist & Risk Officer** auditing a live real-time telemetry packet exported from the **`BTC-USD Spot Swing Engine`** (`17-Desk Rich Live Terminal: Tab [0] Master & Desks [1]–[9]`).",
 
         "",
 
@@ -156,7 +156,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
 
         "",
 
-        "### 2. How to Interpret & Audit Sections 0–12 (The 10-Desk Quantitative Playbook)",
+        "### 2. How to Interpret & Audit Sections 0–16 (The Complete 17-Desk Quantitative Playbook)",
 
         "0. **Section 0 Audit (`Tab [0] BTC Spot Swing Screener, 1:3 RRR Magnet Protocol & Footprint Gate`)**:",
 
@@ -242,13 +242,31 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
 
         "   * **Prior Day/Week Auction & ETF/Macro Context**: Cross-verify Prior Day/Week POC/VAH/VAL location, L2 Order-Book Depth (`±1%`/`±2%`), US Spot ETF net flows, DXY/TIPS real yields, and 14D Wilder RSI / Log-Spread Z-score.",
 
+        "12. **Section 13 Audit (`Tab [P] Price Action & Structure Protocol — SLSP v1.0, Industrial 3-EMA & Tell-Tale Climax`)**:",
+
+        "   * **SLSP v1.0 Swing Liquidity**: Evaluates 4H/1H Industrial 3-EMA trend regime (`EMA21 > EMA55 > EMA200`), 4H Liquidation Wick Flushes (`>= 45%` lower wick), and climax volume absorption.",
+
+        "13. **Section 14 Audit (`Tab [B] Classic Chart Patterns & Candlestick Geometry`)**:",
+
+        "   * **Deterministic Pattern Recognition**: Audits 4H macro and 1H tactical patterns (Double Bottom/Top, Head & Shoulders, Bull/Bear Flags, Triangles, Pinbars/Engulfing candles), neckline breakouts, and invalidation floors.",
+
+        "14. **Section 15 Audit (`Tab [G] Grok Dual-Horizon Flow & 00:00 UTC Anchored VWAP SD Matrix`)**:",
+
+        "   * **Grok Dual-Horizon Analysis**: Cross-checks 4A Swing Context (Daily/4H) vs. 4B Day Context (1H/15m), 00:00 UTC Anchored VWAP ±1σ/±2σ bands, CoinGlass crowding, multi-horizon Spot/Perp CVD divergence, overhead short-liquidation magnets vs. downside long traps, and the Engine Bottomline Verdict.",
+
+        "15. **Section 16 Audit (`Tab [R] SSRN Quantitative Alpha Deck & Academic Empirical Research`)**:",
+
+        "   * **Academic Empirical Foundations**: 5 peer-reviewed SSRN domains (Market Microstructure & Order Book Depth, Time-Series Momentum, Systematic Factor Pricing, On-Chain Structural Metrics, Alternative Data & Machine Learning Friction Hurdles).",
+
+        "   * **5 Operational Academic Risk Gates**: Mesíček & Vojtko (SSRN 5748642) 1D/1H MACD gate, Zarattini et al. (SSRN 5209907) 20D volatility targeting, Karassavidis et al. (SSRN 5821842) 8H ATR dynamic stops, Chan (SSRN 5292305) +30% annualized funding ceiling, and Bysik & Ślepaczuk (SSRN 6795938) 18 bps round-trip cost hurdle.",
+
         "",
 
         "### 3. Mandatory 5-Part Response Format",
 
         "Structure your audit into:",
 
-        "1. **Independent Cross-Tab Telemetry Audit** (Bullish Confluence vs. Hidden Friction/Risk Flags across Tab [0] & Specialist Desks [1]–[9])",
+        "1. **Independent Cross-Tab Telemetry Audit** (Bullish Confluence vs. Hidden Friction/Risk Flags across Tab [0] & Specialist Desks [1]–[9], Tab [G], and Tab [R])",
 
         "2. **Critique of Python Engine Benchmark** (Where you **AGREE** vs. **DISAGREE / REFINE** Section 6)",
 
@@ -1890,6 +1908,68 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
         f"* **Tactical Playbook**: {pat.tactical_playbook if pat else 'Awaiting geometric setup.'}",
         "* **Interactive Chart**: `chart.html` (TradingView Lightweight Chart auto-synced)",
     ])
+
+    # --- SECTION 15: TAB [G] GROK DUAL-HORIZON FLOW & VWAP SD MATRIX ---
+    grok = getattr(store, "grok_quant_evaluation", None)
+    if grok is None:
+        try:
+            from analytics.grok_quant_engine import GrokQuantEngine
+            grok = GrokQuantEngine().evaluate(store)
+        except Exception:
+            grok = None
+
+    if grok is not None:
+        lines.extend([
+            "",
+            "---",
+            "",
+            "## SECTION 15: TAB [G] GROK DUAL-HORIZON FLOW & 00:00 UTC ANCHORED VWAP SD MATRIX",
+            "",
+            f"* **00:00 UTC Anchored VWAP**: `${grok.vwap_daily:,.2f}` | **Stretch Z-Score**: `{grok.vwap_stretch_z:+.2f}σ` (`{grok.vwap_band_status}`)",
+            f"* **VWAP Dispersion (1σ / 2σ)**: `+2.0σ: ${grok.vwap_sd2_upper:,.2f}` | `+1.0σ: ${grok.vwap_sd1_upper:,.2f}` | `-1.0σ: ${grok.vwap_sd1_lower:,.2f}` | `-2.0σ: ${grok.vwap_sd2_lower:,.2f}`",
+            f"* **CoinGlass Crowding & Positioning**: Top Traders `{grok.top_trader_ls_ratio:.2f}` ({grok.top_trader_long_pct}% L) vs Retail Accounts `{grok.global_account_ls_ratio:.2f}` (`{grok.crowding_verdict}`)",
+            f"* **Coinbase Premium Index**: `${grok.coinbase_premium_usd:+,.2f}` (`{grok.coinbase_premium_pct:+.4f}%`, Z=`{grok.coinbase_premium_zscore:+.2f}σ`, `{grok.coinbase_premium_status}`)",
+            f"* **Multi-Horizon CVD Divergence**: 24H Spot `{grok.spot_cvd_24h:+,.1f} BTC` vs Perp `{grok.futures_cvd_24h:+,.1f} BTC` (`{grok.cvd_divergence}`) | 4H Spot `{grok.spot_cvd_4h:+,.1f} BTC` | 15m Spot `{grok.spot_cvd_15m:+,.1f} BTC`",
+            f"* **Liquidation Pool Magnets**: Overhead Short Magnet `${grok.overhead_short_liq_pool:,.0f}` (~${grok.overhead_short_liq_usd/1e6:.0f}M) vs Downside Long Trap `${grok.downside_long_liq_pool:,.0f}` (~${grok.downside_long_liq_usd/1e6:.0f}M)",
+            f"* **4A. Swing Context (Daily/4H)**: {grok.mechanical_read_swing}",
+            f"* **4B. Day Context (1H/15m)**: {grok.mechanical_read_day}",
+            f"* **Engine Bottomline Verdict**: `{grok.bottomline_verdict}`",
+            f"  * **Rationale**: {grok.bottomline_rationale}",
+            f"  * **Trigger to Buy**: {grok.bottomline_buy_trigger}",
+            f"  * **Invalidation Risk**: {grok.bottomline_invalidation_risk}",
+        ])
+
+    # --- SECTION 16: TAB [R] SSRN QUANTITATIVE ALPHA DECK & EMPIRICAL RESEARCH ---
+    ssrn = getattr(store, "ssrn_alpha_evaluation", None)
+    if ssrn is None:
+        try:
+            from analytics.ssrn_research_engine import SSRNResearchEngine
+            ssrn = SSRNResearchEngine().evaluate(store)
+        except Exception:
+            ssrn = None
+
+    if ssrn is not None:
+        lines.extend([
+            "",
+            "---",
+            "",
+            "## SECTION 16: TAB [R] SSRN QUANTITATIVE ALPHA DECK & EMPIRICAL RESEARCH",
+            "",
+            "### 16A. 5 Academic Empirical Domains (Theoretical Foundation)",
+        ])
+        for d in ssrn.domains:
+            lines.append(f"* **{d.title}**: {d.key_finding} | *Spot Swing Role:* `{d.spot_swing_role}`")
+
+        lines.extend([
+            "",
+            "### 16B. 5 Verified Operational Strategy Models & Live Gate Status",
+        ])
+        for m in ssrn.models:
+            gate_badge = "PASS" if m.is_gate_pass else "RESTRICTED"
+            lines.append(
+                f"* **{m.name}** (`{m.ssrn_citation}` • `{m.timeframe}`): {m.logic} | "
+                f"**Benchmark:** `{m.performance}` | **Live Condition:** `[{gate_badge}: {m.live_status}]` ({m.live_value})"
+            )
 
     return "\n".join(lines) + "\n"
 

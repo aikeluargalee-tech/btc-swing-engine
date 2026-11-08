@@ -155,6 +155,19 @@ class TestSSRNResearchEngine(unittest.TestCase):
         self.assertGreater(char_count, 100)
         self.assertIn("chars", msg)
 
+    def test_ai_telemetry_packet_incorporates_tab_g_and_tab_r(self) -> None:
+        """Verify master AI telemetry packet (Key C) incorporates Sections 15 & 16."""
+        from analytics.ai_packet_exporter import build_ai_telemetry_packet
+
+        self.store.binance_spot_price = 76_000.0
+        packet = build_ai_telemetry_packet(self.config, self.store)
+
+        self.assertIn("## SECTION 15: TAB [G]", packet)
+        self.assertIn("## SECTION 16: TAB [R]", packet)
+        self.assertIn("Mesíček", packet)
+        self.assertIn("Zarattini", packet)
+        self.assertIn("Anchored VWAP", packet)
+
 
 if __name__ == "__main__":
     unittest.main()

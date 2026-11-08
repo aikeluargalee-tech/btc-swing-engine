@@ -5448,20 +5448,6 @@ def _poll_keyboard_tab_switch(
                         store.last_packet_copied_ts = time.time()
                         store.last_packet_char_count = char_count
                         changed = True
-                elif ch in ("r", "R"):
-                    store.show_help = False
-                    if store.active_tab != 16:
-                        store.active_tab = 16
-                        changed = True
-                    else:
-                        cur_mode = getattr(store, "ssrn_view_mode", "domains")
-                        store.ssrn_view_mode = "models" if cur_mode == "domains" else "domains"
-                        from analytics.ssrn_research_engine import copy_ssrn_deck_to_clipboard
-                        ok, msg, char_count = copy_ssrn_deck_to_clipboard(store)
-                        store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
-                        store.last_packet_copied_ts = time.time()
-                        store.last_packet_char_count = char_count
-                        changed = True
                 elif ch in ("t", "T"):
                     store.show_help = False
                     if store.active_tab != 8:
@@ -5531,20 +5517,6 @@ def _poll_keyboard_tab_switch(
                     else:
                         from analytics.grok_quant_engine import copy_grok_prompt_to_clipboard
                         ok, msg, char_count = copy_grok_prompt_to_clipboard(store)
-                        store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
-                        store.last_packet_copied_ts = time.time()
-                        store.last_packet_char_count = char_count
-                        changed = True
-                elif ch in ("r", "R"):
-                    store.show_help = False
-                    if store.active_tab != 16:
-                        store.active_tab = 16
-                        changed = True
-                    else:
-                        cur_mode = getattr(store, "ssrn_view_mode", "domains")
-                        store.ssrn_view_mode = "models" if cur_mode == "domains" else "domains"
-                        from analytics.ssrn_research_engine import copy_ssrn_deck_to_clipboard
-                        ok, msg, char_count = copy_ssrn_deck_to_clipboard(store)
                         store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
                         store.last_packet_copied_ts = time.time()
                         store.last_packet_char_count = char_count

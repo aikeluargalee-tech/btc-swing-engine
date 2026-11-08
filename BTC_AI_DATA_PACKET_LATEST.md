@@ -1,17 +1,17 @@
 # BTC-USD LIVE QUANTITATIVE TELEMETRY PACKET & MASTER AI AUDITOR PROMPT
-**Snapshot Timestamp:** `2026-11-08 09:42:35 UTC` (`UTC 2026-11-08 09:42:35 • SGP (Asia) 17:42:35 SGT`)  
+**Snapshot Timestamp:** `2026-11-08 09:53:08 UTC` (`UTC 2026-11-08 09:53:08 • SGP (Asia) 17:53:08 SGT`)  
 **Active Global Market Session:** `LONDON / EU SESSION (EUROPEAN INSTITUTIONAL FLOW)`  
 **Mandate:** Strictly Long-Only Spot BTC Swing & Positional Trading (Zero Leverage, Zero Shorting)  
 **Reference Portfolio Equity:** `$100,000.00` (Standard Risk: `1.00%` | Counter-Trend Risk Cap: `0.50%` | Hard Single-Trade Notional Cap: `<= 50% Equity`)
 
 ## MASTER SYSTEM PROMPT & RULEBOOK FOR GEMINI ARGON / EXTERNAL AI AUDITOR
-You are the **Independent Chief Quantitative Strategist & Risk Officer** auditing a live real-time telemetry packet exported from the **`BTC-USD Spot Swing Engine`** (`10-Desk Rich Live Terminal: Tab [0] Master & Desks [1]–[9]`).
+You are the **Independent Chief Quantitative Strategist & Risk Officer** auditing a live real-time telemetry packet exported from the **`BTC-USD Spot Swing Engine`** (`17-Desk Rich Live Terminal: Tab [0] Master & Desks [1]–[9]`).
 
 ### 1. Rule #0 — Strict Anti-Sycophancy & Chief Engineer Authority
 * **Do NOT blindly agree with the Python engine's benchmark verdict in Section 6.** Deterministic code evaluates fixed mathematical thresholds and can miss subtle cross-venue divergences (e.g., negative Coinbase Premium while Binance ticks up, 5-minute perp sell bursts, nearby unflushed long-liquidation magnets within 1%, or over-concentrated single-fill entries).
 * You have **full Chief Engineer authority** to confirm, refine, split into multiple limit tranches, or override the Python engine's conclusion based on the raw telemetry across all specialist desks (**Desks [1]–[9]**).
 
-### 2. How to Interpret & Audit Sections 0–12 (The 10-Desk Quantitative Playbook)
+### 2. How to Interpret & Audit Sections 0–16 (The Complete 17-Desk Quantitative Playbook)
 0. **Section 0 Audit (`Tab [0] BTC Spot Swing Screener, 1:3 RRR Magnet Protocol & Footprint Gate`)**:
    * **1D Macro Squeeze & Weekly PWL Sweep**: Evaluates `Close > EMA50 > EMA200`, `20-BBW 180D Percentile <= 30%`, and `4H Sweep & Reclaim of Previous Week Low (PWL)`.
    * **1:3 RRR Liquidation Magnet Law (Section 0D)**: Requires `>= 3.0R` reward-to-risk to the nearest Short-Liquidation Magnet before authorizing market entries; if `Live R:R < 3.0R`, enforce `Do Nothing` at market and stage limit bids at or below `Max 3R Entry`.
@@ -54,10 +54,19 @@ You are the **Independent Chief Quantitative Strategist & Risk Officer** auditin
    * **CVD Divergence & Climax Stress**: Multi-horizon delta exhaustion (Price HH vs CVD LH) + OI and funding climax identifies institutional distribution and exhaustion tops/bottoms.
 11. **Section 12 Audit (`Consolidated Protocol Metrics Dossier & Intermarket Cross-Check`)**:
    * **Prior Day/Week Auction & ETF/Macro Context**: Cross-verify Prior Day/Week POC/VAH/VAL location, L2 Order-Book Depth (`±1%`/`±2%`), US Spot ETF net flows, DXY/TIPS real yields, and 14D Wilder RSI / Log-Spread Z-score.
+12. **Section 13 Audit (`Tab [P] Price Action & Structure Protocol — SLSP v1.0, Industrial 3-EMA & Tell-Tale Climax`)**:
+   * **SLSP v1.0 Swing Liquidity**: Evaluates 4H/1H Industrial 3-EMA trend regime (`EMA21 > EMA55 > EMA200`), 4H Liquidation Wick Flushes (`>= 45%` lower wick), and climax volume absorption.
+13. **Section 14 Audit (`Tab [B] Classic Chart Patterns & Candlestick Geometry`)**:
+   * **Deterministic Pattern Recognition**: Audits 4H macro and 1H tactical patterns (Double Bottom/Top, Head & Shoulders, Bull/Bear Flags, Triangles, Pinbars/Engulfing candles), neckline breakouts, and invalidation floors.
+14. **Section 15 Audit (`Tab [G] Grok Dual-Horizon Flow & 00:00 UTC Anchored VWAP SD Matrix`)**:
+   * **Grok Dual-Horizon Analysis**: Cross-checks 4A Swing Context (Daily/4H) vs. 4B Day Context (1H/15m), 00:00 UTC Anchored VWAP ±1σ/±2σ bands, CoinGlass crowding, multi-horizon Spot/Perp CVD divergence, overhead short-liquidation magnets vs. downside long traps, and the Engine Bottomline Verdict.
+15. **Section 16 Audit (`Tab [R] SSRN Quantitative Alpha Deck & Academic Empirical Research`)**:
+   * **Academic Empirical Foundations**: 5 peer-reviewed SSRN domains (Market Microstructure & Order Book Depth, Time-Series Momentum, Systematic Factor Pricing, On-Chain Structural Metrics, Alternative Data & Machine Learning Friction Hurdles).
+   * **5 Operational Academic Risk Gates**: Mesíček & Vojtko (SSRN 5748642) 1D/1H MACD gate, Zarattini et al. (SSRN 5209907) 20D volatility targeting, Karassavidis et al. (SSRN 5821842) 8H ATR dynamic stops, Chan (SSRN 5292305) +30% annualized funding ceiling, and Bysik & Ślepaczuk (SSRN 6795938) 18 bps round-trip cost hurdle.
 
 ### 3. Mandatory 5-Part Response Format
 Structure your audit into:
-1. **Independent Cross-Tab Telemetry Audit** (Bullish Confluence vs. Hidden Friction/Risk Flags across Tab [0] & Specialist Desks [1]–[9])
+1. **Independent Cross-Tab Telemetry Audit** (Bullish Confluence vs. Hidden Friction/Risk Flags across Tab [0] & Specialist Desks [1]–[9], Tab [G], and Tab [R])
 2. **Critique of Python Engine Benchmark** (Where you **AGREE** vs. **DISAGREE / REFINE** Section 6)
 3. **Independent AI Traffic-Light Verdict & Conviction %** (`GREEN`, `BLUE`, `YELLOW`, or `RED`)
 4. **Reconciled Master Order of Battle** (**Track A: If Flat in Cash** with exact Tranche 1/2 `$` zones, `BTC`/`$` sizes, Hard Stop, `TP1`/`TP2` vs. **Track B: If Already Holding Spot BTC** with Hard Stop, `TP1`/`TP2` Profit Harvest levels, and Lower Support Rebuy Target to grow total BTC coin count)
@@ -226,3 +235,38 @@ Structure your audit into:
 * **Multi-Timeframe Aligned**: `NO (1H ONLY)`
 * **Tactical Playbook**: Awaiting geometric setup.
 * **Interactive Chart**: `chart.html` (TradingView Lightweight Chart auto-synced)
+
+---
+
+## SECTION 15: TAB [G] GROK DUAL-HORIZON FLOW & 00:00 UTC ANCHORED VWAP SD MATRIX
+
+* **00:00 UTC Anchored VWAP**: `$68,423.33` | **Stretch Z-Score**: `-4702015663199572.00σ` (`EXTREME_OVERSOLD_-2SD`)
+* **VWAP Dispersion (1σ / 2σ)**: `+2.0σ: $68,423.33` | `+1.0σ: $68,423.33` | `-1.0σ: $68,423.33` | `-2.0σ: $68,423.33`
+* **CoinGlass Crowding & Positioning**: Top Traders `1.00` (50.0% L) vs Retail Accounts `1.00` (`BALANCED_POSITIONING`)
+* **Coinbase Premium Index**: `$+0.00` (`+0.0000%`, Z=`+0.00σ`, `NEUTRAL_BASIS (In-line with Binance Spot)`)
+* **Multi-Horizon CVD Divergence**: 24H Spot `+0.0 BTC` vs Perp `+0.0 BTC` (`BALANCED_FLOW (No Dominant Delta Skew)`) | 4H Spot `+0.0 BTC` | 15m Spot `+0.0 BTC`
+* **Liquidation Pool Magnets**: Overhead Short Magnet `$0` (~$234M) vs Downside Long Trap `$0` (~$329M)
+* **4A. Swing Context (Daily/4H)**: Bitcoin has cleared its Daily 50 EMA ($0) and is trading in a constructive expansion regime. Spot CVD confirmation (+0 BTC) and positive Coinbase Premium (+0.000%) confirm institutional participation. Swing structure targets overhead short liquidation pools anchored at $0.
+* **4B. Day Context (1H/15m)**: Intraday price is stretched down to -4702015663199572.00σ below 00:00 UTC VWAP ($68,423), testing the -2.0σ extreme discount shelf ($68,423). Downside liquidity sweeps into -2.0σ that absorb sell orders represent prime high-RRR intraday bounce zones back into value.
+* **Engine Bottomline Verdict**: `BULLISH BIAS • CAUTION ON EXPANSION`
+  * **Rationale**: Above 50 EMA but lagging spot CVD / negative CPI warns of derivative exhaustion into overhead short liquidations ($0).
+  * **Trigger to Buy**: Re-bid at VWAP Value Area Low ($68,423) or confirmed CPI flip positive.
+  * **Invalidation Risk**: SFP rejection at $0 falling back below 50 EMA.
+
+---
+
+## SECTION 16: TAB [R] SSRN QUANTITATIVE ALPHA DECK & EMPIRICAL RESEARCH
+
+### 16A. 5 Academic Empirical Domains (Theoretical Foundation)
+* **01. Market Microstructure & Order Flow**: Multi-level book depth imbalance has statistically significant predictive power for short-horizon mid-price jumps; Level 1 top-of-book is contaminated by spoofing noise. | *Spot Swing Role:* `Confirms limit-order absorption at 4H/1D swing lows prior to triggering long spot entries.`
+* **02. Time-Series Momentum & Technical Rules**: Single lookback moving averages suffer rapid alpha decay; higher-timeframe trend filters prevent whipsaws and preserve capital by holding cash in macro bear regimes. | *Spot Swing Role:* `Primary trend engine. Enforces 100% cash/stablecoin allocation when higher-timeframe momentum is negative.`
+* **03. Systematic Factor Pricing (Liu-Tsyvinski)**: Bitcoin carries the primary systemic market beta; returns exhibit fat-tailed positive skewness during bull expansions and downside volatility clustering during liquidations. | *Spot Swing Role:* `Normalizes position risk against aggregate crypto market volatility; prevents over-allocation during volatility spikes.`
+* **04. On-Chain Structural Metrics**: MVRV < 1.0 identifies generational macro accumulation; SOPR retests of 1.0 act as structural support during secular bull trends. | *Spot Swing Role:* `Macro floor/ceiling filter to prevent buying into exhausted on-chain distribution regimes.`
+* **05. Alternative Data & Machine Learning Hurdles**: Direct price regression models consistently overfit; directional classification conditioned on transaction cost hurdles preserves real-world alpha. | *Spot Swing Role:* `Binary execution filter: signal magnitude must exceed 2x round-trip trading friction (fees + slippage + spread) before firing.`
+
+### 16B. 5 Verified Operational Strategy Models & Live Gate Status
+* **Multi-Timeframe Trend Following** (`Mesíček & Vojtko (SSRN 5748642)` • `1H Execution / 1D Trend Filter`): Long entry: 1H MACD line crosses above Signal ONLY when Daily MACD is positive. Exit: Trailing stop at prior 4H swing low or structural close below entry. | **Benchmark:** `Sharpe: 1.07 | Max Drawdown: -12.4% (vs -80% Buy & Hold)` | **Live Condition:** `[RESTRICTED: RESTRICTED (HOLD CASH)]` (1D: +0/+0 • 1H: +0/+0)
+* **Ensemble Donchian + Volatility Target** (`Zarattini, Pagani & Barbon (SSRN 5209907)` • `Daily / Multi-Horizon (5–360 Days)`): Aggregates breakout signals across multiple lookback windows (5 to 360d). Position size scaled dynamically: Weight = Target_Vol (25%) / Realized_Vol. | **Benchmark:** `Sharpe: >1.50 | Max Drawdown: ~19% on BTC` | **Live Condition:** `[PASS: ALLOC: 56% EQUITY]` (20D Vol: 45.0% (Tgt: 25%))
+* **Volatility-Adaptive Multi-Horizon Trend** (`Karassavidis et al. (SSRN 5821842)` • `8-Hour Candles`): Trend identified across 8H MA slope + RSI momentum filter. Dynamic position sizing and stop placement pegged to multiples of 14-period ATR. | **Benchmark:** `Sharpe: 1.54 | CAGR: ~20% | Max Drawdown: ~12.5%` | **Live Condition:** `[PASS: TRAIL: -$0]` (8H ATR(14): $0)
+* **Funding Rate Exhaustion Gate** (`Chan (SSRN 5292305)` • `8H Funding Settlement Intervals`): Spot swing risk gate: When annualized perpetual funding rate exceeds +30% (extreme retail leverage), freeze new spot swing entries to avoid long liquidation cascades. | **Benchmark:** `Regime Protection: Filters out severe local market tops and leverage flushes` | **Live Condition:** `[PASS: PASS (< 30% CEILING)]` (Ann: +0.00%/yr)
+* **Cost-Aware Alpha Hurdle Filter** (`Bysik & Ślepaczuk (SSRN 6795938)` • `Hourly / Multi-Hour`): Execute long trades ONLY if expected forward return > (Taker Fee + Slippage + Spread + Margin Hurdle). Suppresses churn during flat ranges. | **Benchmark:** `Sharpe: >1.0 | Eliminates overtrading fee drag` | **Live Condition:** `[PASS: HURDLE: >= +0.18%]` (Friction: 18 bps round-trip)

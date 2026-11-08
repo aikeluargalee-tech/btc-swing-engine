@@ -128,6 +128,15 @@ class TestSSRNResearchEngine(unittest.TestCase):
         self.assertGreater(len(res.ssrn_summary_markdown), 200)
         self.assertIn("SSRN QUANTITATIVE ALPHA DECK", res.ssrn_summary_markdown)
         self.assertIn("Zarattini", res.ssrn_summary_markdown)
+        # Beginner-friendly narrative checks
+        self.assertGreater(len(res.beginner_headline), 0)
+        self.assertGreater(len(res.beginner_reason), 0)
+        self.assertGreater(len(res.beginner_next_move), 0)
+        self.assertTrue("RESTRICTED" in res.overall_verdict or "PERMITTED" in res.overall_verdict)
+        for m in res.models:
+            self.assertGreater(len(m.beginner_question), 0)
+            self.assertGreater(len(m.beginner_translation), 0)
+            self.assertGreater(len(m.beginner_action_note), 0)
 
     def test_tab16_tui_render_both_views(self) -> None:
         """Verify Tab 16 builds cleanly for both View A (domains) and View B (models)."""

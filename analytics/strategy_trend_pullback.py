@@ -1184,14 +1184,15 @@ class TrendPullbackEngine:
             "",
             "## 3. TRADE PLAN (SIMULATION / PAPER EQUITY: US$100,000)",
             f"- **Decision:** `{ev.trade_decision}`",
-            f"- **Limit Entry Zone:** `${ev.limit_entry_low:,.2f} - ${ev.limit_entry_high:,.2f}`",
-            f"- **Structural Stop:** `${ev.structural_stop:,.2f}` (`{ev.stop_distance_atr:.2f} ATR` / `-${ev.stop_distance_usd:,.2f}`)",
-            f"- **Risk Budget (0.50%):** `${ev.risk_budget_usd:,.2f}`  |  **Position Size:** `{ev.position_size_btc:.5f} BTC` (`${ev.position_value_usd:,.2f}`)",
+            f"- **Limit Entry Zone (4H EMA50 Watch):** `${ev.limit_entry_low:,.2f} - ${ev.limit_entry_high:,.2f}`",
+            f"- **Structural Stop:** `${ev.structural_stop:,.2f}` (`{ev.stop_distance_atr:.2f} ATR` / `-${ev.stop_distance_usd:,.2f}` from EMA50)",
+            f"- **Risk Budget (0.50%):** `${ev.risk_budget_usd:,.2f}`  |  **Position Size:** `{ev.position_size_btc:.5f} BTC` (`${ev.position_value_usd:,.2f}`)"
+            + (" *(Sim Reference if Armed — Active Order: 0.00000 BTC)*" if ev.trade_decision == "NO TRADE" else ""),
             f"- **Risk / Reward:** `{ev.risk_reward_label}`",
             "",
             "## 4. POSITION MANAGEMENT & DATA INTEGRITY",
-            f"- **Current Status:** `{ev.position_status}`  |  **Exit Conditions:** `{ev.exit_conditions_status}`",
-            f"- **Invalidation:** {ev.invalidation_reason}",
+            f"- **Current Status:** `{ev.position_status}`  |  **Exit Conditions:** `{'N/A (IN CASH)' if ev.position_status == 'CASH' else ev.exit_conditions_status}`",
+            f"- **Invalidation / Exit Rules:** {ev.invalidation_reason}",
             f"- **Daily Candle:** `{ev.daily_candle_status}`  |  **4H Candle:** `{ev.candle_4h_status}`",
             f"- **Verdict Explanation:** {ev.verdict_explanation}",
         ]
@@ -1216,17 +1217,27 @@ def copy_trend_pullback_to_clipboard(store: StateStore) -> Tuple[bool, str, int]
 
     copied = False
     if os.name == "nt":
+        crlf_text = text.replace("\r\n", "\n").replace("\n", "\r\n")
         try:
-            proc = subprocess.Popen(
-                ["powershell", "-NoProfile", "-Command", "Set-Clipboard -Value $input"],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+            subprocess.run(
+                ["clip.exe"],
+                input=crlf_text.encode("utf-16le"),
+                check=True,
+                timeout=3.0,
             )
-            proc.communicate(input=text.encode("utf-8"), timeout=3.0)
-            copied = proc.returncode == 0
+            copied = True
         except Exception:
-            copied = False
+            try:
+                proc = subprocess.Popen(
+                    ["powershell", "-NoProfile", "-Command", "($input | Out-String) | Set-Clipboard"],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                proc.communicate(input=crlf_text.encode("utf-8"), timeout=3.0)
+                copied = proc.returncode == 0
+            except Exception:
+                copied = False
 
     store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
     store.last_packet_copied_ts = time.time()

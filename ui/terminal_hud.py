@@ -5552,7 +5552,8 @@ def _build_tab18_trend_pullback_hud(
         f"[bold white]1D Close (Closed):[/bold white] [cyan]${tp_eval.daily_close_completed:,.2f}[/cyan]",
         f"[bold white]Daily SMA200:[/bold white]     [cyan]${tp_eval.daily_sma200:,.2f}[/cyan]",
         f"[bold white]SMA200 20D Slope:[/bold white] [{slope_1d_col}]{slope_1d_lbl} ({tp_eval.daily_sma200_slope_20d:+,.2f})[/{slope_1d_col}]",
-        f"[dim]Macro Context: 1W EMA50 ${tp_eval.ema50_1w:,.0f} ({w50_status}) • 1D EMA50 ${tp_eval.ema50_1d:,.0f}[/dim]",
+        f"[dim]1W EMA50 Context: ${tp_eval.ema50_1w:,.0f} ({w50_status} — Read-Only)[/dim]",
+        f"[dim]1D EMA50 Context: ${tp_eval.ema50_1d:,.0f} ({'ABOVE' if (tp_eval.ema50_1d > 0 and spot_p > tp_eval.ema50_1d) else 'BELOW'} — Read-Only)[/dim]",
     ]
     regime_panel = Panel(
         "\n".join(regime_lines),
@@ -5590,6 +5591,7 @@ def _build_tab18_trend_pullback_hud(
         f"[bold white]Recovery Candle:[/bold white] {pb_valid_str}",
         f"[bold white]Setup Status:[/bold white]    [bold white]{tp_eval.setup_status}[/bold white] [dim]({age_str})[/dim]",
         f"[bold white]Max Extension:[/bold white]   [cyan]${tp_eval.max_extension_price:,.2f}[/cyan] [dim](EMA50 + 1.0 ATR)[/dim]",
+        f"[bold white]4H Bar Low/High:[/bold white] [white]${tp_eval.low_4h_completed:,.2f} / ${tp_eval.high_4h_completed:,.2f}[/white]",
         f"[dim]{tp_eval.pullback_rejection_reason}[/dim]",
     ]
     pullback_panel = Panel(
@@ -5611,11 +5613,11 @@ def _build_tab18_trend_pullback_hud(
     trade_lines = [
         f"[bold white]Decision:[/bold white]            [bold bright_white]{tp_eval.trade_decision}[/bold bright_white]",
         f"[bold white]Reference Equity:[/bold white]    [cyan]US${tp_eval.simulation_equity_usd:,.0f} (Simulation / Paper Mode)[/cyan]",
-        f"[bold white]Limit Entry Zone:[/bold white]    [cyan]${tp_eval.limit_entry_low:,.2f} - ${tp_eval.limit_entry_high:,.2f}[/cyan]",
+        f"[bold white]Limit Entry Zone:[/bold white]    [cyan]${tp_eval.limit_entry_low:,.2f} - ${tp_eval.limit_entry_high:,.2f}[/cyan] [dim](4H EMA50 Watch)[/dim]",
         f"[bold white]Structural Stop:[/bold white]     [cyan]${tp_eval.structural_stop:,.2f}[/cyan] ({stop_badge})",
         f"[bold white]Stop Distance:[/bold white]       [white]{tp_eval.stop_distance_atr:.2f} ATR (-${tp_eval.stop_distance_usd:,.2f})[/white]",
         f"[bold white]Risk Per Trade:[/bold white]      [cyan]{tp_eval.risk_per_trade_pct:.2f}% (${tp_eval.risk_budget_usd:,.0f})[/cyan]",
-        f"[bold white]Position Size:[/bold white]       [bold bright_cyan]{tp_eval.position_size_btc:.5f} BTC[/bold bright_cyan]",
+        f"[bold white]Position Size:[/bold white]       [bold bright_cyan]{tp_eval.position_size_btc:.5f} BTC[/bold bright_cyan] [dim](Sim if Armed • Active: 0.0 BTC)[/dim]",
         f"[bold white]Position Value:[/bold white]      [cyan]${tp_eval.position_value_usd:,.2f}[/cyan]",
         f"[bold white]Risk / Reward:[/bold white]       [dim]{tp_eval.risk_reward_label}[/dim]",
     ]
@@ -5633,11 +5635,14 @@ def _build_tab18_trend_pullback_hud(
     s1d_str = "[bold bright_red]TRIGGERED[/bold bright_red]" if tp_eval.exit_two_1d_below_sma200 else "[green]CLEAR[/green]"
     pos_lines = [
         f"[bold white]Current Status:[/bold white]   [bold {pos_col}]{tp_eval.position_status}[/bold {pos_col}]",
-        f"[bold white]Exit Conditions:[/bold white]  [bold white]{tp_eval.exit_conditions_status}[/bold white]",
+        f"[bold white]Exit Conditions:[/bold white]  [bold white]{'N/A (100% USDT CASH)' if tp_eval.position_status == 'CASH' else tp_eval.exit_conditions_status}[/bold white]",
         f"[bold white]Stop Breach:[/bold white]      {sb_str}",
         f"[bold white]2x 4H < EMA50:[/bold white]    {e4h_str}",
         f"[bold white]2x 1D < SMA200:[/bold white]   {s1d_str}",
         f"[dim]Invalidation: {tp_eval.invalidation_reason}[/dim]",
+        f"[bold white]Execution Mode:[/bold white]   [white]Manual Spot Only (No Auto-Exec)[/white]",
+        f"[bold white]Leverage / Short:[/bold white] [green]0.0x Leverage • Long-Only[/green]",
+        f"[dim]Trailing Rule: 2x 4H Close < EMA50 OR 2x 1D Close < SMA200[/dim]",
     ]
     pos_panel = Panel(
         "\n".join(pos_lines),
@@ -5655,6 +5660,10 @@ def _build_tab18_trend_pullback_hud(
         f"[bold white]Last Update:[/bold white]       [white]{tp_eval.timestamp_myt}[/white]",
         f"[bold white]Integrity Gate:[/bold white]    [bold {di_col}]{di_label}[/bold {di_col}]",
         f"[dim]{tp_eval.integrity_failure_reason or 'All required spot OHLCV series verified & fresh.'}[/dim]",
+        f"[bold white]Closed Candle:[/bold white]     [bold bright_green]ENFORCED (Forming Bars Excluded)[/bold bright_green]",
+        f"[bold white]Internal Clock:[/bold white]    [white]{tp_eval.timestamp_utc}[/white]",
+        f"[bold white]Fee Assumption:[/bold white]    [dim]0.10% Entry + 0.10% Exit[/dim]",
+        f"[bold white]Slippage Buffer:[/bold white]   [dim]0.05% Entry + 0.05% Exit[/dim]",
     ]
     data_panel = Panel(
         "\n".join(data_lines),

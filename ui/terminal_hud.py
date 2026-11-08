@@ -5408,6 +5408,22 @@ def _build_tab17_btc_magnet_hud(
     )
 
     horizon_table.add_row(col_up, col_center, col_lo)
+
+    # Gravitational Density Gauges & Vector Direction
+    max_vol = max(up.usd_volume, lo.usd_volume, 1.0)
+    up_blocks = max(1, int(round((up.usd_volume / max_vol) * 16)))
+    lo_blocks = max(1, int(round((lo.usd_volume / max_vol) * 16)))
+    up_bar = f"[bright_cyan]{'■' * up_blocks}{'░' * (16 - up_blocks)}[/bright_cyan] [dim](${up.usd_volume/1e6:,.0f}M Short Pool)[/dim]"
+    lo_bar = f"[bright_yellow]{'■' * lo_blocks}{'░' * (16 - lo_blocks)}[/bright_yellow] [dim](${lo.usd_volume/1e6:,.0f}M Long Pool)[/dim]"
+    if magnet_eval.pull_direction == "LOWER":
+        density_mult = lo.usd_volume / max(up.usd_volume, 1.0)
+        grav_gauge = f"[bold bright_yellow]◀◀ GRAVITATIONAL VECTOR: PULLING DOWN ({density_mult:.1f}x DENSITY) ◀◀[/bold bright_yellow]"
+    elif magnet_eval.pull_direction == "UPPER":
+        density_mult = up.usd_volume / max(lo.usd_volume, 1.0)
+        grav_gauge = f"[bold bright_cyan]▶▶ GRAVITATIONAL VECTOR: PULLING UP ({density_mult:.1f}x DENSITY) ▶▶[/bold bright_cyan]"
+    else:
+        grav_gauge = "[bold white]── BALANCED HORIZON (EQUILIBRIUM) ──[/bold white]"
+    horizon_table.add_row(up_bar, grav_gauge, lo_bar)
     horizon_panel = Panel(
         horizon_table,
         title="[bold bright_white]LIQUIDATION GRAVITATIONAL HORIZON[/bold bright_white]",

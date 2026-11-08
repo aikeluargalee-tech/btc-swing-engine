@@ -5523,7 +5523,7 @@ def _build_tab18_trend_pullback_hud(
     store: StateStore,
     header_panel: Panel,
 ) -> Group:
-    """Builds Desk 18 [A: BTC STRATEGY] - BTC TREND-PULLBACK v1.0 (Research / Paper Mode)."""
+    """Builds Desk 18 [A: BTC STRATEGY] - BTC TREND-PULLBACK v1.0 (DATA-ONLY Metrics & True/False Report)."""
     tp_eval = getattr(store, "trend_pullback_evaluation", None)
     if tp_eval is None:
         from analytics.strategy_trend_pullback import TrendPullbackEngine
@@ -5531,74 +5531,66 @@ def _build_tab18_trend_pullback_hud(
 
     spot_p = tp_eval.spot_price or store.binance_spot_price or 0.0
 
-    # 1. Sub-Ribbon Header (with mandatory Section 12 Research Honesty labels)
+    # 1. Sub-Ribbon Header (DATA-ONLY Metrics Header)
     sub_grid = Table.grid(expand=True)
     sub_grid.add_column(justify="left", no_wrap=True)
     sub_grid.add_column(justify="right", no_wrap=True)
     sub_grid.add_row(
-        f"[bold bright_green]{tp_eval.strategy_name} | SPOT SWING | LONG ONLY | {tp_eval.mode_label}[/bold bright_green]  │  "
-        f"[bold black on bright_yellow] STRATEGY STATUS: {tp_eval.strategy_status} [/bold black on bright_yellow]",
-        f"[bold white]Spot Price: [cyan]${spot_p:,.2f}[/cyan]   •   Last Update: [bright_cyan]{tp_eval.timestamp_myt}[/bright_cyan][/bold white]",
+        f"[bold bright_cyan]{tp_eval.strategy_name} | DATA-ONLY | {tp_eval.mode_label}[/bold bright_cyan]  │  "
+        f"[bold black on bright_yellow] STATUS: {tp_eval.strategy_status} [/bold black on bright_yellow]",
+        f"[bold white]Spot: [cyan]${spot_p:,.2f}[/cyan] • [bright_cyan]{tp_eval.timestamp_myt}[/bright_cyan][/bold white]",
     )
-    sub_panel = Panel(sub_grid, box=box.ROUNDED, border_style="bright_green", padding=(0, 1))
+    sub_panel = Panel(sub_grid, box=box.ROUNDED, border_style="bright_cyan", padding=(0, 1))
 
-    # 2. Row 1 Grid: MARKET REGIME (Left) + 4H TREND FILTER (Center) + PULLBACK ANALYSIS (Right)
-    reg_col = "bright_green" if tp_eval.daily_regime == "BULLISH" else "bright_red"
-    slope_1d_lbl = "RISING" if tp_eval.daily_sma200_rising else "FALLING"
-    slope_1d_col = "green" if tp_eval.daily_sma200_rising else "red"
-    w50_status = "ABOVE" if (tp_eval.ema50_1w > 0 and spot_p > tp_eval.ema50_1w) else ("BELOW" if tp_eval.ema50_1w > 0 else "N/A")
-    regime_lines = [
-        f"[bold white]Daily Regime:[/bold white]     [bold {reg_col}]{tp_eval.daily_regime}[/bold {reg_col}]",
-        f"[bold white]1D Open -> Close:[/bold white] [white]{tp_eval.daily_open_time_utc} -> {tp_eval.daily_close_time_utc}[/white]",
-        f"[bold white]1D Close (Closed):[/bold white] [cyan]${tp_eval.daily_close_completed:,.2f}[/cyan] [dim](O ${tp_eval.daily_open_completed:,.0f} H ${tp_eval.daily_high_completed:,.0f} L ${tp_eval.daily_low_completed:,.0f})[/dim]",
-        f"[bold white]Daily SMA200:[/bold white]     [cyan]${tp_eval.daily_sma200:,.2f}[/cyan] [dim](20D Prior: ${tp_eval.daily_sma200_prev20:,.2f})[/dim]",
-        f"[bold white]SMA200 20D Slope:[/bold white] [{slope_1d_col}]{slope_1d_lbl} ({tp_eval.daily_sma200_slope_20d:+,.2f})[/{slope_1d_col}]",
-        f"[dim]Macro Context (Read-Only): 1W EMA50 ${tp_eval.ema50_1w:,.0f} ({w50_status}) • 1D EMA50 ${tp_eval.ema50_1d:,.0f}[/dim]",
+    # 2. Row 1 Grid: 1. DAILY (1D) + 2. 4H TREND + 3. PULLBACK ZONE
+    daily_lines = [
+        f"[bold white]1D Open -> Close:[/bold white]     [white]{tp_eval.daily_open_time_utc} -> {tp_eval.daily_close_time_utc}[/white]",
+        f"[bold white]Last 1D Close:[/bold white]        [cyan]${tp_eval.daily_close_completed:,.2f}[/cyan] [dim](O ${tp_eval.daily_open_completed:,.2f} H ${tp_eval.daily_high_completed:,.2f} L ${tp_eval.daily_low_completed:,.2f})[/dim]",
+        f"[bold white]1D SMA50 / SMA200:[/bold white]    [cyan]${tp_eval.daily_sma50:,.2f}[/cyan] / [cyan]${tp_eval.daily_sma200:,.2f}[/cyan]",
+        f"[bold white]20D SMA200 Slope:[/bold white]     [white]${tp_eval.daily_sma200_slope_20d:+,.2f}[/white] [dim](20D ago: ${tp_eval.daily_sma200_prev20:,.2f})[/dim]",
+        f"[bold white]Close vs SMA200:[/bold white]      [white]${tp_eval.daily_close_vs_sma200_usd:+,.2f} ({tp_eval.daily_close_vs_sma200_pct:+.2f}%)[/white]",
+        f"[bold white]Close vs SMA50:[/bold white]       [white]${tp_eval.daily_close_vs_sma50_usd:+,.2f} ({tp_eval.daily_close_vs_sma50_pct:+.2f}%)[/white]",
+        f"[bold white]Close > SMA200:[/bold white]       [cyan]{tp_eval.daily_close_above_sma200}[/cyan]  •  [bold white]Close > SMA50:[/bold white] [cyan]{tp_eval.daily_close_above_sma50}[/cyan]  •  [bold white]SMA200 Rising:[/bold white] [cyan]{tp_eval.daily_sma200_rising}[/cyan]",
     ]
-    regime_panel = Panel(
-        "\n".join(regime_lines),
-        title="[bold bright_white]MARKET REGIME (1D GATEKEEPER)[/bold bright_white]",
+    daily_panel = Panel(
+        "\n".join(daily_lines),
+        title="[bold bright_white]1. DAILY (1D)[/bold bright_white]",
         box=box.ROUNDED,
-        border_style=reg_col,
+        border_style="bright_blue",
         padding=(0, 1),
     )
 
-    tr_col = "bright_green" if tp_eval.trend_4h == "CONFIRMED" else "yellow"
-    slope_4h_lbl = "RISING" if tp_eval.ema50_rising_6bars else "FALLING"
-    slope_4h_col = "green" if tp_eval.ema50_rising_6bars else "red"
     trend_lines = [
-        f"[bold white]4H Trend:[/bold white]             [bold {tr_col}]{tp_eval.trend_4h}[/bold {tr_col}]",
         f"[bold white]4H Open -> Close:[/bold white]     [white]{tp_eval.candle_4h_open_time_utc} -> {tp_eval.candle_4h_close_time_utc}[/white]",
-        f"[bold white]4H Close (Closed):[/bold white]    [cyan]${tp_eval.close_4h_completed:,.2f}[/cyan]",
-        f"[bold white]4H EMA50 / EMA200:[/bold white]    [cyan]${tp_eval.ema50_4h:,.2f}[/cyan] / [cyan]${tp_eval.ema200_4h:,.2f}[/cyan]",
-        f"[bold white]4H EMA50 6-Bar Slope:[/bold white] [{slope_4h_col}]{slope_4h_lbl} ({tp_eval.ema50_4h_slope_6bars:+,.2f})[/{slope_4h_col}] [dim](Prior: ${tp_eval.ema50_4h_prev6:,.2f})[/dim]",
-        f"[bold white]4H ATR14:[/bold white]             [cyan]${tp_eval.atr14_4h:,.2f}[/cyan]",
+        f"[bold white]Last 4H Close / ATR14:[/bold white][cyan]${tp_eval.close_4h_completed:,.2f}[/cyan] / [cyan]${tp_eval.atr14_4h:,.2f}[/cyan]",
+        f"[bold white]4H EMA50 / EMA200:[/bold white]    [cyan]${tp_eval.ema50_4h:,.2f}[/cyan] / [cyan]${tp_eval.ema200_4h:,.2f}[/cyan] [dim](EMA50-EMA200: ${tp_eval.ema50_minus_ema200_4h_usd:+,.2f})[/dim]",
+        f"[bold white]6-Bar EMA50 Slope:[/bold white]    [white]${tp_eval.ema50_4h_slope_6bars:+,.2f}[/white] [dim](6 bars ago: ${tp_eval.ema50_4h_prev6:,.2f})[/dim]",
+        f"[bold white]Close vs EMA50:[/bold white]       [white]${tp_eval.close_4h_vs_ema50_usd:+,.2f} ({tp_eval.close_4h_vs_ema50_atr:+.4f} ATR / {tp_eval.close_4h_vs_ema50_atr:+.2f} ATR)[/white]",
+        f"[bold white]Close vs EMA200:[/bold white]      [white]${tp_eval.close_4h_vs_ema200_usd:+,.2f} ({tp_eval.close_4h_vs_ema200_atr:+.4f} ATR / {tp_eval.close_4h_vs_ema200_atr:+.2f} ATR)[/white]",
+        f"[bold white]EMA50>EMA200:[/bold white]         [cyan]{tp_eval.ema50_above_ema200}[/cyan]  •  [bold white]EMA50 Rising 6B:[/bold white] [cyan]{tp_eval.ema50_rising_6bars}[/cyan]  •  [bold white]Close>EMA200:[/bold white] [cyan]{tp_eval.close_4h_above_ema200}[/cyan]",
     ]
     trend_panel = Panel(
         "\n".join(trend_lines),
-        title="[bold bright_white]4H TREND FILTER[/bold bright_white]",
+        title="[bold bright_white]2. 4H TREND[/bold bright_white]",
         box=box.ROUNDED,
-        border_style=tr_col,
+        border_style="bright_blue",
         padding=(0, 1),
     )
 
-    pb_valid = tp_eval.recovery_candle == "CONFIRMED"
-    pb_valid_str = "[bold bright_green]CONFIRMED[/bold bright_green]" if pb_valid else "[bold yellow]NOT CONFIRMED[/bold yellow]"
-    pb_col = "bright_green" if pb_valid else "bright_blue"
-    age_str = f"{tp_eval.bars_since_recovery} / 3 4H bars" if tp_eval.bars_since_recovery >= 0 else "No active recovery candle"
     pullback_lines = [
-        f"[bold white]Evaluated 4H Bar:[/bold white] [white]{tp_eval.candle_4h_open_time_utc} -> {tp_eval.candle_4h_close_time_utc}[/white]",
-        f"[bold white]4H Candle OHLC:[/bold white]   [white]O ${tp_eval.open_4h_completed:,.2f} H ${tp_eval.high_4h_completed:,.2f} L ${tp_eval.low_4h_completed:,.2f} C ${tp_eval.close_4h_completed:,.2f}[/white]",
-        f"[bold white]Pullback Zone:[/bold white]    [cyan]${tp_eval.pullback_zone_lower:,.2f} - ${tp_eval.pullback_zone_upper:,.2f}[/cyan] [dim](-0.50 to +0.25 ATR)[/dim]",
-        f"[bold white]Max Extension:[/bold white]    [cyan]${tp_eval.max_extension_price:,.2f}[/cyan] [dim](EMA50 + 1.00 ATR)[/dim]",
-        f"[bold white]Recovery / Setup:[/bold white] {pb_valid_str} • [bold white]{tp_eval.setup_status}[/bold white] [dim]({age_str})[/dim]",
-        f"[dim]{tp_eval.pullback_rejection_reason}[/dim]",
+        f"[bold white]Zone Lower / Upper:[/bold white]   [cyan]${tp_eval.pullback_zone_lower:,.2f}[/cyan] [dim](EMA50-0.50*ATR)[/dim] / [cyan]${tp_eval.pullback_zone_upper:,.2f}[/cyan] [dim](EMA50+0.25*ATR)[/dim]",
+        f"[bold white]Max Extension:[/bold white]        [cyan]${tp_eval.max_extension_price:,.2f}[/cyan] [dim](EMA50 + 1.00 * ATR14)[/dim]",
+        f"[bold white]Spot Minus Lower:[/bold white]     [white]${tp_eval.spot_minus_zone_lower_usd:+,.2f} ({tp_eval.spot_minus_zone_lower_atr:+.4f} ATR / {tp_eval.spot_minus_zone_lower_atr:+.2f} ATR)[/white]",
+        f"[bold white]Spot Minus Upper:[/bold white]     [white]${tp_eval.spot_minus_zone_upper_usd:+,.2f} ({tp_eval.spot_minus_zone_upper_atr:+.4f} ATR / {tp_eval.spot_minus_zone_upper_atr:+.2f} ATR)[/white]",
+        f"[bold white]Last 4H OHLC:[/bold white]         [white]O ${tp_eval.open_4h_completed:,.2f} H ${tp_eval.high_4h_completed:,.2f} L ${tp_eval.low_4h_completed:,.2f} C ${tp_eval.close_4h_completed:,.2f}[/white]",
+        f"[bold white]Low < Zone Lower:[/bold white]     [cyan]{tp_eval.candle_4h_low_below_zone_lower}[/cyan]  •  [bold white]Low>=Lower:[/bold white] [cyan]{tp_eval.rec_cond1_low_ge_zone_lower}[/cyan]  •  [bold white]Low<=Upper:[/bold white] [cyan]{tp_eval.rec_cond2_low_le_zone_upper}[/cyan]",
+        f"[bold white]Recovery Booleans:[/bold white]    [bold white]C>EMA50:[/bold white] [cyan]{tp_eval.rec_cond3_close_gt_ema50}[/cyan] • [bold white]C>O:[/bold white] [cyan]{tp_eval.rec_cond4_close_gt_open}[/cyan] • [bold white]C<=MaxExt:[/bold white] [cyan]{tp_eval.rec_cond5_close_le_max_ext}[/cyan] • [bold white]All 5:[/bold white] [cyan]{tp_eval.rec_all_conditions_met}[/cyan]",
     ]
     pullback_panel = Panel(
         "\n".join(pullback_lines),
-        title="[bold bright_white]PULLBACK ANALYSIS[/bold bright_white]",
+        title="[bold bright_white]3. PULLBACK ZONE[/bold bright_white]",
         box=box.ROUNDED,
-        border_style=pb_col,
+        border_style="bright_blue",
         padding=(0, 1),
     )
 
@@ -5606,77 +5598,60 @@ def _build_tab18_trend_pullback_hud(
     top_row_grid.add_column(ratio=1)
     top_row_grid.add_column(ratio=1)
     top_row_grid.add_column(ratio=1)
-    top_row_grid.add_row(regime_panel, trend_panel, pullback_panel)
+    top_row_grid.add_row(daily_panel, trend_panel, pullback_panel)
 
-    # 3. Row 2 Grid: TRADE PLAN (Left) + POSITION MANAGEMENT (Center) + DATA INTEGRITY (Right)
-    stop_badge = "[green]VALID[/green]" if tp_eval.stop_valid else "[yellow]REJECTED[/yellow]"
-    active_sz_note = "[dim](Hypothetical Ref • Active Order: 0.00000 BTC)[/dim]" if tp_eval.trade_decision == "NO TRADE" else "[bold green](Active Setup Size)[/bold green]"
-    trade_lines = [
-        f"[bold white]Decision / Equity:[/bold white]  [bold bright_white]{tp_eval.trade_decision}[/bold bright_white] • [cyan]US${tp_eval.simulation_equity_usd:,.2f}[/cyan] [dim]({tp_eval.risk_per_trade_pct:.2f}% = ${tp_eval.risk_budget_usd:,.2f} Risk)[/dim]",
-        f"[bold white]Limit Entry Zone:[/bold white]   [cyan]${tp_eval.limit_entry_low:,.2f} - ${tp_eval.limit_entry_high:,.2f}[/cyan] [dim](Sizing Ref: ${tp_eval.sizing_entry_price:,.2f})[/dim]",
-        f"[bold white]Stop Calculation:[/bold white]   [white]5-Bar Low ${tp_eval.stop_lowest_low_5bars:,.2f} - Buffer ${tp_eval.stop_buffer_usd:,.2f} =[/white] [cyan]${tp_eval.structural_stop:,.2f}[/cyan] ({stop_badge})",
-        f"[bold white]Stop Distance:[/bold white]      [white]-${tp_eval.stop_distance_usd:,.2f} ({tp_eval.stop_distance_atr:.2f} ATR / exact {tp_eval.stop_distance_atr_exact:.4f} ATR)[/white]",
-        f"[bold white]Gross Price Risk:[/bold white]   [white]${tp_eval.gross_price_risk_per_btc:,.2f}/BTC -> ${tp_eval.gross_price_risk_usd:,.2f}[/white]",
-        f"[bold white]Fees (0.10%x2):[/bold white]     [dim]Entry ${tp_eval.entry_fee_usd:,.2f} (${tp_eval.entry_fee_per_btc:,.2f}/BTC) + Exit ${tp_eval.exit_fee_usd:,.2f} (${tp_eval.exit_fee_per_btc:,.2f}/BTC)[/dim]",
-        f"[bold white]Slippage (0.05%x2):[/bold white] [dim]Entry ${tp_eval.entry_slippage_usd:,.2f} (${tp_eval.entry_slippage_per_btc:,.2f}/BTC) + Exit ${tp_eval.exit_slippage_usd:,.2f} (${tp_eval.exit_slippage_per_btc:,.2f}/BTC)[/dim]",
-        f"[bold white]Total Est. Risk:[/bold white]    [cyan]${tp_eval.total_risk_per_btc:,.2f}/BTC -> ${tp_eval.total_estimated_risk_usd:,.2f}[/cyan] [dim](<= ${tp_eval.risk_budget_usd:,.2f} Budget)[/dim]",
-        f"[bold white]Position Size:[/bold white]      [bold bright_cyan]{tp_eval.position_size_btc:.5f} BTC[/bold bright_cyan] ([cyan]${tp_eval.position_value_usd:,.2f}[/cyan]) {active_sz_note}",
-        f"[bold white]Risk / Reward:[/bold white]      [dim]{tp_eval.risk_reward_label}[/dim]",
+    # 3. Row 2 Grid: 4. REFERENCE LEVELS + 5. EXIT RULE INPUTS + 6. DATA INTEGRITY
+    ref_lines = [
+        f"[bold yellow]Reference calculation if entered at ${tp_eval.sizing_entry_price:,.2f}. Not an order.[/bold yellow]",
+        f"[bold white]Ref Entry Price:[/bold white]      [cyan]${tp_eval.sizing_entry_price:,.2f}[/cyan] [dim](4H EMA50 ${tp_eval.ema50_4h:,.2f} + 0.10*ATR14)[/dim]",
+        f"[bold white]Stop Level:[/bold white]           [cyan]${tp_eval.structural_stop:,.2f}[/cyan] [dim](5B Low ${tp_eval.stop_lowest_low_5bars:,.2f} - 0.25*ATR ${tp_eval.stop_buffer_usd:,.2f})[/dim]",
+        f"[bold white]Stop Distance:[/bold white]        [white]${tp_eval.stop_distance_usd:,.2f} ({tp_eval.stop_distance_atr:.2f} ATR / exact {tp_eval.stop_distance_atr_exact:.4f} ATR)[/white]",
+        f"[bold white]Stop Dist Booleans:[/bold white]   [bold white]>=0.50 ATR:[/bold white] [cyan]{tp_eval.stop_dist_ge_min_atr}[/cyan]  •  [bold white]<=3.00 ATR:[/bold white] [cyan]{tp_eval.stop_dist_le_max_atr}[/cyan]",
+        f"[bold white]Budget / Size / Not.:[/bold white] [cyan]${tp_eval.risk_budget_usd:,.2f}[/cyan] [dim]({tp_eval.risk_per_trade_pct:.2f}% of ${tp_eval.simulation_equity_usd:,.2f})[/dim] • [bold bright_cyan]{tp_eval.position_size_btc:.5f} BTC[/bold bright_cyan] ([cyan]${tp_eval.position_value_usd:,.2f}[/cyan])",
+        f"[bold white]Computed Price Risk:[/bold white]  [white]{tp_eval.position_size_btc:.5f} * ${tp_eval.stop_distance_usd:,.2f} =[/white] [cyan]${tp_eval.gross_price_risk_usd:,.2f}[/cyan]",
+        f"[bold white]Fee & Slippage Buf.:[/bold white]  [white]${tp_eval.fee_slippage_buffer_usd:,.2f}[/white] [dim](Fees ${tp_eval.entry_fee_usd:,.2f}+${tp_eval.exit_fee_usd:,.2f}, Slip ${tp_eval.entry_slippage_usd:,.2f}+${tp_eval.exit_slippage_usd:,.2f})[/dim]",
+        f"[bold white]Total Risk Reconcile:[/bold white] [cyan]${tp_eval.gross_price_risk_usd:,.2f} + ${tp_eval.fee_slippage_buffer_usd:,.2f} = ${tp_eval.total_estimated_risk_usd:,.2f}[/cyan] [dim](<=Budget: {tp_eval.total_risk_le_budget})[/dim]",
+        f"[bold white]Spot to Ref Entry:[/bold white]    [white]${tp_eval.spot_to_ref_entry_usd:+,.2f} ({tp_eval.spot_to_ref_entry_pct:+.2f}%)[/white]",
     ]
-    trade_panel = Panel(
-        "\n".join(trade_lines),
-        title="[bold bright_white]TRADE PLAN (SPOT ONLY • NO LEVERAGE)[/bold bright_white]",
+    ref_panel = Panel(
+        "\n".join(ref_lines),
+        title="[bold bright_white]4. REFERENCE LEVELS[/bold bright_white]",
         box=box.ROUNDED,
         border_style="bright_cyan",
         padding=(0, 1),
     )
 
-    pos_col = "bright_green" if tp_eval.position_status == "HOLDING" else "white"
-    if tp_eval.position_status == "CASH":
-        sb_str = "[dim]INACTIVE (IN CASH)[/dim]"
-        e4h_str = "[dim]INACTIVE (IN CASH)[/dim]"
-        s1d_str = "[dim]INACTIVE (IN CASH)[/dim]"
-    else:
-        sb_str = "[bold bright_red]TRIGGERED[/bold bright_red]" if tp_eval.exit_stop_breached else "[green]CLEAR[/green]"
-        e4h_str = "[bold bright_red]TRIGGERED[/bold bright_red]" if tp_eval.exit_two_4h_below_ema50 else "[green]CLEAR[/green]"
-        s1d_str = "[bold bright_red]TRIGGERED[/bold bright_red]" if tp_eval.exit_two_1d_below_sma200 else "[green]CLEAR[/green]"
-    pos_lines = [
-        f"[bold white]Current Status:[/bold white]     [bold {pos_col}]{tp_eval.position_status}[/bold {pos_col}]",
-        f"[bold white]Active Exit Status:[/bold white] [bold white]{tp_eval.exit_conditions_status}[/bold white]",
-        f"[bold white]Entry Eligibility:[/bold white]  [yellow]{tp_eval.entry_eligibility_status}[/yellow]",
-        f"[bold white]Active Stop Breach:[/bold white] {sb_str}",
-        f"[bold white]Active 2x4H<EMA50:[/bold white]  {e4h_str}",
-        f"[bold white]Active 2x1D<SMA200:[/bold white] {s1d_str}",
-        f"[dim]{tp_eval.hypothetical_exit_status}[/dim]",
-        f"[dim]Invalidation: {tp_eval.invalidation_reason}[/dim]",
-        f"[bold white]Execution Mode:[/bold white]     [green]Manual Spot Only • 0.0x Leverage • Long-Only[/green]",
+    exit_lines = [
+        f"[bold white]Position State:[/bold white]       [cyan]{tp_eval.position_status}[/cyan]",
+        f"[bold white]4H Close (t-1):[/bold white]       [white]{tp_eval.prev_4h_close_utc}[/white] • [cyan]${tp_eval.prev_4h_close:,.2f}[/cyan] vs EMA50 [cyan]${tp_eval.prev_4h_ema50:,.2f}[/cyan] [dim](C<EMA50: {tp_eval.prev_4h_close_lt_ema50})[/dim]",
+        f"[bold white]4H Close (t):[/bold white]         [white]{tp_eval.candle_4h_close_time_utc}[/white] • [cyan]${tp_eval.close_4h_completed:,.2f}[/cyan] vs EMA50 [cyan]${tp_eval.ema50_4h:,.2f}[/cyan] [dim](C<EMA50: {tp_eval.last_4h_close_lt_ema50})[/dim]",
+        f"[bold white]Consec. 4H < EMA50:[/bold white]   [cyan]{tp_eval.consecutive_4h_closes_below_ema50}[/cyan]",
+        f"[bold white]1D Close (t-1):[/bold white]       [white]{tp_eval.prev_1d_close_utc}[/white] • [cyan]${tp_eval.prev_1d_close:,.2f}[/cyan] vs SMA200 [cyan]${tp_eval.prev_1d_sma200:,.2f}[/cyan] [dim](C<SMA200: {tp_eval.prev_1d_close_lt_sma200})[/dim]",
+        f"[bold white]1D Close (t):[/bold white]         [white]{tp_eval.daily_close_time_utc}[/white] • [cyan]${tp_eval.daily_close_completed:,.2f}[/cyan] vs SMA200 [cyan]${tp_eval.daily_sma200:,.2f}[/cyan] [dim](C<SMA200: {tp_eval.last_1d_close_lt_sma200})[/dim]",
+        f"[bold white]Consec. 1D < SMA200:[/bold white]  [cyan]{tp_eval.consecutive_1d_closes_below_sma200}[/cyan]",
     ]
-    pos_panel = Panel(
-        "\n".join(pos_lines),
-        title="[bold bright_white]POSITION MANAGEMENT[/bold bright_white]",
+    exit_panel = Panel(
+        "\n".join(exit_lines),
+        title="[bold bright_white]5. EXIT RULE INPUTS[/bold bright_white]",
         box=box.ROUNDED,
         border_style="bright_blue",
         padding=(0, 1),
     )
 
     di_col = "bright_green" if tp_eval.data_integrity_ok else "bright_red"
-    di_label = "OK (CLOSED CANDLES ONLY)" if tp_eval.data_integrity_ok else "DATA UNAVAILABLE"
-    f1d_str = f"YES (Excluded Open {tp_eval.daily_forming_open_utc})" if tp_eval.daily_forming_excluded else f"NO ({tp_eval.daily_forming_open_utc})"
-    f4h_str = f"YES (Excluded Open {tp_eval.candle_4h_forming_open_utc})" if tp_eval.candle_4h_forming_excluded else f"NO ({tp_eval.candle_4h_forming_open_utc})"
     data_lines = [
-        f"[bold white]Daily Candle:[/bold white]       [cyan]{tp_eval.daily_candle_status}[/cyan]",
-        f"[bold white]Forming 1D Bar:[/bold white]     [green]{f1d_str}[/green]",
-        f"[bold white]4H Candle:[/bold white]          [cyan]{tp_eval.candle_4h_status}[/cyan]",
-        f"[bold white]Forming 4H Bar:[/bold white]     [green]{f4h_str}[/green]",
-        f"[bold white]Retrieval (MYT):[/bold white]    [white]{tp_eval.timestamp_myt}[/white]",
-        f"[bold white]Retrieval (UTC):[/bold white]    [white]{tp_eval.timestamp_utc}[/white]",
-        f"[bold white]Integrity Gate:[/bold white]     [bold {di_col}]{di_label}[/bold {di_col}]",
-        f"[dim]{tp_eval.integrity_failure_reason or 'All required spot OHLCV series verified & fresh.'}[/dim]",
-        f"[bold white]Cost Model:[/bold white]         [dim]Fee 0.10%/side + Slippage 0.05%/side[/dim]",
+        f"[bold white]Data Integrity OK:[/bold white]    [bold {di_col}]{tp_eval.data_integrity_ok}[/bold {di_col}]",
+        f"[bold white]Retrieval (UTC):[/bold white]      [white]{tp_eval.timestamp_utc}[/white]",
+        f"[bold white]Retrieval (MYT):[/bold white]      [white]{tp_eval.timestamp_myt}[/white]",
+        f"[bold white]1D Series Count:[/bold white]      [cyan]{tp_eval.completed_1d_count}[/cyan] [dim](Forming Excl: {tp_eval.daily_forming_excluded} [{tp_eval.daily_forming_open_utc}])[/dim]",
+        f"[bold white]4H Series Count:[/bold white]      [cyan]{tp_eval.completed_4h_count}[/cyan] [dim](Forming Excl: {tp_eval.candle_4h_forming_excluded} [{tp_eval.candle_4h_forming_open_utc}])[/dim]",
+        f"[bold white]1D Candle Status:[/bold white]     [white]{tp_eval.daily_candle_status}[/white]",
+        f"[bold white]4H Candle Status:[/bold white]     [white]{tp_eval.candle_4h_status}[/white]",
+        f"[bold white]Integrity Failure:[/bold white]    [dim]{tp_eval.integrity_failure_reason or 'None'}[/dim]",
     ]
     data_panel = Panel(
         "\n".join(data_lines),
-        title="[bold bright_white]DATA INTEGRITY (FAIL-CLOSED)[/bold bright_white]",
+        title="[bold bright_white]6. DATA INTEGRITY[/bold bright_white]",
         box=box.ROUNDED,
         border_style=di_col,
         padding=(0, 1),
@@ -5686,41 +5661,9 @@ def _build_tab18_trend_pullback_hud(
     mid_row_grid.add_column(ratio=1)
     mid_row_grid.add_column(ratio=1)
     mid_row_grid.add_column(ratio=1)
-    mid_row_grid.add_row(trade_panel, pos_panel, data_panel)
+    mid_row_grid.add_row(ref_panel, exit_panel, data_panel)
 
-    # 4. STRATEGY VERDICT Panel
-    verdict_badge_map = {
-        "ENTRY READY": "[bold black on bright_green] ENTRY READY [/bold black on bright_green]",
-        "WAIT": "[bold black on bright_yellow] WAIT [/bold black on bright_yellow]",
-        "HOLD": "[bold black on bright_cyan] HOLD [/bold black on bright_cyan]",
-        "EXIT ALERT": "[bold white on red] EXIT ALERT [/bold white on red]",
-        "NO TRADE": "[bold white on bright_black] NO TRADE [/bold white on bright_black]",
-    }
-    v_badge = verdict_badge_map.get(tp_eval.strategy_verdict, f"[bold white]{tp_eval.strategy_verdict}[/bold white]")
-    v_border = (
-        "bright_green"
-        if tp_eval.strategy_verdict == "ENTRY READY"
-        else ("bright_red" if tp_eval.strategy_verdict == "EXIT ALERT" or not tp_eval.data_integrity_ok else "bright_yellow")
-    )
-    verdict_grid = Table.grid(expand=True)
-    verdict_grid.add_column()
-    verdict_grid.add_row(
-        f"[bold bright_white]STRATEGY VERDICT:[/bold bright_white] {v_badge}  │  "
-        f"[bold bright_cyan]DECISION STATE:[/bold bright_cyan] [bold white]{tp_eval.decision_state}[/bold white]  │  "
-        f"[bold yellow]STRATEGY STATUS: {tp_eval.strategy_status}[/bold yellow]  │  "
-        f"[dim]{tp_eval.mode_label}[/dim]"
-    )
-    verdict_grid.add_row(f"[bold bright_cyan]EXPLANATION:[/bold bright_cyan] [white]{tp_eval.verdict_explanation}[/white]")
-
-    verdict_panel = Panel(
-        verdict_grid,
-        title="[bold bright_white]STRATEGY VERDICT (DETERMINISTIC SPOT SWING PROTOCOL)[/bold bright_white]",
-        box=box.ROUNDED,
-        border_style=v_border,
-        padding=(0, 1),
-    )
-
-    # 5. Bottom Clipboard Bar
+    # 4. Bottom Clipboard Bar
     last_copy_str = ""
     if getattr(store, "last_packet_copied_utc", ""):
         last_copy_str = f"  │  [bold green]Last Brief Copied: {store.last_packet_copied_utc} ({getattr(store, 'last_packet_char_count', 0):,} chars)[/bold green]"
@@ -5729,13 +5672,13 @@ def _build_tab18_trend_pullback_hud(
     bottom_grid.add_column(justify="left", no_wrap=True)
     bottom_grid.add_column(justify="right", no_wrap=True)
     bottom_grid.add_row(
-        "[bold black on bright_green] [KEY A] BTC TREND-PULLBACK v1.0 [/bold black on bright_green]  "
-        "[bright_white]Tap [bold green]'A'[/bold green] to open Desk [A] │ Tap [bold green]'A'[/bold green] again to copy Strategy Brief to Clipboard![/bright_white]" + last_copy_str,
-        "[dim]config/trend_pullback_config.yaml • Independent Calculation[/dim]",
+        "[bold black on bright_cyan] [KEY A] BTC TREND-PULLBACK v1.0 (DATA-ONLY) [/bold black on bright_cyan]  "
+        "[bright_white]Tap [bold cyan]'A'[/bold cyan] to open Desk [A] │ Tap [bold cyan]'A'[/bold cyan] again to copy DATA-ONLY Report to Clipboard![/bright_white]" + last_copy_str,
+        "[dim]config/trend_pullback_config.yaml • Metrics & True/False Only[/dim]",
     )
-    bottom_panel = Panel(bottom_grid, box=box.ROUNDED, border_style="bright_green", padding=(0, 1))
+    bottom_panel = Panel(bottom_grid, box=box.ROUNDED, border_style="bright_cyan", padding=(0, 1))
 
-    return Group(header_panel, sub_panel, top_row_grid, mid_row_grid, verdict_panel, bottom_panel)
+    return Group(header_panel, sub_panel, top_row_grid, mid_row_grid, bottom_panel)
 
 
 def build_dashboard_renderable(

@@ -540,15 +540,14 @@ def test_18_tui_and_ai_packet_integration() -> None:
     output = console.export_text()
 
     assert "BTC TREND-PULLBACK v1.0" in output
-    assert "STRATEGY STATUS: UNVALIDATED" in output
+    assert "STATUS: UNVALIDATED" in output
     assert "RESEARCH / PAPER MODE" in output
-    assert "MARKET REGIME" in output
-    assert "4H TREND FILTER" in output
-    assert "PULLBACK ANALYSIS" in output
-    assert "TRADE PLAN" in output
-    assert "POSITION MANAGEMENT" in output
-    assert "DATA INTEGRITY" in output
-    assert "STRATEGY VERDICT" in output
+    assert "1. DAILY (1D)" in output
+    assert "2. 4H TREND" in output
+    assert "3. PULLBACK ZONE" in output
+    assert "4. REFERENCE LEVELS" in output
+    assert "5. EXIT RULE INPUTS" in output
+    assert "6. DATA INTEGRITY" in output
 
     packet = build_ai_telemetry_packet(config, store)
     assert "SECTION 18: TAB [A] BTC TREND-PULLBACK v1.0" in packet
@@ -679,4 +678,63 @@ def test_22_audit_cash_vs_holding_exit_separation() -> None:
     assert ex_cash["two_1d_below_sma200"] is False
     assert ex_cash["hypothetical_exit_status"].startswith("HYPOTHETICAL ONLY (No Open Position):")
     assert ex_cash["hypothetical_two_4h_below_ema50"] is True
+
+
+def test_23_acceptance_data_only_forbidden_words_and_reconciliation() -> None:
+    """Verifies the 4 Acceptance Tests for the DATA-ONLY report conversion:
+    1. Search the output (case-insensitive) for: verdict, trade, wait, bullish, bearish,
+       confirmed, rejected, recommend. None may appear (except "Not an order" in the reference label).
+    2. size * stop_distance equals the stated risk to $0.01 (with fee/slippage buffer explicitly reconciling).
+    3. Every distance label matches its reference point to the cent.
+    4. Every ATR multiple = distance / ATR14 using the same reference point.
+    """
+    config = EngineConfig()
+    store = StateStore()
+    store.binance_spot_price = 75_958.21
+    store.spot_klines_1d.extend(_build_bullish_1d_bars(230, now_ms=NOW_MS))
+    store.spot_klines_4h.extend(_build_bullish_4h_bars(220, now_ms=NOW_MS))
+
+    ev = TrendPullbackEngine(config).evaluate(store, now_ms=NOW_MS)
+    report = ev.summary_markdown
+    report_lower = report.lower()
+
+    # Acceptance Test 1: Forbidden words check (case-insensitive)
+    forbidden_words = [
+        "verdict",
+        "trade",
+        "wait",
+        "bullish",
+        "bearish",
+        "confirmed",
+        "rejected",
+        "recommend",
+    ]
+    for word in forbidden_words:
+        assert word not in report_lower, f"Forbidden word '{word}' appeared in DATA-ONLY report!"
+    assert "Not an order." in report
+
+    # Acceptance Test 2: size * stop_distance == gross_price_risk to $0.01, and reconciles with fee/slippage buffer
+    computed_price_risk = round(ev.position_size_btc * ev.stop_distance_usd, 2)
+    assert computed_price_risk == ev.gross_price_risk_usd
+    assert round(ev.gross_price_risk_usd + ev.fee_slippage_buffer_usd, 2) == ev.total_estimated_risk_usd
+    assert ev.total_estimated_risk_usd <= ev.risk_budget_usd
+
+    # Acceptance Test 3: Every distance label matches its reference point to $0.01
+    assert round(ev.daily_close_completed - ev.daily_sma200, 2) == ev.daily_close_vs_sma200_usd
+    assert round(ev.daily_close_completed - ev.daily_sma50, 2) == ev.daily_close_vs_sma50_usd
+    assert round(ev.ema50_4h - ev.ema200_4h, 2) == ev.ema50_minus_ema200_4h_usd
+    assert round(ev.close_4h_completed - ev.ema50_4h, 2) == ev.close_4h_vs_ema50_usd
+    assert round(ev.close_4h_completed - ev.ema200_4h, 2) == ev.close_4h_vs_ema200_usd
+    assert round(ev.spot_price - ev.pullback_zone_lower, 2) == ev.spot_minus_zone_lower_usd
+    assert round(ev.spot_price - ev.pullback_zone_upper, 2) == ev.spot_minus_zone_upper_usd
+    assert round(ev.sizing_entry_price - ev.structural_stop, 2) == ev.stop_distance_usd
+    assert round(ev.spot_price - ev.sizing_entry_price, 2) == ev.spot_to_ref_entry_usd
+
+    # Acceptance Test 4: Every ATR multiple = distance / ATR14 using the same reference point
+    assert round(ev.close_4h_vs_ema50_usd / ev.atr14_4h, 4) == ev.close_4h_vs_ema50_atr
+    assert round(ev.close_4h_vs_ema200_usd / ev.atr14_4h, 4) == ev.close_4h_vs_ema200_atr
+    assert round(ev.spot_minus_zone_lower_usd / ev.atr14_4h, 4) == ev.spot_minus_zone_lower_atr
+    assert round(ev.spot_minus_zone_upper_usd / ev.atr14_4h, 4) == ev.spot_minus_zone_upper_atr
+    assert round(ev.stop_distance_usd / ev.atr14_4h, 4) == ev.stop_distance_atr_exact
+
 

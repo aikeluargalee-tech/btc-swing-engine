@@ -5054,3 +5054,58 @@ class TrendPullbackEvaluation:
     entry_eligibility_status: str = "BLOCKED"
     hypothetical_exit_status: str = ""
 
+    # 8. Pure DATA-ONLY Measurement & Boolean Condition Fields
+    daily_sma50: float = 0.0
+    daily_close_vs_sma200_usd: float = 0.0
+    daily_close_vs_sma200_pct: float = 0.0
+    daily_close_vs_sma50_usd: float = 0.0
+    daily_close_vs_sma50_pct: float = 0.0
+    daily_close_above_sma50: bool = False
+
+    ema50_minus_ema200_4h_usd: float = 0.0
+    close_4h_vs_ema50_usd: float = 0.0
+    close_4h_vs_ema50_atr: float = 0.0
+    close_4h_vs_ema200_usd: float = 0.0
+    close_4h_vs_ema200_atr: float = 0.0
+    close_4h_above_ema50: bool = False
+
+    spot_minus_zone_lower_usd: float = 0.0
+    spot_minus_zone_lower_atr: float = 0.0
+    spot_minus_zone_upper_usd: float = 0.0
+    spot_minus_zone_upper_atr: float = 0.0
+    candle_4h_low_below_zone_lower: bool = False
+    candle_4h_low_above_zone_upper: bool = False
+    rec_cond1_low_ge_zone_lower: bool = False
+    rec_cond2_low_le_zone_upper: bool = False
+    rec_cond3_close_gt_ema50: bool = False
+    rec_cond4_close_gt_open: bool = False
+    rec_cond5_close_le_max_ext: bool = False
+    rec_all_conditions_met: bool = False
+
+    spot_to_ref_entry_usd: float = 0.0
+    spot_to_ref_entry_pct: float = 0.0
+    stop_dist_ge_min_atr: bool = False
+    stop_dist_le_max_atr: bool = False
+    fee_slippage_buffer_usd: float = 0.0
+    total_risk_le_budget: bool = False
+
+    prev_4h_open_utc: str = ""
+    prev_4h_close_utc: str = ""
+    prev_4h_close: float = 0.0
+    prev_4h_ema50: float = 0.0
+    prev_4h_close_lt_ema50: bool = False
+    last_4h_close_lt_ema50: bool = False
+    consecutive_4h_closes_below_ema50: int = 0
+
+    prev_1d_open_utc: str = ""
+    prev_1d_close_utc: str = ""
+    prev_1d_close: float = 0.0
+    prev_1d_sma200: float = 0.0
+    prev_1d_close_lt_sma200: bool = False
+    last_1d_close_lt_sma200: bool = False
+    consecutive_1d_closes_below_sma200: int = 0
+
+    completed_1d_count: int = 0
+    completed_4h_count: int = 0
+
+

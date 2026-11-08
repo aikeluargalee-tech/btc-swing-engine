@@ -2020,25 +2020,20 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             tp_ev = None
 
     if tp_ev is not None:
-        slope_1d_lbl = "RISING" if tp_ev.daily_sma200_rising else "FALLING"
-        slope_4h_lbl = "RISING" if tp_ev.ema50_rising_6bars else "FALLING"
         lines.extend([
             "",
             "---",
             "",
-            "## SECTION 18: TAB [A] BTC TREND-PULLBACK v1.0 · RESEARCH / PAPER MODE (UNVALIDATED)",
+            "## SECTION 18: TAB [A] BTC TREND-PULLBACK v1.0 · DATA-ONLY METRICS REPORT",
             "",
-            f"* **Strategy Name**: `{tp_ev.strategy_name}` | **Mode**: `{tp_ev.mode_label}` | **Status**: `STRATEGY STATUS: {tp_ev.strategy_status}`",
+            f"* **Strategy Name**: `{tp_ev.strategy_name}` | **Mode**: `{tp_ev.mode_label}` | **Status**: `{tp_ev.strategy_status}`",
             f"* **Spot BTCUSDT**: `${tp_ev.spot_price:,.2f}` | **Retrieval (MYT)**: `{tp_ev.timestamp_myt}` | **Retrieval (UTC)**: `{tp_ev.timestamp_utc}`",
-            f"* **Market Regime (1D)**: `{tp_ev.daily_regime}` (`Open {tp_ev.daily_open_time_utc} -> Close {tp_ev.daily_close_time_utc}` • `1D Close ${tp_ev.daily_close_completed:,.2f}` vs `SMA200 ${tp_ev.daily_sma200:,.2f}` • `20D Slope: {slope_1d_lbl} {tp_ev.daily_sma200_slope_20d:+,.2f}`)",
-            f"* **4H Trend Filter**: `{tp_ev.trend_4h}` (`Open {tp_ev.candle_4h_open_time_utc} -> Close {tp_ev.candle_4h_close_time_utc}` • `EMA50 ${tp_ev.ema50_4h:,.2f}` vs `EMA200 ${tp_ev.ema200_4h:,.2f}` • `6-Bar Slope: {slope_4h_lbl} {tp_ev.ema50_4h_slope_6bars:+,.2f}` • `ATR14: ${tp_ev.atr14_4h:,.2f}`)",
-            f"* **Macro Reference Context (Read-Only)**: `1W EMA50 ${tp_ev.ema50_1w:,.2f}` | `1D EMA50 ${tp_ev.ema50_1d:,.2f}`",
-            f"* **Pullback Recovery Audit**: `{tp_ev.recovery_candle}` / `{tp_ev.setup_status}` (4H Bar `O ${tp_ev.open_4h_completed:,.2f} H ${tp_ev.high_4h_completed:,.2f} L ${tp_ev.low_4h_completed:,.2f} C ${tp_ev.close_4h_completed:,.2f}` • Zone `${tp_ev.pullback_zone_lower:,.2f} - ${tp_ev.pullback_zone_upper:,.2f}` • Max Ext `${tp_ev.max_extension_price:,.2f}` • Reason: {tp_ev.pullback_rejection_reason})",
-            f"* **Structural Stop Audit**: 5-Bar Low `${tp_ev.stop_lowest_low_5bars:,.2f}` - Buffer `${tp_ev.stop_buffer_usd:,.2f}` = Stop `${tp_ev.structural_stop:,.2f}` (`{tp_ev.stop_distance_atr:.2f} ATR` / exact `{tp_ev.stop_distance_atr_exact:.4f} ATR` / `-${tp_ev.stop_distance_usd:,.2f}` from Ref Entry `${tp_ev.sizing_entry_price:,.2f}` • Valid: `{tp_ev.stop_valid}`)",
-            f"* **Position Sizing Audit (`$100,000.00` Equity • `0.50%` = `${tp_ev.risk_budget_usd:,.2f}` Budget)**: Size `{tp_ev.position_size_btc:.5f} BTC` (`${tp_ev.position_value_usd:,.2f}`) | Gross Risk `${tp_ev.gross_price_risk_usd:,.2f}` + Entry Fee `${tp_ev.entry_fee_usd:,.2f}` + Exit Fee `${tp_ev.exit_fee_usd:,.2f}` + Entry Slip `${tp_ev.entry_slippage_usd:,.2f}` + Exit Slip `${tp_ev.exit_slippage_usd:,.2f}` = Total Est. Loss `${tp_ev.total_estimated_risk_usd:,.2f}`",
-            f"* **Position Management**: Status `{tp_ev.position_status}` | Active Exit Status `{tp_ev.exit_conditions_status}` | Entry Eligibility `{tp_ev.entry_eligibility_status}` | {tp_ev.hypothetical_exit_status}",
-            f"* **Data Integrity**: `{'OK' if tp_ev.data_integrity_ok else 'DATA UNAVAILABLE'}` (`1D: {tp_ev.daily_candle_status}` [Forming Excl: `{tp_ev.daily_forming_excluded}`] • `4H: {tp_ev.candle_4h_status}` [Forming Excl: `{tp_ev.candle_4h_forming_excluded}`])",
-            f"* **Decision State**: **`{tp_ev.decision_state}`** | **Strategy Verdict**: **`{tp_ev.strategy_verdict}`** — {tp_ev.verdict_explanation}",
+            f"* **1. Daily (1D)**: `Open {tp_ev.daily_open_time_utc} -> Close {tp_ev.daily_close_time_utc}` | `1D Close ${tp_ev.daily_close_completed:,.2f}` | `SMA50 ${tp_ev.daily_sma50:,.2f}` | `SMA200 ${tp_ev.daily_sma200:,.2f}` | `20D Slope ${tp_ev.daily_sma200_slope_20d:+,.2f}` | `Close vs SMA200: ${tp_ev.daily_close_vs_sma200_usd:+,.2f} ({tp_ev.daily_close_vs_sma200_pct:+.2f}%)` | `Close > SMA200: {tp_ev.daily_close_above_sma200}` | `Close > SMA50: {tp_ev.daily_close_above_sma50}` | `SMA200 Rising: {tp_ev.daily_sma200_rising}`",
+            f"* **2. 4H Trend**: `Open {tp_ev.candle_4h_open_time_utc} -> Close {tp_ev.candle_4h_close_time_utc}` | `4H Close ${tp_ev.close_4h_completed:,.2f}` | `EMA50 ${tp_ev.ema50_4h:,.2f}` | `EMA200 ${tp_ev.ema200_4h:,.2f}` | `ATR14 ${tp_ev.atr14_4h:,.2f}` | `6-Bar Slope ${tp_ev.ema50_4h_slope_6bars:+,.2f}` | `EMA50 > EMA200: {tp_ev.ema50_above_ema200}` | `EMA50 Rising 6B: {tp_ev.ema50_rising_6bars}` | `Close > EMA200: {tp_ev.close_4h_above_ema200}`",
+            f"* **3. Pullback Zone**: `Lower ${tp_ev.pullback_zone_lower:,.2f}` | `Upper ${tp_ev.pullback_zone_upper:,.2f}` | `Max Ext ${tp_ev.max_extension_price:,.2f}` | `Spot Minus Lower ${tp_ev.spot_minus_zone_lower_usd:+,.2f} ({tp_ev.spot_minus_zone_lower_atr:+.4f} ATR)` | `Low < Zone Lower: {tp_ev.candle_4h_low_below_zone_lower}` | `All 5 Recovery Conditions Met: {tp_ev.rec_all_conditions_met}`",
+            f"* **4. Reference Levels (`Reference calculation if entered at ${tp_ev.sizing_entry_price:,.2f}. Not an order.`)**: `Ref Entry ${tp_ev.sizing_entry_price:,.2f}` | `Stop ${tp_ev.structural_stop:,.2f}` | `Stop Distance ${tp_ev.stop_distance_usd:,.2f} ({tp_ev.stop_distance_atr:.2f} ATR / exact {tp_ev.stop_distance_atr_exact:.4f} ATR)` | `Budget ${tp_ev.risk_budget_usd:,.2f}` | `Size {tp_ev.position_size_btc:.5f} BTC (${tp_ev.position_value_usd:,.2f})` | `Computed Price Risk ${tp_ev.gross_price_risk_usd:,.2f} + Fee/Slippage Buffer ${tp_ev.fee_slippage_buffer_usd:,.2f} = ${tp_ev.total_estimated_risk_usd:,.2f}` | `Spot to Ref Entry ${tp_ev.spot_to_ref_entry_usd:+,.2f} ({tp_ev.spot_to_ref_entry_pct:+.2f}%)`",
+            f"* **5. Exit Rule Inputs**: `Position {tp_ev.position_status}` | `Consecutive 4H Closes < EMA50: {tp_ev.consecutive_4h_closes_below_ema50}` | `Consecutive 1D Closes < SMA200: {tp_ev.consecutive_1d_closes_below_sma200}`",
+            f"* **6. Data Integrity**: `Data Integrity OK: {tp_ev.data_integrity_ok}` (`1D Count: {tp_ev.completed_1d_count}` [Forming Excl: `{tp_ev.daily_forming_excluded}`] • `4H Count: {tp_ev.completed_4h_count}` [Forming Excl: `{tp_ev.candle_4h_forming_excluded}`])",
         ])
 
     return "\n".join(lines) + "\n"

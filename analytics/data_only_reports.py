@@ -211,8 +211,10 @@ def build_tab_b_data_only_report(config: Optional[EngineConfig], store: StateSto
     ])
     candidates = []
     if pat is not None:
-        candidates.extend(getattr(pat, "patterns_4h", []) or [])
-        candidates.extend(getattr(pat, "patterns_1h", []) or [])
+        candidates.extend(getattr(pat, "candidates", []) or [])
+        if not candidates:
+            candidates.extend(getattr(pat, "patterns_4h", []) or [])
+            candidates.extend(getattr(pat, "patterns_1h", []) or [])
     if candidates:
         for idx, c in enumerate(candidates[:8], start=1):
             c_neck = round(float(c.neckline or 0.0), 2)

@@ -194,6 +194,70 @@ class TestPatternDetector(unittest.TestCase):
         panel = render_candlestick_ascii(ohlcv, swings, top_p, width=100, height=10)
         self.assertIsNotNone(panel)
 
+    def test_hs_rejection_missing_trough1(self) -> None:
+        """Verifies that an H&S without Trough 1 (between Left Shoulder and Head) is strictly rejected."""
+        swings = [
+            {"type": "high", "price": 83439.0, "index": 65, "time": 1000},  # Left Shoulder
+            # Notice: No swing low between 65 and 72!
+            {"type": "high", "price": 84898.0, "index": 72, "time": 2000},  # Head
+            {"type": "low", "price": 80939.54, "index": 78, "time": 2500},  # Trough 2 only
+            {"type": "high", "price": 82060.0, "index": 83, "time": 3000},  # Right Shoulder
+        ]
+        result = detect_head_shoulders(swings)
+        self.assertIsNone(result, "H&S must be rejected if Trough 1 between Left and Head is missing")
+
+    def test_hs_rejection_stale_pattern(self) -> None:
+        """Verifies that an H&S formed > max_bars_ago in the past is rejected as stale."""
+        swings = [
+            {"type": "high", "price": 65000.0, "index": 5, "time": 1000},
+            {"type": "low", "price": 63000.0, "index": 10, "time": 1500},
+            {"type": "high", "price": 68000.0, "index": 16, "time": 2000},
+            {"type": "low", "price": 63100.0, "index": 21, "time": 2500},
+            {"type": "high", "price": 65100.0, "index": 27, "time": 3000},
+        ]
+        # Right shoulder index is 27. Total bars is 100 -> age is 73 bars > max_bars_ago (30).
+        result = detect_head_shoulders(swings, total_bars=100, max_bars_ago=30)
+        self.assertIsNone(result, "H&S must be rejected if older than max_bars_ago")
+
+    def test_hs_rejection_measured_move_exhaustion(self) -> None:
+        """Verifies that an H&S is rejected once spot price has exceeded 1.25x the measured move."""
+        swings = [
+            {"type": "high", "price": 85000.0, "index": 5, "time": 1000},
+            {"type": "low", "price": 80000.0, "index": 10, "time": 1500},
+            {"type": "high", "price": 90000.0, "index": 16, "time": 2000},
+            {"type": "low", "price": 80100.0, "index": 21, "time": 2500},
+            {"type": "high", "price": 85100.0, "index": 27, "time": 3000},
+        ]
+        # Neckline = $80,000, Head = $90,000 -> Height = $10,000.
+        # 1.25x measured move = $80,000 - $12,500 = $67,500.
+        # At spot $66,000, the pattern is exhausted.
+        result = detect_head_shoulders(swings, spot_price=66000.0)
+        self.assertIsNone(result, "H&S must be rejected once spot price exhausts measured move")
+
+    def test_tab_b_report_candidate_count(self) -> None:
+        """Verifies that build_tab_b_data_only_report extracts candidates from pat.candidates."""
+        from analytics.data_only_reports import build_tab_b_data_only_report
+
+        store = StateStore()
+        store.binance_spot_price = 75000.0
+        c1 = PatternCandidate(
+            pattern="Double Bottom",
+            bias="Bullish",
+            confidence=0.80,
+            timeframe="1h",
+            neckline=76000.0,
+            floor_or_roof=74000.0,
+        )
+        store.pattern_evaluation = PatternEvaluation(
+            timestamp_utc="2026-11-08 22:00:00 UTC",
+            spot_price=75000.0,
+            top_pattern=c1,
+            candidates=[c1],
+        )
+        report = build_tab_b_data_only_report(None, store)
+        self.assertIn("Candidate 1 (`1h` `Double Bottom`)", report)
+        self.assertNotIn("Candidate Count: `0`", report)
+
 
 if __name__ == "__main__":
     unittest.main()

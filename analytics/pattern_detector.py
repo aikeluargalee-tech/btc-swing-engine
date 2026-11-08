@@ -226,14 +226,21 @@ def detect_swings(ohlcv: List[List[float]], left: int = 5, right: int = 5) -> Li
     return swings
 
 
-def detect_double_bottom(swings: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    """Detects W-formation / Double Bottom with neckline peak and min 10 bars separation."""
+def detect_double_bottom(
+    swings: List[Dict[str, Any]],
+    total_bars: int = 0,
+    spot_price: float = 0.0,
+    max_bars_ago: int = 30,
+) -> Optional[Dict[str, Any]]:
+    """Detects W-formation / Double Bottom with neckline peak and min 8 bars separation."""
     lows = [s for s in swings if s["type"] == "low"]
     if len(lows) < 2:
         return None
 
     for i in range(len(lows) - 1, 0, -1):
         l2 = lows[i]
+        if total_bars > 0 and (total_bars - l2["index"]) > max_bars_ago:
+            continue
         for j in range(i - 1, max(-1, i - 8), -1):
             l1 = lows[j]
             bars = l2["index"] - l1["index"]
@@ -247,6 +254,9 @@ def detect_double_bottom(swings: List[Dict[str, Any]]) -> Optional[Dict[str, Any
                     continue
                 neckline = max(h["price"] for h in highs_between)
                 if neckline < l1["price"] * 1.012:
+                    continue
+                measured_move = neckline - min(l1["price"], l2["price"])
+                if spot_price > 0 and spot_price > (neckline + 1.25 * measured_move):
                     continue
                 conf = 0.84 if _price_tol(l1["price"], l2["price"], 0.007) else 0.70
                 return {
@@ -264,14 +274,21 @@ def detect_double_bottom(swings: List[Dict[str, Any]]) -> Optional[Dict[str, Any
     return None
 
 
-def detect_double_top(swings: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    """Detects M-formation / Double Top with neckline valley and min 10 bars separation."""
+def detect_double_top(
+    swings: List[Dict[str, Any]],
+    total_bars: int = 0,
+    spot_price: float = 0.0,
+    max_bars_ago: int = 30,
+) -> Optional[Dict[str, Any]]:
+    """Detects M-formation / Double Top with neckline valley and min 8 bars separation."""
     highs = [s for s in swings if s["type"] == "high"]
     if len(highs) < 2:
         return None
 
     for i in range(len(highs) - 1, 0, -1):
         h2 = highs[i]
+        if total_bars > 0 and (total_bars - h2["index"]) > max_bars_ago:
+            continue
         for j in range(i - 1, max(-1, i - 8), -1):
             h1 = highs[j]
             bars = h2["index"] - h1["index"]
@@ -285,6 +302,9 @@ def detect_double_top(swings: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
                     continue
                 neckline = min(l["price"] for l in lows_between)
                 if neckline > h1["price"] * 0.988:
+                    continue
+                measured_move = max(h1["price"], h2["price"]) - neckline
+                if spot_price > 0 and spot_price < (neckline - 1.25 * measured_move):
                     continue
                 conf = 0.84 if _price_tol(h1["price"], h2["price"], 0.007) else 0.70
                 return {
@@ -302,26 +322,58 @@ def detect_double_top(swings: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     return None
 
 
-def detect_head_shoulders(swings: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    """Detects classic Head and Shoulders bearish top reversal."""
+def detect_head_shoulders(
+    swings: List[Dict[str, Any]],
+    total_bars: int = 0,
+    spot_price: float = 0.0,
+    max_bars_ago: int = 30,
+) -> Optional[Dict[str, Any]]:
+    """Detects classic Head and Shoulders bearish top reversal.
+    
+    Strict structural requirements:
+    1. Head must be clearly higher than left and right shoulders (> 0.8%).
+    2. Left and right shoulders must be within 2.0% price tolerance.
+    3. Minimum bar separation: left to head >= 6 bars, head to right >= 6 bars.
+    4. Dual distinct troughs: Trough 1 between left & head, Trough 2 between head & right.
+    5. Neckline symmetry: Trough 1 and Trough 2 within 3.5% price tolerance.
+    6. Recency check: right shoulder must be within max_bars_ago (default 30 bars).
+    7. Measured-move exhaustion: if spot has dropped > 1.25x measured move past neckline, pattern is exhausted.
+    """
     highs = [s for s in swings if s["type"] == "high"]
     if len(highs) < 3:
         return None
 
     for i in range(len(highs) - 1, 1, -1):
         right, head, left = highs[i], highs[i - 1], highs[i - 2]
+        if total_bars > 0 and (total_bars - right["index"]) > max_bars_ago:
+            continue
         if not (head["price"] > left["price"] * 1.008 and head["price"] > right["price"] * 1.008):
             continue
         if not _price_tol(left["price"], right["price"], 0.020):
             continue
         if (head["index"] - left["index"] < 6) or (right["index"] - head["index"] < 6):
             continue
-        lows_between = [
-            s for s in swings if s["type"] == "low" and left["index"] < s["index"] < right["index"]
+
+        troughs_1 = [
+            s for s in swings if s["type"] == "low" and left["index"] < s["index"] < head["index"]
         ]
-        if len(lows_between) < 1:
+        troughs_2 = [
+            s for s in swings if s["type"] == "low" and head["index"] < s["index"] < right["index"]
+        ]
+        if not troughs_1 or not troughs_2:
             continue
-        neckline = min(l["price"] for l in lows_between)
+
+        t1 = min(troughs_1, key=lambda s: s["price"])
+        t2 = min(troughs_2, key=lambda s: s["price"])
+
+        if not _price_tol(t1["price"], t2["price"], 0.035):
+            continue
+
+        neckline = min(t1["price"], t2["price"])
+        height = head["price"] - neckline
+        if spot_price > 0 and spot_price < (neckline - 1.25 * height):
+            continue
+
         shoulder_diff = abs(left["price"] - right["price"]) / left["price"]
         conf = 0.86 if shoulder_diff < 0.009 else 0.72
         return {
@@ -330,33 +382,68 @@ def detect_head_shoulders(swings: List[Dict[str, Any]]) -> Optional[Dict[str, An
             "left": left["price"],
             "head": head["price"],
             "right": right["price"],
+            "trough1": t1["price"],
+            "trough2": t2["price"],
             "neckline": neckline,
             "floor_or_roof": head["price"],
             "confidence": conf,
+            "right_idx": right["index"],
         }
     return None
 
 
-def detect_inverse_hs(swings: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    """Detects Inverse Head and Shoulders bullish bottom reversal."""
+def detect_inverse_hs(
+    swings: List[Dict[str, Any]],
+    total_bars: int = 0,
+    spot_price: float = 0.0,
+    max_bars_ago: int = 30,
+) -> Optional[Dict[str, Any]]:
+    """Detects Inverse Head and Shoulders bullish bottom reversal.
+    
+    Strict structural requirements:
+    1. Head must be clearly lower than left and right shoulders (< -0.8%).
+    2. Left and right shoulders must be within 2.0% price tolerance.
+    3. Minimum bar separation: left to head >= 6 bars, head to right >= 6 bars.
+    4. Dual distinct peaks: Peak 1 between left & head, Peak 2 between head & right.
+    5. Neckline symmetry: Peak 1 and Peak 2 within 3.5% price tolerance.
+    6. Recency check: right shoulder must be within max_bars_ago (default 30 bars).
+    7. Measured-move exhaustion: if spot has risen > 1.25x measured move past neckline, pattern is exhausted.
+    """
     lows = [s for s in swings if s["type"] == "low"]
     if len(lows) < 3:
         return None
 
     for i in range(len(lows) - 1, 1, -1):
         right, head, left = lows[i], lows[i - 1], lows[i - 2]
+        if total_bars > 0 and (total_bars - right["index"]) > max_bars_ago:
+            continue
         if not (head["price"] < left["price"] * 0.992 and head["price"] < right["price"] * 0.992):
             continue
         if not _price_tol(left["price"], right["price"], 0.020):
             continue
         if (head["index"] - left["index"] < 6) or (right["index"] - head["index"] < 6):
             continue
-        highs_between = [
-            s for s in swings if s["type"] == "high" and left["index"] < s["index"] < right["index"]
+
+        peaks_1 = [
+            s for s in swings if s["type"] == "high" and left["index"] < s["index"] < head["index"]
         ]
-        if len(highs_between) < 1:
+        peaks_2 = [
+            s for s in swings if s["type"] == "high" and head["index"] < s["index"] < right["index"]
+        ]
+        if not peaks_1 or not peaks_2:
             continue
-        neckline = max(h["price"] for h in highs_between)
+
+        p1 = max(peaks_1, key=lambda s: s["price"])
+        p2 = max(peaks_2, key=lambda s: s["price"])
+
+        if not _price_tol(p1["price"], p2["price"], 0.035):
+            continue
+
+        neckline = max(p1["price"], p2["price"])
+        height = neckline - head["price"]
+        if spot_price > 0 and spot_price > (neckline + 1.25 * height):
+            continue
+
         shoulder_diff = abs(left["price"] - right["price"]) / left["price"]
         conf = 0.86 if shoulder_diff < 0.009 else 0.72
         return {
@@ -365,18 +452,30 @@ def detect_inverse_hs(swings: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
             "left": left["price"],
             "head": head["price"],
             "right": right["price"],
+            "peak1": p1["price"],
+            "peak2": p2["price"],
             "neckline": neckline,
             "floor_or_roof": head["price"],
             "confidence": conf,
+            "right_idx": right["index"],
         }
     return None
 
 
-def detect_wedge(swings: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def detect_wedge(
+    swings: List[Dict[str, Any]],
+    total_bars: int = 0,
+    spot_price: float = 0.0,
+    max_bars_ago: int = 30,
+) -> Optional[Dict[str, Any]]:
     """Detects Rising Wedge (bearish) and Falling Wedge (bullish) from converging slopes."""
     highs = [s for s in swings if s["type"] == "high"][-5:]
     lows = [s for s in swings if s["type"] == "low"][-5:]
     if len(highs) < 3 or len(lows) < 3:
+        return None
+
+    last_pivot_idx = max(highs[-1]["index"], lows[-1]["index"])
+    if total_bars > 0 and (total_bars - last_pivot_idx) > max_bars_ago:
         return None
 
     def _calc_slope(pts: List[Dict[str, Any]]) -> float:
@@ -414,11 +513,20 @@ def detect_wedge(swings: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     return None
 
 
-def detect_triangle(swings: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+def detect_triangle(
+    swings: List[Dict[str, Any]],
+    total_bars: int = 0,
+    spot_price: float = 0.0,
+    max_bars_ago: int = 30,
+) -> Optional[Dict[str, Any]]:
     """Detects Ascending Triangle (bullish), Descending Triangle (bearish), and Symmetrical Triangle (compression)."""
     highs = [s for s in swings if s["type"] == "high"][-5:]
     lows = [s for s in swings if s["type"] == "low"][-5:]
     if len(highs) < 3 or len(lows) < 3:
+        return None
+
+    last_pivot_idx = max(highs[-1]["index"], lows[-1]["index"])
+    if total_bars > 0 and (total_bars - last_pivot_idx) > max_bars_ago:
         return None
 
     def _calc_slope(pts: List[Dict[str, Any]]) -> float:
@@ -465,8 +573,14 @@ def detect_triangle(swings: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     return None
 
 
-def scan_patterns(swings: List[Dict[str, Any]], timeframe: str = "1h") -> List[PatternCandidate]:
+def scan_patterns(
+    swings: List[Dict[str, Any]],
+    timeframe: str = "1h",
+    total_bars: int = 0,
+    spot_price: float = 0.0,
+) -> List[PatternCandidate]:
     """Scans all pattern detectors against swings and returns ranked PatternCandidate objects."""
+    max_bars = 30 if timeframe == "4h" else 50
     candidates_raw: List[Dict[str, Any]] = []
     for fn in (
         detect_double_bottom,
@@ -476,7 +590,7 @@ def scan_patterns(swings: List[Dict[str, Any]], timeframe: str = "1h") -> List[P
         detect_wedge,
         detect_triangle,
     ):
-        p = fn(swings)
+        p = fn(swings, total_bars=total_bars, spot_price=spot_price, max_bars_ago=max_bars)
         if p:
             candidates_raw.append(p)
 
@@ -775,8 +889,18 @@ class PatternEngine:
         swings_4h = detect_swings(ohlcv_4h, left=3, right=3) if len(ohlcv_4h) >= 15 else []
 
         # 2. Scan patterns on both timeframes
-        patterns_1h = scan_patterns(swings_1h, timeframe="1h")
-        patterns_4h = scan_patterns(swings_4h, timeframe="4h")
+        patterns_1h = scan_patterns(
+            swings_1h,
+            timeframe="1h",
+            total_bars=len(ohlcv_1h),
+            spot_price=spot_px,
+        )
+        patterns_4h = scan_patterns(
+            swings_4h,
+            timeframe="4h",
+            total_bars=len(ohlcv_4h),
+            spot_price=spot_px,
+        )
 
         # 3. Analyze 1H structure trend
         struct = analyze_structure(ohlcv_1h, swings_1h)

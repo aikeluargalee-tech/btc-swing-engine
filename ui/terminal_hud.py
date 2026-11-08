@@ -5663,7 +5663,39 @@ def _build_tab18_trend_pullback_hud(
     mid_row_grid.add_column(ratio=1)
     mid_row_grid.add_row(ref_panel, exit_panel, data_panel)
 
-    # 4. Bottom Clipboard Bar
+    # 4. STRATEGY VERDICT Panel (On-screen visual summary for human operator; excluded from DATA-ONLY clipboard export)
+    verdict_badge_map = {
+        "ENTRY READY": "[bold black on bright_green] ENTRY READY [/bold black on bright_green]",
+        "WAIT": "[bold black on bright_yellow] WAIT [/bold black on bright_yellow]",
+        "HOLD": "[bold black on bright_cyan] HOLD [/bold black on bright_cyan]",
+        "EXIT ALERT": "[bold white on red] EXIT ALERT [/bold white on red]",
+        "NO TRADE": "[bold white on bright_black] NO TRADE [/bold white on bright_black]",
+    }
+    v_badge = verdict_badge_map.get(tp_eval.strategy_verdict, f"[bold white]{tp_eval.strategy_verdict}[/bold white]")
+    v_border = (
+        "bright_green"
+        if tp_eval.strategy_verdict == "ENTRY READY"
+        else ("bright_red" if tp_eval.strategy_verdict == "EXIT ALERT" or not tp_eval.data_integrity_ok else "bright_yellow")
+    )
+    verdict_grid = Table.grid(expand=True)
+    verdict_grid.add_column()
+    verdict_grid.add_row(
+        f"[bold bright_white]STRATEGY VERDICT:[/bold bright_white] {v_badge}  │  "
+        f"[bold bright_cyan]DECISION STATE:[/bold bright_cyan] [bold white]{tp_eval.decision_state}[/bold white]  │  "
+        f"[bold yellow]STATUS: {tp_eval.strategy_status}[/bold yellow]  │  "
+        f"[dim]{tp_eval.mode_label}[/dim]"
+    )
+    verdict_grid.add_row(f"[bold bright_cyan]EXPLANATION:[/bold bright_cyan] [white]{tp_eval.verdict_explanation}[/white]")
+
+    verdict_panel = Panel(
+        verdict_grid,
+        title="[bold bright_white]STRATEGY VERDICT (ON-SCREEN OPERATOR VIEW • EXCLUDED FROM LLM CLIPBOARD)[/bold bright_white]",
+        box=box.ROUNDED,
+        border_style=v_border,
+        padding=(0, 1),
+    )
+
+    # 5. Bottom Clipboard Bar
     last_copy_str = ""
     if getattr(store, "last_packet_copied_utc", ""):
         last_copy_str = f"  │  [bold green]Last Brief Copied: {store.last_packet_copied_utc} ({getattr(store, 'last_packet_char_count', 0):,} chars)[/bold green]"
@@ -5672,13 +5704,13 @@ def _build_tab18_trend_pullback_hud(
     bottom_grid.add_column(justify="left", no_wrap=True)
     bottom_grid.add_column(justify="right", no_wrap=True)
     bottom_grid.add_row(
-        "[bold black on bright_cyan] [KEY A] BTC TREND-PULLBACK v1.0 (DATA-ONLY) [/bold black on bright_cyan]  "
+        "[bold black on bright_cyan] [KEY A] BTC TREND-PULLBACK v1.0 [/bold black on bright_cyan]  "
         "[bright_white]Tap [bold cyan]'A'[/bold cyan] to open Desk [A] │ Tap [bold cyan]'A'[/bold cyan] again to copy DATA-ONLY Report to Clipboard![/bright_white]" + last_copy_str,
-        "[dim]config/trend_pullback_config.yaml • Metrics & True/False Only[/dim]",
+        "[dim]Screen: Full Verdict • Clipboard: DATA-ONLY[/dim]",
     )
     bottom_panel = Panel(bottom_grid, box=box.ROUNDED, border_style="bright_cyan", padding=(0, 1))
 
-    return Group(header_panel, sub_panel, top_row_grid, mid_row_grid, bottom_panel)
+    return Group(header_panel, sub_panel, top_row_grid, mid_row_grid, verdict_panel, bottom_panel)
 
 
 def build_dashboard_renderable(

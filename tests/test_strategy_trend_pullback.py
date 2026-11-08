@@ -548,6 +548,7 @@ def test_18_tui_and_ai_packet_integration() -> None:
     assert "4. REFERENCE LEVELS" in output
     assert "5. EXIT RULE INPUTS" in output
     assert "6. DATA INTEGRITY" in output
+    assert "STRATEGY VERDICT" in output
 
     packet = build_ai_telemetry_packet(config, store)
     assert "SECTION 18: TAB [A] BTC TREND-PULLBACK v1.0" in packet

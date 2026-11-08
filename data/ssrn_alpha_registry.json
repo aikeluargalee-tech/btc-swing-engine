@@ -1,0 +1,111 @@
+{
+  "domains": [
+    {
+      "id": "microstructure",
+      "title": "01. Market Microstructure & Order Flow",
+      "core_metrics": [
+        "Order Book Imbalance (OBI)",
+        "Cumulative Volume Delta (CVD)",
+        "Spread Dynamics"
+      ],
+      "key_finding": "Multi-level book depth imbalance has statistically significant predictive power for short-horizon mid-price jumps; Level 1 top-of-book is contaminated by spoofing noise.",
+      "spot_swing_role": "Confirms limit-order absorption at 4H/1D swing lows prior to triggering long spot entries."
+    },
+    {
+      "id": "momentum",
+      "title": "02. Time-Series Momentum & Technical Rules",
+      "core_metrics": [
+        "Variable Moving Averages (VMA)",
+        "Time-Series Momentum (TSMOM)",
+        "Breakout Ensembles"
+      ],
+      "key_finding": "Single lookback moving averages suffer rapid alpha decay; higher-timeframe trend filters prevent whipsaws and preserve capital by holding cash in macro bear regimes.",
+      "spot_swing_role": "Primary trend engine. Enforces 100% cash/stablecoin allocation when higher-timeframe momentum is negative."
+    },
+    {
+      "id": "factors",
+      "title": "03. Systematic Factor Pricing (Liu-Tsyvinski)",
+      "core_metrics": [
+        "Crypto Market Factor (MKT_crypto)",
+        "Size/Illiquidity Premium",
+        "Downside Risk Semi-Variance"
+      ],
+      "key_finding": "Bitcoin carries the primary systemic market beta; returns exhibit fat-tailed positive skewness during bull expansions and downside volatility clustering during liquidations.",
+      "spot_swing_role": "Normalizes position risk against aggregate crypto market volatility; prevents over-allocation during volatility spikes."
+    },
+    {
+      "id": "onchain",
+      "title": "04. On-Chain Structural Metrics",
+      "core_metrics": [
+        "MVRV Ratio",
+        "Spent Output Profit Ratio (SOPR)",
+        "Entity-Adjusted Realized Price"
+      ],
+      "key_finding": "MVRV < 1.0 identifies generational macro accumulation; SOPR retests of 1.0 act as structural support during secular bull trends.",
+      "spot_swing_role": "Macro floor/ceiling filter to prevent buying into exhausted on-chain distribution regimes."
+    },
+    {
+      "id": "ml_sentiment",
+      "title": "05. Alternative Data & Machine Learning Hurdles",
+      "core_metrics": [
+        "Search Volume Index (SVI)",
+        "Cost-Aware Gradient Boosted Trees",
+        "Regime Classifiers"
+      ],
+      "key_finding": "Direct price regression models consistently overfit; directional classification conditioned on transaction cost hurdles preserves real-world alpha.",
+      "spot_swing_role": "Binary execution filter: signal magnitude must exceed 2x round-trip trading friction (fees + slippage + spread) before firing."
+    }
+  ],
+  "models": [
+    {
+      "id": "mtf_macd",
+      "name": "Multi-Timeframe Trend Following",
+      "ssrn_citation": "Mesíček & Vojtko (SSRN 5748642)",
+      "timeframe": "1H Execution / 1D Trend Filter",
+      "indicators": "MACD(12,26,9) 1H & Daily, Price Action Trailing Exit",
+      "logic": "Long entry: 1H MACD line crosses above Signal ONLY when Daily MACD is positive. Exit: Trailing stop at prior 4H swing low or structural close below entry.",
+      "performance": "Sharpe: 1.07 | Max Drawdown: -12.4% (vs -80% Buy & Hold)",
+      "live_rule": "1D MACD must be Bullish to permit 1H long entries"
+    },
+    {
+      "id": "ensemble_donchian",
+      "name": "Ensemble Donchian + Volatility Target",
+      "ssrn_citation": "Zarattini, Pagani & Barbon (SSRN 5209907)",
+      "timeframe": "Daily / Multi-Horizon (5–360 Days)",
+      "indicators": "Ensemble N-day Highs/Lows, 20-day Realized Volatility",
+      "logic": "Aggregates breakout signals across multiple lookback windows (5 to 360d). Position size scaled dynamically: Weight = Target_Vol (25%) / Realized_Vol.",
+      "performance": "Sharpe: >1.50 | Max Drawdown: ~19% on BTC",
+      "live_rule": "Scale position inversely to 20-Day Annualized Volatility"
+    },
+    {
+      "id": "vol_adaptive_8h",
+      "name": "Volatility-Adaptive Multi-Horizon Trend",
+      "ssrn_citation": "Karassavidis et al. (SSRN 5821842)",
+      "timeframe": "8-Hour Candles",
+      "indicators": "Multi-horizon MA, Multi-timeframe RSI, ATR Risk Trailing",
+      "logic": "Trend identified across 8H MA slope + RSI momentum filter. Dynamic position sizing and stop placement pegged to multiples of 14-period ATR.",
+      "performance": "Sharpe: 1.54 | CAGR: ~20% | Max Drawdown: ~12.5%",
+      "live_rule": "Peg trailing stop distance to 2.5x 14-Period ATR"
+    },
+    {
+      "id": "funding_carry_filter",
+      "name": "Funding Rate Exhaustion Gate",
+      "ssrn_citation": "Chan (SSRN 5292305)",
+      "timeframe": "8H Funding Settlement Intervals",
+      "indicators": "Perpetual Funding Rate Percentile, Annualized Basis",
+      "logic": "Spot swing risk gate: When annualized perpetual funding rate exceeds +30% (extreme retail leverage), freeze new spot swing entries to avoid long liquidation cascades.",
+      "performance": "Regime Protection: Filters out severe local market tops and leverage flushes",
+      "live_rule": "Freeze new longs when Annualized Funding > +30.0%"
+    },
+    {
+      "id": "cost_aware_ml",
+      "name": "Cost-Aware Alpha Hurdle Filter",
+      "ssrn_citation": "Bysik & Ślepaczuk (SSRN 6795938)",
+      "timeframe": "Hourly / Multi-Hour",
+      "indicators": "Expected Return Model vs. Round-Trip Taker Fees & Slippage",
+      "logic": "Execute long trades ONLY if expected forward return > (Taker Fee + Slippage + Spread + Margin Hurdle). Suppresses churn during flat ranges.",
+      "performance": "Sharpe: >1.0 | Eliminates overtrading fee drag",
+      "live_rule": "Required minimum forward target: >= +0.18% (18 bps)"
+    }
+  ]
+}

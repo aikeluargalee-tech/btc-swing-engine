@@ -1,5 +1,5 @@
 # BTC-USD LIVE QUANTITATIVE TELEMETRY PACKET & MASTER AI AUDITOR PROMPT
-**Snapshot Timestamp:** `2026-11-08 09:25:42 UTC` (`UTC 2026-11-08 09:25:42 • SGP (Asia) 17:25:42 SGT`)  
+**Snapshot Timestamp:** `2026-11-08 09:42:35 UTC` (`UTC 2026-11-08 09:42:35 • SGP (Asia) 17:42:35 SGT`)  
 **Active Global Market Session:** `LONDON / EU SESSION (EUROPEAN INSTITUTIONAL FLOW)`  
 **Mandate:** Strictly Long-Only Spot BTC Swing & Positional Trading (Zero Leverage, Zero Shorting)  
 **Reference Portfolio Equity:** `$100,000.00` (Standard Risk: `1.00%` | Counter-Trend Risk Cap: `0.50%` | Hard Single-Trade Notional Cap: `<= 50% Equity`)

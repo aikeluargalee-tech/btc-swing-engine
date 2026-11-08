@@ -4803,4 +4803,57 @@ class GrokQuantEvaluation:
     bottomline_buy_trigger: str = ""
     bottomline_invalidation_risk: str = ""
 
+@dataclass
+class SSRNDomainItem:
+    """Core academic research domain documented in SSRN quantitative literature."""
+    id: str
+    title: str
+    core_metrics: List[str]
+    key_finding: str
+    spot_swing_role: str
+
+
+@dataclass
+class SSRNModelItem:
+    """Empirical walk-forward trading model from published SSRN preprints."""
+    id: str
+    name: str
+    ssrn_citation: str
+    timeframe: str
+    indicators: str
+    logic: str
+    performance: str
+    live_rule: str
+    live_status: str = "MONITORING"
+    live_value: str = ""
+    is_gate_pass: bool = True
+
+
+@dataclass
+class SSRNAlphaEvaluation:
+    """State for Tab [R: SSRN RESEARCH] - Academic quantitative domains & empirical strategies."""
+    timestamp_utc: str = ""
+    spot_price: float = 0.0
+    domains: List[SSRNDomainItem] = field(default_factory=list)
+    models: List[SSRNModelItem] = field(default_factory=list)
+
+    # Live SSRN Metrics & Empirical Condition Gates
+    daily_macd_status: str = "NEUTRAL"
+    hourly_macd_status: str = "NEUTRAL"
+    mtf_macd_gate_pass: bool = False
+
+    realized_vol_20d_ann: float = 0.0
+    target_vol_sizing_pct: float = 100.0  # (25% Target Vol / Realized Vol)
+
+    atr_14_8h: float = 0.0
+    atr_trailing_stop_dist: float = 0.0
+
+    annualized_funding_pct: float = 0.0
+    funding_gate_status: str = "PASS"
+
+    round_trip_friction_bps: float = 18.0
+    cost_hurdle_pass: bool = True
+
+    active_view_mode: str = "domains"  # "domains" or "models"
+    ssrn_summary_markdown: str = ""
 

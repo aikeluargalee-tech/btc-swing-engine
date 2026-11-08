@@ -165,6 +165,11 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         if active_tab == 15
         else "[dim white][G: GROK FLOW][/dim white]"
     )
+    tR = (
+        "[bold black on bright_yellow] [R: SSRN RESEARCH] [/bold black on bright_yellow]"
+        if active_tab == 16
+        else "[dim white][R: SSRN RESEARCH][/dim white]"
+    )
     t0 = (
         "[bold white on blue] [0: SPOT SWING] [/bold white on blue]"
         if active_tab == 0
@@ -194,6 +199,7 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         9: "9: TD EXHAUSTION",
         14: "14: PATTERNS & CHART",
         15: "15: GROK QUANT FLOW [G]",
+        16: "16: SSRN RESEARCH [R]",
     }
     if active_tab in subdesk_names:
         subdesk_info = f"  │  [bold black on bright_yellow] [DEEP DIVE {subdesk_names[active_tab]}] [/bold black on bright_yellow]"
@@ -209,13 +215,13 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
     nav_grid.add_column(justify="right", no_wrap=True)
     nav_grid.add_row(
         f"[bold white]BTC-USD[/bold white] | Spot: [bold cyan]${spot_px:,.2f}[/bold cyan] | Regime: {regime_str} ({score_str}) | Feeds: Spot {spot_ws_dot} • Perp {perp_ws_dot} • CB {cb_ws_dot}",
-        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: P Structure • B Patterns • G Grok Flow (GG to Copy) • F Footprint • W Waterfall • 0 Screener • L Master • C Packet • H Guide[/dim]",
+        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: P Structure • B Patterns • G Grok Flow • R SSRN Research • F Footprint • W Waterfall • 0 Screener • L Master • C Packet • H Guide[/dim]",
     )
 
     tab_grid = Table.grid(expand=True)
     tab_grid.add_column(justify="left", no_wrap=True)
     tab_grid.add_row(
-        f"{tP}  {tB}  {tG}  {tF}  {tW}  {t0}  {tL}  │  {tC}  {tH}{subdesk_info}"
+        f"{tP}  {tB}  {tG}  {tR}  {tF}  {tW}  {t0}  {tL}  │  {tC}  {tH}{subdesk_info}"
     )
     nav_panel = Panel(Group(nav_grid, tab_grid), border_style="bright_blue", box=box.ROUNDED, padding=(0, 1))
 
@@ -5107,18 +5113,122 @@ def _build_tab15_grok_quant_hud(store: StateStore, header_panel: Panel) -> Group
     return Group(header_panel, verdict_panel, mid_grid, flow_panel, playbook_grid, bottomline_panel, bottom_panel)
 
 
+def _build_tab16_ssrn_research_hud(
+    config: EngineConfig,
+    store: StateStore,
+    header_panel: Panel,
+) -> Group:
+    """Builds the 5-panel layout for Tab 16 [R: SSRN RESEARCH] - Academic quantitative domains & empirical strategies."""
+    ssrn = store.ssrn_alpha_evaluation
+    if ssrn is None:
+        from analytics.ssrn_research_engine import SSRNResearchEngine
+        engine = SSRNResearchEngine(config)
+        ssrn = engine.evaluate(store)
+
+    view_mode = getattr(store, "ssrn_view_mode", "domains")
+
+    # Sub-Ribbon with View Toggle
+    mode_a_style = "bold black on bright_yellow" if view_mode == "domains" else "dim white"
+    mode_b_style = "bold black on bright_cyan" if view_mode == "models" else "dim white"
+    sub_grid = Table.grid(expand=True)
+    sub_grid.add_column(justify="left", no_wrap=True)
+    sub_grid.add_column(justify="right", no_wrap=True)
+    sub_grid.add_row(
+        f"[bold bright_yellow]DESK [R]: SSRN QUANTITATIVE ALPHA DECK[/bold bright_yellow]  │  "
+        f"[{mode_a_style}] VIEW A: 5 ACADEMIC DOMAINS [/{mode_a_style}]   "
+        f"[{mode_b_style}] VIEW B: 5 EMPIRICAL STRATEGIES [/{mode_b_style}]",
+        f"[dim]Press [bold yellow]'R'[/bold yellow] to toggle view • [bold yellow]'RR'[/bold yellow] to copy brief[/dim]",
+    )
+    verdict_panel = Panel(sub_grid, box=box.ROUNDED, border_style="bright_yellow", padding=(0, 1))
+
+    if view_mode == "domains":
+        # Render 5 Academic Domains
+        domains_by_id = {d.id: d for d in ssrn.domains}
+
+        def make_domain_panel(d, border_col: str = "bright_blue") -> Panel:
+            t = Table.grid(expand=True)
+            t.add_column()
+            metrics_str = " • ".join([f"[bold cyan]{m}[/bold cyan]" for m in d.core_metrics])
+            t.add_row(f"[dim]Core Metrics:[/dim] {metrics_str}")
+            t.add_row(f"[bright_white]{d.key_finding}[/bright_white]")
+            t.add_row(f"[bold bright_green]SPOT SWING ROLE:[/bold bright_green] [green]{d.spot_swing_role}[/green]")
+            return Panel(t, title=f"[bold {border_col}]{d.title}[/bold {border_col}]", box=box.ROUNDED, border_style=border_col, padding=(0, 1))
+
+        d1 = domains_by_id.get("microstructure")
+        d2 = domains_by_id.get("momentum")
+        d3 = domains_by_id.get("factors")
+        d4 = domains_by_id.get("onchain")
+        d5 = domains_by_id.get("ml_sentiment")
+
+        row1_table = Table.grid(expand=True)
+        row1_table.add_column(ratio=1)
+        row1_table.add_column(ratio=1)
+        row1_table.add_row(
+            make_domain_panel(d1, "bright_blue") if d1 else Panel(""),
+            make_domain_panel(d2, "bright_magenta") if d2 else Panel(""),
+        )
+
+        row2_table = Table.grid(expand=True)
+        row2_table.add_column(ratio=1)
+        row2_table.add_column(ratio=1)
+        row2_table.add_row(
+            make_domain_panel(d3, "cyan") if d3 else Panel(""),
+            make_domain_panel(d4, "green") if d4 else Panel(""),
+        )
+
+        p5 = make_domain_panel(d5, "yellow") if d5 else Panel("")
+        content_group = Group(row1_table, row2_table, p5)
+
+    else:
+        # Render View B: 5 Empirical Operational Models
+        models_table = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold cyan", pad_edge=False)
+        models_table.add_column("Strategy Model & Citation", justify="left", no_wrap=False, ratio=3)
+        models_table.add_column("Timeframe & Rule Logic", justify="left", no_wrap=False, ratio=4)
+        models_table.add_column("Empirical Performance", justify="center", no_wrap=False, ratio=2)
+        models_table.add_column("Live Market Condition", justify="center", no_wrap=False, ratio=2)
+
+        for m in ssrn.models:
+            gate_col = "bold black on green" if m.is_gate_pass else "bold white on red"
+            status_badge = f"[{gate_col}] {m.live_status} [/{gate_col}]\n[dim]{m.live_value}[/dim]"
+            title_cell = f"[bold bright_white]{m.name}[/bold bright_white]\n[dim cyan]{m.ssrn_citation}[/dim cyan]"
+            rule_cell = f"[bold yellow]{m.timeframe}[/bold yellow]\n[white]{m.logic}[/white]"
+            perf_cell = f"[bold green]{m.performance}[/bold green]"
+            models_table.add_row(title_cell, rule_cell, perf_cell, status_badge)
+
+        content_group = Group(Panel(models_table, title="[bold cyan]VIEW B: VERIFIED EMPIRICAL STRATEGY MODELS & LIVE GATES[/bold cyan]", box=box.ROUNDED, border_style="cyan", padding=(0, 1)))
+
+    # Bottom clipboard strip
+    last_copy_str = ""
+    if getattr(store, "last_packet_copied_utc", ""):
+        last_copy_str = f"  │  [bold green]✓ COPIED AT {store.last_packet_copied_utc} ({getattr(store, 'last_packet_char_count', 0):,} chars)[/bold green]"
+
+    bottom_grid = Table.grid(expand=True)
+    bottom_grid.add_column(justify="left", no_wrap=True)
+    bottom_grid.add_column(justify="right", no_wrap=True)
+    bottom_grid.add_row(
+        f"[bold black on bright_yellow] [KEY R / RR] VIEW TOGGLE & CLIPBOARD [/bold black on bright_yellow]  "
+        f"[bright_white]Tap [bold yellow]'R'[/bold yellow] to toggle Domains ⟷ Models • Tap [bold yellow]'RR'[/bold yellow] to copy SSRN Academic Brief! (0 screenshots needed)[/bright_white]{last_copy_str}",
+        f"[dim]Peer-Reviewed Quantitative Research • Spot-Only Gating[/dim]",
+    )
+    bottom_panel = Panel(bottom_grid, box=box.ROUNDED, border_style="bright_yellow", padding=(0, 1))
+
+    return Group(header_panel, verdict_panel, content_group, bottom_panel)
+
+
 def build_dashboard_renderable(
     config: EngineConfig,
     store: StateStore,
     tab_override: Optional[int] = None,
 ) -> Group:
     """Builds the active tab's 5-panel Rich renderable for the live terminal HUD."""
-    valid_tabs = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
+    valid_tabs = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)
     if tab_override is not None:
         if isinstance(tab_override, int) and tab_override in valid_tabs:
             active_tab = tab_override
         elif str(tab_override).lower() in ("g", "grok", "grok_flow", "15"):
             active_tab = 15
+        elif str(tab_override).lower() in ("r", "ssrn", "research", "alpha", "16"):
+            active_tab = 16
         elif str(tab_override).lower() in ("b", "pattern", "patterns", "chart", "14"):
             active_tab = 14
         elif str(tab_override).lower() in ("l", "master", "m", "10"):
@@ -5155,6 +5265,8 @@ def build_dashboard_renderable(
     if getattr(store, "show_help", False):
         return _build_help_overlay(store, header_panel)
 
+    if active_tab == 16:
+        return _build_tab16_ssrn_research_hud(config, store, header_panel)
     if active_tab == 15:
         return _build_tab15_grok_quant_hud(store, header_panel)
     if active_tab == 14:
@@ -5215,8 +5327,9 @@ def print_dry_run_report(
             13: "TAB [P: PRICE ACTION & STRUCTURE PROTOCOL (SLSP v1.0 + 3-EMA + SENSORS)]",
             14: "TAB [B: CLASSIC CHART PATTERN RADAR & CANDLESTICK GEOMETRY]",
             15: "TAB [G: GROK DUAL-HORIZON FLOW & VWAP SD MATRIX]",
+            16: "TAB [R: SSRN QUANTITATIVE ALPHA DECK & EMPIRICAL RESEARCH]",
         }
-        for t in (0, 15, 12, 11, 14, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13):
+        for t in (0, 16, 15, 12, 11, 14, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13):
             title = tab_titles.get(t, f"TAB [{t}]")
             console.print(f"\n[bold cyan]=== VERIFICATION SNAPSHOT: {title} ===[/bold cyan]")
             console.print(build_dashboard_renderable(config, store, tab_override=t))
@@ -5244,6 +5357,8 @@ def print_dry_run_report(
             t_num = 14
         elif tab_lower in ("g", "grok", "grok_flow", "15"):
             t_num = 15
+        elif tab_lower in ("r", "ssrn", "research", "alpha", "16"):
+            t_num = 16
         elif tab_lower in ("p", "structure", "slsp", "pa", "13"):
             t_num = 13
         else:
@@ -5251,7 +5366,7 @@ def print_dry_run_report(
                 t_num = int(tab_arg)
             except ValueError:
                 t_num = 0
-        store.active_tab = t_num if t_num in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15) else 0
+        store.active_tab = t_num if t_num in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16) else 0
         console.print(build_dashboard_renderable(config, store, tab_override=store.active_tab))
 
 
@@ -5315,6 +5430,34 @@ def _poll_keyboard_tab_switch(
                     else:
                         from analytics.grok_quant_engine import copy_grok_prompt_to_clipboard
                         ok, msg, char_count = copy_grok_prompt_to_clipboard(store)
+                        store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+                        store.last_packet_copied_ts = time.time()
+                        store.last_packet_char_count = char_count
+                        changed = True
+                elif ch in ("r", "R"):
+                    store.show_help = False
+                    if store.active_tab != 16:
+                        store.active_tab = 16
+                        changed = True
+                    else:
+                        cur_mode = getattr(store, "ssrn_view_mode", "domains")
+                        store.ssrn_view_mode = "models" if cur_mode == "domains" else "domains"
+                        from analytics.ssrn_research_engine import copy_ssrn_deck_to_clipboard
+                        ok, msg, char_count = copy_ssrn_deck_to_clipboard(store)
+                        store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+                        store.last_packet_copied_ts = time.time()
+                        store.last_packet_char_count = char_count
+                        changed = True
+                elif ch in ("r", "R"):
+                    store.show_help = False
+                    if store.active_tab != 16:
+                        store.active_tab = 16
+                        changed = True
+                    else:
+                        cur_mode = getattr(store, "ssrn_view_mode", "domains")
+                        store.ssrn_view_mode = "models" if cur_mode == "domains" else "domains"
+                        from analytics.ssrn_research_engine import copy_ssrn_deck_to_clipboard
+                        ok, msg, char_count = copy_ssrn_deck_to_clipboard(store)
                         store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
                         store.last_packet_copied_ts = time.time()
                         store.last_packet_char_count = char_count
@@ -5388,6 +5531,34 @@ def _poll_keyboard_tab_switch(
                     else:
                         from analytics.grok_quant_engine import copy_grok_prompt_to_clipboard
                         ok, msg, char_count = copy_grok_prompt_to_clipboard(store)
+                        store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+                        store.last_packet_copied_ts = time.time()
+                        store.last_packet_char_count = char_count
+                        changed = True
+                elif ch in ("r", "R"):
+                    store.show_help = False
+                    if store.active_tab != 16:
+                        store.active_tab = 16
+                        changed = True
+                    else:
+                        cur_mode = getattr(store, "ssrn_view_mode", "domains")
+                        store.ssrn_view_mode = "models" if cur_mode == "domains" else "domains"
+                        from analytics.ssrn_research_engine import copy_ssrn_deck_to_clipboard
+                        ok, msg, char_count = copy_ssrn_deck_to_clipboard(store)
+                        store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+                        store.last_packet_copied_ts = time.time()
+                        store.last_packet_char_count = char_count
+                        changed = True
+                elif ch in ("r", "R"):
+                    store.show_help = False
+                    if store.active_tab != 16:
+                        store.active_tab = 16
+                        changed = True
+                    else:
+                        cur_mode = getattr(store, "ssrn_view_mode", "domains")
+                        store.ssrn_view_mode = "models" if cur_mode == "domains" else "domains"
+                        from analytics.ssrn_research_engine import copy_ssrn_deck_to_clipboard
+                        ok, msg, char_count = copy_ssrn_deck_to_clipboard(store)
                         store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
                         store.last_packet_copied_ts = time.time()
                         store.last_packet_char_count = char_count

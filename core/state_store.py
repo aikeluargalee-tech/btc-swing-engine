@@ -16,6 +16,7 @@ from .models import (
     FootprintEvaluation,
     Gartley5StrategyEvaluation,
     GrokQuantEvaluation,
+    SSRNAlphaEvaluation,
     KlineBar,
     LiquidationDetectorReport,
     MacroRadarEvaluation,
@@ -120,6 +121,8 @@ class StateStore:
         self.macro_intermarket: Any = None
         self.protocol_dossier: Optional[Dict[str, Any]] = None
         self.grok_quant_evaluation: Optional[GrokQuantEvaluation] = None
+        self.ssrn_alpha_evaluation: Optional[SSRNAlphaEvaluation] = None
+        self.ssrn_view_mode: str = "domains"
 
         # --- Connection & System Health ---
         self.warmup_complete: bool = False

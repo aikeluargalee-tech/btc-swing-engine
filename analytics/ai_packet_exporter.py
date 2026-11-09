@@ -246,10 +246,6 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
 
         "   * **SLSP v1.0 Swing Liquidity**: Evaluates 4H/1H Industrial 3-EMA trend regime (`EMA21 > EMA55 > EMA200`), 4H Liquidation Wick Flushes (`>= 45%` lower wick), and climax volume absorption.",
 
-        "13. **Section 14 Audit (`Tab [B] - DEPRECATED & PRUNED`)**:",
-
-        "   * **Deterministic Pattern Recognition**: Audits 4H macro and 1H tactical patterns (Double Bottom/Top, Head & Shoulders, Bull/Bear Flags, Triangles, Pinbars/Engulfing candles), neckline breakouts, and invalidation floors.",
-
         "14. **Section 15 Audit (`Tab [G] Grok Dual-Horizon Flow & 00:00 UTC Anchored VWAP SD Matrix`)**:",
 
         "   * **Grok Dual-Horizon Analysis**: Cross-checks 4A Swing Context (Daily/4H) vs. 4B Day Context (1H/15m), 00:00 UTC Anchored VWAP ±1σ/±2σ bands, CoinGlass crowding, multi-horizon Spot/Perp CVD divergence, overhead short-liquidation magnets vs. downside long traps, and the Engine Bottomline Verdict.",
@@ -1895,15 +1891,6 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             "* **Status**: Engine initializing higher-timeframe swing pivots, 4H rejection candles, and liquidation sensor streams.",
         ])
 
-    # --- SECTION 14: TAB [B] DEPRECATED ---
-    lines.extend([
-        "",
-        "---",
-        "",
-        "## SECTION 14: TAB [B] DEPRECATED (Classical Chart Pattern Detection Removed)",
-        "* **Status**: Pragmatically pruned from engine in favor of quantitative flow, volume profiling, and structural levels.",
-    ])
-
     # --- SECTION 15: TAB [G] GROK DUAL-HORIZON FLOW & VWAP SD MATRIX ---
     grok = getattr(store, "grok_quant_evaluation", None)
     if grok is None:
@@ -2094,22 +2081,7 @@ def copy_ai_packet_to_clipboard_and_disk(config: EngineConfig, store: StateStore
 
             bar_poc_p = store.footprint_engine.active_bar.poc_price or f_ev.current_price
 
-        pat_ev = getattr(store, "pattern_evaluation", None)
-        pat_radar_json = {}
-        if pat_ev is not None and pat_ev.top_pattern is not None:
-            top_p = pat_ev.top_pattern
-            pat_radar_json = {
-                "top_pattern": top_p.pattern,
-                "bias": top_p.bias,
-                "confidence": round(top_p.confidence, 2),
-                "neckline": round(top_p.neckline, 2) if top_p.neckline else None,
-                "floor_or_roof": round(top_p.floor_or_roof, 2) if top_p.floor_or_roof else None,
-                "trigger_status": pat_ev.trigger_status,
-                "tactical_playbook": pat_ev.tactical_playbook,
-                "multi_timeframe_aligned": pat_ev.multi_timeframe_aligned,
-            }
         footprint_metrics = {
-            "pattern_radar": {"status": "DEPRECATED"},
 
             "order_flow": {
 

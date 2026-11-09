@@ -1,7 +1,4 @@
 {
-  "pattern_radar": {
-    "status": "DEPRECATED"
-  },
   "order_flow": {
     "footprint": {
       "active_bar_delta": 10.0,

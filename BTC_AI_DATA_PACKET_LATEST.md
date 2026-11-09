@@ -1,12 +1,12 @@
 # BTC SWING ENGINE | GLOBAL DATA-ONLY TELEMETRY PACKET ([C: AI PACKET])
-**Retrieval Time (UTC):** `2026-11-08 23:45:15 UTC`  |  **Retrieval Time (MYT):** `2026-11-09 07:45:15 MYT (UTC+8)`
+**Retrieval Time (UTC):** `2026-11-09 00:28:41 UTC`  |  **Retrieval Time (MYT):** `2026-11-09 08:28:41 MYT (UTC+8)`
 **Spot Price (BTCUSDT):** `$0.00`
 **Output Specification:** `DATA-ONLY (Raw Measurements, Reference Formulas & True/False Conditions Only — Zero Interpretive Prose)`
 
 ---
 
 # BTC TREND-PULLBACK v1.0 | DATA-ONLY REPORT (RESEARCH / PAPER MODE)
-**STATUS:** `UNVALIDATED`  |  **Retrieval Time (UTC):** `2026-11-08 23:45:15 UTC`  |  **Retrieval Time (MYT):** `2026-11-09 07:45:15 MYT (UTC+8)`
+**STATUS:** `UNVALIDATED`  |  **Retrieval Time (UTC):** `2026-11-09 00:28:41 UTC`  |  **Retrieval Time (MYT):** `2026-11-09 08:28:41 MYT (UTC+8)`
 **Spot Price (BTCUSDT):** `$0.00`
 
 ## 1. DAILY (1D)
@@ -81,8 +81,8 @@
 - **Spot <= Stop Level (`$0.00 <= $0.00`):** `False`
 
 ## 6. DATA INTEGRITY
-- **Data Retrieval Time (UTC):** `2026-11-08 23:45:15 UTC`
-- **Data Retrieval Time (MYT):** `2026-11-09 07:45:15 MYT (UTC+8)`
+- **Data Retrieval Time (UTC):** `2026-11-09 00:28:41 UTC`
+- **Data Retrieval Time (MYT):** `2026-11-09 08:28:41 MYT (UTC+8)`
 - **Data Integrity Pass:** `False`
 - **Completed 1D Candles Available:** `0` | **Last Completed 1D Status:** `UNAVAILABLE` | **Forming 1D Candle Excluded:** `False` (`None`)
 - **Completed 4H Candles Available:** `0` | **Last Completed 4H Status:** `UNAVAILABLE` | **Forming 4H Candle Excluded:** `False` (`None`)
@@ -90,13 +90,13 @@
 ---
 
 # TAB [M: MAGNET] | DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-08 23:45:15 UTC`  |  **Retrieval Time (MYT):** `2026-11-09 07:45:15 MYT (UTC+8)`
+**Retrieval Time (UTC):** `2026-11-09 00:28:41 UTC`  |  **Retrieval Time (MYT):** `2026-11-09 08:28:41 MYT (UTC+8)`
 **Spot Price (BTCUSDT):** `$76,000.00` (`24H Change: +0.00%`)
 
 ## 1. LIQUIDATION GRAVITATIONAL HORIZON
-- **Upper Liquidation Cluster (Short Liquidations):** `$77,024.20` (`+1.35%` / `$+1,024.20` from Spot) | Volume: `$234.70M`
+- **Upper Liquidation Cluster (Short Liquidations):** `$77,024.20` (`+1.35%` / `$+1,024.20` from Spot) | Volume: `$233.23M`
 - **Center Spot Price:** `$76,000.00`
-- **Lower Liquidation Cluster (Long Liquidations):** `$73,196.32` (`-3.69%` / `$-2,803.68` from Spot) | Volume: `$438.03M`
+- **Lower Liquidation Cluster (Long Liquidations):** `$73,196.32` (`-3.69%` / `$-2,803.68` from Spot) | Volume: `$435.36M`
 - **Upper-to-Lower Cluster Weight Ratio:** `0.54x` (`Higher Weight Side`: `UPPER`)
 
 ## 2. DERIVATIVES & VOLATILITY INPUTS
@@ -105,7 +105,7 @@
 - **24H Classification Label:** `Range`
 
 ## 3. 7 INTERNAL CONDITION BOOLEANS (TRUE/FALSE)
-- **Rule 1 (`Clear Magnet Present`):** `True` (`Magnet ABOVE: $77,024 (+1.3%, $235M)`)
+- **Rule 1 (`Clear Magnet Present`):** `True` (`Magnet ABOVE: $77,024 (+1.3%, $233M)`)
 - **Rule 2 (`Open-Interest Confirmation`):** `True` (`OI velocity supportive (+0.8% 4h delta)`)
 - **Rule 3 (`Funding Non-Contradictory`):** `True` (`Borrow rate calm (+0.0%/yr carry)`)
 - **Rule 4 (`Regime Conduciveness`):** `True` (`Market in Range mode (conducive to magnet sweep)`)
@@ -117,7 +117,7 @@
 ---
 
 # TAB [G: GROK FLOW] | DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-08 23:45:15 UTC`  |  **Retrieval Time (MYT):** `2026-11-09 07:45:15 MYT (UTC+8)`
+**Retrieval Time (UTC):** `2026-11-09 00:28:42 UTC`  |  **Retrieval Time (MYT):** `2026-11-09 08:28:42 MYT (UTC+8)`
 **Spot Price (BTCUSDT):** `$0.00`
 
 ## 1. 00:00 UTC ANCHORED VWAP & STANDARD DEVIATION BANDS
@@ -155,7 +155,7 @@
 ---
 
 # TAB [R: SSRN RESEARCH] | DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-08 23:45:15 UTC`  |  **Retrieval Time (MYT):** `2026-11-09 07:45:15 MYT (UTC+8)`
+**Retrieval Time (UTC):** `2026-11-09 00:28:42 UTC`  |  **Retrieval Time (MYT):** `2026-11-09 08:28:42 MYT (UTC+8)`
 **Spot Price (BTCUSDT):** `$0.00`
 
 ## 1. EMPIRICAL FACTOR & GATE METRICS
@@ -191,7 +191,7 @@
 ---
 
 # TAB [P: STRUCTURE] | DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-08 23:45:15 UTC`  |  **Retrieval Time (MYT):** `2026-11-09 07:45:15 MYT (UTC+8)`
+**Retrieval Time (UTC):** `2026-11-09 00:28:42 UTC`  |  **Retrieval Time (MYT):** `2026-11-09 08:28:42 MYT (UTC+8)`
 **Spot Price (BTCUSDT):** `$0.00`
 
 ## 1. DAILY SWING STRUCTURE & KEY SHELVES (SLSP v1.0)
@@ -200,7 +200,7 @@
 ---
 
 # TAB [F: FOOTPRINT] | DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-08 23:45:15 UTC`  |  **Retrieval Time (MYT):** `2026-11-09 07:45:15 MYT (UTC+8)`
+**Retrieval Time (UTC):** `2026-11-09 00:28:42 UTC`  |  **Retrieval Time (MYT):** `2026-11-09 08:28:42 MYT (UTC+8)`
 **Spot Price (BTCUSDT):** `$0.00`
 
 ## 1. 15-MINUTE INTRA-CANDLE FOOTPRINT METRICS
@@ -226,7 +226,7 @@
 ---
 
 # TAB [W: WATERFALL] | DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-08 23:45:15 UTC`  |  **Retrieval Time (MYT):** `2026-11-09 07:45:15 MYT (UTC+8)`
+**Retrieval Time (UTC):** `2026-11-09 00:28:42 UTC`  |  **Retrieval Time (MYT):** `2026-11-09 08:28:42 MYT (UTC+8)`
 **Spot Price (BTCUSDT):** `$0.00`
 
 ## 1. 5-PILLAR CONDITION BOOLEANS & RAW INPUTS
@@ -240,7 +240,7 @@
 ---
 
 # TAB [0: SPOT SWING] | DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-08 23:45:15 UTC`  |  **Retrieval Time (MYT):** `2026-11-09 07:45:15 MYT (UTC+8)`
+**Retrieval Time (UTC):** `2026-11-09 00:28:42 UTC`  |  **Retrieval Time (MYT):** `2026-11-09 08:28:42 MYT (UTC+8)`
 **Spot Price (BTCUSDT):** `$0.00`
 
 ## 1. SPOT SWING SCREENER METRICS & GATE BOOLEANS
@@ -249,7 +249,7 @@
 ---
 
 # TAB [L: MASTER] | 8-FLAGSHIP DESK DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-08 23:45:15 UTC`  |  **Retrieval Time (MYT):** `2026-11-09 07:45:15 MYT (UTC+8)`
+**Retrieval Time (UTC):** `2026-11-09 00:28:42 UTC`  |  **Retrieval Time (MYT):** `2026-11-09 08:28:42 MYT (UTC+8)`
 **Spot Price (BTCUSDT):** `$0.00`
 **Desk Purpose & Scope:** `Single-screen 8-Flagship-Desk Telemetry Matrix (P, G, R, M, A, F, W, 0) & 4-Domain Readiness Overview. Keeps each strategy's reference entry, stop, and sizing calculations strictly unblended.`
 

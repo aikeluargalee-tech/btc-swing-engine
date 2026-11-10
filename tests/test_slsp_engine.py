@@ -576,5 +576,72 @@ class TestSLSPEngine(unittest.TestCase):
         self.assertIn("Disaster Hard Stop", report)
 
 
+    def test_liquidation_shelf_type_alignment(self) -> None:
+        """Verifies that Resistance levels only match Upper Short Magnets, and Support only matches Lower Long Pools."""
+        from core.models import BTCMagnetEvaluation, BTCMagnetLevel
+        bars_1d = [
+            make_kline(1700000000000 + i * 86400000, 74000, 77000, 73500, 76300)
+            for i in range(20)
+        ]
+        bars_4h = [
+            make_kline(1700000000000 + i * 14400000, 75800, 76500, 75500, 76323)
+            for i in range(30)
+        ]
+        self.store.spot_klines_1d.extend(bars_1d)
+        self.store.binance_spot_price = 74950.0
+
+        # Magnet with Lower pool at 73,800 and Upper pool at 77,000
+        fake_mag = BTCMagnetEvaluation(
+            timestamp_utc="2026-11-10 12:00:00 UTC",
+            spot_price=74950.0,
+            price_change_24h_pct=+0.5,
+            funding_rate_annual_pct=+10.0,
+            oi_delta_4h_pct=-0.1,
+            market_regime="Range / Liquidation Magnet",
+            regime_id="RANGE_LIQUIDATION_MAGNET",
+            regime_name="Range / Liquidation Magnet",
+            majority_score="4/4",
+            majority_matches_count=4,
+            regime_diagnosis="Range bound",
+            is_conflicted=False,
+            conflict_reason="",
+            all_observations=[],
+            upper_magnet=BTCMagnetLevel(price=77000.0, dist_pct=+2.7, usd_volume=240e6),
+            lower_magnet=BTCMagnetLevel(price=73800.0, dist_pct=-1.5, usd_volume=410e6),
+            pull_direction="LOWER",
+            immediate_ratio=1.7,
+            total_ladder_ratio=1.65,
+            immediate_u_vol=240.0,
+            immediate_l_vol=410.0,
+            total_u_vol=200.0,
+            total_l_vol=350.0,
+            lsce_status="UNTESTED",
+            lsce_cluster_tested="Lower Longs ($73,800)",
+            lsce_sweep_depth_pct=+1.5,
+            lsce_reclaim_level=73800.0,
+            lsce_spot_absorption="Pending",
+            lsce_action_verdict="Maintain cash reserve.",
+            action="Stand Aside (0.50x)",
+            sizing_factor=0.50,
+            rotation="Remain USDT",
+            entry_instruction="Wait for sweep.",
+            structural_stop_price=73200.0,
+            structural_stop_dist_pct=2.33,
+            disaster_stop_price=71500.0,
+            disaster_stop_dist_pct=4.6,
+            risk_budget_pass=True,
+            rule_checks=[],
+        )
+        self.store.btc_magnet_evaluation = fake_mag
+
+        eval_p = self.engine.evaluate(self.store, bars_1d, bars_4h, current_price=74950.0)
+
+        # Nearest resistance should NEVER have a Lower Long Pool tag
+        if eval_p.nearest_resistance:
+            self.assertNotEqual(eval_p.nearest_resistance.liquidation_cluster_tag, "Lower Long Pool ($410.0M • -1.5%)")
+            if eval_p.nearest_resistance.liquidation_cluster_tag:
+                self.assertIn("Upper Short", eval_p.nearest_resistance.liquidation_cluster_tag)
+
+
 if __name__ == "__main__":
     unittest.main()

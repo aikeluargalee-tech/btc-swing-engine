@@ -420,15 +420,22 @@ class SLSPEngine:
         regime, reg_reason, last_sh, last_sl = self.detect_daily_regime(spot_1d, current_price)
         all_levels = self.detect_key_levels(spot_1d, current_price, active_vp)
 
-        # Cross-reference Key Shelves with Liquidation Clusters
+        # Cross-reference Key Shelves with Liquidation Clusters (Type-Aligned)
         for lv in all_levels:
-            if l_mag_p > 0 and abs(lv.center_price - l_mag_p) / max(current_price, 1.0) <= 0.025:
-                lv.liquidation_volume_usd = l_mag_vol
-                lv.liquidation_cluster_tag = f"Lower Long Pool (${l_mag_vol/1e6:.1f}M • {l_mag_dist:+.1f}%)"
-                lv.strength = min(5, lv.strength + 1)
-            elif u_mag_p > 0 and abs(lv.center_price - u_mag_p) / max(current_price, 1.0) <= 0.025:
-                lv.liquidation_volume_usd = u_mag_vol
-                lv.liquidation_cluster_tag = f"Upper Short Magnet (${u_mag_vol/1e6:.1f}M • {u_mag_dist:+.1f}%)" 
+            if lv.level_type == "SUPPORT" and l_mag_p > 0:
+                in_band = (lv.price_min <= l_mag_p <= lv.price_max)
+                near_center = (abs(lv.center_price - l_mag_p) / l_mag_p <= 0.015)
+                if in_band or near_center:
+                    lv.liquidation_volume_usd = l_mag_vol
+                    lv.liquidation_cluster_tag = f"Lower Long Pool (${l_mag_vol/1e6:.1f}M • {l_mag_dist:+.1f}%)"
+                    lv.strength = min(5, lv.strength + 1)
+            elif lv.level_type == "RESISTANCE" and u_mag_p > 0:
+                in_band = (lv.price_min <= u_mag_p <= lv.price_max)
+                near_center = (abs(lv.center_price - u_mag_p) / u_mag_p <= 0.015)
+                if in_band or near_center:
+                    lv.liquidation_volume_usd = u_mag_vol
+                    lv.liquidation_cluster_tag = f"Upper Short Magnet (${u_mag_vol/1e6:.1f}M • {u_mag_dist:+.1f}%)"
+                    lv.strength = min(5, lv.strength + 1)
         supports = [lv for lv in all_levels if lv.level_type == "SUPPORT"]
         resistances = [lv for lv in all_levels if lv.level_type == "RESISTANCE"]
 

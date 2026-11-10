@@ -5356,7 +5356,7 @@ def _build_tab17_btc_magnet_hud(
     store: StateStore,
     header_panel: Panel,
 ) -> Group:
-    """Builds Desk 17 [M: BTC MAGNET] - Mechanics-First Liquidation Gravity & Edge Detector."""
+    """Builds Desk 17 [M: BTC MAGNET] - Institutional 5-Regime Radar & LSCE Liquidation Gravity Deck."""
     magnet_eval = store.btc_magnet_evaluation
     if magnet_eval is None:
         from analytics.btc_magnet_engine import BTCMagnetEngine
@@ -5372,13 +5372,84 @@ def _build_tab17_btc_magnet_hud(
     sub_grid.add_column(justify="left", no_wrap=True)
     sub_grid.add_column(justify="right", no_wrap=True)
     sub_grid.add_row(
-        "[bold bright_cyan]DESK [M]: BTC MAGNET | LIQUIDATION GRAVITY DECK[/bold bright_cyan]  |  "
-        "[bold bright_white]MECHANICS-FIRST SWING INTELLIGENCE (DEFAULTS TO WAIT)[/bold bright_white]",
-        "[dim]Press [bold cyan]'M'[/bold cyan] (or [bold cyan]'MM'[/bold cyan]) to copy Shareable Magnet Card brief[/dim]",
+        "[bold bright_cyan]DESK [M]: BTC MAGNET | LIQUIDATION GRAVITATIONAL RADAR[/bold bright_cyan]  |  "
+        "[bold bright_white]5-REGIME RADAR • LSCE SWEEP ENGINE • SPOT SWING COCKPIT[/bold bright_white]",
+        "[dim]Press [bold cyan]'M'[/bold cyan] (or [bold cyan]'MM'[/bold cyan]) to copy Shareable Magnet Brief[/dim]",
     )
     sub_panel = Panel(sub_grid, box=box.ROUNDED, border_style="bright_cyan", padding=(0, 1))
 
-    # 2. Liquidation Gravitational Horizon Box (3-Column Strip)
+    # 2. STEP 1 • MACRO REGIME DIAGNOSIS (MAJORITY VOTING >= 3/4)
+    reg_id = getattr(magnet_eval, "regime_id", "RANGE_LIQUIDATION_MAGNET")
+    reg_name = getattr(magnet_eval, "regime_name", "Range / Liquidation Magnet")
+    score_str = getattr(magnet_eval, "majority_score", "3/4")
+    diag_str = getattr(magnet_eval, "regime_diagnosis", "Positioning imbalance and forced liquidations dominate")
+    action_str = getattr(magnet_eval, "action", "Stand Aside (0.0x)")
+    rotation_str = getattr(magnet_eval, "rotation", "Remain USDT")
+    sizing = getattr(magnet_eval, "sizing_factor", 0.0)
+
+    regime_color = "bright_cyan"
+    if reg_id == "SPOT_LED_EXPANSION":
+        regime_color = "bright_green"
+    elif reg_id in ("CASCADE_FORCED_DELEVERAGING", "DISTRIBUTION_BEAR_CONTINUATION"):
+        regime_color = "bright_red"
+    elif reg_id == "LEVERAGED_FRAGILE_UPSIDE":
+        regime_color = "bright_yellow"
+    elif reg_id == "TRANSITION_MIXED":
+        regime_color = "bright_magenta"
+
+    step1_table = Table.grid(expand=True)
+    step1_table.add_column()
+
+    header_line = (
+        f"[bold bright_white]STEP 1 • MACRO REGIME DIAGNOSIS:[/bold bright_white]  "
+        f"[bold black on {regime_color}] {reg_name.upper()} [/bold black on {regime_color}]  "
+        f"[bold bright_white][ {score_str} OBSERVATIONS CONFIRMED ][/bold bright_white]  |  "
+        f"[dim]Sizing:[/dim] [bold {regime_color}]{sizing:.2f}x[/bold {regime_color}]  "
+        f"[dim]Rotation:[/dim] [bold white]{rotation_str}[/bold white]"
+    )
+    step1_table.add_row(header_line)
+    step1_table.add_row(f"[dim]Diagnosis:[/dim] [bold bright_white]{diag_str}[/bold bright_white]")
+
+    if getattr(magnet_eval, "is_conflicted", False):
+        step1_table.add_row(
+            f"[bold white on red] CONFLICTED SIGNALS DEMOTED TO MIXED [/bold white on red] "
+            f"[yellow]{getattr(magnet_eval, 'conflict_reason', '')}[/yellow]"
+        )
+
+    # Observations Checklist Grid
+    obs_grid = Table.grid(expand=True)
+    obs_grid.add_column(ratio=6)
+    obs_grid.add_column(ratio=6)
+
+    all_obs = getattr(magnet_eval, "all_observations", [])
+    if all_obs:
+        rows_to_render = []
+        for obs_txt, passed in all_obs:
+            mark = "[bold black on bright_green] [✓] PASS [/bold black on bright_green]" if passed else "[bold white on red] [✗] FAIL [/bold white on red]"
+            rows_to_render.append(f"{mark} [white]{obs_txt}[/white]")
+
+        for i in range(0, len(rows_to_render), 2):
+            col1 = rows_to_render[i]
+            col2 = rows_to_render[i+1] if i+1 < len(rows_to_render) else ""
+            obs_grid.add_row(col1, col2)
+    else:
+        obs_grid.add_row("[dim]Evaluating on-exchange positioning metrics...[/dim]", "")
+
+    step1_table.add_row(obs_grid)
+    step1_table.add_row(
+        f"[dim]Execution Directives:[/dim] [bold cyan]{action_str}[/bold cyan]  •  "
+        f"[dim]Entry:[/dim] [white]{getattr(magnet_eval, 'entry_instruction', 'Await confirmed signal')}[/white]"
+    )
+
+    step1_panel = Panel(
+        step1_table,
+        title=f"[bold bright_white]STEP 1 • 5-REGIME RADAR FRAMEWORK (MAJORITY VOTING >= 3/4)[/bold bright_white]",
+        box=box.ROUNDED,
+        border_style=regime_color,
+        padding=(0, 1),
+    )
+
+    # 3. STEP 2 • LIQUIDATION GRAVITATIONAL HORIZON & DUAL-LADDER DEPTH
     horizon_table = Table(box=box.ROUNDED, expand=True, show_header=True, header_style="bold bright_white", pad_edge=False)
     horizon_table.add_column("▲ UPPER MAGNET (SHORT LIQUIDATIONS)", justify="center", ratio=3)
     horizon_table.add_column("◆ SPOT HORIZON (CENTER ZERO)", justify="center", ratio=4)
@@ -5390,21 +5461,21 @@ def _build_tab17_btc_magnet_hud(
     col_up = (
         f"[bold bright_cyan]${up.price:,.0f}[/bold bright_cyan]  "
         f"[cyan]({up.dist_pct:+.1f}% / +${up_dist_usd:,.0f})[/cyan]\n"
-        f"[dim]Density: ${up.usd_volume/1e6:,.1f}M Cluster (Binance/Exchanges)[/dim]"
+        f"[dim]Density: ${up.usd_volume/1e6:,.1f}M Cluster[/dim]"
     )
 
     pull_color = "bright_cyan" if magnet_eval.pull_direction == "UPPER" else ("bright_yellow" if magnet_eval.pull_direction == "LOWER" else "white")
     col_center = (
         f"[bold bright_white]SPOT: ${spot_p:,.2f}[/bold bright_white]  "
         f"[{'green' if magnet_eval.price_change_24h_pct >= 0 else 'red'}]({magnet_eval.price_change_24h_pct:+.2f}% 24h)[/{'green' if magnet_eval.price_change_24h_pct >= 0 else 'red'}]\n"
-        f"[bold {pull_color}]PULL DIRECTION: {magnet_eval.pull_direction} MAGNET ({magnet_eval.pull_ratio:.2f}x RATIO)[/bold {pull_color}]\n"
-        f"[dim]24h Range: ${magnet_eval.low_24h:,.0f} - ${magnet_eval.high_24h:,.0f} • Perp Funding: {magnet_eval.funding_rate_annual_pct:+.1f}%/yr • 4h OI: {magnet_eval.oi_delta_4h_pct:+.1f}% • Regime: {magnet_eval.market_regime}[/dim]"
+        f"[bold {pull_color}]PULL: {magnet_eval.pull_direction} MAGNET[/bold {pull_color}]\n"
+        f"[dim]Immediate (100x): {getattr(magnet_eval, 'immediate_ratio', 1.0):.1f}x Skew • Total Ladder (10x-100x): {getattr(magnet_eval, 'total_ladder_ratio', 1.0):.2f}x Skew[/dim]"
     )
 
     col_lo = (
         f"[bold bright_yellow]${lo.price:,.0f}[/bold bright_yellow]  "
         f"[yellow]({lo.dist_pct:+.1f}% / -${lo_dist_usd:,.0f})[/yellow]\n"
-        f"[dim]Density: ${lo.usd_volume/1e6:,.1f}M Cluster (Binance/Exchanges)[/dim]"
+        f"[dim]Density: ${lo.usd_volume/1e6:,.1f}M Cluster[/dim]"
     )
 
     horizon_table.add_row(col_up, col_center, col_lo)
@@ -5424,41 +5495,83 @@ def _build_tab17_btc_magnet_hud(
     else:
         grav_gauge = "[bold white]── BALANCED HORIZON (EQUILIBRIUM) ──[/bold white]"
     horizon_table.add_row(up_bar, grav_gauge, lo_bar)
-    horizon_panel = Panel(
+
+    step2_panel = Panel(
         horizon_table,
-        title="[bold bright_white]LIQUIDATION GRAVITATIONAL HORIZON[/bold bright_white]",
+        title="[bold bright_white]STEP 2 • LIQUIDATION GRAVITATIONAL HORIZON & DUAL-LADDER DEPTH[/bold bright_white]",
         box=box.ROUNDED,
         border_style="bright_cyan",
         padding=(0, 1),
     )
 
-    # 3. Status Report Card (Locked Templates from docs/status-templates.md)
+    # 4. STEP 3 • LIQUIDATION SWEEP CONFIRMATION ENGINE (LSCE)
+    lsce_status = getattr(magnet_eval, "lsce_status", "UNTESTED")
+    lsce_color = "bright_cyan"
+    if lsce_status == "SWEEP_AND_RECLAIM_CONFIRMED":
+        lsce_color = "bright_green"
+    elif lsce_status == "SWEEP_IN_PROGRESS":
+        lsce_color = "bright_yellow"
+    elif lsce_status == "SWEEP_FAILED_BREAKDOWN":
+        lsce_color = "bright_red"
+
+    lsce_grid = Table.grid(expand=True)
+    lsce_grid.add_column()
+    lsce_grid.add_row(
+        f"[bold bright_white]LSCE EXECUTION STATE:[/bold bright_white]  "
+        f"[bold black on {lsce_color}] {lsce_status} [/bold black on {lsce_color}]  |  "
+        f"[dim]Tested Cluster:[/dim] [bold white]{getattr(magnet_eval, 'lsce_cluster_tested', 'N/A')}[/bold white]  |  "
+        f"[dim]Sweep Depth:[/dim] [bold {lsce_color}]{getattr(magnet_eval, 'lsce_sweep_depth_pct', 0.0):+.2f}%[/bold {lsce_color}]  |  "
+        f"[dim]Reclaim Level:[/dim] [bold bright_white]${getattr(magnet_eval, 'lsce_reclaim_level', 0.0):,.2f}[/bold bright_white]  |  "
+        f"[dim]Absorption:[/dim] [bold white]{getattr(magnet_eval, 'lsce_spot_absorption', 'Neutral')}[/bold white]"
+    )
+    lsce_grid.add_row(
+        f"[bold cyan]SWEEP DIRECTIVE:[/bold cyan] [white]{getattr(magnet_eval, 'lsce_action_verdict', '')}[/white]"
+    )
+
+    step3_panel = Panel(
+        lsce_grid,
+        title="[bold bright_white]STEP 3 • LIQUIDATION SWEEP CONFIRMATION ENGINE (LSCE)[/bold bright_white]",
+        box=box.ROUNDED,
+        border_style=lsce_color,
+        padding=(0, 1),
+    )
+
+    # 5. STEP 4 • CAPITAL SIZING, INVIOLABLE STOPS & 7-RULE AUDIT
+    risk_grid = Table.grid(expand=True)
+    risk_grid.add_column()
+
+    s_stop = getattr(magnet_eval, "structural_stop_price", 0.0)
+    s_dist = getattr(magnet_eval, "structural_stop_dist_pct", 0.0)
+    d_stop = getattr(magnet_eval, "disaster_stop_price", 0.0)
+    d_dist = getattr(magnet_eval, "disaster_stop_dist_pct", 0.0)
+    budget_pass = getattr(magnet_eval, "risk_budget_pass", True)
+
+    budget_badge = "[bold black on green] [OK] PASS (<= 4.5%) [/bold black on green]" if budget_pass else "[bold white on red] [X] FAIL (> 4.5%) [/bold white on red]"
+
+    risk_grid.add_row(
+        f"[bold bright_white]INVIOLABLE STOPS & RISK BUDGET:[/bold bright_white]  "
+        f"[dim]Structural Stop (1H Close):[/dim] [bold bright_white]${s_stop:,.2f} (-{s_dist:.2f}%)[/bold bright_white]  |  "
+        f"[dim]Disaster Hard Stop (200 SMA & 25x):[/dim] [bold bright_yellow]${d_stop:,.2f} (-{d_dist:.2f}%)[/bold bright_yellow]  |  "
+        f"[dim]Risk Budget Compliance:[/dim] {budget_badge}"
+    )
+
+    # Status Report Card (Locked Templates from docs/status-templates.md)
     is_edge = magnet_eval.verdict == "SPEAK"
     verdict_badge = "[bold black on bright_cyan] SWING EDGE PRESENT [/bold black on bright_cyan]" if is_edge else "[bold black on bright_yellow] NO CLEAR EDGE - WAIT [/bold black on bright_yellow]"
     verdict_border = "bright_cyan" if is_edge else "bright_yellow"
 
-    status_grid = Table.grid(expand=True)
-    status_grid.add_column()
-    status_grid.add_row(
+    risk_grid.add_row(
         f"[bold bright_white]>_ MECHANICAL STATUS VERDICT:[/bold bright_white] {verdict_badge}  |  "
         f"[bold bright_white]{magnet_eval.headline}[/bold bright_white]"
     )
-    status_grid.add_row(
+    risk_grid.add_row(
         f"[bold bright_cyan]EXPLANATION READOUT:[/bold bright_cyan] [white]{magnet_eval.body}[/white]"
     )
-    status_grid.add_row(
+    risk_grid.add_row(
         f"[dim]Rule Reference: {magnet_eval.rule_subtitle}[/dim]"
     )
 
-    status_panel = Panel(
-        status_grid,
-        title="[bold bright_white]>_ STATUS REPORT (ONE-QUESTION READOUT)[/bold bright_white]",
-        box=box.ROUNDED,
-        border_style=verdict_border,
-        padding=(0, 1),
-    )
-
-    # 4. 7 Internal Speaking Rules Audit Table
+    # 7 Internal Speaking Rules Mini-Table
     rules_table = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold cyan", pad_edge=False)
     rules_table.add_column("RULE # & FILTER NAME", justify="left", ratio=3)
     rules_table.add_column("LOCKED SPECIFICATION REQUIREMENT", justify="left", ratio=4)
@@ -5485,15 +5598,15 @@ def _build_tab17_btc_magnet_hud(
             status_str,
         )
 
-    rules_panel = Panel(
-        rules_table,
-        title="[bold bright_white]7 INTERNAL SPEAKING RULES AUDIT CHECKLIST[/bold bright_white]",
+    risk_panel = Panel(
+        Group(risk_grid, rules_table),
+        title="[bold bright_white]STEP 4 • CAPITAL SIZING, INVIOLABLE RISK & 7-RULE CHECKLIST[/bold bright_white]",
         box=box.ROUNDED,
-        border_style="bright_blue",
+        border_style=verdict_border,
         padding=(0, 1),
     )
 
-    # 5. Bottom Clipboard & Sharing Panel
+    # 6. Bottom Clipboard & Sharing Panel
     last_copy_str = ""
     if getattr(store, "last_packet_copied_utc", ""):
         last_copy_str = f"  |  [bold green]Last Brief Copied: {store.last_packet_copied_utc} ({getattr(store, 'last_packet_char_count', 0):,} chars)[/bold green]"
@@ -5503,12 +5616,12 @@ def _build_tab17_btc_magnet_hud(
     bottom_grid.add_column(justify="right", no_wrap=True)
     bottom_grid.add_row(
         "[bold black on bright_cyan] [KEY M / MM] BTC MAGNET CLIPBOARD [/bold black on bright_cyan]  "
-        "[bright_white]Tap [bold cyan]'M'[/bold cyan] to switch to Desk [M] | Tap [bold cyan]'M'[/bold cyan] again (or [bold cyan]'MM'[/bold cyan]) to copy Shareable Magnet Card brief![/bright_white]" + last_copy_str,
-        "[dim]BTC Magnet Engine | btc-magnet.netlify.app[/dim]",
+        "[bright_white]Tap [bold cyan]'M'[/bold cyan] to switch to Desk [M] | Tap [bold cyan]'M'[/bold cyan] again (or [bold cyan]'MM'[/bold cyan]) to copy Shareable Magnet Brief![/bright_white]" + last_copy_str,
+        "[dim]BTC Magnet Monitor | aikeluargalee-tech.github.io/btc-magnet-monitor[/dim]",
     )
     bottom_panel = Panel(bottom_grid, box=box.ROUNDED, border_style="bright_cyan", padding=(0, 1))
 
-    return Group(header_panel, sub_panel, horizon_panel, status_panel, rules_panel, bottom_panel)
+    return Group(header_panel, sub_panel, step1_panel, step2_panel, step3_panel, risk_panel, bottom_panel)
 
 
 def _build_tab18_trend_pullback_hud(

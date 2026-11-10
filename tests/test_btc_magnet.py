@@ -159,6 +159,56 @@ class TestBTCMagnetEngine(unittest.TestCase):
         self.assertIn("### 17A. Liquidation Gravitational Horizon", packet)
         self.assertIn("### 17B. 7 Internal Speaking Rules Audit", packet)
 
+    def test_5_regime_radar_majority_voting(self) -> None:
+        """Verify 5-Regime Radar majority voting engine (>= 3 of 4 matches)."""
+        res = self.engine.evaluate(self.store)
+        self.assertIn(res.regime_id, (
+            "SPOT_LED_EXPANSION",
+            "LEVERAGED_FRAGILE_UPSIDE",
+            "RANGE_LIQUIDATION_MAGNET",
+            "CASCADE_FORCED_DELEVERAGING",
+            "DISTRIBUTION_BEAR_CONTINUATION",
+            "TRANSITION_MIXED",
+        ))
+        self.assertTrue(len(res.majority_score) > 0)
+        self.assertGreaterEqual(res.majority_matches_count, 1)
+        self.assertTrue(len(res.all_observations) >= 4)
+        for obs_desc, obs_pass in res.all_observations:
+            self.assertIsInstance(obs_desc, str)
+            self.assertIsInstance(obs_pass, bool)
+
+    def test_lsce_state_machine(self) -> None:
+        """Verify Liquidation Sweep Confirmation Engine (LSCE) 4-state engine."""
+        res = self.engine.evaluate(self.store)
+        self.assertIn(res.lsce_status, (
+            "UNTESTED",
+            "SWEEP_IN_PROGRESS",
+            "SWEEP_FAILED_BREAKDOWN",
+            "SWEEP_AND_RECLAIM_CONFIRMED",
+        ))
+        self.assertGreater(res.lsce_reclaim_level, 0.0)
+        self.assertIsNotNone(res.lsce_action_verdict)
+
+    def test_dual_ladder_and_six_factors(self) -> None:
+        """Verify immediate vs total ladder ratios and 6-factor decision hierarchy."""
+        res = self.engine.evaluate(self.store)
+        self.assertGreater(res.immediate_ratio, 0.0)
+        self.assertGreater(res.total_ladder_ratio, 0.0)
+        self.assertEqual(len(res.six_factors), 6)
+        self.assertIn("factor_1_size", res.six_factors)
+        self.assertIn("factor_6_atr_volatility", res.six_factors)
+
+    def test_dual_inviolable_stops_and_sizing(self) -> None:
+        """Verify structural stop and disaster hard stop below 200 SMA & 25x shelf."""
+        res = self.engine.evaluate(self.store)
+        self.assertGreater(res.structural_stop_price, 0.0)
+        self.assertGreater(res.disaster_stop_price, 0.0)
+        self.assertLess(res.disaster_stop_price, res.spot_price)
+        self.assertLessEqual(res.disaster_stop_price, res.structural_stop_price)
+        self.assertIn(res.rotation, ("USDT -> BTC", "BTC -> USDT", "Remain USDT"))
+        self.assertGreaterEqual(res.sizing_factor, 0.0)
+        self.assertLessEqual(res.sizing_factor, 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

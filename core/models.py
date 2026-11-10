@@ -14,7 +14,7 @@ from enum import Enum
 
 
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
 
@@ -4927,6 +4927,47 @@ class BTCMagnetEvaluation:
     rules_passed_count: int = 0
     rule_checks: List[BTCMagnetRuleCheck] = field(default_factory=list)
     magnet_summary_markdown: str = ""
+
+    # 5-Regime Radar Framework (Majority Voting >= 3 of 4)
+    regime_id: str = "RANGE_LIQUIDATION_MAGNET"
+    regime_name: str = "Range / Liquidation Magnet"
+    regime_diagnosis: str = "Positioning imbalance and forced liquidations dominate"
+    majority_score: str = "3/4"
+    majority_matches_count: int = 3
+    matched_observations: List[str] = field(default_factory=list)
+    all_observations: List[Tuple[str, bool]] = field(default_factory=list)
+    is_conflicted: bool = False
+    conflict_reason: str = ""
+
+    # Liquidation Sweep Confirmation Engine (LSCE)
+    lsce_status: str = "UNTESTED"  # UNTESTED, SWEEP_IN_PROGRESS, SWEEP_FAILED_BREAKDOWN, SWEEP_AND_RECLAIM_CONFIRMED
+    lsce_cluster_tested: str = "N/A"
+    lsce_sweep_depth_pct: float = 0.0
+    lsce_reclaim_level: float = 0.0
+    lsce_spot_absorption: str = "Neutral"
+    lsce_action_verdict: str = "Wait for sweep confirmation"
+
+    # Multi-Tier Depth Ladder & Dual Imbalance Accounting
+    immediate_ratio: float = 1.0
+    immediate_l_vol: float = 0.0
+    immediate_u_vol: float = 0.0
+    total_ladder_ratio: float = 1.0
+    total_l_vol: float = 0.0
+    total_u_vol: float = 0.0
+    six_factors: Dict[str, str] = field(default_factory=dict)
+    levels_ladder: Dict[str, Any] = field(default_factory=dict)
+
+    # Inviolable Capital Sizing & Risk Management
+    sizing_factor: float = 0.0  # 0.0x to 1.0x deployable cash
+    action: str = "Wait / Stand Aside (0.0x)"
+    rotation: str = "Remain USDT"
+    entry_instruction: str = ""
+    stop_rule: str = ""
+    structural_stop_price: float = 0.0
+    structural_stop_dist_pct: float = 0.0
+    disaster_stop_price: float = 0.0
+    disaster_stop_dist_pct: float = 0.0
+    risk_budget_pass: bool = True
 
 
 @dataclass

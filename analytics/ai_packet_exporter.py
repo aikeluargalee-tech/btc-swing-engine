@@ -1954,7 +1954,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             )
 
 
-    # --- SECTION 17: TAB [M] BTC MAGNET · LIQUIDATION GRAVITY & SWING EDGE DETECTOR ---
+    # --- SECTION 17: TAB [M] BTC MAGNET — LIQUIDATION GRAVITY & SWING EDGE DETECTOR ---
     magnet = getattr(store, "btc_magnet_evaluation", None)
     if magnet is None:
         try:
@@ -1968,18 +1968,24 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             "",
             "---",
             "",
-            "## SECTION 17: TAB [M] BTC MAGNET · LIQUIDATION GRAVITY & SWING EDGE DETECTOR",
+            "## SECTION 17: TAB [M] BTC MAGNET — LIQUIDATION GRAVITY & SWING EDGE DETECTOR",
             "",
             f"* **Mechanical Status Verdict**: `[{magnet.verdict_badge}]`",
             f"* **Status Headline**: {magnet.headline}",
             f"* **Explanation Readout**: {magnet.body}",
             f"* **Rule Subtitle**: *{magnet.rule_subtitle}*",
             "",
+            f"* **5-Regime Radar**: `{getattr(magnet, 'regime_name', 'Range / Liquidation Magnet')}` (`{getattr(magnet, 'majority_score', '3/4')}` confirmed)",
+            f"* **Regime Diagnosis**: {getattr(magnet, 'regime_diagnosis', '')}",
+            f"* **Recommended Sizing**: `{getattr(magnet, 'sizing_factor', 0.0):.2f}x` ({getattr(magnet, 'action', '')}) | Rotation: `{getattr(magnet, 'rotation', 'Remain USDT')}`",
+            f"* **LSCE Sweep State**: `[{getattr(magnet, 'lsce_status', 'UNTESTED')}]` — {getattr(magnet, 'lsce_action_verdict', '')}",
+            f"* **Dual Stops**: Structural `${getattr(magnet, 'structural_stop_price', 0.0):,.2f}` | Disaster Hard Stop `${getattr(magnet, 'disaster_stop_price', 0.0):,.2f}` (-{getattr(magnet, 'disaster_stop_dist_pct', 0.0):.2f}%)",
+            "",
             "### 17A. Liquidation Gravitational Horizon",
             f"* **Upper Magnet (Short Liquidations)**: `${magnet.upper_magnet.price:,.0f}` (`{magnet.upper_magnet.dist_pct:+.1f}%`) — `${magnet.upper_magnet.usd_volume/1e6:.1f}M` cluster",
             f"* **Center Spot Horizon**: `${magnet.spot_price:,.2f}` (`{magnet.price_change_24h_pct:+.2f}% 24h`)",
             f"* **Lower Support (Long Liquidations)**: `${magnet.lower_magnet.price:,.0f}` (`{magnet.lower_magnet.dist_pct:+.1f}%`) — `${magnet.lower_magnet.usd_volume/1e6:.1f}M` cluster",
-            f"* **Gravitational Pull**: `{magnet.pull_direction} MAGNET` (Ratio: `{magnet.pull_ratio:.2f}x` upper-to-lower volume)",
+            f"* **Gravitational Pull**: `{magnet.pull_direction} MAGNET` (Immediate 100x: `{getattr(magnet, 'immediate_ratio', 1.0):.1f}x` | Total Ladder: `{getattr(magnet, 'total_ladder_ratio', 1.0):.2f}x`)",
             f"* **Perpetual Funding**: `{magnet.funding_rate_annual_pct:+.1f}%/yr` | **4h OI Velocity**: `{magnet.oi_delta_4h_pct:+.1f}%` | **Regime**: `{magnet.market_regime}`",
             "",
             "### 17B. 7 Internal Speaking Rules Audit",

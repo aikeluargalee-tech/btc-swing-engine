@@ -304,19 +304,51 @@ def build_tab_m_data_only_report(config: Optional[EngineConfig], store: StateSto
         f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (MYT):** `{ts_myt}`",
         f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}` (`24H Change: {mag.price_change_24h_pct:+.2f}%`)",
         "",
-        "## 1. LIQUIDATION GRAVITATIONAL HORIZON",
+        "## 1. 5-REGIME RADAR DIAGNOSIS & MAJORITY VOTING",
+        f"- **Active Market Regime:** `{mag.regime_name}` (ID: `{mag.regime_id}`)",
+        f"- **Majority Voting Score:** `{mag.majority_score}` (`{mag.majority_matches_count}/4 Observations Confirmed`)",
+        f"- **Regime Diagnosis:** `{mag.regime_diagnosis}`",
+        f"- **Conflicted Signal Demoted to Mixed:** `{mag.is_conflicted}`",
+    ]
+    if mag.is_conflicted and mag.conflict_reason:
+        lines.append(f"- **Conflict Reason:** `{mag.conflict_reason}`")
+    lines.append("- **Verified On-Exchange Positioning Observations:**")
+    for obs, passed in mag.all_observations:
+        lines.append(f"  * `{obs}`: `{bool(passed)}`")
+
+    lines.extend([
+        "",
+        "## 2. LIQUIDATION GRAVITATIONAL HORIZON & DUAL-LADDER DEPTH",
         f"- **Upper Liquidation Cluster (Short Liquidations):** `${up_px:,.2f}` (`{mag.upper_magnet.dist_pct:+.2f}%` / `${up_diff_usd:+,.2f}` from Spot) | Volume: `${mag.upper_magnet.usd_volume/1e6:.2f}M`",
         f"- **Center Spot Price:** `${spot_px:,.2f}`",
         f"- **Lower Liquidation Cluster (Long Liquidations):** `${lo_px:,.2f}` (`{mag.lower_magnet.dist_pct:+.2f}%` / `${lo_diff_usd:+,.2f}` from Spot) | Volume: `${mag.lower_magnet.usd_volume/1e6:.2f}M`",
-        f"- **Upper-to-Lower Cluster Weight Ratio:** `{mag.pull_ratio:.2f}x` (`Higher Weight Side`: `{mag.pull_direction}`)",
+        f"- **Immediate Tier (100x) Imbalance Ratio:** `{mag.immediate_ratio:.2f}x` (${mag.immediate_l_vol:.1f}M Lower vs ${mag.immediate_u_vol:.1f}M Upper)",
+        f"- **Total Ladder (10x-100x) Imbalance Ratio:** `{mag.total_ladder_ratio:.2f}x` (${mag.total_l_vol:.1f}M Lower vs ${mag.total_u_vol:.1f}M Upper)",
+        f"- **Dominant Pull Direction:** `{mag.pull_direction}`",
         "",
-        "## 2. DERIVATIVES & VOLATILITY INPUTS",
+        "## 3. LIQUIDATION SWEEP CONFIRMATION ENGINE (LSCE)",
+        f"- **LSCE State:** `[{mag.lsce_status}]`",
+        f"- **Cluster Tested:** `{mag.lsce_cluster_tested}`",
+        f"- **Sweep Depth Pct:** `{mag.lsce_sweep_depth_pct:+.2f}%`",
+        f"- **Reclaim Target Level:** `${mag.lsce_reclaim_level:,.2f}`",
+        f"- **Spot Absorption Readout:** `{mag.lsce_spot_absorption}`",
+        f"- **LSCE Action Verdict:** `{mag.lsce_action_verdict}`",
+        "",
+        "## 4. INVIOLABLE RISK DIRECTIVES & CAPITAL SIZING",
+        f"- **Recommended Spot Sizing:** `{mag.sizing_factor:.2f}x` ({mag.action})",
+        f"- **Capital Rotation Directive:** `{mag.rotation}`",
+        f"- **Entry Instruction:** `{mag.entry_instruction}`",
+        f"- **Structural Invalidation Stop:** `${mag.structural_stop_price:,.2f}` (`{mag.structural_stop_dist_pct:.2f}%` from Spot)",
+        f"- **Disaster Hard Stop (Below 200 SMA & 25x Shelf):** `${mag.disaster_stop_price:,.2f}` (`{mag.disaster_stop_dist_pct:.2f}%` from Spot)",
+        f"- **Risk Budget Compliance Pass (<= 4.5%):** `{mag.risk_budget_pass}`",
+        "",
+        "## 5. DERIVATIVES & VOLATILITY INPUTS",
         f"- **Annualized Perpetual Funding Rate:** `{mag.funding_rate_annual_pct:+.2f}%/yr`",
         f"- **4H Open Interest Delta:** `{mag.oi_delta_4h_pct:+.2f}%`",
         f"- **24H Classification Label:** `{mag.market_regime}`",
         "",
-        "## 3. 7 INTERNAL CONDITION BOOLEANS (TRUE/FALSE)",
-    ]
+        "## 6. 7 INTERNAL CONDITION BOOLEANS (TRUE/FALSE)",
+    ])
     for r in mag.rule_checks:
         lines.append(f"- **Rule {r.rule_num} (`{r.name}`):** `{bool(r.passed)}` (`{r.detail}`)")
     lines.append(f"- **Conditions 1-6 True Count:** `{passed_count} / 6`")
@@ -324,9 +356,6 @@ def build_tab_m_data_only_report(config: Optional[EngineConfig], store: StateSto
     return sanitize_data_only_text("\n".join(lines))
 
 
-# ==============================================================================
-# 6. TAB [A: BTC STRATEGY] DATA-ONLY REPORT
-# ==============================================================================
 def build_tab_a_data_only_report(config: Optional[EngineConfig], store: StateStore) -> str:
     tp_ev = getattr(store, "trend_pullback_evaluation", None)
     if tp_ev is None:

@@ -1,14 +1,14 @@
 {
   "order_flow": {
     "footprint": {
-      "active_bar_delta": 10.0,
-      "bar_poc": 68425.0,
+      "active_bar_delta": 0.0,
+      "bar_poc": 76000.0,
       "gate_1_macro_tap": false,
-      "gate_2_positioning_crowded": true,
+      "gate_2_positioning_crowded": false,
       "gate_3_wick_absorption": false,
       "gate_4_delta_flip": false,
       "stacked_imbalances_count": 0,
-      "active_battle_zone": 68425.0,
+      "active_battle_zone": 0.0,
       "signal": "OBSERVATION",
       "suggested_entry": 0.0,
       "suggested_stop": 0.0,

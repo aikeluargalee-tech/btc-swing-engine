@@ -34,6 +34,7 @@ from core.models import (
     SLSPTradeSetup,
     VolumeProfileResult,
 )
+from analytics.btc_magnet_engine import BTCMagnetEngine
 from core.state_store import StateStore
 from .liquidation_reader import read_latest_liquidation_report
 from .slsp_trade_manager import SLSPTradeManager
@@ -370,17 +371,64 @@ class SLSPEngine:
     def evaluate(
         self,
         store: StateStore,
-        spot_1d: Sequence[KlineBar],
-        bars_4h: Sequence[KlineBar],
-        current_price: float,
+        spot_1d: Optional[Sequence[KlineBar]] = None,
+        bars_4h: Optional[Sequence[KlineBar]] = None,
+        current_price: float = 0.0,
         active_vp: Optional[VolumeProfileResult] = None,
     ) -> SLSPEvaluation:
+        if spot_1d is None:
+            spot_1d = getattr(store, "spot_klines_1d", []) or []
+        if bars_4h is None:
+            bars_4h = getattr(store, "spot_klines_4h", []) or []
+        if current_price <= 0.0:
+            current_price = float(getattr(store, "binance_spot_price", 0.0) or (spot_1d[-1].close if spot_1d else 0.0))
         """Executes full SLSP v1.0 evaluation and synthesizes all 4 components into Tab [13]."""
         now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+        # Integrated Tab M Microstructure & Liquidation Gravity
+        mag_eval = getattr(store, "btc_magnet_evaluation", None)
+        if mag_eval is None:
+            try:
+                mag_eval = BTCMagnetEngine(self.config).evaluate(store)
+            except Exception:
+                mag_eval = None
+
+        macro_reg_id = getattr(mag_eval, "regime_id", "RANGE_LIQUIDATION_MAGNET") if mag_eval else "RANGE_LIQUIDATION_MAGNET"
+        macro_reg_name = getattr(mag_eval, "regime_name", "Range / Liquidation Magnet") if mag_eval else "Range / Liquidation Magnet"
+        macro_score = getattr(mag_eval, "majority_score", "4/4") if mag_eval else "4/4"
+        macro_diag = getattr(mag_eval, "regime_diagnosis", "Positioning imbalance and forced liquidations dominate") if mag_eval else ""
+        macro_sizing = getattr(mag_eval, "sizing_factor", 0.50) if mag_eval else 0.50
+        macro_rotation = getattr(mag_eval, "rotation", "Remain USDT") if mag_eval else "Remain USDT"
+        lsce_stat = getattr(mag_eval, "lsce_status", "UNTESTED") if mag_eval else "UNTESTED"
+        lsce_cluster = getattr(mag_eval, "lsce_cluster_tested", "N/A") if mag_eval else "N/A"
+        lsce_verdict = getattr(mag_eval, "lsce_action_verdict", "Wait for sweep confirmation") if mag_eval else ""
+        u_mag_p = getattr(getattr(mag_eval, "upper_magnet", None), "price", 0.0)
+        u_mag_dist = getattr(getattr(mag_eval, "upper_magnet", None), "dist_pct", 0.0)
+        u_mag_vol = getattr(getattr(mag_eval, "upper_magnet", None), "usd_volume", 0.0)
+        l_mag_p = getattr(getattr(mag_eval, "lower_magnet", None), "price", 0.0)
+        l_mag_dist = getattr(getattr(mag_eval, "lower_magnet", None), "dist_pct", 0.0)
+        l_mag_vol = getattr(getattr(mag_eval, "lower_magnet", None), "usd_volume", 0.0)
+        pull_dir = getattr(mag_eval, "pull_direction", "NEUTRAL") if mag_eval else "NEUTRAL"
+        imm_ratio = getattr(mag_eval, "immediate_ratio", 1.0) if mag_eval else 1.0
+        tot_ratio = getattr(mag_eval, "total_ladder_ratio", 1.0) if mag_eval else 1.0
+        s_stop = getattr(mag_eval, "structural_stop_price", 0.0) if mag_eval else 0.0
+        s_dist = getattr(mag_eval, "structural_stop_dist_pct", 0.0) if mag_eval else 0.0
+        d_stop = getattr(mag_eval, "disaster_stop_price", 0.0) if mag_eval else 0.0
+        d_dist = getattr(mag_eval, "disaster_stop_dist_pct", 0.0) if mag_eval else 0.0
 
         # 1. Component 1: Daily Market Structure & Horizontal Key Levels
         regime, reg_reason, last_sh, last_sl = self.detect_daily_regime(spot_1d, current_price)
         all_levels = self.detect_key_levels(spot_1d, current_price, active_vp)
+
+        # Cross-reference Key Shelves with Liquidation Clusters
+        for lv in all_levels:
+            if l_mag_p > 0 and abs(lv.center_price - l_mag_p) / max(current_price, 1.0) <= 0.025:
+                lv.liquidation_volume_usd = l_mag_vol
+                lv.liquidation_cluster_tag = f"Lower Long Pool (${l_mag_vol/1e6:.1f}M • {l_mag_dist:+.1f}%)"
+                lv.strength = min(5, lv.strength + 1)
+            elif u_mag_p > 0 and abs(lv.center_price - u_mag_p) / max(current_price, 1.0) <= 0.025:
+                lv.liquidation_volume_usd = u_mag_vol
+                lv.liquidation_cluster_tag = f"Upper Short Magnet (${u_mag_vol/1e6:.1f}M • {u_mag_dist:+.1f}%)" 
         supports = [lv for lv in all_levels if lv.level_type == "SUPPORT"]
         resistances = [lv for lv in all_levels if lv.level_type == "RESISTANCE"]
 
@@ -491,6 +539,23 @@ class SLSPEngine:
             confluence_score += 10
             decision_log.append(f"4H Rejection Confirmed: {rej_type} (Wick: {wick_ratio*100:.1f}%, Vol: {vol_ratio:.1f}x)")
 
+        # Integrated Tab M Macro Positioning & LSCE Checks
+        macro_hard_lock = False
+        macro_lock_reason = ""
+        if macro_reg_id in ("CASCADE_FORCED_DELEVERAGING", "LEVERAGED_FRAGILE_UPSIDE", "DISTRIBUTION_BEAR_CONTINUATION") or getattr(mag_eval, "is_conflicted", False):
+            macro_hard_lock = True
+            macro_lock_reason = f"Macro Regime ({macro_reg_name}) commands 100% Cash. No knife-catching allowed."
+            trade_state = "STAND_ASIDE"
+            decision_log.append(f"🚨 MACRO HARD-LOCK (100% CASH): {macro_lock_reason}")
+        elif lsce_stat == "SWEEP_IN_PROGRESS":
+            macro_hard_lock = True
+            macro_lock_reason = f"Active liquidation sweep in progress at {lsce_cluster}. Wait for absorption."
+            trade_state = "STAND_ASIDE"
+            decision_log.append(f"🚨 MACRO VETO: {macro_lock_reason}")
+        elif lsce_stat == "SWEEP_AND_RECLAIM_CONFIRMED":
+            confluence_score = min(100, confluence_score + 20)
+            decision_log.append("LSCE Confirmed: Lower liquidity shelf swept and reclaimed with positive spot absorption (+20 pts)!")
+
         # 8. Construct Candidate Trade Setup
         active_setup: Optional[SLSPTradeSetup] = None
         if nearest_supp:
@@ -534,17 +599,21 @@ class SLSPEngine:
                     and nearest_supp.strength >= self.min_level_strength
                 )
 
+                effective_size_btc = round(size_btc * macro_sizing, 4)
+                effective_notional_usd = round(notional_usd * macro_sizing, 2)
+                effective_is_valid = is_valid and not macro_hard_lock and (macro_sizing > 0.0)
+
                 active_setup = SLSPTradeSetup(
-                    is_valid=is_valid,
-                    direction="LONG",
+                    is_valid=effective_is_valid,
+                    direction="LONG" if not macro_hard_lock else "STAND_ASIDE",
                     regime=regime,
                     level=nearest_supp,
                     entry_price=round(current_price, 2),
                     stop_loss=stop_loss,
                     risk_per_coin=round(risk_per_coin, 2),
                     risk_pct=self.risk_pct,
-                    position_size_btc=size_btc,
-                    notional_value_usd=notional_usd,
+                    position_size_btc=effective_size_btc,
+                    notional_value_usd=effective_notional_usd,
                     tp1_price=tp1_price,
                     tp2_price=tp2_price,
                     breakeven_trigger_price=be_trigger,
@@ -556,6 +625,8 @@ class SLSPEngine:
                     rejection_wick_ratio=wick_ratio,
                     rejection_volume_ratio=vol_ratio,
                     confluence_notes=decision_log,
+                    disaster_stop=d_stop,
+                    macro_sizing_factor=macro_sizing,
                 )
 
         # 9. Update Active Trade State via Trade Manager
@@ -570,7 +641,7 @@ class SLSPEngine:
             trade_state = "IN_POSITION"
         elif cb_active:
             trade_state = "CIRCUIT_BREAKER_LOCKOUT"
-        elif tt_veto:
+        elif tt_veto or macro_hard_lock:
             trade_state = "STAND_ASIDE"
         elif active_setup and active_setup.is_valid:
             trade_state = "TRIGGER_FIRED"
@@ -595,7 +666,10 @@ class SLSPEngine:
                 f"| Size: {active_setup.position_size_btc:.4f} BTC (${active_setup.notional_value_usd:,.0f}) | Confluence: {confluence_score}/100"
             )
         elif trade_state == "STAND_ASIDE":
-            summary = "STAND ASIDE: 5x Tell-Tale Volume Climax Active or Macro Downtrend Veto Engaged."
+            if macro_hard_lock:
+                summary = f"STAND ASIDE: Macro Hard-Lock Active ({macro_lock_reason}). Derivatives positioning dictates 100% Cash ($0.00)."
+            else:
+                summary = "STAND ASIDE: 5x Tell-Tale Volume Climax Active or Macro Downtrend Veto Engaged."
         elif trade_state == "CIRCUIT_BREAKER_LOCKOUT":
             summary = f"CIRCUIT BREAKER LOCKOUT: {cb_reason} Trading suspended."
         elif trade_state in ("VALUE_ZONE_WATCH", "REJECTION_ARMED"):
@@ -639,6 +713,30 @@ class SLSPEngine:
             confluence_score=min(100, confluence_score),
             plain_english_summary=summary,
             decision_log=decision_log,
+            macro_regime_id=macro_reg_id,
+            macro_regime_name=macro_reg_name,
+            macro_regime_score=macro_score,
+            macro_regime_diagnosis=macro_diag,
+            macro_sizing_factor=macro_sizing,
+            macro_rotation=macro_rotation,
+            macro_hard_lock_cash=macro_hard_lock,
+            macro_lock_reason=macro_lock_reason,
+            upper_magnet_price=u_mag_p,
+            upper_magnet_dist_pct=u_mag_dist,
+            upper_magnet_vol_usd=u_mag_vol,
+            lower_magnet_price=l_mag_p,
+            lower_magnet_dist_pct=l_mag_dist,
+            lower_magnet_vol_usd=l_mag_vol,
+            dominant_pull_dir=pull_dir,
+            immediate_ratio=imm_ratio,
+            total_ladder_ratio=tot_ratio,
+            lsce_status=lsce_stat,
+            lsce_cluster_tested=lsce_cluster,
+            lsce_action_verdict=lsce_verdict,
+            structural_stop_price=s_stop,
+            structural_stop_dist_pct=s_dist,
+            disaster_stop_price=d_stop,
+            disaster_stop_dist_pct=d_dist,
         )
 
         store.slsp_evaluation = evaluation

@@ -3990,12 +3990,12 @@ def _build_tab13_slsp_price_action_hud(store: StateStore, header_panel: Panel) -
     """Renders Tab [13: P]: 4-Pillar Price Action & Structure Protocol Desk.
     
     5-Panel Institutional Architecture:
-    - Verdict Banner: Executive Trade State, Bias, Mode, Confluence Score, Risk Cap, Spot Price
+    - Verdict Banner: Executive Trade State, Step 1 Macro Radar Diagnosis, Bias, Mode, Confluence Score, Risk Cap, Spot Price
     - Row 1:
-      - Left: [1] File A: SLSP v1.0 (Structure + Level Swing Protocol)
+      - Left: [1] File A: SLSP v1.0 (Structure + Level Swing Protocol with Liquidation Shelves & Dual Stops)
       - Right: [2] File B: Industrial 3-EMA Trading Strategy
     - Row 2:
-      - Left: [3] Project 8: BTC Liquidation Flush Detector
+      - Left: [3] Project 8: BTC Liquidation Gravitational Radar & LSCE Sweep Engine
       - Right: [4] Project 7: Tell-Tale Volume Capitulation Climax Sensor
     - Row 3:
       - Full Width: [5] Executive Bottomline & Beginner Action Playbook (What To Do Right Now)
@@ -4042,24 +4042,31 @@ def _build_tab13_slsp_price_action_hud(store: StateStore, header_panel: Panel) -
     }.get(slsp.trade_state, "bold white on blue")
 
     score_color = "bright_green" if slsp.confluence_score >= 75 else ("yellow" if slsp.confluence_score >= 50 else "dim red")
+    macro_badge_color = "bright_cyan" if "RANGE" in (slsp.macro_regime_id or "") else ("bright_green" if "EXPANSION" in (slsp.macro_regime_id or "") else "yellow")
+    macro_name_display = slsp.macro_regime_name if slsp.macro_regime_name else "Transition / Mixed"
+    macro_score_display = slsp.macro_regime_score if slsp.macro_regime_score else "0/4"
 
     verdict_grid = Table.grid(expand=True)
     verdict_grid.add_column(justify="left", no_wrap=True)
     verdict_grid.add_column(justify="right", no_wrap=True)
     verdict_grid.add_row(
         f"[{state_style}] [{slsp.trade_state}] [/{state_style}]  •  "
+        f"STEP 1 MACRO RADAR: [{macro_badge_color}][bold]{macro_name_display.upper()} ({macro_score_display})[/bold][/{macro_badge_color}]  •  "
         f"BIAS: [bold white]{slsp.regime}[/bold white]  •  "
-        f"MODE: [bold cyan]{slsp.mode}[/bold cyan]  •  "
         f"CONFLUENCE: [{score_color}][bold]{slsp.confluence_score}/100[/bold][/{score_color}]",
-        f"[dim white]Risk Cap:[/dim white] [bold yellow]0.75% Equity ($750 Max)[/bold yellow]  │  "
+        f"[dim white]Macro Sizing:[/dim white] [bold yellow]{slsp.macro_sizing_factor:.2f}x ({slsp.macro_rotation})[/bold yellow]  │  "
         f"[dim white]BTC Spot:[/dim white] [bold cyan]${spot_px:,.2f}[/bold cyan]",
     )
 
+    verdict_rows = [verdict_grid]
+    if slsp.macro_hard_lock_cash:
+        verdict_rows.append(
+            Text(f"🔒 MACRO HARD-LOCK ACTIVE: {slsp.macro_lock_reason or 'Positioning mandates 100% Cash ($0.00 notional). All long setups vetoed.'}", style="bold white on red")
+        )
+    verdict_rows.append(Text(f"EXECUTIVE SUMMARY: {slsp.plain_english_summary}", style="italic white"))
+
     verdict_panel = Panel(
-        Group(
-            verdict_grid,
-            Text(f"EXECUTIVE SUMMARY: {slsp.plain_english_summary}", style="italic white"),
-        ),
+        Group(*verdict_rows),
         title="[bold bright_yellow]DESK [P] EXECUTIVE VERDICT: 4-PILLAR PRICE ACTION & STRUCTURE PROTOCOL[/bold bright_yellow]",
         border_style="bright_yellow",
         box=box.ROUNDED,
@@ -4090,10 +4097,11 @@ def _build_tab13_slsp_price_action_hud(store: StateStore, header_panel: Panel) -
         pocket_tag = "[bold bright_green]IN POCKET (<=0.5%)[/bold bright_green]" if in_pocket else f"[dim]{dist_s:+.1f}% dist[/dim]"
         round_tag = " • Round #" if supp.is_round_number else ""
         hvn_tag = " • HVN Shelf" if supp.is_hvn else ""
+        liq_tag_s = f" • [bold magenta]{supp.liquidation_cluster_tag}[/bold magenta]" if supp.liquidation_cluster_tag else ""
         p1_table.add_row(
             "Key Support Shelf",
             f"${supp.center_price:,.2f} (${supp.price_min:,.0f}–${supp.price_max:,.0f})",
-            f"{_star_rating_str(supp.strength)} • {supp.touch_count}x touches{round_tag}{hvn_tag} • {pocket_tag}",
+            f"{_star_rating_str(supp.strength)} • {supp.touch_count}x touches{round_tag}{hvn_tag}{liq_tag_s} • {pocket_tag}",
         )
     else:
         p1_table.add_row("Key Support Shelf", "No Daily Level <= 10%", "[dim]Scanning swing pivots...[/dim]")
@@ -4102,10 +4110,11 @@ def _build_tab13_slsp_price_action_hud(store: StateStore, header_panel: Panel) -
     if slsp.nearest_resistance:
         res = slsp.nearest_resistance
         dist_r = ((res.center_price - spot_px) / spot_px) * 100.0
+        liq_tag_r = f" • [bold magenta]{res.liquidation_cluster_tag}[/bold magenta]" if res.liquidation_cluster_tag else ""
         p1_table.add_row(
             "Key Resistance Shelf",
             f"${res.center_price:,.2f} (${res.price_min:,.0f}–${res.price_max:,.0f})",
-            f"{_star_rating_str(res.strength)} • +{dist_r:.1f}% overhead ({res.touch_count}x touches)",
+            f"{_star_rating_str(res.strength)} • +{dist_r:.1f}% overhead ({res.touch_count}x touches){liq_tag_r}",
         )
     else:
         p1_table.add_row("Key Resistance Shelf", "No Major Level <= 10%", "[green]Blue Sky / Clear Path[/green]")
@@ -4144,16 +4153,16 @@ def _build_tab13_slsp_price_action_hud(store: StateStore, header_panel: Panel) -
         p1_table.add_row(
             "SLSP Trade Sizing & Risk",
             f"{setup.position_size_btc:.4f} BTC (${setup.notional_value_usd:,.0f} notional)",
-            f"[bold yellow]0.75% Equity (${100000.0 * (setup.risk_pct/100):,.0f} max risk)[/bold yellow] • Zero Leverage",
+            f"[bold yellow]{slsp.macro_sizing_factor:.2f}x Sizing ({slsp.macro_rotation})[/bold yellow] • Zero Leverage",
         )
         p1_table.add_row(
-            "Targets & Invalidation",
-            f"SL: ${setup.stop_loss:,.2f} (-${setup.risk_per_coin:,.2f})",
+            "Targets & Dual Stops",
+            f"SL: ${setup.stop_loss:,.2f} (1H) • Disaster: ${setup.disaster_stop:,.2f} (Hard)",
             f"TP1 (+1.5R): ${setup.tp1_price:,.2f} (50%) • TP2 (+2.5R): ${setup.tp2_price:,.2f} • BE @ +1.0R",
         )
     else:
-        p1_table.add_row("SLSP Trade Sizing & Risk", "Fixed 0.75% Equity Risk", "$100,000 Equity • $750 Max Risk • Zero Leverage")
-        p1_table.add_row("Targets & Invalidation", "TP1: +1.5R (50%) • TP2: +2.5R", "BE Ratchet @ +1.0R (+0.1% fees) • 4H Close Invalidation")
+        p1_table.add_row("SLSP Trade Sizing & Risk", f"Macro Sizing: {slsp.macro_sizing_factor:.2f}x ({slsp.macro_rotation})", "$100,000 Equity • Max Risk 0.75% • Zero Leverage")
+        p1_table.add_row("Targets & Dual Stops", f"SL: ${slsp.structural_stop_price:,.2f} (1H) • Disaster: ${slsp.disaster_stop_price:,.2f} (Hard)", "BE Ratchet @ +1.0R (+0.1% fees) • 4H Close Invalidation")
 
     # 7. Circuit Breakers
     cb_style = "bold bright_green" if not slsp.circuit_breaker_active else "bold bright_red"
@@ -4269,94 +4278,84 @@ def _build_tab13_slsp_price_action_hud(store: StateStore, header_panel: Panel) -
     )
 
     # =========================================================================
-    # ROW 2 - LEFT: PANEL [3] PROJECT 8: BTC LIQUIDATION FLUSH DETECTOR
+    # ROW 2 - LEFT: PANEL [3] PROJECT 8: BTC LIQUIDATION GRAVITATIONAL RADAR & LSCE ENGINE
     # =========================================================================
     p3_table = Table(box=box.SIMPLE_HEAD, expand=True, padding=(0, 1))
-    p3_table.add_column("Flush Metric", style="magenta", no_wrap=True, ratio=3)
+    p3_table.add_column("Gravitational / Flush Metric", style="magenta", no_wrap=True, ratio=3)
     p3_table.add_column("Observed Value", style="white", no_wrap=True, ratio=4)
-    p3_table.add_column("Cascade Telemetry", style="green", no_wrap=True, ratio=4)
+    p3_table.add_column("Gravitational Telemetry", style="green", no_wrap=True, ratio=4)
 
-    # 1. Crash/Flush Lifecycle Stage
-    flush_status = liq_rep.verdict if liq_rep else "STANDBY"
-    flush_detail = liq_rep.verdict_detail if liq_rep else "Companion detector monitoring"
+    # 1. Dominant Gravitational Vector & Imbalance Ratios
+    pull_color = "bold bright_green" if slsp.dominant_pull_dir == "UPPER" else ("bold bright_red" if slsp.dominant_pull_dir == "LOWER" else "bold yellow")
     p3_table.add_row(
-        "Crash Lifecycle Stage",
-        f"[bold white]{flush_status}[/bold white]",
-        f"[dim]{flush_detail[:42]}[/dim]",
+        "Dominant Gravitational Pull",
+        f"Pull Vector: [{pull_color}]{slsp.dominant_pull_dir}[/{pull_color}]",
+        f"Immediate (100x): {slsp.immediate_ratio:.2f}x • Total Ladder: {slsp.total_ladder_ratio:.2f}x",
     )
 
-    # 2. Damage So Far ($ Liquidated across windows)
-    w15m = liq_rep.windows.get("15m") if (liq_rep and liq_rep.windows) else None
-    w1h = liq_rep.windows.get("1h") if (liq_rep and liq_rep.windows) else None
-    w4h = liq_rep.windows.get("4h") if (liq_rep and liq_rep.windows) else None
-    w24h = liq_rep.windows.get("24h") if (liq_rep and liq_rep.windows) else None
+    # 2. Upper Short Liquidation Magnet (Ceiling)
+    u_diff_usd = round(slsp.upper_magnet_price - spot_px, 2)
+    p3_table.add_row(
+        "Upper Magnet (Short Liqs)",
+        f"${slsp.upper_magnet_price:,.2f} ({slsp.upper_magnet_dist_pct:+.2f}% / ${u_diff_usd:+,.0f})",
+        f"Volume: ${slsp.upper_magnet_vol_usd / 1e6:.1f}M Short Pool (Ceiling Target)",
+    )
 
-    v_15m = f"${w15m.total_usd/1000:,.0f}k" if w15m else "$0k"
-    v_1h = f"${w1h.total_usd/1000:,.0f}k" if w1h else "$0k"
-    v_4h = f"${w4h.total_usd/1000:,.0f}k" if w4h else "$0k"
-    v_24h = f"${w24h.total_usd/1000:,.0f}k" if w24h else "$0k"
+    # 3. Lower Long Liquidation Magnet (Support Floor)
+    l_diff_usd = round(slsp.lower_magnet_price - spot_px, 2)
+    p3_table.add_row(
+        "Lower Magnet (Long Liqs)",
+        f"${slsp.lower_magnet_price:,.2f} ({slsp.lower_magnet_dist_pct:+.2f}% / ${l_diff_usd:+,.0f})",
+        f"Volume: ${slsp.lower_magnet_vol_usd / 1e6:.1f}M Long Pool (Gravitational Shelf)",
+    )
 
+    # 4. LSCE Sweep State Machine
+    lsce_styles = {
+        "UNTESTED": "bold yellow",
+        "SWEEP_IN_PROGRESS": "bold white on red",
+        "SWEEP_AND_RECLAIM_CONFIRMED": "bold black on bright_green",
+        "BREAKDOWN_CONTINUATION": "bold white on red",
+    }
+    lsce_style = lsce_styles.get(slsp.lsce_status, "bold cyan")
+    p3_table.add_row(
+        "LSCE Sweep State Machine",
+        f"[{lsce_style}][ {slsp.lsce_status} ][/{lsce_style}]",
+        f"Target: {slsp.lsce_cluster_tested} • {slsp.lsce_action_verdict[:35]}",
+    )
+
+    # 5. Flush Damage & Leverage Contraction
     tier_style = "bright_green" if (liq_rep and liq_rep.magnitude_tier == "NORMAL") else ("bold yellow" if (liq_rep and "ELEVATED" in liq_rep.magnitude_tier) else "bold bright_red")
     tier_name = liq_rep.magnitude_tier if liq_rep else "NORMAL"
+    flush_status = liq_rep.verdict if liq_rep else "STANDBY"
+    w24h = liq_rep.windows.get("24h") if (liq_rep and liq_rep.windows) else None
+    v_24h = f"${w24h.total_usd/1000:,.0f}k" if w24h else "$0k"
     p3_table.add_row(
-        "Damage So Far ($ Liquidated)",
-        f"15m: {v_15m} • 1h: {v_1h} • 4h: {v_4h} • 24h: {v_24h}",
-        f"Magnitude Tier: [{tier_style}]{tier_name}[/{tier_style}]",
+        "Flush Damage & 4H OI Delta",
+        f"4H dOI: {slsp.liq_flush_oi_delta:+.2f}% • 24h Liq: {v_24h}",
+        f"Magnitude Tier: [{tier_style}]{tier_name}[/{tier_style}] ({flush_status})",
     )
 
-    # 3. Leverage Wipeout Telemetry
-    oi_contracts = liq_rep.open_interest_contracts if liq_rep else 0.0
-    fund_rate = liq_rep.funding_rate if liq_rep else 0.0
-    fund_stat = liq_rep.funding_status if liq_rep else "NEUTRAL"
-    oi_txt = f"{oi_contracts:,.0f} contracts" if oi_contracts > 0 else "N/A"
-    p3_table.add_row(
-        "Leverage Wipeout Telemetry",
-        f"OI: {oi_txt} • 1h dOI: {slsp.liq_flush_oi_delta:+.2f}%",
-        f"Funding: {fund_rate*100:+.4f}% • [dim]{fund_stat[:28]}[/dim]",
-    )
-
-    # 4. Key Demand Zone Analysis ($75,000–$78,000)
+    # 6. Demand Zone / Microstructure
     dz_status = liq_rep.demand_zone_status if (liq_rep and liq_rep.demand_zone_status != "N/A") else "INSIDE_ZONE"
     dz_lower = liq_rep.demand_zone_lower if (liq_rep and liq_rep.demand_zone_lower > 0) else 75000.0
     dz_upper = liq_rep.demand_zone_upper if (liq_rep and liq_rep.demand_zone_upper > 0) else 78000.0
     dz_dist_lower = liq_rep.demand_zone_dist_lower_pct if liq_rep else +0.54
-    dz_dist_upper = liq_rep.demand_zone_dist_upper_pct if liq_rep else -3.33
-
-    dz_style = "bold bright_green" if dz_status == "INSIDE_ZONE" else ("bold yellow" if dz_status == "APPROACHING_ZONE" else "bold bright_red")
-    p3_table.add_row(
-        "Key Demand Zone ($75k–$78k)",
-        f"[{dz_style}]{dz_status}[/{dz_style}] (${dz_lower:,.0f} – ${dz_upper:,.0f})",
-        f"Floor: {dz_dist_lower:+.2f}% ($75k) • Ceiling: {dz_dist_upper:+.2f}% ($78k)",
-    )
-
-    # 5. Microstructure / Post-Flush Structure
     post_struct = liq_rep.post_flush_price_structure if liq_rep else None
     hl_formed = post_struct.higher_low_formed if post_struct else True
-    ll_stopped = post_struct.stopped_making_lower_lows if post_struct else True
-    vol_ratio_pf = post_struct.volume_ratio if post_struct else 0.75
-
+    dz_style = "bold bright_green" if dz_status == "INSIDE_ZONE" else ("bold yellow" if dz_status == "APPROACHING_ZONE" else "bold bright_red")
     p3_table.add_row(
-        "Microstructure Post-Flush",
-        f"Higher Low: {'[bold green]YES[/bold green]' if hl_formed else '[dim]NO[/dim]'} • Lower Lows Stopped: {'[bold green]YES[/bold green]' if ll_stopped else '[dim]NO[/dim]'}",
-        f"Spot Volume Ratio: {vol_ratio_pf:.2f}x 20MA • Prior High: PENDING",
-    )
-
-    # 6. Asia Session Low Sweep & Reclaim
-    asia_swept = trap_eval.asia_low_swept if trap_eval else False
-    asia_style = "bold bright_green" if asia_swept else "dim"
-    p3_table.add_row(
-        "Session Liquidity Sweeps",
-        f"Asia Session Low: [{asia_style}]{'SWEPT & RECLAIMED (+25 PTS)' if asia_swept else 'INTACT / UNSWEPT'}[/{asia_style}]",
-        "Forced selling absorbed; base building above demand floor",
+        "Demand Floor & Reclaim",
+        f"[{dz_style}]{dz_status}[/{dz_style}] (${dz_lower:,.0f}–${dz_upper:,.0f})",
+        f"Higher Low: {'YES' if hl_formed else 'NO'} • Floor Dist: {dz_dist_lower:+.2f}%",
     )
 
     p3_panel = Panel(
         Group(
-            Text('  "The Detector tells me how the crash/flush is doing so far — 100% True"', style="italic magenta"),
+            Text('  "Gravitational Horizon: Dual-Ladder Depth (10x-100x) • LSCE Sweep & Reclaim"', style="italic magenta"),
             Rule(style="dim magenta"),
             p3_table,
         ),
-        title="[bold magenta][3] PROJECT 8: BTC LIQUIDATION FLUSH DETECTOR[/bold magenta]",
+        title="[bold magenta][3] PROJECT 8: BTC LIQUIDATION GRAVITATIONAL RADAR & LSCE ENGINE[/bold magenta]",
         border_style="magenta",
         box=box.ROUNDED,
         padding=(0, 1),
@@ -4471,7 +4470,7 @@ def _build_tab13_slsp_price_action_hud(store: StateStore, header_panel: Panel) -
     p1_verdict = "✓ READY" if p1_ok else "⏳ WAITING"
     recap_table.add_row(
         "Panel [1]: SLSP v1.0",
-        f"Regime: {slsp.regime}. Sitting at {supp_desc}. Obstacle: {obs_desc}. Sized for 0.75% equity ($750 max risk).",
+        f"Regime: {slsp.regime}. Sitting at {supp_desc}. Obstacle: {obs_desc}. Sized for {slsp.macro_sizing_factor:.2f}x ({slsp.macro_rotation}).",
         f"[{p1_status_style}]{p1_verdict}[/{p1_status_style}]",
     )
 
@@ -4486,12 +4485,12 @@ def _build_tab13_slsp_price_action_hud(store: StateStore, header_panel: Panel) -
     )
 
     # Panel 3 Summary
-    liq_ok = (liq_rep and liq_rep.magnitude_tier == "NORMAL")
-    p3_status_style = "bold green" if liq_ok else "bold yellow"
-    p3_verdict = "✓ STABLE" if liq_ok else "⚠️ ACTIVE"
+    p3_ok = (slsp.lsce_status == "SWEEP_AND_RECLAIM_CONFIRMED" or (liq_rep and liq_rep.magnitude_tier == "NORMAL"))
+    p3_status_style = "bold green" if p3_ok else ("bold red" if slsp.lsce_status == "SWEEP_IN_PROGRESS" else "bold yellow")
+    p3_verdict = "✓ CONFIRMED" if slsp.lsce_status == "SWEEP_AND_RECLAIM_CONFIRMED" else ("🚨 SWEEPING" if slsp.lsce_status == "SWEEP_IN_PROGRESS" else "⏳ UNTESTED")
     recap_table.add_row(
-        "Panel [3]: Liq Flush Detector",
-        f"Crash lifecycle: {flush_status}. Total 24h liq: {v_24h} ({tier_name}). Inside $75k–$78k demand zone (+0.54% from floor). Higher low formed.",
+        "Panel [3]: Liq Radar & LSCE",
+        f"Pull: {slsp.dominant_pull_dir} ({slsp.total_ladder_ratio:.2f}x imbalance). Lower: ${slsp.lower_magnet_price:,.0f} (${slsp.lower_magnet_vol_usd / 1e6:.1f}M). LSCE: [{slsp.lsce_status}]. {slsp.lsce_action_verdict[:55]}",
         f"[{p3_status_style}]{p3_verdict}[/{p3_status_style}]",
     )
 
@@ -4507,17 +4506,23 @@ def _build_tab13_slsp_price_action_hud(store: StateStore, header_panel: Panel) -
 
     # B. Current Direct Action Playbook
     p5_action_lines = []
-    if slsp.trade_state == "IN_POSITION":
+    if slsp.macro_hard_lock_cash:
+        p5_action_lines.append(
+            "[bold white on red]▶ CURRENT DIRECTIVE: STAND ASIDE / 100% USDT CASH (MACRO REGIME HARD-LOCK)[/bold white on red]\n"
+            f"  • [bold red]Why We Are Not Buying:[/bold red] Step 1 Macro Regime is [bold yellow]{slsp.macro_regime_name}[/bold yellow] ({slsp.macro_regime_score}). {slsp.macro_lock_reason}\n"
+            f"  • [bold yellow]Next Step:[/bold yellow] Inviolable capital directive: {slsp.macro_rotation}. LSCE state is [{slsp.lsce_status}]. Stand aside until liquidations stabilize and reclaim triggers."
+        )
+    elif slsp.trade_state == "IN_POSITION":
         p5_action_lines.append(
             "[bold bright_green]▶ CURRENT DIRECTIVE: IN ACTIVE SWING POSITION (HOLD & MONITOR)[/bold bright_green]\n"
-            f"  • Your position is live. Stop loss is protected at [bold cyan]${setup.stop_loss:,.2f}[/bold cyan].\n"
+            f"  • Your position is live. Structural stop is at [bold cyan]${setup.stop_loss:,.2f}[/bold cyan] • Disaster stop at [bold red]${setup.disaster_stop:,.2f}[/bold red].\n"
             f"  • [bold yellow]Next Step:[/bold yellow] Do nothing. The triple-barrier manager will automatically harvest TP1 at [bold green]${setup.tp1_price:,.2f}[/bold green] or ratchet to Breakeven at [bold green]${setup.breakeven_trigger_price:,.2f}[/bold green]."
         )
     elif slsp.trade_state == "TRIGGER_FIRED":
         p5_action_lines.append(
             "[bold black on bright_yellow]▶ CURRENT DIRECTIVE: EXECUTE BUY ORDER (ALL 4 LAYERS CONFIRMED)[/bold black on bright_yellow]\n"
-            f"  • [bold green]Action Required:[/bold green] Stage limit buy order at [bold cyan]${setup.entry_price:,.2f}[/bold cyan] for [bold green]{setup.position_size_btc:.4f} BTC[/bold green] (${setup.notional_value_usd:,.0f} notional).\n"
-            f"  • Hard Stop: [bold red]${setup.stop_loss:,.2f}[/bold red] (-${setup.risk_per_coin:,.2f})  │  TP1: [bold green]${setup.tp1_price:,.2f}[/bold green] (+1.5R)  │  TP2: [bold green]${setup.tp2_price:,.2f}[/bold green] (+2.5R)."
+            f"  • [bold green]Action Required:[/bold green] Stage limit buy order at [bold cyan]${setup.entry_price:,.2f}[/bold cyan] for [bold green]{setup.position_size_btc:.4f} BTC[/bold green] (${setup.notional_value_usd:,.0f} notional | Macro Factor: {slsp.macro_sizing_factor:.2f}x).\n"
+            f"  • Structural SL: [bold red]${setup.stop_loss:,.2f}[/bold red]  │  Disaster Hard Stop: [bold red]${setup.disaster_stop:,.2f}[/bold red]  │  TP1: [bold green]${setup.tp1_price:,.2f}[/bold green] (+1.5R)  │  TP2: [bold green]${setup.tp2_price:,.2f}[/bold green] (+2.5R)."
         )
     elif slsp.trade_state == "STAND_ASIDE":
         p5_action_lines.append(
@@ -4547,15 +4552,16 @@ def _build_tab13_slsp_price_action_hud(store: StateStore, header_panel: Panel) -
         supp_price_str = f"${slsp.nearest_support.center_price:,.2f}" if slsp.nearest_support else "N/A"
         p5_action_lines.append(
             "[bold cyan]▶ CURRENT DIRECTIVE: SCANNING HIGHER-TIMEFRAME STRUCTURE (100% CASH)[/bold cyan]\n"
-            f"  • Market regime is {slsp.regime}. Price is currently in mid-range space without an active structural touch.\n"
+            f"  • Market regime is {slsp.regime} • Macro Radar: {macro_name_display} ({macro_score_display}). Price is currently in mid-range space without an active structural touch.\n"
             f"  • [bold yellow]Next Step:[/bold yellow] Be patient. Wait for price to pull back to the nearest support ({supp_price_str}) or break out with volume."
         )
 
     # C. 4-Way Execution Alignment Checklist
-    c1 = "[green]✓ P1: SLSP Support Shelf (4★)[/green]" if (slsp.nearest_support and slsp.nearest_support.strength >= 3) else "[dim]○ P1: Support Level[/dim]"
+    c_macro = f"[green]✓ Macro: {macro_name_display[:12]}[/green]" if not slsp.macro_hard_lock_cash else f"[red]✗ Macro Lock: {macro_name_display[:12]}[/red]"
+    c1 = "[green]✓ P1: Support Shelf (4★)[/green]" if (slsp.nearest_support and slsp.nearest_support.strength >= 3) else "[dim]○ P1: Support Shelf[/dim]"
     c2 = "[red]✗ P1: 1.5R Runway Clear[/red]" if (setup and setup.obstacle_detected) else "[green]✓ P1: 1.5R Runway Clear[/green]"
     c3 = "[green]✓ P2: 3-EMA Value Band[/green]" if slsp.ema_3_value_zone_active else "[dim]○ P2: 3-EMA Value Band[/dim]"
-    c4 = "[green]✓ P3: Liq Stabilisation[/green]" if (liq_rep and liq_rep.magnitude_tier == "NORMAL") else "[yellow]⚠️ P3: Liq Cascade[/yellow]"
+    c_lsce = "[green]✓ P3: LSCE Reclaimed[/green]" if slsp.lsce_status == "SWEEP_AND_RECLAIM_CONFIRMED" else (f"[yellow]⚠️ P3: {slsp.lsce_status[:10]}[/yellow]" if slsp.lsce_status != "UNTESTED" else f"[dim]○ P3: LSCE Untested[/dim]")
     c5 = "[green]✓ P4: Tell-Tale Veto Pass[/green]" if not slsp.tell_tale_veto else "[red]✗ P4: Tell-Tale Veto Active[/red]"
 
     p5_checklist = Table.grid(expand=True)
@@ -4568,8 +4574,9 @@ def _build_tab13_slsp_price_action_hud(store: StateStore, header_panel: Panel) -
         )
     else:
         copy_badge = "[bold cyan][Press P again: Copy DATA-ONLY Report -> logs/btc_structure_latest.md][/bold cyan]"
+
     p5_checklist.add_row(
-        f"[bold white]4-Pillar Checklist:[/bold white]  {c1} │ {c2} │ {c3} │ {c4} │ {c5}",
+        f"[bold white]Confluence Checklist:[/bold white]  {c_macro} │ {c1} │ {c2} │ {c3} │ {c_lsce} │ {c5}",
         copy_badge,
     )
 
@@ -4588,7 +4595,6 @@ def _build_tab13_slsp_price_action_hud(store: StateStore, header_panel: Panel) -
     )
 
     return Group(header_panel, verdict_panel, row1_grid, row2_grid, bottomline_panel)
-
 
 
 def _build_help_overlay(store: StateStore, header_panel: Panel) -> Group:

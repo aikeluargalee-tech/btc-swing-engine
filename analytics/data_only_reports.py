@@ -74,6 +74,11 @@ def build_tab_p_data_only_report(config: Optional[EngineConfig], store: StateSto
     ts_utc, ts_myt = _timestamps_utc_myt()
     spot_px = _spot_price(store)
     slsp = getattr(store, "slsp_evaluation", None)
+    if slsp is None:
+        from analytics.slsp_engine import SLSPEngine
+        spot_1d = getattr(store, "spot_klines_1d", []) or []
+        bars_4h = getattr(store, "spot_klines_4h", []) or []
+        slsp = SLSPEngine(cfg).evaluate(store, spot_1d, bars_4h, current_price=spot_px)
     ema_snap = getattr(store, "ema_strategy", None)
     liq_rep = getattr(slsp, "liq_detector_report", None) if slsp else getattr(store, "liquidation_report", None)
 
@@ -82,85 +87,119 @@ def build_tab_p_data_only_report(config: Optional[EngineConfig], store: StateSto
         f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (MYT):** `{ts_myt}`",
         f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}`",
         "",
-        "## 1. DAILY SWING STRUCTURE & KEY SHELVES (SLSP v1.0)",
+        "## 1. 5-REGIME RADAR DIAGNOSIS & MACRO SIZING",
+        f"- **Active Market Regime:** `{slsp.macro_regime_name}` (ID: `{slsp.macro_regime_id}`)",
+        f"- **Majority Voting Score:** `{slsp.macro_regime_score}`",
+        f"- **Regime Diagnosis:** `{slsp.macro_regime_diagnosis}`",
+        f"- **Macro Sizing Factor:** `{slsp.macro_sizing_factor:.2f}x`",
+        f"- **Capital Rotation Directive:** `{slsp.macro_rotation}`",
+        f"- **Macro Hard-Lock Cash Active:** `{slsp.macro_hard_lock_cash}`",
     ]
+    if slsp.macro_hard_lock_cash and slsp.macro_lock_reason:
+        lines.append(f"- **Macro Hard-Lock Reason:** `{slsp.macro_lock_reason}`")
 
-    if slsp is not None:
-        supp = slsp.nearest_support
-        res = slsp.nearest_resistance
-        if supp is not None:
-            s_center = round(float(supp.center_price), 2)
-            s_diff_usd = round(spot_px - s_center, 2)
-            s_diff_pct = round((s_diff_usd / s_center) * 100.0, 2) if s_center > 0 else 0.0
-            lines.extend([
-                f"- **Nearest Support Shelf Center:** `${s_center:,.2f}` (Band: `${supp.price_min:,.2f} - ${supp.price_max:,.2f}`)",
-                f"- **Spot Minus Support Center (`Spot - Support`):** `${s_diff_usd:+,.2f}` (`{s_diff_pct:+.2f}%`)",
-                f"- **Support Strength / Touches:** `{supp.strength}/5` | Touches: `{supp.touch_count}`",
-                f"- **Support Is Round Number:** `{bool(supp.is_round_number)}` | **Support Is HVN:** `{bool(supp.is_hvn)}`",
-            ])
-        else:
-            lines.append("- **Nearest Support Shelf Center:** `0.00` (No shelf within 10% scan window)")
-
-        if res is not None:
-            r_center = round(float(res.center_price), 2)
-            r_diff_usd = round(r_center - spot_px, 2)
-            r_diff_pct = round((r_diff_usd / spot_px) * 100.0, 2) if spot_px > 0 else 0.0
-            lines.extend([
-                f"- **Nearest Resistance Shelf Center:** `${r_center:,.2f}` (Band: `${res.price_min:,.2f} - ${res.price_max:,.2f}`)",
-                f"- **Resistance Center Minus Spot (`Resistance - Spot`):** `${r_diff_usd:+,.2f}` (`{r_diff_pct:+.2f}%`)",
-                f"- **Resistance Strength / Touches:** `{res.strength}/5` | Touches: `{res.touch_count}`",
-            ])
-        else:
-            lines.append("- **Nearest Resistance Shelf Center:** `0.00` (No shelf within 10% scan window)")
-
-        setup = slsp.active_setup
-        ref_entry = round(float(setup.entry_price), 2) if (setup and setup.entry_price > 0) else spot_px
-        ref_stop = round(float(setup.stop_loss), 2) if (setup and setup.stop_loss > 0) else round(spot_px * 0.98, 2)
-        stop_dist = round(ref_entry - ref_stop, 2)
-        ref_1_5r = round(ref_entry + 1.5 * stop_dist, 2) if stop_dist > 0 else 0.0
-        ref_2_5r = round(ref_entry + 2.5 * stop_dist, 2) if stop_dist > 0 else 0.0
-        obs_r = round(float(setup.obstacle_r), 2) if setup else 0.0
-        clearance_ok = bool(not setup.obstacle_detected) if setup else False
-
+    lines.extend([
+        "",
+        "## 2. DAILY SWING STRUCTURE & LIQUIDATION-BACKED KEY SHELVES (SLSP v1.0)",
+        f"- **Daily Market Bias:** `{slsp.regime}`",
+        f"- **Confluence Score:** `{slsp.confluence_score}/100`",
+        f"- **Trade State:** `{slsp.trade_state}`",
+    ])
+    supp = slsp.nearest_support
+    res = slsp.nearest_resistance
+    if supp is not None:
+        s_center = round(float(supp.center_price), 2)
+        s_diff_usd = round(spot_px - s_center, 2)
+        s_diff_pct = round((s_diff_usd / s_center) * 100.0, 2) if s_center > 0 else 0.0
         lines.extend([
-            "",
-            f"## 2. REFERENCE LEVELS (Reference calculation if entered at ${ref_entry:,.2f}. Not an order.)",
-            f"- **Reference Entry Price:** `${ref_entry:,.2f}`",
-            f"- **Reference Stop Level:** `${ref_stop:,.2f}`",
-            f"- **Stop Distance (`Reference Entry - Stop Level`):** `${stop_dist:,.2f}`",
-            f"- **1.5R Reference Level (`Entry + 1.5 * Stop Distance`):** `${ref_1_5r:,.2f}`",
-            f"- **2.5R Reference Level (`Entry + 2.5 * Stop Distance`):** `${ref_2_5r:,.2f}`",
-            f"- **Distance to Overhead Resistance in R (`Obstacle R`):** `{obs_r:.2f}R`",
-            f"- **Clearance >= 1.50R (`Obstacle R >= 1.50`):** `{clearance_ok}`",
-            "",
-            "## 3. DAILY & 4H 3-EMA METRICS",
-            f"- **1D EMA20 / EMA50 / EMA200:** `${ (ema_snap.daily_ema_20 if ema_snap else 0.0):,.2f}` / `${ (ema_snap.daily_ema_50 if ema_snap else 0.0):,.2f}` / `${ (ema_snap.daily_ema_200 if ema_snap else 0.0):,.2f}`",
-            f"- **1D EMA200 5-Day Slope (%):** `{slsp.ema_3_slope_200:+.3f}%`",
-            f"- **1D ADX(14):** `{slsp.ema_3_adx:.2f}` | **ADX(14) >= 20.0:** `{bool(slsp.ema_3_adx >= 20.0)}`",
-            f"- **4H EMA9 / EMA20 / EMA50:** `${ (ema_snap.ema_4h_9 if ema_snap else 0.0):,.2f}` / `${ (ema_snap.ema_4h_20 if ema_snap else 0.0):,.2f}` / `${ (ema_snap.ema_4h_50 if ema_snap else 0.0):,.2f}`",
-            f"- **Spot Inside 4H [EMA20, EMA50] Value Band:** `{bool(slsp.ema_3_value_zone_active)}`",
-            f"- **4H Wick Condition Met (Last 3 Closed 4H Bars):** `{bool(ema_snap.rejection_active) if ema_snap else False}`",
-            f"- **4H Close > 4H EMA9:** `{bool(ema_snap.trigger_active) if ema_snap else False}`",
-            f"- **Positioning Sub-Conditions Met Count:** `{slsp.ema_3_positioning_met} / 3`",
-            "",
-            "## 4. LIQUIDATION FLUSH & VOLUME CLIMAX SENSORS",
-            f"- **1H OI Delta (%):** `{slsp.liq_flush_oi_delta:+.2f}%`",
-            f"- **15m Relative Volume (`RelVol vs 20-bar SMA`):** `{slsp.tell_tale_relvol_15m:.2f}x` | **15m RelVol >= 5.0x:** `{bool(slsp.tell_tale_relvol_15m >= 5.0)}`",
-            f"- **5m Relative Volume (`RelVol vs 20-bar SMA`):** `{slsp.tell_tale_relvol_5m:.2f}x` | **5m RelVol >= 5.0x:** `{bool(slsp.tell_tale_relvol_5m >= 5.0)}`",
-            f"- **Volume Climax Interlock Active:** `{bool(slsp.tell_tale_veto)}`",
+            f"- **Nearest Support Shelf Center:** `${s_center:,.2f}` (Band: `${supp.price_min:,.2f} - ${supp.price_max:,.2f}`)",
+            f"- **Spot Minus Support Center (`Spot - Support`):** `${s_diff_usd:+,.2f}` (`{s_diff_pct:+.2f}%`)",
+            f"- **Support Strength / Touches:** `{supp.strength}/5` | Touches: `{supp.touch_count}`",
+            f"- **Support Is Round Number:** `{bool(supp.is_round_number)}` | **Support Is HVN:** `{bool(supp.is_hvn)}`",
+            f"- **Support Liquidation Cluster Tag:** `{supp.liquidation_cluster_tag if supp.liquidation_cluster_tag else 'None'}`",
+            f"- **Support Liquidation Volume USD:** `${supp.liquidation_volume_usd:,.2f}`",
         ])
-        if liq_rep is not None:
-            w15 = liq_rep.windows.get("15m")
-            w1h = liq_rep.windows.get("1h")
-            w4h = liq_rep.windows.get("4h")
-            w24h = liq_rep.windows.get("24h")
-            lines.extend([
-                f"- **Liquidated USD (`15m / 1h / 4h / 24h`):** `${(w15.total_usd if w15 else 0.0):,.0f}` / `${(w1h.total_usd if w1h else 0.0):,.0f}` / `${(w4h.total_usd if w4h else 0.0):,.0f}` / `${(w24h.total_usd if w24h else 0.0):,.0f}`",
-                f"- **24H Liquidation Multiple:** `{liq_rep.liquidation_multiple_24h:.2f}x`",
-                f"- **Reference Zone (`$75,000 - $78,000`) Distance to Lower / Upper:** `{liq_rep.demand_zone_dist_lower_pct:+.2f}%` / `{liq_rep.demand_zone_dist_upper_pct:+.2f}%`",
-            ])
     else:
-        lines.append("- **SLSP Evaluation Data Available:** `False`")
+        lines.append("- **Nearest Support Shelf Center:** `0.00` (No shelf within 10% scan window)")
+
+    if res is not None:
+        r_center = round(float(res.center_price), 2)
+        r_diff_usd = round(r_center - spot_px, 2)
+        r_diff_pct = round((r_diff_usd / spot_px) * 100.0, 2) if spot_px > 0 else 0.0
+        lines.extend([
+            f"- **Nearest Resistance Shelf Center:** `${r_center:,.2f}` (Band: `${res.price_min:,.2f} - ${res.price_max:,.2f}`)",
+            f"- **Resistance Center Minus Spot (`Resistance - Spot`):** `${r_diff_usd:+,.2f}` (`{r_diff_pct:+.2f}%`)",
+            f"- **Resistance Strength / Touches:** `{res.strength}/5` | Touches: `{res.touch_count}`",
+            f"- **Resistance Liquidation Cluster Tag:** `{res.liquidation_cluster_tag if res.liquidation_cluster_tag else 'None'}`",
+            f"- **Resistance Liquidation Volume USD:** `${res.liquidation_volume_usd:,.2f}`",
+        ])
+    else:
+        lines.append("- **Nearest Resistance Shelf Center:** `0.00` (No shelf within 10% scan window)")
+
+    lines.extend([
+        "",
+        "## 3. LIQUIDATION GRAVITATIONAL HORIZON & LSCE SWEEP ENGINE",
+        f"- **Dominant Gravitational Pull:** `{slsp.dominant_pull_dir}`",
+        f"- **Immediate Tier (100x) Imbalance Ratio:** `{slsp.immediate_ratio:.2f}x`",
+        f"- **Total Ladder (10x-100x) Imbalance Ratio:** `{slsp.total_ladder_ratio:.2f}x`",
+        f"- **Upper Liquidation Magnet Cluster:** `${slsp.upper_magnet_price:,.2f}` (`{slsp.upper_magnet_dist_pct:+.2f}%` from Spot) | Volume: `${slsp.upper_magnet_vol_usd / 1e6:.2f}M`",
+        f"- **Lower Liquidation Magnet Cluster:** `${slsp.lower_magnet_price:,.2f}` (`{slsp.lower_magnet_dist_pct:+.2f}%` from Spot) | Volume: `${slsp.lower_magnet_vol_usd / 1e6:.2f}M`",
+        f"- **LSCE Sweep State:** `[{slsp.lsce_status}]`",
+        f"- **LSCE Cluster Tested:** `{slsp.lsce_cluster_tested}`",
+        f"- **LSCE Action Verdict:** `{slsp.lsce_action_verdict}`",
+    ])
+
+    setup = slsp.active_setup
+    ref_entry = round(float(setup.entry_price), 2) if (setup and setup.entry_price > 0) else spot_px
+    ref_stop = round(float(setup.stop_loss), 2) if (setup and setup.stop_loss > 0) else round(spot_px * 0.98, 2)
+    stop_dist = round(ref_entry - ref_stop, 2)
+    ref_1_5r = round(ref_entry + 1.5 * stop_dist, 2) if stop_dist > 0 else 0.0
+    ref_2_5r = round(ref_entry + 2.5 * stop_dist, 2) if stop_dist > 0 else 0.0
+    obs_r = round(float(setup.obstacle_r), 2) if setup else 0.0
+    clearance_ok = bool(not setup.obstacle_detected) if setup else False
+    sized_btc = round(float(setup.position_size_btc), 4) if setup else 0.0
+    notional_usd = round(float(setup.notional_value_usd), 2) if setup else 0.0
+
+    lines.extend([
+        "",
+        f"## 4. REFERENCE LEVELS & DUAL INVIOLABLE STOPS (Reference calculation if entered at ${ref_entry:,.2f})",
+        f"- **Reference Entry Price:** `${ref_entry:,.2f}`",
+        f"- **Structural Stop Loss (1H Close):** `${slsp.structural_stop_price:,.2f}` (`{slsp.structural_stop_dist_pct:.2f}%` from Spot)",
+        f"- **Disaster Hard Stop (Below 200 SMA & 25x Shelf):** `${slsp.disaster_stop_price:,.2f}` (`{slsp.disaster_stop_dist_pct:.2f}%` from Spot)",
+        f"- **Risk Budget Compliance Pass (<= 4.5%):** `{bool(slsp.disaster_stop_dist_pct <= 4.5)}`",
+        f"- **Stop Distance (`Reference Entry - Structural Stop`):** `${stop_dist:,.2f}`",
+        f"- **1.5R Reference Level (`Entry + 1.5 * Stop Distance`):** `${ref_1_5r:,.2f}`",
+        f"- **2.5R Reference Level (`Entry + 2.5 * Stop Distance`):** `${ref_2_5r:,.2f}`",
+        f"- **Distance to Overhead Resistance in R (`Obstacle R`):** `{obs_r:.2f}R`",
+        f"- **Clearance >= 1.50R (`Obstacle R >= 1.50`):** `{clearance_ok}`",
+        f"- **Sized Position (Macro Sized {slsp.macro_sizing_factor:.2f}x):** `{sized_btc:.4f} BTC` (`${notional_usd:,.2f}` notional)",
+        "",
+        "## 5. DAILY & 4H 3-EMA METRICS",
+        f"- **1D EMA20 / EMA50 / EMA200:** `${ (ema_snap.daily_ema_20 if ema_snap else 0.0):,.2f}` / `${ (ema_snap.daily_ema_50 if ema_snap else 0.0):,.2f}` / `${ (ema_snap.daily_ema_200 if ema_snap else 0.0):,.2f}`",
+        f"- **1D EMA200 5-Day Slope (%):** `{slsp.ema_3_slope_200:+.3f}%`",
+        f"- **1D ADX(14):** `{slsp.ema_3_adx:.2f}` | **ADX(14) >= 20.0:** `{bool(slsp.ema_3_adx >= 20.0)}`",
+        f"- **4H EMA9 / EMA20 / EMA50:** `${ (ema_snap.ema_4h_9 if ema_snap else 0.0):,.2f}` / `${ (ema_snap.ema_4h_20 if ema_snap else 0.0):,.2f}` / `${ (ema_snap.ema_4h_50 if ema_snap else 0.0):,.2f}`",
+        f"- **Spot Inside 4H [EMA20, EMA50] Value Band:** `{bool(slsp.ema_3_value_zone_active)}`",
+        f"- **4H Wick Condition Met (Last 3 Closed 4H Bars):** `{bool(ema_snap.rejection_active) if ema_snap else False}`",
+        f"- **4H Close > 4H EMA9:** `{bool(ema_snap.trigger_active) if ema_snap else False}`",
+        f"- **Positioning Sub-Conditions Met Count:** `{slsp.ema_3_positioning_met} / 3`",
+        "",
+        "## 6. LIQUIDATION FLUSH & VOLUME CLIMAX SENSORS",
+        f"- **1H OI Delta (%):** `{slsp.liq_flush_oi_delta:+.2f}%`",
+        f"- **15m Relative Volume (`RelVol vs 20-bar SMA`):** `{slsp.tell_tale_relvol_15m:.2f}x` | **15m RelVol >= 5.0x:** `{bool(slsp.tell_tale_relvol_15m >= 5.0)}`",
+        f"- **5m Relative Volume (`RelVol vs 20-bar SMA`):** `{slsp.tell_tale_relvol_5m:.2f}x` | **5m RelVol >= 5.0x:** `{bool(slsp.tell_tale_relvol_5m >= 5.0)}`",
+        f"- **Volume Climax Interlock Active:** `{bool(slsp.tell_tale_veto)}`",
+    ])
+    if liq_rep is not None:
+        w15 = liq_rep.windows.get("15m")
+        w1h = liq_rep.windows.get("1h")
+        w4h = liq_rep.windows.get("4h")
+        w24h = liq_rep.windows.get("24h")
+        lines.extend([
+            f"- **Liquidated USD (`15m / 1h / 4h / 24h`):** `${(w15.total_usd if w15 else 0.0):,.0f}` / `${(w1h.total_usd if w1h else 0.0):,.0f}` / `${(w4h.total_usd if w4h else 0.0):,.0f}` / `${(w24h.total_usd if w24h else 0.0):,.0f}`",
+            f"- **24H Liquidation Multiple:** `{liq_rep.liquidation_multiple_24h:.2f}x`",
+            f"- **Reference Zone (`$75,000 - $78,000`) Distance to Lower / Upper:** `{liq_rep.demand_zone_dist_lower_pct:+.2f}%` / `{liq_rep.demand_zone_dist_upper_pct:+.2f}%`",
+        ])
 
     return sanitize_data_only_text("\n".join(lines))
 

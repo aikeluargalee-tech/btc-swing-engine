@@ -4623,6 +4623,8 @@ class SLSPKeyLevel:
     is_hvn: bool = False
     is_swing_pivot: bool = True
     description: str = ""
+    liquidation_volume_usd: float = 0.0
+    liquidation_cluster_tag: str = ""
 
 
 @dataclass
@@ -4644,6 +4646,8 @@ class SLSPTradeSetup:
     breakeven_trigger_price: float = 0.0  # +1.0R
     breakeven_active: bool = False
     obstacle_detected: bool = False
+    disaster_stop: float = 0.0
+    macro_sizing_factor: float = 1.0
     obstacle_r: float = 999.0
     obstacle_description: str = ""
     rejection_candle_type: str = "NONE"  # "PINBAR", "ENGULFING", "MOMENTUM_CLOSE", "NONE"
@@ -4692,6 +4696,32 @@ class SLSPEvaluation:
     confluence_score: int = 0  # 0 to 100
     plain_english_summary: str = ""
     decision_log: List[str] = field(default_factory=list)
+
+    # Integrated Tab M Context (5-Regime Radar & Liquidation Gravity):
+    macro_regime_id: str = "RANGE_LIQUIDATION_MAGNET"
+    macro_regime_name: str = "Range / Liquidation Magnet"
+    macro_regime_score: str = "4/4"
+    macro_regime_diagnosis: str = ""
+    macro_sizing_factor: float = 0.50
+    macro_rotation: str = "Remain USDT"
+    macro_hard_lock_cash: bool = False
+    macro_lock_reason: str = ""
+    upper_magnet_price: float = 0.0
+    upper_magnet_dist_pct: float = 0.0
+    upper_magnet_vol_usd: float = 0.0
+    lower_magnet_price: float = 0.0
+    lower_magnet_dist_pct: float = 0.0
+    lower_magnet_vol_usd: float = 0.0
+    dominant_pull_dir: str = "NEUTRAL"
+    immediate_ratio: float = 1.0
+    total_ladder_ratio: float = 1.0
+    lsce_status: str = "UNTESTED"
+    lsce_cluster_tested: str = ""
+    lsce_action_verdict: str = ""
+    structural_stop_price: float = 0.0
+    structural_stop_dist_pct: float = 0.0
+    disaster_stop_price: float = 0.0
+    disaster_stop_dist_pct: float = 0.0
 
 
 @dataclass

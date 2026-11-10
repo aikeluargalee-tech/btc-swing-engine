@@ -229,4 +229,12 @@ class FSMStorageManager:
             json.dump(payload, tf, indent=2)
             temp_name = tf.name
 
-        os.replace(temp_name, self.storage_path)
+        try:
+            os.replace(temp_name, self.storage_path)
+        except OSError:
+            import shutil
+            try:
+                shutil.copyfile(temp_name, self.storage_path)
+                os.remove(temp_name)
+            except Exception:
+                pass

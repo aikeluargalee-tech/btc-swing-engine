@@ -450,5 +450,131 @@ class TestSLSPEngine(unittest.TestCase):
 
 
 
+    def test_macro_regime_integration_and_radar(self) -> None:
+        """Verifies Step 1 Macro Regime Radar, majority voting, and sizing factor on Desk P."""
+        bars_1d = [
+            make_kline(1700000000000 + i * 86400000, 74000, 77000, 73500, 76300)
+            for i in range(20)
+        ]
+        bars_4h = [
+            make_kline(1700000000000 + i * 14400000, 75800, 76500, 75500, 76323)
+            for i in range(30)
+        ]
+        self.store.spot_klines_1d.extend(bars_1d)
+        self.store.binance_spot_price = 76323.79
+        eval_p = self.engine.evaluate(self.store, bars_1d, bars_4h, current_price=76323.79)
+
+        self.assertIsNotNone(eval_p.macro_regime_name)
+        self.assertIsNotNone(eval_p.macro_regime_score)
+        self.assertIn("/4", eval_p.macro_regime_score)
+        self.assertGreaterEqual(eval_p.macro_sizing_factor, 0.0)
+        self.assertLessEqual(eval_p.macro_sizing_factor, 1.0)
+        self.assertIn(eval_p.dominant_pull_dir, ["UPPER", "LOWER", "NEUTRAL"])
+        self.assertGreater(eval_p.upper_magnet_price, 0.0)
+        self.assertGreater(eval_p.lower_magnet_price, 0.0)
+        self.assertIn(eval_p.lsce_status, ["UNTESTED", "SWEEP_IN_PROGRESS", "SWEEP_AND_RECLAIM_CONFIRMED", "BREAKDOWN_CONTINUATION"])
+
+    def test_macro_hard_lock_on_cascade(self) -> None:
+        """Verifies that a Cascade or Fragile Trap regime forces Desk P into 100% Cash STAND_ASIDE."""
+        from core.models import BTCMagnetEvaluation, BTCMagnetLevel
+        bars_1d = [
+            make_kline(1700000000000 + i * 86400000, 74000, 77000, 73500, 76300)
+            for i in range(20)
+        ]
+        bars_4h = [
+            make_kline(1700000000000 + i * 14400000, 75800, 76500, 75500, 76323)
+            for i in range(30)
+        ]
+        self.store.spot_klines_1d.extend(bars_1d)
+        self.store.binance_spot_price = 76323.79
+
+        # Inject a CASCADE macro evaluation
+        fake_mag = BTCMagnetEvaluation(
+            timestamp_utc="2026-11-10 12:00:00 UTC",
+            spot_price=76323.79,
+            price_change_24h_pct=-6.5,
+            funding_rate_annual_pct=-15.0,
+            oi_delta_4h_pct=-8.0,
+            market_regime="Downtrend / Cascade",
+            regime_id="CASCADE",
+            regime_name="Cascade",
+            majority_score="4/4",
+            majority_matches_count=4,
+            regime_diagnosis="Forced liquidation waterfall in progress",
+            is_conflicted=False,
+            conflict_reason="",
+            all_observations=[("Cascade active", True)],
+            upper_magnet=BTCMagnetLevel(price=80000.0, dist_pct=+4.8, usd_volume=50e6),
+            lower_magnet=BTCMagnetLevel(price=71000.0, dist_pct=-7.0, usd_volume=500e6),
+            pull_direction="LOWER",
+            immediate_ratio=3.5,
+            total_ladder_ratio=4.0,
+            immediate_u_vol=50.0,
+            immediate_l_vol=175.0,
+            total_u_vol=100.0,
+            total_l_vol=400.0,
+            lsce_status="SWEEP_IN_PROGRESS",
+            lsce_cluster_tested="Lower Longs ($71,000)",
+            lsce_sweep_depth_pct=-7.0,
+            lsce_reclaim_level=71000.0,
+            lsce_spot_absorption="Unconfirmed",
+            lsce_action_verdict="Cascade dump in progress. Veto all longs.",
+            action="Stand Aside (0.00x)",
+            sizing_factor=0.0,
+            rotation="Remain USDT",
+            entry_instruction="Do not buy falling knife.",
+            structural_stop_price=75000.0,
+            structural_stop_dist_pct=1.73,
+            disaster_stop_price=73000.0,
+            disaster_stop_dist_pct=4.35,
+            risk_budget_pass=True,
+            rule_checks=[],
+        )
+        self.store.btc_magnet_evaluation = fake_mag
+
+        eval_p = self.engine.evaluate(self.store, bars_1d, bars_4h, current_price=76323.79)
+        self.assertTrue(eval_p.macro_hard_lock_cash)
+        self.assertEqual(eval_p.trade_state, "STAND_ASIDE")
+        self.assertEqual(eval_p.macro_sizing_factor, 0.0)
+        self.assertEqual(eval_p.macro_rotation, "Remain USDT")
+        if eval_p.active_setup:
+            self.assertEqual(eval_p.active_setup.position_size_btc, 0.0)
+
+    def test_dual_inviolable_stops_and_data_only_report(self) -> None:
+        """Verifies Dual Inviolable Stops and full build_tab_p_data_only_report output."""
+        from analytics.data_only_reports import build_tab_p_data_only_report
+        bars_1d = [
+            make_kline(1700000000000 + i * 86400000, 74000, 77000, 73500, 76300)
+            for i in range(20)
+        ]
+        bars_4h = [
+            make_kline(1700000000000 + i * 14400000, 75800, 76500, 75500, 76323)
+            for i in range(30)
+        ]
+        self.store.spot_klines_1d.extend(bars_1d)
+        self.store.binance_spot_price = 76323.79
+        eval_p = self.engine.evaluate(self.store, bars_1d, bars_4h, current_price=76323.79)
+
+        # Check stops
+        self.assertGreater(eval_p.structural_stop_price, 0.0)
+        self.assertGreater(eval_p.disaster_stop_price, 0.0)
+        self.assertLess(eval_p.disaster_stop_price, eval_p.structural_stop_price)
+        self.assertGreater(eval_p.disaster_stop_dist_pct, 0.0)
+
+        # Check Tab P DATA-ONLY report
+        report = build_tab_p_data_only_report(self.config, self.store)
+        self.assertIn("# TAB [P: STRUCTURE] | DATA-ONLY METRICS REPORT", report)
+        self.assertIn("## 1. 5-REGIME RADAR DIAGNOSIS & MACRO SIZING", report)
+        self.assertIn("## 2. DAILY SWING STRUCTURE & LIQUIDATION-BACKED KEY SHELVES", report)
+        self.assertIn("## 3. LIQUIDATION GRAVITATIONAL HORIZON & LSCE SWEEP ENGINE", report)
+        self.assertIn("## 4. REFERENCE LEVELS & DUAL INVIOLABLE STOPS", report)
+        self.assertIn("## 5. DAILY & 4H 3-EMA METRICS", report)
+        self.assertIn("## 6. LIQUIDATION FLUSH & VOLUME CLIMAX SENSORS", report)
+        self.assertIn("Active Market Regime:", report)
+        self.assertIn("Dominant Gravitational Pull:", report)
+        self.assertIn("Structural Stop Loss", report)
+        self.assertIn("Disaster Hard Stop", report)
+
+
 if __name__ == "__main__":
     unittest.main()

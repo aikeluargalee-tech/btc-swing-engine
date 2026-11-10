@@ -1769,6 +1769,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             except Exception:
                 liq_rep = None
 
+        macro_lock_str = f" | **Macro Hard-Lock**: `LOCKED 100% CASH` ({slsp.macro_lock_reason})" if slsp.macro_hard_lock_cash else ""
         lines.extend([
             "",
             "---",
@@ -1777,8 +1778,9 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             "",
             "> [!NOTE]",
             "> **THE 4-PILLAR PRICE ACTION & STRUCTURE CONFLUENCE LAW**",
-            "> Integrates File A (SLSP v1.0 swing structure and 1.5R obstacle law), File B (Industrial 3-EMA 200D slope anchor and 4H value zone), Project 8 (BTC Liquidation Flush Detector cascade lifecycle and $75k–$78k demand zone), and Project 7 (Tell-Tale 5.0x volume capitulation climax first-shock alarm).",
+            "> Integrates File A (SLSP v1.0 swing structure and 1.5R obstacle law), File B (Industrial 3-EMA 200D slope anchor and 4H value zone), Project 8 (BTC Liquidation Flush Detector cascade lifecycle, gravitational depth and LSCE sweep machine), and Project 7 (Tell-Tale 5.0x volume capitulation climax first-shock alarm).",
             "",
+            f"* **Step 1 Macro Regime Radar**: **`{slsp.macro_regime_name}`** (`{slsp.macro_regime_score}` Confirmed) | Diagnosis: `{slsp.macro_regime_diagnosis}` | Macro Sizing: `{slsp.macro_sizing_factor:.2f}x` ({slsp.macro_rotation}){macro_lock_str}",
             f"* **Desk [P] Trade State**: **`{slsp.trade_state}`** | **Confluence Score**: **`{slsp.confluence_score}/100`** | **Bias**: **`{slsp.regime}`** | **Mode**: **`{slsp.mode}`**",
             f"* **Executive Bottomline Summary**: {slsp.plain_english_summary}",
             "",
@@ -1791,8 +1793,9 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             dist_s = ((atomic_spot_price - supp.center_price) / supp.center_price) * 100.0 if atomic_spot_price else 0.0
             round_txt = "Yes" if supp.is_round_number else "No"
             hvn_txt = "Yes" if supp.is_hvn else "No"
+            liq_tag_s = f" | Liquidation Pool: `{supp.liquidation_cluster_tag}` (${supp.liquidation_volume_usd/1e6:.1f}M)" if supp.liquidation_cluster_tag else ""
             lines.append(
-                f"* **Nearest Key Support Shelf**: `${supp.center_price:,.2f}` (Range: `${supp.price_min:,.0f}–${supp.price_max:,.0f}` | Distance: `{dist_s:+.2f}%` | Strength: `{supp.strength}/5★` | Touches: `{supp.touch_count}x` | Round Number: `{round_txt}` | HVN: `{hvn_txt}`)"
+                f"* **Nearest Key Support Shelf**: `${supp.center_price:,.2f}` (Range: `${supp.price_min:,.0f}–${supp.price_max:,.0f}` | Distance: `{dist_s:+.2f}%` | Strength: `{supp.strength}/5★` | Touches: `{supp.touch_count}x` | Round Number: `{round_txt}` | HVN: `{hvn_txt}`{liq_tag_s})"
             )
         else:
             lines.append("* **Nearest Key Support Shelf**: None within 10% (Scanning swing pivots)")
@@ -1800,8 +1803,9 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
         if slsp.nearest_resistance:
             res = slsp.nearest_resistance
             dist_r = ((res.center_price - atomic_spot_price) / atomic_spot_price) * 100.0 if atomic_spot_price else 0.0
+            liq_tag_r = f" | Liquidation Pool: `{res.liquidation_cluster_tag}` (${res.liquidation_volume_usd/1e6:.1f}M)" if res.liquidation_cluster_tag else ""
             lines.append(
-                f"* **Nearest Key Resistance Shelf**: `${res.center_price:,.2f}` (Range: `${res.price_min:,.0f}–${res.price_max:,.0f}` | Distance: `{dist_r:+.2f}%` overhead | Strength: `{res.strength}/5★` | Touches: `{res.touch_count}x`)"
+                f"* **Nearest Key Resistance Shelf**: `${res.center_price:,.2f}` (Range: `${res.price_min:,.0f}–${res.price_max:,.0f}` | Distance: `{dist_r:+.2f}%` overhead | Strength: `{res.strength}/5★` | Touches: `{res.touch_count}x`{liq_tag_r})"
             )
         else:
             lines.append("* **Nearest Key Resistance Shelf**: Blue Sky / Clear Path (No major daily resistance within 10%)")
@@ -1811,8 +1815,8 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             lines.extend([
                 f"* **1.5R Runway Obstacle Check**: `{setup.obstacle_r:.2f}R` clearance to resistance | Status: **`{obs_flag}`** ({setup.obstacle_description})",
                 f"* **4H Candlestick Rejection**: Type: `{setup.rejection_candle_type}` (Lower Wick Ratio: `{setup.rejection_wick_ratio*100:.1f}%`) | 4H Volume vs 20 SMA: `{setup.rejection_volume_ratio:.2f}x`",
-                f"* **Institutional Sizing (0.75% Equity Risk)**: Sized: `{setup.position_size_btc:.4f} BTC` (`${setup.notional_value_usd:,.2f}` notional | Zero Leverage Spot) | Max Risk: `${100000.0 * (setup.risk_pct/100):,.2f}`",
-                f"* **Execution Geometry**: Entry: `${setup.entry_price:,.2f}` | Stop Loss: `${setup.stop_loss:,.2f}` (-${setup.risk_per_coin:,.2f}) | TP1 (+1.5R 50% scale-out): `${setup.tp1_price:,.2f}` | TP2 (+2.5R runner): `${setup.tp2_price:,.2f}` | Breakeven Ratchet (+1.0R): `${setup.breakeven_trigger_price:,.2f}`",
+                f"* **Macro Sizing & Risk Allocation**: Sized: `{setup.position_size_btc:.4f} BTC` (`${setup.notional_value_usd:,.2f}` notional | Macro Factor: `{slsp.macro_sizing_factor:.2f}x` | Zero Leverage Spot) | Max Risk: `${100000.0 * (setup.risk_pct/100):,.2f}`",
+                f"* **Execution Geometry & Dual Stops**: Entry: `${setup.entry_price:,.2f}` | Structural Stop (1H Close): `${slsp.structural_stop_price:,.2f}` ({slsp.structural_stop_dist_pct:.2f}%) | Disaster Hard Stop (Below 200 SMA & 25x Shelf): `${slsp.disaster_stop_price:,.2f}` ({slsp.disaster_stop_dist_pct:.2f}%) | Risk Budget Pass: `{bool(slsp.disaster_stop_dist_pct <= 4.5)}` | TP1 (+1.5R): `${setup.tp1_price:,.2f}` | TP2 (+2.5R): `${setup.tp2_price:,.2f}` | Breakeven Ratchet (+1.0R): `${setup.breakeven_trigger_price:,.2f}`",
             ])
         else:
             lines.append("* **Active Setup Parameters**: Scanning for structural touch and 4H rejection candle")
@@ -1850,6 +1854,9 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             t4h = f"${w4h.total_usd:,.0f}" if w4h else "$0"
             t24h = f"${w24h.total_usd:,.0f}" if w24h else "$0"
             lines.extend([
+                f"* **Liquidation Horizon & Depth Ladder**: Dominant Pull: **`{slsp.dominant_pull_dir}`** | Imbalance Ratios: Immediate (100x): `{slsp.immediate_ratio:.2f}x`, Total Ladder (10x-100x): `{slsp.total_ladder_ratio:.2f}x`",
+                f"* **Liquidation Magnet Pools**: Upper (Shorts): `${slsp.upper_magnet_price:,.2f}` ({slsp.upper_magnet_dist_pct:+.2f}%, `${slsp.upper_magnet_vol_usd / 1e6:.1f}M`) | Lower (Longs): `${slsp.lower_magnet_price:,.2f}` ({slsp.lower_magnet_dist_pct:+.2f}%, `${slsp.lower_magnet_vol_usd / 1e6:.1f}M`)",
+                f"* **LSCE Sweep State Machine**: Status: **`[{slsp.lsce_status}]`** | Tested: `{slsp.lsce_cluster_tested}` | Action Verdict: {slsp.lsce_action_verdict}",
                 f"* **Crash Lifecycle Stage**: **`{liq_rep.verdict}`** (`{liq_rep.primary_classification}`) | Detail: {liq_rep.verdict_detail}",
                 f"* **Damage So Far ($ Liquidated)**: 15m: `{t15}` | 1h: `{t1h}` | 4h: `{t4h}` | 24h: `{t24h}` | Magnitude Tier: **`{liq_rep.magnitude_tier}`** (24h Multiple: `{liq_rep.liquidation_multiple_24h:.2f}x`)",
                 f"* **Leverage Wipeout Telemetry**: Open Interest: `{liq_rep.open_interest_contracts:,.0f} contracts` | 1H dOI: `{slsp.liq_flush_oi_delta:+.2f}%` | Funding Rate: `{liq_rep.funding_rate*100:+.4f}%` ({liq_rep.funding_status})",

@@ -397,7 +397,7 @@ class BTCMagnetEngine:
         f1 = f"Immediate: LOWER is {imm_ratio:.1f}x larger (${imm_l:.1f}M vs ${imm_u:.1f}M) | Total Ladder: LOWER is {tot_ratio:.2f}x (${tot_l:.1f}M vs ${tot_u:.1f}M)"
         f2 = f"Spot CVD ratio {spot_cvd_ratio:.2f} (Physical Demand) vs Perp CVD {perp_cvd_trend}"
         long_pct = round((ls_ratio / (1.0 + ls_ratio)) * 100.0, 1) if ls_ratio > 0 else 50.0
-        f3 = f"Funding {raw_funding*100:+.3f}%, Retail L/S {ls_ratio:.2f} ({long_pct}% net long)"
+        f3 = f"Funding {raw_funding:+.4f}%/8h, Retail L/S {ls_ratio:.2f} ({long_pct}% net long)"
         f4 = "Range compression with downside liquidation fragility"
         f5 = f"LOWER is {dist_l:.2f}% away vs UPPER {dist_u:.2f}% away"
         f6 = f"ATR compressed {atr_comp:.1f}% of 72h peak"
@@ -511,8 +511,8 @@ class BTCMagnetEngine:
         c_casc_all.append((f"OI crashing ({oi_delta_1h:+.1f}% 1h / {oi_delta_4h:+.1f}% 4h)", b2))
         if b2: c_casc.append(c_casc_all[-1][0])
 
-        b3 = (raw_funding <= -0.005)
-        c_casc_all.append((f"Funding plunged deeply negative ({raw_funding*100:+.3f}%)", b3))
+        b3 = (raw_funding <= -0.020)
+        c_casc_all.append((f"Funding plunged deeply negative ({raw_funding:+.4f}%/8h)", b3))
         if b3: c_casc.append(c_casc_all[-1][0])
 
         b4 = (futures_basis_annual < 1.0)
@@ -546,8 +546,8 @@ class BTCMagnetEngine:
         c_lev_all.append((f"Perp OI surging rapidly (+{oi_delta_4h:.1f}% 4h)", b2))
         if b2: c_lev.append(c_lev_all[-1][0])
 
-        b3 = (raw_funding >= 0.020)
-        c_lev_all.append((f"Funding rate overheated (+{raw_funding*100:.3f}%)", b3))
+        b3 = (raw_funding >= 0.025)
+        c_lev_all.append((f"Funding rate overheated (+{raw_funding:+.4f}%/8h)", b3))
         if b3: c_lev.append(c_lev_all[-1][0])
 
         b4 = (long_short_ratio >= 2.1)
@@ -581,8 +581,8 @@ class BTCMagnetEngine:
         c_dist_all.append((f"Spot CVD persistently negative (Delta {spot_cvd_4h_btc:+.1f} BTC / Ratio {spot_cvd_ratio:.2f})", b2))
         if b2: c_dist.append(c_dist_all[-1][0])
 
-        b3 = (raw_funding >= 0.002 or futures_basis_annual < 4.0)
-        c_dist_all.append((f"Trapped longs paying funding ({raw_funding*100:.3f}%) / compressed basis ({futures_basis_annual:.1f}%)", b3))
+        b3 = (raw_funding >= 0.005 or futures_basis_annual < 4.0)
+        c_dist_all.append((f"Trapped longs paying funding ({raw_funding:+.4f}%/8h) / compressed basis ({futures_basis_annual:.1f}%)", b3))
         if b3: c_dist.append(c_dist_all[-1][0])
 
         b4 = (bids_asks_depth_ratio < 0.35)
@@ -617,8 +617,8 @@ class BTCMagnetEngine:
         c_rng_all.append((f"Spot CVD neutral/balanced (Ratio {spot_cvd_ratio:.2f})", b2))
         if b2: c_rng.append(c_rng_all[-1][0])
 
-        b3 = (long_short_ratio >= 1.55 or abs(raw_funding) <= 0.012)
-        c_rng_all.append((f"Positioning crowded (L/S {long_short_ratio:.2f}, funding {raw_funding*100:.3f}%)", b3))
+        b3 = (long_short_ratio >= 1.55 or abs(raw_funding) <= 0.020)
+        c_rng_all.append((f"Positioning crowded (L/S {long_short_ratio:.2f}, funding {raw_funding:+.4f}%/8h)", b3))
         if b3: c_rng.append(c_rng_all[-1][0])
 
         b4 = (upper_magnet.usd_volume >= 100_000_000 and lower_magnet.usd_volume >= 100_000_000)
@@ -674,8 +674,8 @@ class BTCMagnetEngine:
         c_spot_all.append((f"Spot CVD leading (Ratio {spot_cvd_ratio:.2f}, 4h Delta +{spot_cvd_4h_btc:.1f} BTC)", b2))
         if b2: c_spot.append(c_spot_all[-1][0])
 
-        b3 = (raw_funding <= 0.012 and oi_delta_24h <= 4.0)
-        c_spot_all.append((f"Funding and OI controlled (Funding {raw_funding*100:.3f}%, OI 24h {oi_delta_24h:+.1f}%)", b3))
+        b3 = (raw_funding <= 0.015 and oi_delta_24h <= 4.0)
+        c_spot_all.append((f"Funding and OI controlled (Funding {raw_funding:+.4f}%/8h, OI 24h {oi_delta_24h:+.1f}%)", b3))
         if b3: c_spot.append(c_spot_all[-1][0])
 
         b4 = (price_change_24h >= 2.0)

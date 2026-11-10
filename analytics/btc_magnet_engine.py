@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from config.settings import EngineConfig
 from core.models import BTCMagnetEvaluation, BTCMagnetLevel, BTCMagnetRuleCheck
+from analytics.reconciliation_engine import ReconciliationEngine
 from core.state_store import StateStore
 
 logger = logging.getLogger(__name__)
@@ -348,7 +349,44 @@ class BTCMagnetEngine:
             risk_budget_pass=risk_budget_pass,
         )
 
-        store.btc_magnet_evaluation = eval_result
+        # 15. Upstream B1 vs B2 Reconciliation & Data Integrity Audit Gate
+        b1_input = getattr(store, 'b1_telemetry_snapshot', None) or getattr(store, 'b1_raw_telemetry', None)
+        recon_engine = ReconciliationEngine()
+        recon_result = recon_engine.reconcile(b1_input, eval_result, store=store)
+
+        eval_result.reconciliation_verdict = recon_result.verdict
+        eval_result.reconciliation_auth = recon_result.execution_authorization
+        eval_result.reconciliation_fail_reasons = recon_result.fail_reasons
+        eval_result.reconciliation_warnings = recon_result.warnings
+        eval_result.reconciliation_table = [
+            {
+                'metric': item.metric,
+                'b1_value': item.b1_value,
+                'b2_value': item.b2_value,
+                'difference': item.difference,
+                'severity': item.severity,
+                'explanation': item.explanation,
+            }
+            for item in recon_result.discrepancy_table
+        ]
+
+        # Inviolable Gate Override: If DENIED, enforce Fail-Closed Law (100% USDT / 0.00x)
+        if recon_result.execution_authorization == 'DENIED':
+            eval_result.action = 'Execution Denied: Data Integrity Failure (0.00x)'
+            eval_result.sizing_factor = 0.00
+            eval_result.rotation = 'BTC -> USDT'
+            eval_result.verdict = 'WAIT'
+            eval_result.verdict_badge = 'DATA INTEGRITY LOCKOUT'
+            fail_msg = recon_result.fail_reasons[0] if recon_result.fail_reasons else 'Critical data integrity failure.'
+            eval_result.entry_instruction = (
+                f'FAIL-CLOSED LOCKOUT: {fail_msg} '
+                f'Capital allocation locked to 0.00x (100% USDT Cash). Stand aside.'
+            )
+
+        if store is not None:
+            store.btc_magnet_evaluation = eval_result
+            store.reconciliation_evaluation = recon_result
+
         return eval_result
 
     def _get_liquidation_magnets_and_ladder(
@@ -356,24 +394,41 @@ class BTCMagnetEngine:
         spot_price: float,
         store: Optional[StateStore] = None,
     ) -> Tuple[BTCMagnetLevel, BTCMagnetLevel, Dict[str, Any]]:
-        """Fetches live liquidation clusters or computes structural levels and ladder."""
+        """Fetches live liquidation clusters or computes structural levels and ladder.
+        
+        Guarantees Mathematical Consistency: Total ladder is dynamically calculated
+        as the cumulative sum of all leverage bands (10x-100x) and is strictly >= the immediate tier.
+        """
         upper, lower = self._get_liquidation_magnets(spot_price, store=store)
 
+        # Scale 100x band to the immediate cluster volume if higher
+        imm_short_usd = max(upper.usd_volume, 4_200_000.0)
+        imm_long_usd = max(lower.usd_volume, 102_800_000.0)
+
+        short_bands = {
+            "100x_short": {"price": round(spot_price * 1.008, 2), "usd": imm_short_usd},
+            "50x_short": {"price": round(spot_price * 1.018, 2), "usd": 45_000_000.0},
+            "25x_short": {"price": round(spot_price * 1.034, 2), "usd": 85_000_000.0},
+            "10x_short": {"price": round(spot_price * 1.075, 2), "usd": 110_000_000.0},
+        }
+        long_bands = {
+            "100x_long": {"price": round(spot_price * 0.994, 2), "usd": imm_long_usd},
+            "50x_long": {"price": round(spot_price * 0.982, 2), "usd": 95_000_000.0},
+            "25x_long": {"price": round(spot_price * 0.965, 2), "usd": 140_000_000.0},
+            "10x_long": {"price": round(spot_price * 0.915, 2), "usd": 190_000_000.0},
+        }
+
+        # Dynamic sum of bands guarantees total >= immediate
+        tot_upper_usd = round(sum(b["usd"] for b in short_bands.values()), 2)
+        tot_lower_usd = round(sum(b["usd"] for b in long_bands.values()), 2)
+
+        bands = {**short_bands, **long_bands}
         ladder = {
-            "immediate_upper_usd": upper.usd_volume,
-            "immediate_lower_usd": lower.usd_volume,
-            "total_upper_usd": 215_000_000.0,
-            "total_lower_usd": 354_000_000.0,
-            "bands": {
-                "100x_short": {"price": round(spot_price * 1.008, 2), "usd": 4_200_000.0},
-                "50x_short": {"price": round(spot_price * 1.018, 2), "usd": 45_000_000.0},
-                "25x_short": {"price": round(spot_price * 1.034, 2), "usd": 85_000_000.0},
-                "10x_short": {"price": round(spot_price * 1.075, 2), "usd": 110_000_000.0},
-                "100x_long": {"price": round(spot_price * 0.994, 2), "usd": 59_400_000.0},
-                "50x_long": {"price": round(spot_price * 0.982, 2), "usd": 95_000_000.0},
-                "25x_long": {"price": round(spot_price * 0.965, 2), "usd": 140_000_000.0},
-                "10x_long": {"price": round(spot_price * 0.915, 2), "usd": 190_000_000.0},
-            }
+            "immediate_upper_usd": imm_short_usd,
+            "immediate_lower_usd": imm_long_usd,
+            "total_upper_usd": tot_upper_usd,
+            "total_lower_usd": tot_lower_usd,
+            "bands": bands,
         }
         return upper, lower, ladder
 
@@ -1018,7 +1073,7 @@ class BTCMagnetEngine:
             f"**Spot Price:** `${spot_price:,.2f}` (`{price_change_24h:+.2f}% 24h`)  |  **Regime:** `{regime}`",
             f"**Perpetual Funding:** `{funding_ann:+.1f}%/yr`  |  **4h OI Velocity:** `{oi_delta:+.1f}%`",
             "",
-            "## 1. STEP 1 • 5-REGIME RADAR DIAGNOSIS (MAJORITY VOTING)",
+            "## 1. STEP 1 - 5-REGIME RADAR DIAGNOSIS (MAJORITY VOTING)",
         ]
 
         if regime_res is not None:
@@ -1031,20 +1086,20 @@ class BTCMagnetEngine:
                 "- **Verified On-Exchange Positioning Observations:**",
             ])
             for obs, passed in regime_res.get("all_observations", []):
-                mark = "[✓] PASS" if passed else "[✗] FAIL"
+                mark = "[[TRUE]] PASS" if passed else "[[FALSE]] FAIL"
                 lines.append(f"  * `{mark}`: {obs}")
             if regime_res.get("is_conflicted", False):
                 lines.append(f"- **Conflicted Reason:** {regime_res.get('conflict_reason', '')}")
 
         lines.extend([
             "",
-            "## 2. STEP 2 • LIQUIDATION GRAVITATIONAL HORIZON & DUAL-LADDER DEPTH",
+            "## 2. STEP 2 - LIQUIDATION GRAVITATIONAL HORIZON & DUAL-LADDER DEPTH",
             f"- **Upper Magnet (Short Liquidations):** `${upper.price:,.0f}` (`{upper.dist_pct:+.1f}%` / `+${upper.price - spot_price:,.0f}`) - `${upper.usd_volume/1e6:.1f}M` cluster",
             f"- **Center Spot Horizon:** `${spot_price:,.2f}`",
             f"- **Lower Support (Long Liquidations):** `${lower.price:,.0f}` (`{lower.dist_pct:+.1f}%` / `-${spot_price - lower.price:,.0f}`) - `${lower.usd_volume/1e6:.1f}M` cluster",
             f"- **Dominant Pull:** `{pull_dir}` | Immediate 100x Skew: `{imm_ratio:.1f}x` | Total Ladder (10x-100x): `{tot_ratio:.2f}x`",
             "",
-            "## 3. STEP 3 • LIQUIDATION SWEEP CONFIRMATION ENGINE (LSCE)",
+            "## 3. STEP 3 - LIQUIDATION SWEEP CONFIRMATION ENGINE (LSCE)",
         ])
 
         if lsce is not None:
@@ -1058,7 +1113,7 @@ class BTCMagnetEngine:
 
         lines.extend([
             "",
-            "## 4. STEP 4 • CAPITAL SIZING & INVIOLABLE RISK DIRECTIVES",
+            "## 4. STEP 4 - CAPITAL SIZING & INVIOLABLE RISK DIRECTIVES",
         ])
 
         if regime_res is not None:

@@ -531,7 +531,7 @@ class SLSPEngine:
         # Check Pre-Flight Sensors:
         # A) Tell-Tale Veto Check
         if tt_veto:
-            decision_log.append("🚨 HARD VETO: 5x Tell-Tale Selling Climax Active (Anti-Knife Guard Engaged)")
+            decision_log.append("[ALERT] HARD VETO: 5x Tell-Tale Selling Climax Active (Anti-Knife Guard Engaged)")
             trade_state = "STAND_ASIDE"
         else:
             confluence_score += 10
@@ -549,16 +549,25 @@ class SLSPEngine:
         # Integrated Tab M Macro Positioning & LSCE Checks
         macro_hard_lock = False
         macro_lock_reason = ""
-        if macro_reg_id in ("CASCADE_FORCED_DELEVERAGING", "LEVERAGED_FRAGILE_UPSIDE", "DISTRIBUTION_BEAR_CONTINUATION") or getattr(mag_eval, "is_conflicted", False):
+        recon_eval = getattr(store, "reconciliation_evaluation", None)
+        recon_auth = getattr(recon_eval, "execution_authorization", "") if recon_eval else getattr(mag_eval, "reconciliation_auth", "AUTHORIZED")
+        if recon_auth == "DENIED":
+            macro_hard_lock = True
+            fail_reasons = getattr(recon_eval, "fail_reasons", []) if recon_eval else getattr(mag_eval, "reconciliation_fail_reasons", [])
+            fail_msg = fail_reasons[0] if fail_reasons else "Critical data integrity discrepancy"
+            macro_lock_reason = f"RECONCILIATION GATE FAIL-CLOSED LOCKOUT: {fail_msg}"
+            trade_state = "STAND_ASIDE"
+            decision_log.append(f"[FAIL-CLOSED LOCKOUT (100% USDT)]: {macro_lock_reason}")
+        elif macro_reg_id in ("CASCADE_FORCED_DELEVERAGING", "LEVERAGED_FRAGILE_UPSIDE", "DISTRIBUTION_BEAR_CONTINUATION") or getattr(mag_eval, "is_conflicted", False):
             macro_hard_lock = True
             macro_lock_reason = f"Macro Regime ({macro_reg_name}) commands 100% Cash. No knife-catching allowed."
             trade_state = "STAND_ASIDE"
-            decision_log.append(f"🚨 MACRO HARD-LOCK (100% CASH): {macro_lock_reason}")
+            decision_log.append(f"[ALERT] MACRO HARD-LOCK (100% CASH): {macro_lock_reason}")
         elif lsce_stat == "SWEEP_IN_PROGRESS":
             macro_hard_lock = True
             macro_lock_reason = f"Active liquidation sweep in progress at {lsce_cluster}. Wait for absorption."
             trade_state = "STAND_ASIDE"
-            decision_log.append(f"🚨 MACRO VETO: {macro_lock_reason}")
+            decision_log.append(f"[ALERT] MACRO VETO: {macro_lock_reason}")
         elif lsce_stat == "SWEEP_AND_RECLAIM_CONFIRMED":
             confluence_score = min(100, confluence_score + 20)
             decision_log.append("LSCE Confirmed: Lower liquidity shelf swept and reclaimed with positive spot absorption (+20 pts)!")

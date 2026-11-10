@@ -126,6 +126,9 @@ class StateStore:
         self.ssrn_alpha_evaluation: Optional[SSRNAlphaEvaluation] = None
         self.ssrn_view_mode: str = "models"
         self.btc_magnet_evaluation: Optional[BTCMagnetEvaluation] = None
+        self.reconciliation_evaluation: Optional[Any] = None
+        self.b1_raw_telemetry: Optional[str] = None
+        self.b1_telemetry_snapshot: Optional[Any] = None
         self.trend_pullback_evaluation: Optional[TrendPullbackEvaluation] = None
         self.trend_pullback_position_status: str = "CASH"
         self.trend_pullback_entry_price: float = 0.0

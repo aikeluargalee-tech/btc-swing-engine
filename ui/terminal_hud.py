@@ -4061,7 +4061,7 @@ def _build_tab13_slsp_price_action_hud(store: StateStore, header_panel: Panel) -
     verdict_rows = [verdict_grid]
     if slsp.macro_hard_lock_cash:
         verdict_rows.append(
-            Text(f"🔒 MACRO HARD-LOCK ACTIVE: {slsp.macro_lock_reason or 'Positioning mandates 100% Cash ($0.00 notional). All long setups vetoed.'}", style="bold white on red")
+            Text(f"[LOCK] MACRO HARD-LOCK ACTIVE: {slsp.macro_lock_reason or 'Positioning mandates 100% Cash ($0.00 notional). All long setups vetoed.'}", style="bold white on red")
         )
     verdict_rows.append(Text(f"EXECUTIVE SUMMARY: {slsp.plain_english_summary}", style="italic white"))
 
@@ -5421,6 +5421,28 @@ def _build_tab17_btc_magnet_hud(
             f"[bold white on red] CONFLICTED SIGNALS DEMOTED TO MIXED [/bold white on red] "
             f"[yellow]{getattr(magnet_eval, 'conflict_reason', '')}[/yellow]"
         )
+
+    # Reconciliation Gate Badge
+    recon_eval = getattr(store, "reconciliation_evaluation", None)
+    if recon_eval is not None:
+        auth_status = recon_eval.execution_authorization
+        if auth_status == "DENIED":
+            fail_line = recon_eval.fail_reasons[0] if recon_eval.fail_reasons else "Critical data integrity discrepancy"
+            step1_table.add_row(
+                f"[bold white on red] [RECONCILIATION GATE: FAIL-CLOSED LOCKOUT (0.00x)] [/bold white on red] "
+                f"[bold bright_red]{fail_line}[/bold bright_red]"
+            )
+        elif recon_eval.verdict == "PASS_WITH_WARNINGS":
+            warn_line = recon_eval.warnings[0] if recon_eval.warnings else "Asynchronous data divergence detected"
+            step1_table.add_row(
+                f"[bold black on yellow] [RECONCILIATION GATE: PASS WITH WARNINGS] [/bold black on yellow] "
+                f"[yellow]{warn_line}[/yellow]"
+            )
+        else:
+            step1_table.add_row(
+                f"[bold black on green] [RECONCILIATION GATE: 100% VERIFIED] [/bold black on green] "
+                f"[green]Multi-tier liquidation math & funding normalized.[/green]"
+            )
 
     # Observations Checklist Grid
     obs_grid = Table.grid(expand=True)

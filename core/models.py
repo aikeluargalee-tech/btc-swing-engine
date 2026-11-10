@@ -4999,6 +4999,13 @@ class BTCMagnetEvaluation:
     disaster_stop_dist_pct: float = 0.0
     risk_budget_pass: bool = True
 
+    # B1 vs B2 Reconciliation & Data Integrity Audit
+    reconciliation_verdict: str = "PASS"
+    reconciliation_auth: str = "AUTHORIZED"
+    reconciliation_fail_reasons: List[str] = field(default_factory=list)
+    reconciliation_warnings: List[str] = field(default_factory=list)
+    reconciliation_table: List[Dict[str, str]] = field(default_factory=list)
+
 
 @dataclass
 class TrendPullbackEvaluation:
@@ -5179,4 +5186,75 @@ class TrendPullbackEvaluation:
     completed_1d_count: int = 0
     completed_4h_count: int = 0
 
+# =============================================================================
+# B1 vs B2 Reconciliation & Data Integrity Audit Models
+# =============================================================================
+@dataclass
+class ReconciliationMetricItem:
+    metric: str = ""
+    b1_value: str = ""
+    b2_value: str = ""
+    difference: str = ""
+    severity: str = "INFO"  # INFO, WARNING, CRITICAL
+    explanation: str = ""
+
+
+@dataclass
+class B1TelemetrySnapshot:
+    raw_text: str = ""
+    timestamp_utc: str = ""
+    spot_price: float = 0.0
+    regime_name: str = ""
+    majority_score: str = ""
+    rotation: str = ""
+    action: str = ""
+    sizing_factor: float = 0.0
+    lsce_status: str = ""
+    structural_stop: float = 0.0
+    disaster_stop: float = 0.0
+    immediate_ratio: float = 0.0
+    total_ladder_ratio: float = 0.0
+    lower_immediate_pool_px: float = 0.0
+    lower_immediate_pool_usd: float = 0.0
+    upper_immediate_pool_px: float = 0.0
+    upper_immediate_pool_usd: float = 0.0
+    total_lower_usd: float = 0.0
+    total_upper_usd: float = 0.0
+    spot_cvd_ratio: float = 0.0
+    funding_rate_8h_pct: float = 0.0
+    funding_rate_annual_pct: float = 0.0
+    long_short_ratio: float = 0.0
+    futures_basis_annual_pct: float = 0.0
+    is_valid: bool = False
+
+
+@dataclass
+class ReconciliationAuditResult:
+    timestamp_utc: str = ""
+    b1_timestamp_utc: str = ""
+    b2_timestamp_utc: str = ""
+    time_delta_sec: float = 0.0
+    verdict: str = "PASS"  # PASS, PASS_WITH_WARNINGS, FAIL, INSUFFICIENT_DATA, STALE_DATA
+    execution_authorization: str = "AUTHORIZED"  # AUTHORIZED, DENIED
+    fail_reasons: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+
+    # 5 Modules Check Booleans
+    ladder_check_passed: bool = True
+    ladder_details: str = ""
+    funding_check_passed: bool = True
+    funding_details: str = ""
+    geometry_check_passed: bool = True
+    geometry_details: str = ""
+    lsce_check_passed: bool = True
+    lsce_details: str = ""
+    freshness_check_passed: bool = True
+    freshness_details: str = ""
+
+    # Execution Directives
+    capital_allocation: float = 0.0
+    target_allocation: str = "100% USDT"
+    portfolio_rotation: str = "BTC -> USDT"
+    trading_status: str = "NO TRADE"
+    discrepancy_table: List[ReconciliationMetricItem] = field(default_factory=list)
 

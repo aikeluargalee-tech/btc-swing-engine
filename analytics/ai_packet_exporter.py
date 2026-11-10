@@ -2027,8 +2027,59 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             f"* **6. Data Integrity**: `Data Integrity OK: {tp_ev.data_integrity_ok}` (`1D Count: {tp_ev.completed_1d_count}` [Forming Excl: `{tp_ev.daily_forming_excluded}`] • `4H Count: {tp_ev.completed_4h_count}` [Forming Excl: `{tp_ev.candle_4h_forming_excluded}`])",
         ])
 
-    return "\n".join(lines) + "\n"
+    # --- SECTION 19: B1 vs B2 DATA INTEGRITY RECONCILIATION AUDIT & EXECUTION GATE ---
+    recon_eval = getattr(store, "reconciliation_evaluation", None)
+    if recon_eval is None and magnet is not None:
+        try:
+            from analytics.reconciliation_engine import ReconciliationEngine
+            b1_input = getattr(store, "b1_telemetry_snapshot", None) or getattr(store, "b1_raw_telemetry", None)
+            recon_eval = ReconciliationEngine().reconcile(b1_input, magnet, store=store)
+            store.reconciliation_evaluation = recon_eval
+        except Exception:
+            recon_eval = None
 
+    if recon_eval is not None:
+        lines.extend([
+            "",
+            "---",
+            "",
+            "## SECTION 19: B1 vs B2 DATA INTEGRITY RECONCILIATION AUDIT & EXECUTION GATE",
+            "",
+            f"* **Reconciliation Verdict**: `[{recon_eval.verdict}]` | **Execution Authorization**: `[{recon_eval.execution_authorization}]`",
+            f"* **Capital Sizing Directive**: `{recon_eval.capital_allocation:.2f}x` | **Target Allocation**: `{recon_eval.target_allocation}`",
+            f"* **Portfolio Rotation Directive**: `{recon_eval.portfolio_rotation}` | **Trading Status**: `{recon_eval.trading_status}`",
+            "",
+            "### 19A. 5-Module Data Integrity Checklist",
+            f"* **Module A (Ladder Math Consistency)**: `{'PASS' if recon_eval.ladder_check_passed else 'FAIL'}` - {recon_eval.ladder_details}",
+            f"* **Module B (Funding Carry Normalization)**: `{'PASS' if recon_eval.funding_check_passed else 'FAIL'}` - {recon_eval.funding_details}",
+            f"* **Module C (Cluster Geometry & Horizon)**: `{'PASS' if recon_eval.geometry_check_passed else 'FAIL'}` - {recon_eval.geometry_details}",
+            f"* **Module D (LSCE Sweep Proof & Rotation)**: `{'PASS' if recon_eval.lsce_check_passed else 'FAIL'}` - {recon_eval.lsce_details}",
+            f"* **Module E (Snapshot Synchronization)**: `{'PASS' if recon_eval.freshness_check_passed else 'FAIL'}` - {recon_eval.freshness_details}",
+            "",
+            "### 19B. Discrepancy & Reconciliation Table",
+            "| Metric | B1 Telemetry | B2 Engine | Difference | Severity | Audit Explanation |",
+            "| :--- | :--- | :--- | :--- | :--- | :--- |",
+        ])
+        for itm in recon_eval.discrepancy_table:
+            lines.append(
+                f"| {itm.metric} | {itm.b1_value} | {itm.b2_value} | {itm.difference} | `[{itm.severity}]` | {itm.explanation} |"
+            )
+        if recon_eval.fail_reasons:
+            lines.extend([
+                "",
+                "### 19C. Critical Integrity Failures (Fail-Closed Lockout)",
+            ])
+            for r in recon_eval.fail_reasons:
+                lines.append(f"* **[LOCKOUT DIRECTIVE]**: `{r}`")
+        if recon_eval.warnings:
+            lines.extend([
+                "",
+                "### 19D. Asynchronous & Methodological Warnings",
+            ])
+            for w in recon_eval.warnings:
+                lines.append(f"* **[WARNING]**: `{w}`")
+
+    return "\n".join(lines) + "\n"
 
 
 

@@ -201,6 +201,23 @@ def build_tab_p_data_only_report(config: Optional[EngineConfig], store: StateSto
             f"- **Reference Zone (`$75,000 - $78,000`) Distance to Lower / Upper:** `{liq_rep.demand_zone_dist_lower_pct:+.2f}%` / `{liq_rep.demand_zone_dist_upper_pct:+.2f}%`",
         ])
 
+    recon_eval = getattr(store, "reconciliation_evaluation", None)
+    if recon_eval is not None:
+        lines.extend([
+            "",
+            "## 7. UPSTREAM DATA INTEGRITY RECONCILIATION GATE",
+            f"- **Reconciliation Verdict:** `{recon_eval.verdict}`",
+            f"- **Execution Authorization:** `{recon_eval.execution_authorization}`",
+            f"- **Trading Status:** `{recon_eval.trading_status}`",
+            f"- **Prescribed Capital Allocation:** `{recon_eval.capital_allocation:.2f}x` (`{recon_eval.target_allocation}`)",
+            f"- **Portfolio Rotation Directive:** `{recon_eval.portfolio_rotation}`",
+            f"- **Module A (Ladder Math):** `{'PASS' if recon_eval.ladder_check_passed else 'FAIL'}` | **Module D (LSCE Proof):** `{'PASS' if recon_eval.lsce_check_passed else 'FAIL'}`",
+        ])
+        if recon_eval.fail_reasons:
+            lines.append(f"- **Lockout Directive:** `{recon_eval.fail_reasons[0]}`")
+        elif recon_eval.warnings:
+            lines.append(f"- **Active Warning:** `{recon_eval.warnings[0]}`")
+
     return sanitize_data_only_text("\n".join(lines))
 
 
@@ -391,6 +408,55 @@ def build_tab_m_data_only_report(config: Optional[EngineConfig], store: StateSto
     for r in mag.rule_checks:
         lines.append(f"- **Rule {r.rule_num} (`{r.name}`):** `{bool(r.passed)}` (`{r.detail}`)")
     lines.append(f"- **Conditions 1-6 True Count:** `{passed_count} / 6`")
+
+    recon_eval = getattr(store, "reconciliation_evaluation", None)
+    if recon_eval is None and mag is not None:
+        from analytics.reconciliation_engine import ReconciliationEngine
+        b1_input = getattr(store, "b1_telemetry_snapshot", None) or getattr(store, "b1_raw_telemetry", None)
+        recon_eval = ReconciliationEngine().reconcile(b1_input, mag, store=store)
+        store.reconciliation_evaluation = recon_eval
+
+    if recon_eval is not None:
+        lines.extend([
+            "",
+            "## 7. B1 vs B2 DATA INTEGRITY RECONCILIATION AUDIT",
+            f"- **Reconciliation Verdict:** `{recon_eval.verdict}`",
+            f"- **Execution Authorization:** `{recon_eval.execution_authorization}`",
+            f"- **Prescribed Capital Sizing:** `{recon_eval.capital_allocation:.2f}x` ({recon_eval.trading_status})",
+            f"- **Portfolio Rotation Directive:** `{recon_eval.portfolio_rotation}`",
+            f"- **Target Capital Allocation:** `{recon_eval.target_allocation}`",
+            "- **Mandatory Module Verification:**",
+            f"  * `Module A (Ladder Math Consistency)`: `{'PASS' if recon_eval.ladder_check_passed else 'FAIL'}` ({recon_eval.ladder_details})",
+            f"  * `Module B (Funding Carry Normalization)`: `{'PASS' if recon_eval.funding_check_passed else 'FAIL'}` ({recon_eval.funding_details})",
+            f"  * `Module C (Cluster Geometry & Horizon)`: `{'PASS' if recon_eval.geometry_check_passed else 'FAIL'}` ({recon_eval.geometry_details})",
+            f"  * `Module D (LSCE Sweep Proof & Rotation)`: `{'PASS' if recon_eval.lsce_check_passed else 'FAIL'}` ({recon_eval.lsce_details})",
+            f"  * `Module E (Snapshot Synchronization)`: `{'PASS' if recon_eval.freshness_check_passed else 'FAIL'}` ({recon_eval.freshness_details})",
+        ])
+        if recon_eval.discrepancy_table:
+            lines.extend([
+                "",
+                "### Discrepancy & Reconciliation Table",
+                "| Metric | B1 Value | B2 Value | Difference | Severity | Explanation |",
+                "| :--- | :--- | :--- | :--- | :--- | :--- |",
+            ])
+            for item in recon_eval.discrepancy_table:
+                lines.append(
+                    f"| {item.metric} | {item.b1_value} | {item.b2_value} | {item.difference} | `{item.severity}` | {item.explanation} |"
+                )
+        if recon_eval.fail_reasons:
+            lines.extend([
+                "",
+                "### Critical Integrity Failures (Fail-Closed Lockout)",
+            ])
+            for r in recon_eval.fail_reasons:
+                lines.append(f"- [LOCKOUT DIRECTIVE] `{r}`")
+        if recon_eval.warnings:
+            lines.extend([
+                "",
+                "### Asynchronous & Methodological Warnings",
+            ])
+            for w in recon_eval.warnings:
+                lines.append(f"- [WARNING] `{w}`")
 
     return sanitize_data_only_text("\n".join(lines))
 

@@ -152,7 +152,9 @@ class TestFourGateEngine(unittest.TestCase):
         self.assertEqual(ev.btc_sleeve_usd, 10000.0)
         self.assertGreater(ev.btc_sleeve_units, 0.0)
         self.assertAlmostEqual(ev.btc_sleeve_units * ev.live_spot_price, 10000.0, places=2)
-        self.assertIn("NEUTRAL", ev.inventory_state)
+        self.assertTrue(
+            ("SLEEVE B HOLD" in ev.inventory_state) or ("LOOP_A_TRIGGER" in ev.inventory_state)
+        )
 
     def test_dibse_loop_a_dip_harvester_math(self):
         spot_k, perp_k, fund_p = _generate_synthetic_4h_bars(240, 72000.0)
@@ -172,17 +174,44 @@ class TestFourGateEngine(unittest.TestCase):
         spot_k, perp_k, fund_p = _generate_synthetic_4h_bars(240, 78000.0)
         ev = self.engine.calculate_evaluation(spot_k, perp_k, fund_p, 45.0)
 
-        # Loop B properties
+        # Loop B telemetry remains computed while auto-sell execution is gated off by G1
         self.assertIn(ev.loop_b_score, [0, 1, 2, 3, 4])
-        self.assertIn(ev.loop_b_status, ["HOLDING_BTC", "EXECUTE_SELL", "HOLDING_SPOT_USDT_INVENTORY"])
-        self.assertIn(ev.loop_b_verdict, ["EXECUTE: DEPLOY BTC → SELL TO USDT", "HOLD BTC INVENTORY"])
+        self.assertEqual(ev.loop_b_status, "GATED_OFF_HOLD_BTC")
+        self.assertIn("G1", ev.loop_b_verdict)
+        self.assertIn("HOLD BTC", ev.loop_b_verdict)
         self.assertGreater(ev.loop_b_sell_price, 0.0)
         self.assertLess(ev.loop_b_buyback_price, ev.loop_b_sell_price)
         self.assertGreater(ev.loop_b_discount_pct, 0.0)
         self.assertGreater(ev.loop_b_free_satoshis_btc, 0.0)
         self.assertGreater(ev.loop_b_free_satoshis_pct, 0.0)
         self.assertGreater(ev.loop_b_surplus_cash_usd, 0.0)
-        self.assertIn("ZERO FORCED STOP-BUY", ev.loop_b_stop_rule)
+        self.assertIn("G1 GATE", ev.loop_b_stop_rule)
+
+    def test_dibse_loop_b_gated_off_even_under_distribution_telemetry(self):
+        spot_k, perp_k, fund_p = _generate_synthetic_4h_bars(240, 78000.0)
+        # Inject synthetic spot distribution + perp euphoria on closed bars [-7:-1]
+        for idx in range(233, 239):
+            s_row = list(spot_k[idx])
+            p_row = list(perp_k[idx])
+            # Price pushes up into VAH then closes slightly back below H20
+            c = 83500.0 + ((idx - 233) * 120.0)
+            if idx == 238:
+                s_row[2] = str(86000.0)
+                c = 82400.0
+            s_row[4] = str(c)
+            p_row[4] = str(c)
+            s_row[9] = "200.0"  # Spot negative delta (2*200 - 1000 = -600)
+            p_row[9] = "850.0"  # Perp positive delta (2*850 - 1000 = +700)
+            spot_k[idx] = s_row
+            perp_k[idx] = p_row
+        fund_p[-2:] = [
+            {"fundingTime": fund_p[-2]["fundingTime"], "fundingRate": "0.00035000"},
+            {"fundingTime": fund_p[-1]["fundingTime"], "fundingRate": "0.00035000"},
+        ]
+        ev = self.engine.calculate_evaluation(spot_k, perp_k, fund_p, 45.0)
+        self.assertEqual(ev.loop_b_status, "GATED_OFF_HOLD_BTC")
+        self.assertNotEqual(ev.status, "LIVE" if ev.loop_a_score < 4 else "__IMPOSSIBLE__")
+        self.assertNotIn("EXECUTE: DEPLOY BTC", ev.loop_b_verdict)
 
     def test_dibse_historical_event_study_dual_loop(self):
         spot_k, perp_k, fund_p = _generate_synthetic_4h_bars(240, 75000.0)

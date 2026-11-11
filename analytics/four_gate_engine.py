@@ -387,11 +387,18 @@ class FourGateEngine:
         target_a_pct = (target_a - p_entry_a) / p_entry_a if p_entry_a > 0 else 0.0
         expected_profit_usd_a = usdt_sleeve * target_a_pct
 
-        # Loop B Confluence & Execution Ticket (Rip Harvester & Satoshi Accumulator)
+        # Loop B Confluence & Diagnostic Telemetry (G1 Gate: binary auto-sell disabled)
+        # Empirically failed 2020-2026 G1 validation (N=2 triggers, -79.08% BTC stack dilution).
         score_b = int(gate_1_b_pass) + int(gate_2_b_pass) + int(gate_3_b_pass) + int(gate_4_b_pass)
-        loop_b_is_trigger = (score_b == 4)
-        loop_b_verdict = "EXECUTE: DEPLOY BTC → SELL TO USDT" if loop_b_is_trigger else "HOLD BTC INVENTORY"
-        loop_b_status = "EXECUTE_SELL" if loop_b_is_trigger else "HOLDING_BTC"
+        loop_b_execution_enabled = False
+        loop_b_is_trigger = bool(loop_b_execution_enabled and (score_b == 4))
+        loop_b_verdict = (
+            "4/4 DIST ALERT (G1 GATED OFF — HOLD BTC)"
+            if score_b == 4
+            else "HOLD BTC INVENTORY (G1 GATE: AUTO-SELL OFF)"
+        )
+        loop_b_status = "GATED_OFF_HOLD_BTC"
+        loop_b_stop_rule = "G1 GATE: PASSIVE BTC HOLD (LOOP B AUTO-SELL DISABLED AFTER N=2 / -79.1% BTC LOSS)"
         p_sell_b = float(closes[-1])
         if p_sell_b > poc_30 * 1.02:
             buyback_target_b = poc_30
@@ -405,16 +412,14 @@ class FourGateEngine:
         surplus_cash_usd = btc_sleeve_units * (p_sell_b - buyback_target_b) if buyback_target_b > 0 else 0.0
 
         if loop_a_is_trigger:
-            inventory_state = "LOOP_A_TRIGGER (DEPLOY USDT → BUY BTC)"
-        elif loop_b_is_trigger:
-            inventory_state = "LOOP_B_TRIGGER (DEPLOY BTC → SELL TO USDT)"
+            inventory_state = "LOOP_A_TRIGGER (BUY BTC)"
         else:
-            inventory_state = "NEUTRAL (10% USDT / 10% BTC)"
+            inventory_state = "G1: LOOP A ACTIVE / SLEEVE B HOLD"
 
         # Legacy Confluence Score & Verdict (Loop A / Spot Long)
         score = score_a
         verdict = "EXECUTE SPOT LONG" if loop_a_is_trigger else "STANDBY / CASH"
-        status = "LIVE" if (loop_a_is_trigger or loop_b_is_trigger) else "STANDBY"
+        status = "LIVE" if loop_a_is_trigger else "STANDBY"
 
         # -------------------------------------------------------------
         # Audit Fix 2: POSITION SIZING & 0.75% SAFETY SHIELD (Legacy Reference)
@@ -512,6 +517,7 @@ class FourGateEngine:
             loop_b_free_satoshis_btc=free_satoshis_btc,
             loop_b_free_satoshis_pct=free_satoshis_pct,
             loop_b_surplus_cash_usd=surplus_cash_usd,
+            loop_b_stop_rule=loop_b_stop_rule,
             # Legacy Fields
             live_spot_price=live_spot_px,
             last_closed_bar_utc=last_closed_bar_utc,

@@ -5886,18 +5886,18 @@ def _build_tab19_four_gate_hud(
     sub_panel = Panel(sub_grid, box=box.ROUNDED, border_style="bright_cyan", padding=(0, 1))
 
     # 2. Dual-Inventory Active Sandbox Allocation Banner
-    inv_table = Table.grid(expand=True)
+    inv_table = Table.grid(expand=True, padding=(0, 1))
     inv_table.add_column(ratio=1)
     inv_table.add_column(ratio=1)
     inv_table.add_column(ratio=1)
 
-    usdt_badge = "[bold black on bright_green] READY / CASH [/bold black on bright_green]" if score_a < 4 else "[bold black on bright_green] DEPLOYING TO BTC [/bold black on bright_green]"
-    btc_badge = "[bold black on bright_cyan] HOLDING SPOT BTC [/bold black on bright_cyan]" if score_b < 4 else "[bold black on bright_yellow] DEPLOYING TO USDT [/bold black on bright_yellow]"
+    usdt_badge = "[bold black on bright_green] ACTIVE [/bold black on bright_green]" if score_a < 4 else "[bold black on bright_green] BUY BTC [/bold black on bright_green]"
+    btc_badge = "[bold black on bright_cyan] HOLD BTC [/bold black on bright_cyan]" if score_b < 4 else "[bold black on bright_yellow] 4/4 DIST ALERT [/bold black on bright_yellow]"
 
     inv_table.add_row(
-        f"[bold bright_yellow]TRANCHE 1 (10% USDT SLEEVE):[/bold bright_yellow] [bold white]${ev.usdt_sleeve_usd:,.2f}[/bold white]  {usdt_badge}",
-        f"[bold bright_cyan]TRANCHE 2 (10% BTC SLEEVE):[/bold bright_cyan] [bold white]~{ev.btc_sleeve_units:.4f} BTC (${ev.btc_sleeve_usd:,.2f})[/bold white]  {btc_badge}",
-        f"[bold bright_magenta]INVENTORY STATE:[/bold bright_magenta] [bold white]{inv_state_str}[/bold white]",
+        f"[bold bright_yellow]10% USDT SLEEVE:[/bold bright_yellow] [bold white]${ev.usdt_sleeve_usd:,.2f}[/bold white] {usdt_badge}",
+        f"[bold bright_cyan]10% BTC SLEEVE:[/bold bright_cyan] [bold white]~{ev.btc_sleeve_units:.4f} BTC (${ev.btc_sleeve_usd:,.2f})[/bold white] {btc_badge}",
+        f"[bold bright_magenta]STATE:[/bold bright_magenta] [bold white]{inv_state_str}[/bold white]",
     )
     inv_panel = Panel(
         inv_table,
@@ -5929,35 +5929,34 @@ def _build_tab19_four_gate_hud(
     ]
     card_a_panel = Panel(
         "\n".join(card_a_lines),
-        title="[bold bright_green]SWING LOOP A: USDT SLEEVE (DIP HARVESTER — BUY LOW, SELL HIGH)[/bold bright_green]",
+        title="[bold bright_green]SWING LOOP A [G1 VALIDATED ACTIVE]: USDT SLEEVE (DIP HARVESTER)[/bold bright_green]",
         box=box.ROUNDED,
         border_style="bright_green" if score_a == 4 else "green",
         padding=(0, 1),
     )
 
-    # 4. Split-Sleeve Dual Cockpit: LOOP B (BTC Sleeve - Rip Harvester & Stack Accumulator)
+    # 4. Split-Sleeve Dual Cockpit: LOOP B (Gated Off per G1 Audit — Diagnostic Telemetry Only)
     badge_b = (
-        "[bold black on bright_green] EXECUTE: SELL SPOT BTC [/bold black on bright_green]"
+        "[bold black on bright_yellow] 4/4 DIST ALERT (GATED OFF — HOLD BTC) [/bold black on bright_yellow]"
         if score_b == 4
-        else "[bold black on bright_yellow] HOLD BTC INVENTORY [/bold black on bright_yellow]"
+        else "[bold black on bright_cyan] HOLD BTC INVENTORY (AUTO-SELL GATED OFF) [/bold black on bright_cyan]"
     )
     card_b_lines = [
-        f"[bold white]Loop Verdict:[/bold white]       {badge_b}  •  [bold {score_color_b}]Confluence: {score_b}/4[/bold {score_color_b}]",
+        f"[bold white]Loop Verdict:[/bold white]       {badge_b}  •  [bold {score_color_b}]Telemetry: {score_b}/4[/bold {score_color_b}]",
         f"[bold white]Gate 1 (Lévy Signed):[/bold white] {_pass_badge(ev.loop_b_g1_levy if ev else False)}  [cyan]{ev.loop_b_g1_val:+.4f}[/cyan] [dim](Rule: A_SP < 0.0, Spot Dragging)[/dim]",
         f"[bold white]Gate 2 (CVD Z-Flow):[/bold white]  {_pass_badge(ev.loop_b_g2_zflow if ev else False)}  [cyan]{ev.loop_b_g2_val:+.2f}[/cyan] [dim](Rule: D_flow <= -1.0 & Spot24h < 0)[/dim]",
         f"[bold white]Gate 3 (30D VAH/H20):[/bold white] {_pass_badge(ev.loop_b_g3_structure if ev else False)}  [yellow]{ev.loop_b_g3_state if ev else 'NONE'}[/yellow] [dim](12H Rejection VAH/H20)[/dim]",
         f"[bold white]Gate 4 (90D Funding):[/bold white] {_pass_badge(ev.loop_b_g4_positioning if ev else False)}  [cyan]{ev.loop_b_g4_funding_p90:.1f}%[/cyan] [dim](Req >=75% / >0.015% Euphoria Trap)[/dim]",
         f"[dim]───────────────────────────────────────────────────────────────────[/dim]",
-        f"[bold bright_yellow]EXECUTION TICKET:[/bold bright_yellow]   [bold white]Sell ~{ev.btc_sleeve_units:.4f} BTC (${ev.btc_sleeve_usd:,.2f}) at ${ev.loop_b_sell_price:,.2f}[/bold white]",
-        f"[bold bright_cyan]BUYBACK TARGET:[/bold bright_cyan]     [cyan]${ev.loop_b_buyback_price:,.2f}[/cyan] [dim](-{ev.loop_b_discount_pct * 100:.2f}% discount)[/dim]  │  [bold white]Free Sats: [bright_cyan]+{ev.loop_b_free_satoshis_btc:.6f} BTC[/bright_cyan][/bold white]",
-        f"[bold bright_green]COMPOUNDING YIELD:[/bold bright_green]  [bright_green]+{ev.loop_b_free_satoshis_pct:.2f}% Free BTC Stack[/bright_green] [dim]OR +${ev.loop_b_surplus_cash_usd:,.2f} Surplus Cash[/dim]",
-        f"[bold bright_cyan]RISK MANDATE:[/bold bright_cyan]       [dim]{ev.loop_b_stop_rule if ev else 'ZERO FORCED STOP-BUY'}[/dim]",
+        f"[bold bright_yellow]G1 DIAGNOSTIC REF:[/bold bright_yellow]  [dim]Ref Sell ~{ev.btc_sleeve_units:.4f} BTC (${ev.btc_sleeve_usd:,.2f}) @ ${ev.loop_b_sell_price:,.2f} (DISABLED)[/dim]",
+        f"[bold bright_cyan]HYPOTHETICAL REBUY:[/bold bright_cyan] [dim]${ev.loop_b_buyback_price:,.2f} (-{ev.loop_b_discount_pct * 100:.2f}%) │ +${ev.loop_b_surplus_cash_usd:,.2f} │ G1 Fail: N=2 (-79.1% BTC)[/dim]",
+        f"[bold red]G1 AUDIT RULING:[/bold red]    [yellow]Hold Passive BTC Sleeve (Auto-Sell Disabled Pending G2)[/yellow]",
     ]
     card_b_panel = Panel(
         "\n".join(card_b_lines),
-        title="[bold bright_cyan]SWING LOOP B: BTC SLEEVE (RIP HARVESTER & SATOSHI ACCUMULATOR)[/bold bright_cyan]",
+        title="[bold yellow]SWING LOOP B [GATED OFF / TELEMETRY ONLY]: BTC SLEEVE (PASSIVE HOLD)[/bold yellow]",
         box=box.ROUNDED,
-        border_style="bright_cyan" if score_b == 4 else "blue",
+        border_style="yellow",
         padding=(0, 1),
     )
 

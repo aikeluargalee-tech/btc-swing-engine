@@ -103,4 +103,13 @@ Being early or "wrong" on short-term timing never destroys capital or forces rea
 
 ---
 
+## 6. G1 Empirical Governance Status (`2020-01-01 -> 2026-11-11` Audit)
+
+Per [DIBSE_G1_VALIDATION_REPORT.md](file:///C:/Users/aikel/.gemini/antigravity/scratch/btc_swing_engine/docs/DIBSE_G1_VALIDATION_REPORT.md) (`15,039` closed Binance 4H bars, `10 bps/side`):
+
+- **Production Status — Loop A (`G1 VALIDATED ACTIVE`):** Completed `14/14` round-trips (`+245.68%` cash yield on the 10% USDT sleeve, deployed `33.0%` of bars). Running Loop A alongside passive BTC hold (`DIBSE_LOOP_A_ONLY`) returned `+32.38%` CAGR (`$136,979` ending sandbox equity, Sharpe `0.81`), beating passive 50/50 hold (`$112,411`, Sharpe `0.77`) and all partial single-gate ablations (`G3_ONLY` Sharpe `0.48`).
+- **Production Status — Loop B (`GATED OFF / DIAGNOSTIC TELEMETRY ONLY`):** Binary 100%-sleeve Loop B sales fired only `2` times in 7 years (`t = -0.17` on 10D discount) and stranded Sleeve B in dead USDT for `2,194.7 days` after `2020-11-07` (`$14,818` sell vs `$11,393 POC` target), diluting Sleeve B's BTC stack by `-79.08%`. Auto-sell verdict execution is disabled on Tab `[Q]` until a pre-registered G2 tranched/anchored Loop B redesign passes out-of-sample testing.
+
+---
+
 *Authored and verified for the BTC Swing Engine ecosystem.*

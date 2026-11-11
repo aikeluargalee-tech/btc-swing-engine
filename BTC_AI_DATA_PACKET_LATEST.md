@@ -1,13 +1,13 @@
 # BTC SWING ENGINE | GLOBAL DATA-ONLY TELEMETRY PACKET ([C: AI PACKET])
-**Retrieval Time (UTC):** `2026-11-10 05:03:16 UTC`  |  **Retrieval Time (MYT):** `2026-11-10 13:03:16 MYT (UTC+8)`
-**Spot Price (BTCUSDT):** `$76,000.00`
+**Retrieval Time (UTC):** `2026-11-11 07:28:15 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:28:15 MYT (UTC+8)`
+**Spot Price (BTCUSDT):** `$0.00`
 **Output Specification:** `DATA-ONLY (Raw Measurements, Reference Formulas & True/False Conditions Only — Zero Interpretive Prose)`
 
 ---
 
 # BTC TREND-PULLBACK v1.0 | DATA-ONLY REPORT (RESEARCH / PAPER MODE)
-**STATUS:** `UNVALIDATED`  |  **Retrieval Time (UTC):** `2026-11-10 05:03:16 UTC`  |  **Retrieval Time (MYT):** `2026-11-10 13:03:16 MYT (UTC+8)`
-**Spot Price (BTCUSDT):** `$76,000.00`
+**STATUS:** `UNVALIDATED`  |  **Retrieval Time (UTC):** `2026-11-11 07:28:15 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:28:15 MYT (UTC+8)`
+**Spot Price (BTCUSDT):** `$0.00`
 
 ## 1. DAILY (1D)
 - **Completed 1D Candle Window:** `Open N/A -> Close N/A`
@@ -78,11 +78,11 @@
 - **Completed 1D Candle (t-1) (`Open N/A -> Close N/A`):** Close `$0.00` vs 1D SMA200 `$0.00` (`+0.00` USD) | `Close < 1D SMA200`: `False`
 - **Completed 1D Candle (t) (`Open N/A -> Close N/A`):** Close `$0.00` vs 1D SMA200 `$0.00` (`+0.00` USD) | `Close < 1D SMA200`: `False`
 - **Consecutive Completed 1D Closes Below 1D SMA200:** `0`
-- **Spot <= Stop Level (`$76,000.00 <= $0.00`):** `False`
+- **Spot <= Stop Level (`$0.00 <= $0.00`):** `False`
 
 ## 6. DATA INTEGRITY
-- **Data Retrieval Time (UTC):** `2026-11-10 05:03:16 UTC`
-- **Data Retrieval Time (MYT):** `2026-11-10 13:03:16 MYT (UTC+8)`
+- **Data Retrieval Time (UTC):** `2026-11-11 07:28:15 UTC`
+- **Data Retrieval Time (MYT):** `2026-11-11 15:28:15 MYT (UTC+8)`
 - **Data Integrity Pass:** `False`
 - **Completed 1D Candles Available:** `0` | **Last Completed 1D Status:** `UNAVAILABLE` | **Forming 1D Candle Excluded:** `False` (`None`)
 - **Completed 4H Candles Available:** `0` | **Last Completed 4H Status:** `UNAVAILABLE` | **Forming 4H Candle Excluded:** `False` (`None`)
@@ -90,7 +90,7 @@
 ---
 
 # TAB [M: MAGNET] | DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-10 05:03:16 UTC`  |  **Retrieval Time (MYT):** `2026-11-10 13:03:16 MYT (UTC+8)`
+**Retrieval Time (UTC):** `2026-11-11 07:28:15 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:28:15 MYT (UTC+8)`
 **Spot Price (BTCUSDT):** `$76,000.00` (`24H Change: +0.00%`)
 
 ## 1. 5-REGIME RADAR DIAGNOSIS & MAJORITY VOTING
@@ -101,31 +101,31 @@
 - **Verified On-Exchange Positioning Observations:**
   * `Defined range (3.60% width) & ATR compressed 74.4%`: `True`
   * `Spot CVD neutral/balanced (Ratio 1.00)`: `True`
-  * `Positioning crowded (L/S 1.85, funding 0.000%)`: `True`
+  * `Positioning crowded (L/S 1.85, funding +0.0000%/8h)`: `True`
   * `Clear liquidation clusters active above and below price`: `True`
 
 ## 2. LIQUIDATION GRAVITATIONAL HORIZON & DUAL-LADDER DEPTH
-- **Upper Liquidation Cluster (Short Liquidations):** `$77,024.20` (`+1.35%` / `$+1,024.20` from Spot) | Volume: `$242.63M`
+- **Upper Liquidation Cluster (Short Liquidations):** `$76,334.44` (`+0.44%` / `$+334.44` from Spot) | Volume: `$193.80M`
 - **Center Spot Price:** `$76,000.00`
-- **Lower Liquidation Cluster (Long Liquidations):** `$73,196.32` (`-3.69%` / `$-2,803.68` from Spot) | Volume: `$409.31M`
-- **Immediate Tier (100x) Imbalance Ratio:** `1.69x` ($409.3M Lower vs $242.6M Upper)
-- **Total Ladder (10x-100x) Imbalance Ratio:** `1.65x` ($354.0M Lower vs $215.0M Upper)
+- **Lower Liquidation Cluster (Long Liquidations):** `$72,540.84` (`-4.55%` / `$-3,459.16` from Spot) | Volume: `$261.26M`
+- **Immediate Tier (100x) Imbalance Ratio:** `1.35x` ($261.3M Lower vs $193.8M Upper)
+- **Total Ladder (10x-100x) Imbalance Ratio:** `1.58x` ($686.3M Lower vs $433.8M Upper)
 - **Dominant Pull Direction:** `UPPER`
 
 ## 3. LIQUIDATION SWEEP CONFIRMATION ENGINE (LSCE)
 - **LSCE State:** `[UNTESTED]`
-- **Cluster Tested:** `Lower Longs ($73,196)`
-- **Sweep Depth Pct:** `+3.69%`
-- **Reclaim Target Level:** `$73,196.32`
+- **Cluster Tested:** `Lower Longs ($72,541)`
+- **Sweep Depth Pct:** `+4.55%`
+- **Reclaim Target Level:** `$72,540.84`
 - **Spot Absorption Readout:** `Pending`
-- **LSCE Action status:** `Lower pool ($73,196) is +3.69% away and untested. Maintain cash reserve.`
+- **LSCE Action status:** `Lower pool ($72,541) is +4.55% away and untested. Maintain cash reserve.`
 
 ## 4. INVIOLABLE RISK DIRECTIVES & CAPITAL SIZING
 - **reported Spot Sizing:** `0.50x` (Range / Liquidation Magnet: Stand Aside or Selective (0.50x))
 - **Capital Rotation Directive:** `Remain USDT`
 - **Entry Instruction:** `Price oscillating in range. pending liquidation sweep confirmation before full allocation.`
 - **Structural Invalidation Stop:** `$74,482.74` (`2.00%` from Spot)
-- **Disaster Hard Stop (Below 200 SMA & 25x Shelf):** `$71,957.11` (`5.32%` from Spot)
+- **Disaster Hard Stop (Below 200 SMA & 25x Shelf):** `$71,312.72` (`6.17%` from Spot)
 - **Risk Budget Compliance Pass (<= 4.5%):** `False`
 
 ## 5. DERIVATIVES & VOLATILITY INPUTS
@@ -134,37 +134,60 @@
 - **24H Classification Label:** `Range`
 
 ## 6. 7 INTERNAL CONDITION BOOLEANS (TRUE/FALSE)
-- **Rule 1 (`Clear Magnet Present`):** `True` (`Magnet ABOVE: $77,024 (+1.3%, $243M)`)
+- **Rule 1 (`Clear Magnet Present`):** `False` (`No dense liquidation cluster within 4.5% reach`)
 - **Rule 2 (`Open-Interest Confirmation`):** `True` (`OI velocity supportive (+0.8% 4h delta)`)
 - **Rule 3 (`Funding Non-Contradictory`):** `True` (`Borrow rate calm (+0.0%/yr carry)`)
 - **Rule 4 (`Regime Conduciveness`):** `True` (`Market in Range mode (conducive to magnet sweep)`)
 - **Rule 5 (`Spot Flow & Structure Alignment`):** `True` (`Structure intact (24h change: +0.00%)`)
-- **Rule 6 (`Not Already Swept`):** `True` (`Target cluster intact and unswept`)
-- **Rule 7 (`Conviction Threshold`):** `True` (`6/6 internal filters passed cleanly`)
-- **Conditions 1-6 True Count:** `6 / 6`
+- **Rule 6 (`Not Already Swept`):** `False` (`Cluster already breached or expired`)
+- **Rule 7 (`Conviction Threshold`):** `False` (`Conditions incomplete (4/6 passed). Default: standby.`)
+- **Conditions 1-6 True Count:** `4 / 6`
+
+## 7. B1 vs B2 DATA INTEGRITY RECONCILIATION AUDIT
+- **Reconciliation status:** `PASS`
+- **Execution Authorization:** `AUTHORIZED`
+- **Prescribed Capital Sizing:** `0.50x` (EXECUTION AUTHORIZED)
+- **Portfolio Rotation Directive:** `Remain USDT`
+- **Target Capital Allocation:** `Range / Liquidation Magnet: Stand Aside or Selective (0.50x)`
+- **Mandatory Module Verification:**
+  * `Module A (Ladder Math Consistency)`: `PASS` (B2 Internal Ladder Math Consistent: Total ($686.3M) >= Imm ($261.3M).)
+  * `Module B (Funding Carry Normalization)`: `PASS` (Normalized 8H Carry: B1=+0.0100%/8h | B2=+0.0100%/8h. Baseline Calm.)
+  * `Module C (Cluster Geometry & Horizon)`: `PASS` (Cluster Geometry Aligned within MACRO_HORIZON (>1.5%).)
+  * `Module D (LSCE Sweep Proof & Rotation)`: `PASS` (LSCE State Aligned: [UNTESTED].)
+  * `Module E (Snapshot Synchronization)`: `PASS` (Snapshots Synchronized (0.0m delta <= 15.0m).)
+
+### Discrepancy & Reconciliation Table
+| Metric | B1 Value | B2 Value | Difference | Severity | Explanation |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| Lower Ladder Math Consistency | Total: $520.0M | Total: $686.3M | Valid (Total >= Imm) | `INFO` | Cumulative 10x-100x ladder correctly encompasses immediate 100x component. |
+| Total Ladder Imbalance Ratio | 1.65x | 1.58x | +0.07x (Confluent) | `INFO` | Both engines confirm downside liquidation skew (>1.50x). |
+| Funding Rate Normalization | +0.0100%/8h (+10.95%/yr) | +0.0100%/8h (+0.00%/yr) | 10.95%/yr delta | `INFO` | Both feeds confirm calm/neutral carry within +0.0100%/8h baseline. |
+| Lower Magnet Target Geometry | $74,860.00 | $72,540.84 | $2,319.16 | `INFO` | Cluster horizons reconciled. |
+| LSCE Sweep Confirmation State | UNTESTED | [UNTESTED] | Aligned | `INFO` | Both engines confirm current sweep state. |
+| Snapshot Synchronization | 2026-11-11 07:28:15 UTC | 2026-11-11 07:28:15 UTC | 0.0m delta (Synchronized) | `INFO` | Both telemetry feeds retrieved within acceptable synchronization window. |
 
 ---
 
 # TAB [G: GROK FLOW] | DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-10 05:03:17 UTC`  |  **Retrieval Time (MYT):** `2026-11-10 13:03:17 MYT (UTC+8)`
-**Spot Price (BTCUSDT):** `$76,000.00`
+**Retrieval Time (UTC):** `2026-11-11 07:28:16 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:28:16 MYT (UTC+8)`
+**Spot Price (BTCUSDT):** `$0.00`
 
 ## 1. 00:00 UTC ANCHORED VWAP & STANDARD DEVIATION BANDS
-- **00:00 UTC Anchored VWAP:** `$76,000.00`
-- **1.0 SD Dispersion (`Sigma`):** `$1,140.00`
-- **Spot Minus VWAP (`Spot - VWAP`):** `$+0.00` (`+0.00%` | Stretch Z-Score: `+0.00 SD`)
-- **+2.0 SD Upper Band:** `$78,280.00` | **Spot > +2.0 SD:** `False`
-- **+1.0 SD Upper Band:** `$77,140.00` | **Spot > +1.0 SD:** `False`
-- **-1.0 SD Lower Band:** `$74,860.00` | **Spot < -1.0 SD:** `False`
-- **-2.0 SD Lower Band:** `$73,720.00` | **Spot < -2.0 SD:** `False`
-- **Spot Inside [-1.0 SD, +1.0 SD] Band:** `True`
+- **00:00 UTC Anchored VWAP:** `$68,423.33`
+- **1.0 SD Dispersion (`Sigma`):** `$0.00`
+- **Spot Minus VWAP (`Spot - VWAP`):** `$-68,423.33` (`-100.00%` | Stretch Z-Score: `-4702015663199572.00 SD`)
+- **+2.0 SD Upper Band:** `$68,423.33` | **Spot > +2.0 SD:** `False`
+- **+1.0 SD Upper Band:** `$68,423.33` | **Spot > +1.0 SD:** `False`
+- **-1.0 SD Lower Band:** `$68,423.33` | **Spot < -1.0 SD:** `True`
+- **-2.0 SD Lower Band:** `$68,423.33` | **Spot < -2.0 SD:** `True`
+- **Spot Inside [-1.0 SD, +1.0 SD] Band:** `False`
 
 ## 2. DAILY & INTRADAY MOVING AVERAGES & SESSION EXTREMES
-- **1H EMA9 / 1H EMA21:** `$76,000.00` / `$76,000.00` | **1H EMA9 > 1H EMA21:** `False`
-- **1D EMA50:** `$79,800.00` | **Spot Minus 1D EMA50:** `$-3,800.00` (`-4.76%`) | **Spot > 1D EMA50:** `False`
-- **1D SMA200:** `$82,080.00` | **Spot Minus 1D SMA200:** `$-6,080.00` (`-7.41%`) | **Spot > 1D SMA200:** `False`
-- **Current Day High / Low:** `$76,760.00` / `$75,240.00`
-- **Previous Day High / Low:** `$77,143.80` / `$74,863.80`
+- **1H EMA9 / 1H EMA21:** `$0.00` / `$0.00` | **1H EMA9 > 1H EMA21:** `False`
+- **1D EMA50:** `$0.00` | **Spot Minus 1D EMA50:** `$+0.00` (`+0.00%`) | **Spot > 1D EMA50:** `False`
+- **1D SMA200:** `$0.00` | **Spot Minus 1D SMA200:** `$+0.00` (`+0.00%`) | **Spot > 1D SMA200:** `False`
+- **Current Day High / Low:** `$0.00` / `$0.00`
+- **Previous Day High / Low:** `$0.00` / `$0.00`
 
 ## 3. DERIVATIVES POSITIONING & LIQUIDATION CLUSTERS
 - **Open Interest:** `0.00 BTC` (`$0`)
@@ -172,8 +195,8 @@
 - **8H Perpetual Funding Rate:** `+0.0000%` | **Funding Rate <= 0.0100%:** `True`
 - **Top Participant L/S Ratio:** `1.00` (`50.0%` Long / `50.0%` Short)
 - **Global Account L/S Ratio:** `1.00` | **Global L/S >= 2.00:** `False`
-- **Overhead Short Liquidation Cluster:** `$81,624.00` (`$234.0M`)
-- **Downside Long Liquidation Cluster:** `$74,556.00` (`$329.0M`)
+- **Overhead Short Liquidation Cluster:** `$0.00` (`$234.0M`)
+- **Downside Long Liquidation Cluster:** `$0.00` (`$329.0M`)
 
 ## 4. MULTI-HORIZON CVD & COINBASE PREMIUM
 - **24H CVD (`Spot vs Perp`):** Spot `+0.00 BTC` | Perp `+0.00 BTC` | `Spot CVD 24H > 0`: `False` | `Spot CVD 24H > Perp CVD 24H`: `False`
@@ -184,8 +207,8 @@
 ---
 
 # TAB [R: SSRN RESEARCH] | DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-10 05:03:17 UTC`  |  **Retrieval Time (MYT):** `2026-11-10 13:03:17 MYT (UTC+8)`
-**Spot Price (BTCUSDT):** `$76,000.00`
+**Retrieval Time (UTC):** `2026-11-11 07:28:16 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:28:16 MYT (UTC+8)`
+**Spot Price (BTCUSDT):** `$0.00`
 
 ## 1. EMPIRICAL FACTOR & GATE METRICS
 - **1D MACD Gate Pass (`1D MACD > Signal or Hist > 0`):** `False`
@@ -212,7 +235,7 @@
 
 ## 3. 5 EMPIRICAL DOMAIN TELEMETRY
 - **01. Market Microstructure & Order Flow:** `OBI: +0.0% | 4H CVD: -142.5 BTC` (Core Metrics: `Order Book Imbalance (OBI), Cumulative Volume Delta (CVD), Spread Dynamics`)
-- **02. Time-Series Momentum & Technical Rules:** `1D: BULL (UPTREND) | 4H: CHOP | 1H: BEAR CHOP` (Core Metrics: `Variable Moving Averages (VMA), Time-Series Momentum (TSMOM), Breakout Ensembles`)
+- **02. Time-Series Momentum & Technical Rules:** `1D: CHOP (RANGING) | 4H: CHOP | 1H: BEAR CHOP` (Core Metrics: `Variable Moving Averages (VMA), Time-Series Momentum (TSMOM), Breakout Ensembles`)
 - **03. Systematic Factor Pricing (Liu-Tsyvinski):** `Var: 0.1537 | 20D Skew: -0.15` (Core Metrics: `Crypto Market Factor (MKT_crypto), Size/Illiquidity Premium, Downside Risk Semi-Variance`)
 - **04. On-Chain Structural Metrics:** `MVRV: 1.63 | SOPR: 1.02` (Core Metrics: `MVRV Ratio, Spent Output Profit Ratio (SOPR), Entity-Adjusted Realized Price`)
 - **05. Alternative Data & Machine Learning Hurdles:** `Hurdle: 18 bps (+0.18%)` (Core Metrics: `Search Volume Index (SVI), Cost-Aware Gradient Boosted Trees, Regime Classifiers`)
@@ -220,33 +243,94 @@
 ---
 
 # TAB [P: STRUCTURE] | DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-10 05:03:17 UTC`  |  **Retrieval Time (MYT):** `2026-11-10 13:03:17 MYT (UTC+8)`
-**Spot Price (BTCUSDT):** `$76,000.00`
+**Retrieval Time (UTC):** `2026-11-11 07:28:16 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:28:16 MYT (UTC+8)`
+**Spot Price (BTCUSDT):** `$0.00`
 
-## 1. DAILY SWING STRUCTURE & KEY SHELVES (SLSP v1.0)
-- **SLSP Evaluation Data Available:** `False`
+## 1. 5-REGIME RADAR DIAGNOSIS & MACRO SIZING
+- **Active Market Regime:** `Range / Liquidation Magnet` (ID: `RANGE_LIQUIDATION_MAGNET`)
+- **Majority Voting Score:** `4/4`
+- **Regime Diagnosis:** `Positioning imbalance and forced liquidations dominate`
+- **Macro Sizing Factor:** `0.50x`
+- **Capital Rotation Directive:** `Remain USDT`
+- **Macro Hard-Lock Cash Active:** `False`
+
+## 2. DAILY SWING STRUCTURE & LIQUIDATION-BACKED KEY SHELVES (SLSP v1.0)
+- **Daily Market Bias:** `UNCLEAR`
+- **Confluence Score:** `20/100`
+- **position State:** `SCANNING`
+- **Nearest Support Shelf Center:** `0.00` (No shelf within 10% scan window)
+- **Nearest Resistance Shelf Center:** `0.00` (No shelf within 10% scan window)
+
+## 3. LIQUIDATION GRAVITATIONAL HORIZON & LSCE SWEEP ENGINE
+- **Dominant Gravitational Pull:** `UPPER`
+- **Immediate Tier (100x) Imbalance Ratio:** `1.35x`
+- **Total Ladder (10x-100x) Imbalance Ratio:** `1.58x`
+- **Upper Liquidation Magnet Cluster:** `$76,334.44` (`+0.44%` from Spot) | Volume: `$193.80M`
+- **Lower Liquidation Magnet Cluster:** `$72,540.84` (`-4.55%` from Spot) | Volume: `$261.26M`
+- **LSCE Sweep State:** `[UNTESTED]`
+- **LSCE Cluster Tested:** `Lower Longs ($72,541)`
+- **LSCE Action status:** `Lower pool ($72,541) is +4.55% away and untested. Maintain cash reserve.`
+
+## 4. REFERENCE LEVELS & DUAL INVIOLABLE STOPS (Reference calculation if entered at $0.00)
+- **Reference Entry Price:** `$0.00`
+- **Structural Stop Loss (1H Close):** `$74,482.74` (`2.00%` from Spot)
+- **Disaster Hard Stop (Below 200 SMA & 25x Shelf):** `$71,312.72` (`6.17%` from Spot)
+- **Risk Budget Compliance Pass (<= 4.5%):** `False`
+- **Stop Distance (`Reference Entry - Structural Stop`):** `$0.00`
+- **1.5R Reference Level (`Entry + 1.5 * Stop Distance`):** `$0.00`
+- **2.5R Reference Level (`Entry + 2.5 * Stop Distance`):** `$0.00`
+- **Distance to Overhead Resistance in R (`Obstacle R`):** `0.00R`
+- **Clearance >= 1.50R (`Obstacle R >= 1.50`):** `False`
+- **Sized Position (Macro Sized 0.50x):** `0.0000 BTC` (`$0.00` notional)
+
+## 5. DAILY & 4H 3-EMA METRICS
+- **1D EMA20 / EMA50 / EMA200:** `$0.00` / `$0.00` / `$0.00`
+- **1D EMA200 5-Day Slope (%):** `+0.000%`
+- **1D ADX(14):** `0.00` | **ADX(14) >= 20.0:** `False`
+- **4H EMA9 / EMA20 / EMA50:** `$0.00` / `$0.00` / `$0.00`
+- **Spot Inside 4H [EMA20, EMA50] Value Band:** `False`
+- **4H Wick Condition Met (Last 3 Closed 4H Bars):** `False`
+- **4H Close > 4H EMA9:** `False`
+- **Positioning Sub-Conditions Met Count:** `0 / 3`
+
+## 6. LIQUIDATION FLUSH & VOLUME CLIMAX SENSORS
+- **1H OI Delta (%):** `+0.00%`
+- **15m Relative Volume (`RelVol vs 20-bar SMA`):** `0.00x` | **15m RelVol >= 5.0x:** `False`
+- **5m Relative Volume (`RelVol vs 20-bar SMA`):** `0.00x` | **5m RelVol >= 5.0x:** `False`
+- **Volume Climax Interlock Active:** `False`
+- **Liquidated USD (`15m / 1h / 4h / 24h`):** `$990,358` / `$1,345,573` / `$1,502,022` / `$1,502,022`
+- **24H Liquidation Multiple:** `0.05x`
+- **Reference Zone (`$75,000 - $78,000`) Distance to Lower / Upper:** `+1.00%` / `-2.89%`
+
+## 7. UPSTREAM DATA INTEGRITY RECONCILIATION GATE
+- **Reconciliation status:** `PASS`
+- **Execution Authorization:** `AUTHORIZED`
+- **Trading Status:** `EXECUTION AUTHORIZED`
+- **Prescribed Capital Allocation:** `0.50x` (`Range / Liquidation Magnet: Stand Aside or Selective (0.50x)`)
+- **Portfolio Rotation Directive:** `Remain USDT`
+- **Module A (Ladder Math):** `PASS` | **Module D (LSCE Proof):** `PASS`
 
 ---
 
 # TAB [F: FOOTPRINT] | DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-10 05:03:17 UTC`  |  **Retrieval Time (MYT):** `2026-11-10 13:03:17 MYT (UTC+8)`
-**Spot Price (BTCUSDT):** `$76,000.00`
+**Retrieval Time (UTC):** `2026-11-11 07:28:16 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:28:16 MYT (UTC+8)`
+**Spot Price (BTCUSDT):** `$0.00`
 
 ## 1. 15-MINUTE INTRA-CANDLE FOOTPRINT METRICS
-- **Active 15m Bar Net Delta:** `+0.00 BTC`
-- **Previous Completed 15m Bar Net Delta:** `+0.00 BTC`
-- **Active Battle Zone Price:** `$0.00`
+- **Active 15m Bar Net Delta:** `+10.00 BTC`
+- **Previous Completed 15m Bar Net Delta:** `+10.00 BTC`
+- **Active Battle Zone Price:** `$68,425.00`
 - **Stacked Imbalances Count:** `0`
 
 ## 2. 4 GATE CONDITION BOOLEANS (TRUE/FALSE)
 - **Gate 1 (`Macro/Tactical Level Tap`):** `False` (Level: `` at `$0.00`)
-- **Gate 2 (`Positioning Filter`):** `False`
+- **Gate 2 (`Positioning Filter`):** `True`
 - **Gate 3 (`Wick Absorption`):** `False`
 - **Gate 4 (`15m Net Delta Flip`):** `False`
 - **All Gates True:** `False`
 
-## 3. REFERENCE LEVELS (Reference calculation if entered at $76,000.00. Not an order.)
-- **Reference Entry Price:** `$76,000.00`
+## 3. REFERENCE LEVELS (Reference calculation if entered at $0.00. Not an order.)
+- **Reference Entry Price:** `$0.00`
 - **Reference Stop Level:** `$0.00`
 - **Stop Distance (`|Entry - Stop|`):** `$0.00`
 - **1:2 Reference Level:** `$0.00`
@@ -255,22 +339,22 @@
 ---
 
 # TAB [W: WATERFALL] | DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-10 05:03:17 UTC`  |  **Retrieval Time (MYT):** `2026-11-10 13:03:17 MYT (UTC+8)`
-**Spot Price (BTCUSDT):** `$76,000.00`
+**Retrieval Time (UTC):** `2026-11-11 07:28:16 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:28:16 MYT (UTC+8)`
+**Spot Price (BTCUSDT):** `$0.00`
 
 ## 1. 5-PILLAR CONDITION BOOLEANS & RAW INPUTS
 - **Pillar 1 (`Confluence Score >= 50.0`):** `False` (Confluence Score: `0.00`)
 - **Pillar 2 (`Value Area Edge & Not Mid-Range`):** `False` (`30D cVAL $0.00` | `30D cPOC $0.00` | `30D cVAH $0.00` | `VA Position`: `0.0%` | `Mid-Range`: `False`)
 - **Pillar 3 (`8H Funding <= 0.0100%`):** `True` (`8H Funding`: `+0.0000%` | `4H OI Change`: `+0.00%`)
 - **Pillar 4 (`4H Spot Delta > 0 BTC`):** `False` (`4H Spot Delta`: `+0.00 BTC` | `4H Perp Delta`: `+0.00 BTC`)
-- **Pillar 5 (`15m Footprint 4-Gate Pass`):** `False` (`15m Active Delta`: `+0.00 BTC`)
+- **Pillar 5 (`15m Footprint 4-Gate Pass`):** `False` (`15m Active Delta`: `+10.00 BTC`)
 - **Total Pillars True:** `1 / 5`
 
 ---
 
 # TAB [0: SPOT SWING] | DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-10 05:03:17 UTC`  |  **Retrieval Time (MYT):** `2026-11-10 13:03:17 MYT (UTC+8)`
-**Spot Price (BTCUSDT):** `$76,000.00`
+**Retrieval Time (UTC):** `2026-11-11 07:28:16 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:28:16 MYT (UTC+8)`
+**Spot Price (BTCUSDT):** `$0.00`
 
 ## 1. SPOT SWING SCREENER METRICS & GATE BOOLEANS
 - **Spot Swing Screener Evaluation Available:** `False`
@@ -278,8 +362,8 @@
 ---
 
 # TAB [L: MASTER] | 8-FLAGSHIP DESK DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-10 05:03:17 UTC`  |  **Retrieval Time (MYT):** `2026-11-10 13:03:17 MYT (UTC+8)`
-**Spot Price (BTCUSDT):** `$76,000.00`
+**Retrieval Time (UTC):** `2026-11-11 07:28:16 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:28:16 MYT (UTC+8)`
+**Spot Price (BTCUSDT):** `$0.00`
 **Desk Purpose & Scope:** `Single-screen 8-Flagship-Desk Telemetry Matrix (P, G, R, M, A, F, W, 0) & 4-Domain Readiness Overview. Keeps each strategy's reference entry, stop, and sizing calculations strictly unblended.`
 
 ## 1. 8-FLAGSHIP TOP-RIBBON DESK READINESS METRICS (`P, G, R, M, A, F, W, 0`)

@@ -41,6 +41,7 @@ from .slsp_engine import SLSPEngine
 from .grok_quant_engine import GrokQuantEngine
 from .ssrn_research_engine import SSRNResearchEngine
 from .btc_magnet_engine import BTCMagnetEngine
+from .four_gate_engine import FourGateEngine
 from .strategy_trend_pullback import TrendPullbackEngine
 from .trap_engine import TrapEngine
 from .exhaustion_engine import ExhaustionEngine
@@ -68,6 +69,7 @@ class SignalDetector:
         self.ssrn_engine = SSRNResearchEngine(config)
         self.btc_magnet_engine = BTCMagnetEngine(config)
         self.trend_pullback_engine = TrendPullbackEngine(config)
+        self.four_gate_engine = FourGateEngine(config)
         # Side-effect free by default (no state writes / alerts). Only the live HUD opts in via set_read_only(False).
         self.spot_swing_engine = SpotSwingEngine(config, read_only=True)
         fsm_db_path = os.path.join(
@@ -398,6 +400,12 @@ class SignalDetector:
             self.trend_pullback_engine.evaluate(store)
         except Exception:
             logging.getLogger("trend_pullback").exception("BTC Trend-Pullback evaluation failed")
+
+        # 2l. Evaluate Tab [19: Q]: 4-GATE QUANTITATIVE PROTOCOL
+        try:
+            self.four_gate_engine.evaluate(store)
+        except Exception:
+            logging.getLogger("four_gate").exception("4-Gate Protocol evaluation failed")
 
         c_vah = active_vp.c_vah
         c_poc = active_vp.c_poc

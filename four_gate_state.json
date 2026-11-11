@@ -1,0 +1,101 @@
+{
+  "timestamp_utc": "2026-11-11 07:28:32 UTC",
+  "status": "STANDBY",
+  "verdict": "STANDBY / CASH",
+  "score": 1,
+  "gate_1": {
+    "passed": false,
+    "A_SP": -0.24318551514171782,
+    "details": "A_SP=-0.2432 <= 0.0 (Spot path lagging or drag)"
+  },
+  "gate_2": {
+    "passed": false,
+    "D_flow": 0.7777992650291925,
+    "z_S": 0.11087281367617716,
+    "z_F": -0.6669264513530153,
+    "dS_24h": 413.8375500000002,
+    "details": "D_flow=+0.78 (z_S=+0.11, z_F=-0.67, Spot24h=+413.8)"
+  },
+  "gate_3": {
+    "passed": false,
+    "state": "NONE",
+    "poc_30": 81611.9029,
+    "val_30": 76013.3671,
+    "vah_30": 82342.14670000001,
+    "l_20": 72727.27,
+    "details": "No Structural Trigger: POC=$81,611.9, VAL=$76,013.4, L20=$72,727.3"
+  },
+  "gate_4": {
+    "passed": true,
+    "funding_rate": 7.999e-05,
+    "funding_p90": 68.88888888888889,
+    "details": "Telemetry Rank=68.9% (Funding=+0.0080%)"
+  },
+  "sizing": {
+    "dvol": 39.45,
+    "entry_price": 73770.16,
+    "stop_price": 70708.69836000001,
+    "stop_pct": 0.04149999999999992,
+    "target_1_price": 79893.08327999999,
+    "notional_risk_usd": 18072.289156626543,
+    "notional_vol_usd": 100000.0,
+    "final_notional_usd": 18072.289156626543,
+    "btc_size": 0.24498102154891005
+  },
+  "event_study": {
+    "count": 4,
+    "small_sample": true,
+    "win_rate_1d": 25.0,
+    "mean_ret_1d": -0.17373646064870132,
+    "median_ret_1d": -1.155101860953077,
+    "win_rate_3d": 25.0,
+    "mean_ret_3d": -0.18646968405472505,
+    "median_ret_3d": -1.7494771916240937,
+    "win_rate_5d": 100.0,
+    "mean_ret_5d": 5.811865203804305,
+    "median_ret_5d": 4.326374950437308,
+    "win_rate_10d": 100.0,
+    "mean_ret_10d": 7.485398590226875,
+    "median_ret_10d": 7.392353197221927,
+    "triggers": [
+      {
+        "bar_idx": 191,
+        "entry_price": 77892.24,
+        "state": "STATE_B",
+        "ret_1d": -0.012353348677609097,
+        "ret_3d": -0.018352020689095735,
+        "ret_5d": 0.041184076873383,
+        "ret_10d": 0.08514044531265243
+      },
+      {
+        "bar_idx": 192,
+        "entry_price": 77776.0,
+        "state": "STATE_B",
+        "ret_1d": -0.010748688541452443,
+        "ret_3d": -0.016637523143386134,
+        "ret_5d": 0.04534342213536315,
+        "ret_10d": 0.07352628060069946
+      },
+      {
+        "bar_idx": 193,
+        "entry_price": 78578.02,
+        "state": "STATE_B",
+        "ret_1d": -0.026292594290362674,
+        "ret_3d": -0.02288184405766408,
+        "ret_5d": 0.038916607977650626,
+        "ret_10d": 0.07432078334373907
+      },
+      {
+        "bar_idx": 215,
+        "entry_price": 77798.01,
+        "state": "STATE_B",
+        "ret_1d": 0.04244517308347616,
+        "ret_3d": 0.05041260052795695,
+        "ret_5d": 0.10703050116577545,
+        "ret_10d": 0.06642843435198408
+      }
+    ]
+  },
+  "raw_data_available": true,
+  "error_message": ""
+}

@@ -5258,3 +5258,60 @@ class ReconciliationAuditResult:
     trading_status: str = "NO TRADE"
     discrepancy_table: List[ReconciliationMetricItem] = field(default_factory=list)
 
+
+@dataclass
+class FourGateEvaluation:
+    """Quantitative Telemetry & Execution State for the 4-Gate Quantitative Protocol (Tab 19 / [Q])."""
+    timestamp_utc: str = ""
+    status: str = "STANDBY"  # "LIVE", "STANDBY", "HALT: DATA UNAVAILABLE"
+    verdict: str = "STANDBY / CASH"  # "EXECUTE SPOT LONG", "STANDBY / CASH", "HALT: DATA UNAVAILABLE"
+    score: int = 0  # 0 to 4
+
+    # Gate 1: Rough Path Signature Engine (Lévy Signed Area)
+    gate_1_levy: bool = False
+    gate_1_val: float = 0.0  # A_SP
+    gate_1_details: str = ""
+
+    # Gate 2: Spot vs Perp CVD Z-Score Divergence
+    gate_2_zflow: bool = False
+    gate_2_val: float = 0.0  # D_flow
+    gate_2_z_s: float = 0.0
+    gate_2_z_f: float = 0.0
+    gate_2_ds_24h: float = 0.0
+    gate_2_details: str = ""
+
+    # Gate 3: 30D Executed Volume Profile Structure
+    gate_3_structure: bool = False
+    gate_3_state: str = "NONE"  # "STATE_A", "STATE_B", "NONE"
+    gate_3_poc: float = 0.0
+    gate_3_val: float = 0.0
+    gate_3_vah: float = 0.0
+    gate_3_l20: float = 0.0
+    gate_3_details: str = ""
+
+    # Gate 4: Positioning & Anti-Crowding Filter
+    gate_4_positioning: bool = False
+    gate_4_funding_rate: float = 0.0
+    gate_4_funding_p90: float = 0.0
+    gate_4_details: str = ""
+
+    # Market & Risk Control
+    dvol_current: Optional[float] = None
+    entry_price: float = 0.0
+    stop_price: float = 0.0
+    stop_pct: float = 0.0
+    target_1_price: float = 0.0
+    notional_risk_usd: float = 0.0
+    notional_vol_usd: float = 0.0
+    final_notional_usd: float = 0.0
+    btc_size: float = 0.0
+
+    # 90-Day Event Study (In-Sample Walk-Forward Expectancy)
+    event_study_triggers_count: int = 0
+    event_study_small_sample: bool = True
+    event_study_results: Dict[str, Any] = field(default_factory=dict)
+
+    raw_data_available: bool = True
+    error_message: str = ""
+
+

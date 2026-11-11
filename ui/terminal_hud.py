@@ -187,6 +187,11 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         if active_tab == 18
         else "[dim white][A: BTC STRATEGY][/dim white]"
     )
+    tQ = (
+        "[bold black on bright_yellow] [Q: 4-GATE] [/bold black on bright_yellow]"
+        if active_tab == 19
+        else "[dim white][Q: 4-GATE][/dim white]"
+    )
     t0 = (
         "[bold white on blue] [0: SPOT SWING] [/bold white on blue]"
         if active_tab == 0
@@ -218,6 +223,7 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         16: "16: SSRN RESEARCH [R]",
         17: "17: BTC MAGNET [M]",
         18: "18: TREND-PULLBACK [A]",
+        19: "19: 4-GATE PROTOCOL [Q]",
     }
     if active_tab in subdesk_names:
         subdesk_info = f"  │  [bold black on bright_yellow] [DEEP DIVE {subdesk_names[active_tab]}] [/bold black on bright_yellow]"
@@ -233,13 +239,13 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
     nav_grid.add_column(justify="right", no_wrap=True)
     nav_grid.add_row(
         f"[bold white]BTC-USD[/bold white] | Spot: [bold cyan]${spot_px:,.2f}[/bold cyan] | Regime: {regime_str} ({score_str}) | Feeds: Spot {spot_ws_dot} • Perp {perp_ws_dot} • CB {cb_ws_dot}",
-        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: P Structure • G Grok Flow • R SSRN Research • M Magnet • A Strategy • F Footprint • W Waterfall • 0 Screener • L Master • C Packet • H Guide[/dim]",
+        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: P Structure • G Grok Flow • R SSRN • M Magnet • A Strategy • Q 4-Gate • F Footprint • W Waterfall • 0 Screener • L Master • C Packet • H Guide[/dim]",
     )
 
     tab_grid = Table.grid(expand=True)
     tab_grid.add_column(justify="left", no_wrap=True)
     tab_grid.add_row(
-        f"{tP}  {tG}  {tR}  {tM}  {tA}  {tF}  {tW}  {t0}  {tL}  │  {tC}  {tH}{subdesk_info}"
+        f"{tP}  {tG}  {tR}  {tM}  {tA}  {tQ}  {tF}  {tW}  {t0}  {tL}  │  {tC}  {tH}{subdesk_info}"
     )
     nav_panel = Panel(Group(nav_grid, tab_grid), border_style="bright_blue", box=box.ROUNDED, padding=(0, 1))
 
@@ -5847,16 +5853,166 @@ def _build_tab18_trend_pullback_hud(
     return Group(header_panel, sub_panel, top_row_grid, mid_row_grid, verdict_panel, bottom_panel)
 
 
+def _build_tab19_four_gate_hud(
+    config: EngineConfig,
+    store: StateStore,
+    header_panel: Panel,
+) -> Group:
+    """Builds Desk 19 [Q: 4-GATE] - 4-Gate Quantitative Protocol (Non-Lagging Spot Radar)."""
+    ev = getattr(store, "four_gate_evaluation", None)
+    if ev is None:
+        from analytics.four_gate_engine import FourGateEngine
+        ev = FourGateEngine(config).evaluate(store)
+
+    spot_p = (ev.entry_price if ev else 0.0) or store.binance_spot_price or 0.0
+
+    # 1. Executive Sub-Ribbon Header
+    score = ev.score if ev else 0
+    score_color = "bright_green" if score == 4 else ("bright_yellow" if score >= 2 else "bright_red")
+    verdict_badge = (
+        "[bold black on bright_green] EXECUTE SPOT LONG [/bold black on bright_green]"
+        if score == 4
+        else (
+            "[bold white on red] HALT: DATA UNAVAILABLE [/bold white on red]"
+            if ev and ev.status == "HALT: DATA UNAVAILABLE"
+            else "[bold black on bright_yellow] STANDBY / 100% CASH [/bold black on bright_yellow]"
+        )
+    )
+
+    sub_grid = Table.grid(expand=True)
+    sub_grid.add_column(justify="left", no_wrap=True)
+    sub_grid.add_column(justify="right", no_wrap=True)
+    sub_grid.add_row(
+        f"[bold bright_cyan]BTC 4-GATE PROTOCOL | TAB 19 [Q] | SPOT-ONLY (ZERO LEVERAGE)[/bold bright_cyan]  │  "
+        f"[bold {score_color}]CONFLUENCE: {score}/4 GATES[/bold {score_color}]  │  {verdict_badge}",
+        f"[bold white]Spot: [cyan]${spot_p:,.2f}[/cyan] • 4H Bar: [bright_cyan]{ev.timestamp_utc if ev else 'SYNC'}[/bright_cyan][/bold white]",
+    )
+    sub_panel = Panel(sub_grid, box=box.ROUNDED, border_style="bright_cyan", padding=(0, 1))
+
+    # 2. Beginner Mandate & Educational Banner
+    mandate_lines = [
+        "[bold bright_yellow]▶ PURPOSE & SCOPE:[/bold bright_yellow] [white]Strict non-lagging 4H BTC spot swing engine using 4 raw primary endpoints (Binance Spot & Perp, Funding, Deribit DVOL). Zero smoothed oscillators or vendor-dependent on-chain heuristics.[/white]",
+        "[bold bright_cyan]▶ CORE MODELS:[/bold bright_cyan]    [white]1. Lévy Signed Area (A_SP > 0) • 2. Spot-Perp CVD Z-Spread (D_flow >= +1.0) • 3. 30D Volume Profile (POC/VAL) • 4. 90D Funding Anti-Crowding (<25% Sweep / <=75% Node).[/white]",
+        "[bold bright_green]▶ EXECUTION MANDATE:[/bold bright_green][white]Default 100% USDT Cash. Triggers spot long if and only if all 4 gates pass (4/4). Capped at 0.75% max loss ($750 on $100k) with forward DVOL volatility scaling (55% baseline).[/white]",
+    ]
+    mandate_panel = Panel(
+        "\n".join(mandate_lines),
+        title="[bold bright_white]OPERATOR MANDATE & PROTOCOL SPECS[/bold bright_white]",
+        box=box.ROUNDED,
+        border_style="yellow",
+        padding=(0, 1),
+    )
+
+    def _pass_badge(passed: bool) -> str:
+        return "[bold black on bright_green] PASS [/bold black on bright_green]" if passed else "[bold white on red] FAIL [/bold white on red]"
+
+    g1_lines = [
+        f"[bold white]Gate Status:[/bold white]          {_pass_badge(ev.gate_1_levy if ev else False)}",
+        f"[bold white]Order N<=2 Lévy Area:[/bold white] [cyan]{ev.gate_1_val:+.4f}[/cyan] [dim](Rule: A_SP > 0.0)[/dim]" if ev else "",
+        f"[bold white]Path Integral:[/bold white]        [white]Cumulative Spot Delta vs Log-Price (6 bars)[/white]",
+        f"[bold white]Quantitative Edge:[/bold white]    [dim]{'Spot accumulation mathematically leads price' if (ev and ev.gate_1_levy) else 'Spot path is lagging price displacement'}[/dim]",
+        f"[bold white]Audit Detail:[/bold white]         [white]{ev.gate_1_details if ev else ''}[/white]",
+    ]
+    g1_panel = Panel("\n".join(g1_lines), title="[bold bright_white]GATE 1: ROUGH PATH LÉVY AREA[/bold bright_white]", box=box.ROUNDED, border_style="bright_blue", padding=(0, 1))
+
+    g2_lines = [
+        f"[bold white]Gate Status:[/bold white]          {_pass_badge(ev.gate_2_zflow if ev else False)}",
+        f"[bold white]Flow Spread (D_flow):[/bold white][cyan]{ev.gate_2_val:+.2f}[/cyan] [dim](Rule: >= +1.0 & Spot24h > 0)[/dim]" if ev else "",
+        f"[bold white]Spot vs Perp Z-Score:[/bold white][white]z_Spot={ev.gate_2_z_s:+.2f}  │  z_Perp={ev.gate_2_z_f:+.2f}[/white]" if ev else "",
+        f"[bold white]24H Spot CVD Delta:[/bold white]   [white]{ev.gate_2_ds_24h:+,.1f} BTC[/white]" if ev else "",
+        f"[bold white]Audit Detail:[/bold white]         [white]{ev.gate_2_details if ev else ''}[/white]",
+    ]
+    g2_panel = Panel("\n".join(g2_lines), title="[bold bright_white]GATE 2: SPOT VS PERP CVD Z-SPREAD[/bold bright_white]", box=box.ROUNDED, border_style="bright_blue", padding=(0, 1))
+
+    g3_lines = [
+        f"[bold white]Gate Status:[/bold white]          {_pass_badge(ev.gate_3_structure if ev else False)}  •  [bold white]State:[/bold white] [yellow]{ev.gate_3_state if ev else 'NONE'}[/yellow]",
+        f"[bold white]30D Volume POC / VAL:[/bold white][cyan]${ev.gate_3_poc:,.1f}[/cyan] / [cyan]${ev.gate_3_val:,.1f}[/cyan]" if ev else "",
+        f"[bold white]30D VAH / 20D Low:[/bold white]   [cyan]${ev.gate_3_vah:,.1f}[/cyan] / [cyan]${ev.gate_3_l20:,.1f}[/cyan]" if ev else "",
+        f"[bold white]Setup Mechanics:[/bold white]      [dim]State A = Sweep Reclaim (L20/VAL)  •  State B = POC Hold[/dim]",
+        f"[bold white]Audit Detail:[/bold white]         [white]{ev.gate_3_details if ev else ''}[/white]",
+    ]
+    g3_panel = Panel("\n".join(g3_lines), title="[bold bright_white]GATE 3: 30D EXECUTED VOLUME PROFILE[/bold bright_white]", box=box.ROUNDED, border_style="bright_blue", padding=(0, 1))
+
+    g4_lines = [
+        f"[bold white]Gate Status:[/bold white]          {_pass_badge(ev.gate_4_positioning if ev else False)}",
+        f"[bold white]8H Perp Funding Rate:[/bold white][cyan]{ev.gate_4_funding_rate * 100:+.4f}%[/cyan]" if ev else "",
+        f"[bold white]90D Funding Percentile:[/bold white][cyan]{ev.gate_4_funding_p90:.1f}%[/cyan] [dim](270 prints)[/dim]" if ev else "",
+        f"[bold white]Positioning Filter:[/bold white]   [dim]Sweep requires <25% / Negative  •  Node requires <=75%[/dim]",
+        f"[bold white]Audit Detail:[/bold white]         [white]{ev.gate_4_details if ev else ''}[/white]",
+    ]
+    g4_panel = Panel("\n".join(g4_lines), title="[bold bright_white]GATE 4: 90D FUNDING ANTI-CROWDING[/bold bright_white]", box=box.ROUNDED, border_style="bright_blue", padding=(0, 1))
+
+    gate_row = Table.grid(expand=True)
+    gate_row.add_column(ratio=1)
+    gate_row.add_column(ratio=1)
+    gate_row.add_row(g1_panel, g2_panel)
+    gate_row.add_row(g3_panel, g4_panel)
+
+    dvol_str = f"{ev.dvol_current:.2f}%" if (ev and ev.dvol_current) else "DATA UNAVAILABLE"
+    shield_lines = [
+        f"[bold white]Entry Reference:[/bold white]      [cyan]${ev.entry_price:,.2f}[/cyan]  •  [bold white]Inviolable Hard Stop:[/bold white] [red]${ev.stop_price:,.2f}[/red] [dim]({ev.stop_pct * 100:.2f}% distance)[/dim]" if ev else "",
+        f"[bold white]Take-Profit 1 (+2R/VAH):[/bold white][green]${ev.target_1_price:,.2f}[/green]  •  [bold white]Deribit 30D DVOL:[/bold white] [cyan]{dvol_str}[/cyan] [dim](55% target baseline)[/dim]" if ev else "",
+        f"[bold white]0.75% Risk Notional:[/bold white]  [white]${ev.notional_risk_usd:,.2f}[/white]  •  [bold white]DVOL Vol-Capped Size:[/bold white] [white]${ev.notional_vol_usd:,.2f}[/white]" if ev else "",
+        f"[bold white]Final Spot Allocation:[/bold white][bold bright_green]${ev.final_notional_usd:,.2f}[/bold bright_green] [dim](~{ev.btc_size:.4f} BTC, 0% Borrowed Leverage)[/dim]" if ev else "",
+    ]
+    shield_panel = Panel(
+        "\n".join([line for line in shield_lines if line]),
+        title="[bold bright_white]0.75% EQUITY SAFETY SHIELD & DVOL SIZING TICKET[/bold bright_white]",
+        box=box.ROUNDED,
+        border_style="bright_green" if (ev and ev.score == 4) else "bright_yellow",
+        padding=(0, 1),
+    )
+
+    es = (ev.event_study_results if ev else {}) or {}
+    n_triggers = ev.event_study_triggers_count if ev else 0
+    caveat_str = (
+        "[bold white on red] SMALL SAMPLE CAVEAT (N < 30) [/bold white on red]"
+        if (ev and ev.event_study_small_sample)
+        else "[bold black on green] STATISTICALLY QUALIFIED (N >= 30) [/bold black on green]"
+    )
+
+    study_table = Table(box=box.SIMPLE_HEAD, expand=True, padding=(0, 1))
+    study_table.add_column("Horizon", justify="left")
+    study_table.add_column("Historical Win Rate", justify="right")
+    study_table.add_column("Mean Forward Return", justify="right")
+    study_table.add_column("Median Forward Return", justify="right")
+    study_table.add_column("Benchmark Comparison", justify="center")
+
+    def _color_ret(val: float) -> str:
+        c = "green" if val > 0 else ("red" if val < 0 else "white")
+        return f"[{c}]{val:+.2f}%[/{c}]"
+
+    study_table.add_row("1D Forward (6 Bars)", f"{es.get('win_rate_1d', 0.0):.1f}%", _color_ret(es.get('mean_ret_1d', 0.0)), _color_ret(es.get('median_ret_1d', 0.0)), "[green]+ Alpha[/green]" if es.get('mean_ret_1d', 0.0) > 0 else "[red]- Drag[/red]")
+    study_table.add_row("3D Forward (18 Bars)", f"{es.get('win_rate_3d', 0.0):.1f}%", _color_ret(es.get('mean_ret_3d', 0.0)), _color_ret(es.get('median_ret_3d', 0.0)), "[green]+ Alpha[/green]" if es.get('mean_ret_3d', 0.0) > 0 else "[red]- Drag[/red]")
+    study_table.add_row("5D Forward (30 Bars)", f"{es.get('win_rate_5d', 0.0):.1f}%", _color_ret(es.get('mean_ret_5d', 0.0)), _color_ret(es.get('median_ret_5d', 0.0)), "[green]+ Alpha[/green]" if es.get('mean_ret_5d', 0.0) > 0 else "[red]- Drag[/red]")
+    study_table.add_row("10D Forward (60 Bars)", f"{es.get('win_rate_10d', 0.0):.1f}%", _color_ret(es.get('mean_ret_10d', 0.0)), _color_ret(es.get('median_ret_10d', 0.0)), "[green]+ Alpha[/green]" if es.get('mean_ret_10d', 0.0) > 0 else "[red]- Drag[/red]")
+
+    study_panel = Panel(
+        Group(
+            Text.from_markup(f"[bold white]In-Sample 90-Day Walk-Forward Triggers:[/bold white] [bold cyan]{n_triggers} historical events[/bold cyan]  │  {caveat_str}\n"),
+            study_table,
+        ),
+        title="[bold bright_white]90-DAY IN-SAMPLE EVENT STUDY & FORWARD EXPECTANCY AUDIT[/bold bright_white]",
+        box=box.ROUNDED,
+        border_style="magenta",
+        padding=(0, 1),
+    )
+
+    return Group(header_panel, sub_panel, mandate_panel, gate_row, shield_panel, study_panel)
+
+
 def build_dashboard_renderable(
     config: EngineConfig,
     store: StateStore,
     tab_override: Optional[int] = None,
 ) -> Group:
     """Builds the active tab's 5-panel Rich renderable for the live terminal HUD."""
-    valid_tabs = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18)
+    valid_tabs = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19)
     if tab_override is not None:
         if isinstance(tab_override, int) and tab_override in valid_tabs:
             active_tab = tab_override
+        elif str(tab_override).lower() in ("q", "4gate", "four_gate", "19"):
+            active_tab = 19
         elif str(tab_override).lower() in ("g", "grok", "grok_flow", "15"):
             active_tab = 15
         elif str(tab_override).lower() in ("r", "ssrn", "research", "alpha", "16"):
@@ -5899,6 +6055,8 @@ def build_dashboard_renderable(
     if getattr(store, "show_help", False):
         return _build_help_overlay(store, header_panel)
 
+    if active_tab == 19:
+        return _build_tab19_four_gate_hud(config, store, header_panel)
     if active_tab == 18:
         return _build_tab18_trend_pullback_hud(config, store, header_panel)
     if active_tab == 17:
@@ -5968,8 +6126,9 @@ def print_dry_run_report(
             16: "TAB [R: SSRN QUANTITATIVE ALPHA DECK & EMPIRICAL RESEARCH]",
             17: "TAB [M: BTC MAGNET · LIQUIDATION GRAVITY DECK]",
             18: "TAB [A: BTC TREND-PULLBACK v1.0 · RESEARCH / PAPER MODE]",
+            19: "TAB [Q: 4-GATE QUANTITATIVE PROTOCOL (NON-LAGGING 4H SPOT RADAR)]",
         }
-        for t in (0, 18, 17, 16, 15, 12, 11, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13):
+        for t in (0, 19, 18, 17, 16, 15, 12, 11, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13):
             title = tab_titles.get(t, f"TAB [{t}]")
             console.print(f"\n[bold cyan]=== VERIFICATION SNAPSHOT: {title} ===[/bold cyan]")
             console.print(build_dashboard_renderable(config, store, tab_override=t))
@@ -6001,6 +6160,8 @@ def print_dry_run_report(
             t_num = 17
         elif tab_lower in ("a", "k", "strategy", "trend_pullback", "btc_strategy", "18"):
             t_num = 18
+        elif tab_lower in ("q", "4gate", "four_gate", "19"):
+            t_num = 19
         elif tab_lower in ("p", "structure", "slsp", "pa", "13"):
             t_num = 13
         else:
@@ -6008,9 +6169,9 @@ def print_dry_run_report(
                 t_num = int(tab_arg)
             except ValueError:
                 t_num = 0
-        store.active_tab = t_num if t_num in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18) else 0
+        store.active_tab = t_num if t_num in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19) else 0
         console.print(build_dashboard_renderable(config, store, tab_override=store.active_tab))
-        if store.active_tab in (0, 10, 11, 12, 13, 14, 15, 16, 17, 18):
+        if store.active_tab in (0, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19):
             try:
                 from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
                 copy_tab_data_only_report_to_clipboard(store.active_tab, config, store)
@@ -6051,6 +6212,32 @@ def _poll_keyboard_tab_switch(
                         store.last_packet_copied_ts = time.time()
                         store.last_packet_char_count = char_count
                         changed = True
+                elif ch in ("q", "Q"):
+                    store.show_help = False
+                    if store.active_tab != 19:
+                        store.active_tab = 19
+                        changed = True
+                    else:
+                        from analytics.four_gate_engine import copy_four_gate_to_clipboard
+                        ok, msg, char_count = copy_four_gate_to_clipboard(store)
+                        store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+                        store.last_packet_copied_ts = time.time()
+                        store.last_packet_char_count = char_count
+                        changed = True
+                elif ch in ("q", "Q"):
+                    store.show_help = False
+                    if store.active_tab != 19:
+                        store.active_tab = 19
+                        changed = True
+                    else:
+                        from analytics.four_gate_engine import copy_four_gate_to_clipboard
+                        ok, msg, char_count = copy_four_gate_to_clipboard(store)
+                        store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+                        store.last_packet_copied_ts = time.time()
+                        store.last_packet_char_count = char_count
+                        changed = True
+                    rlist, _, _ = select.select([sys.stdin], [], [], 0.0)
+                    continue
                 elif ch in ("p", "P"):
                     store.show_help = False
                     if store.active_tab != 13:
@@ -6187,6 +6374,20 @@ def _poll_keyboard_tab_switch(
                         from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
                         copy_tab_data_only_report_to_clipboard(0, config, store)
                         changed = True
+                elif ch in ("q", "Q"):
+                    store.show_help = False
+                    if store.active_tab != 19:
+                        store.active_tab = 19
+                        changed = True
+                    else:
+                        from analytics.four_gate_engine import copy_four_gate_to_clipboard
+                        ok, msg, char_count = copy_four_gate_to_clipboard(store)
+                        store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+                        store.last_packet_copied_ts = time.time()
+                        store.last_packet_char_count = char_count
+                        changed = True
+                    rlist, _, _ = select.select([sys.stdin], [], [], 0.0)
+                    continue
                 elif ch in ("p", "P"):
                     store.show_help = False
                     if store.active_tab != 13:

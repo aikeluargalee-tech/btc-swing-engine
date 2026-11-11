@@ -18,6 +18,7 @@ from .models import (
     GrokQuantEvaluation,
     SSRNAlphaEvaluation,
     BTCMagnetEvaluation,
+    FourGateEvaluation,
     TrendPullbackEvaluation,
     KlineBar,
     LiquidationDetectorReport,
@@ -133,6 +134,7 @@ class StateStore:
         self.trend_pullback_position_status: str = "CASH"
         self.trend_pullback_entry_price: float = 0.0
         self.trend_pullback_stop_price: float = 0.0
+        self.four_gate_evaluation: Optional[FourGateEvaluation] = None
 
         # --- Connection & System Health ---
         self.warmup_complete: bool = False

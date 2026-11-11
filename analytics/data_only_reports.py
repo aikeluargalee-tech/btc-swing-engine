@@ -469,6 +469,67 @@ def build_tab_a_data_only_report(config: Optional[EngineConfig], store: StateSto
     return sanitize_data_only_text(tp_ev.summary_markdown)
 
 
+def build_tab_q_data_only_report(config: Optional[EngineConfig], store: StateStore) -> str:
+    ev = getattr(store, "four_gate_evaluation", None)
+    if ev is None:
+        from analytics.four_gate_engine import FourGateEngine
+        ev = FourGateEngine(config).evaluate(store)
+    if ev is None:
+        return "# BTC 4-GATE QUANTITATIVE PROTOCOL TELEMETRY\nSTATUS: DATA UNAVAILABLE"
+
+    es = ev.event_study_results or {}
+    lines = [
+        "# BTC 4-GATE QUANTITATIVE PROTOCOL TELEMETRY PACKET (TAB 19 / [Q])",
+        f"TIMESTAMP_UTC: {ev.timestamp_utc}",
+        f"STATUS: {ev.status}",
+        f"VERDICT: {ev.verdict}",
+        f"CONFLUENCE_SCORE: {ev.score}/4",
+        "",
+        "## 1. 4-GATE TELEMETRY METRICS",
+        f"GATE_1_LEVY_SIGNED_AREA_PASS: {ev.gate_1_levy}",
+        f"GATE_1_A_SP: {ev.gate_1_val:+.4f}",
+        f"GATE_1_DETAILS: {ev.gate_1_details}",
+        f"GATE_2_SPOT_PERP_ZFLOW_PASS: {ev.gate_2_zflow}",
+        f"GATE_2_D_FLOW: {ev.gate_2_val:+.2f}",
+        f"GATE_2_Z_SPOT: {ev.gate_2_z_s:+.2f}",
+        f"GATE_2_Z_PERP: {ev.gate_2_z_f:+.2f}",
+        f"GATE_2_SPOT_24H_DELTA_BTC: {ev.gate_2_ds_24h:+,.1f}",
+        f"GATE_3_30D_VOLUME_PROFILE_PASS: {ev.gate_3_structure}",
+        f"GATE_3_ACTIVE_STATE: {ev.gate_3_state}",
+        f"GATE_3_POC_30_USD: {ev.gate_3_poc:,.2f}",
+        f"GATE_3_VAL_30_USD: {ev.gate_3_val:,.2f}",
+        f"GATE_3_VAH_30_USD: {ev.gate_3_vah:,.2f}",
+        f"GATE_3_L20_20D_LOW_USD: {ev.gate_3_l20:,.2f}",
+        f"GATE_4_POSITIONING_FILTER_PASS: {ev.gate_4_positioning}",
+        f"GATE_4_PERP_FUNDING_RATE_PCT: {ev.gate_4_funding_rate * 100:+.4f}%",
+        f"GATE_4_FUNDING_90D_PERCENTILE: {ev.gate_4_funding_p90:.2f}%",
+        "",
+        "## 2. 0.75% RISK SHIELD & SIZING TICKET",
+        f"ENTRY_PRICE_USD: {ev.entry_price:,.2f}",
+        f"HARD_STOP_PRICE_USD: {ev.stop_price:,.2f}",
+        f"STOP_DISTANCE_PCT: {ev.stop_pct * 100:.2f}%",
+        f"TARGET_1_PRICE_USD: {ev.target_1_price:,.2f}",
+        f"DERIBIT_30D_DVOL: {f'{ev.dvol_current:.2f}%' if ev.dvol_current else 'DATA UNAVAILABLE'}",
+        f"NOTIONAL_RISK_USD: {ev.notional_risk_usd:,.2f}",
+        f"NOTIONAL_VOL_CAP_USD: {ev.notional_vol_usd:,.2f}",
+        f"FINAL_SPOT_ALLOCATION_USD: {ev.final_notional_usd:,.2f}",
+        f"POSITION_SIZE_BTC: {ev.btc_size:.4f}",
+        "",
+        "## 3. IN-SAMPLE 90-DAY EVENT STUDY",
+        f"HISTORICAL_TRIGGERS_N: {ev.event_study_triggers_count}",
+        f"SMALL_SAMPLE_CAVEAT: {ev.event_study_small_sample}",
+        f"WIN_RATE_1D_PCT: {es.get('win_rate_1d', 0.0):.1f}%",
+        f"MEAN_RETURN_1D_PCT: {es.get('mean_ret_1d', 0.0):+.2f}%",
+        f"WIN_RATE_3D_PCT: {es.get('win_rate_3d', 0.0):.1f}%",
+        f"MEAN_RETURN_3D_PCT: {es.get('mean_ret_3d', 0.0):+.2f}%",
+        f"WIN_RATE_5D_PCT: {es.get('win_rate_5d', 0.0):.1f}%",
+        f"MEAN_RETURN_5D_PCT: {es.get('mean_ret_5d', 0.0):+.2f}%",
+        f"WIN_RATE_10D_PCT: {es.get('win_rate_10d', 0.0):.1f}%",
+        f"MEAN_RETURN_10D_PCT: {es.get('mean_ret_10d', 0.0):+.2f}%",
+    ]
+    return sanitize_data_only_text("\n".join(lines))
+
+
 # ==============================================================================
 # 7. TAB [F: FOOTPRINT] DATA-ONLY REPORT
 # ==============================================================================
@@ -823,6 +884,7 @@ def copy_tab_data_only_report_to_clipboard(
         16: (build_tab_r_data_only_report(cfg, store), "ssrn_research_brief_latest.md"),
         17: (build_tab_m_data_only_report(cfg, store), "btc_magnet_latest.md"),
         18: (build_tab_a_data_only_report(cfg, store), "btc_trend_pullback_latest.md"),
+        19: (build_tab_q_data_only_report(cfg, store), "btc_four_gate_latest.md"),
         11: (build_tab_f_data_only_report(cfg, store), "btc_footprint_latest.md"),
         12: (build_tab_w_data_only_report(cfg, store), "btc_waterfall_latest.md"),
         0: (build_tab_0_data_only_report(cfg, store), "btc_spot_swing_latest.md"),

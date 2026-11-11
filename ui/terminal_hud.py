@@ -5864,7 +5864,8 @@ def _build_tab19_four_gate_hud(
         from analytics.four_gate_engine import FourGateEngine
         ev = FourGateEngine(config).evaluate(store)
 
-    spot_p = (ev.entry_price if ev else 0.0) or store.binance_spot_price or 0.0
+    live_spot = (ev.live_spot_price if ev and ev.live_spot_price else 0.0) or store.binance_spot_price or 0.0
+    closed_bar_str = ev.last_closed_bar_utc if (ev and ev.last_closed_bar_utc) else (ev.timestamp_utc if ev else "SYNC")
 
     # 1. Executive Sub-Ribbon Header
     score = ev.score if ev else 0
@@ -5885,7 +5886,7 @@ def _build_tab19_four_gate_hud(
     sub_grid.add_row(
         f"[bold bright_cyan]BTC 4-GATE PROTOCOL | TAB 19 [Q] | SPOT-ONLY (ZERO LEVERAGE)[/bold bright_cyan]  │  "
         f"[bold {score_color}]CONFLUENCE: {score}/4 GATES[/bold {score_color}]  │  {verdict_badge}",
-        f"[bold white]Spot: [cyan]${spot_p:,.2f}[/cyan] • 4H Bar: [bright_cyan]{ev.timestamp_utc if ev else 'SYNC'}[/bright_cyan][/bold white]",
+        f"[bold white]Live Spot: [cyan]${live_spot:,.2f}[/cyan] • Last Closed 4H Bar: [bright_cyan]{closed_bar_str}[/bright_cyan][/bold white]",
     )
     sub_panel = Panel(sub_grid, box=box.ROUNDED, border_style="bright_cyan", padding=(0, 1))
 
@@ -5976,23 +5977,52 @@ def _build_tab19_four_gate_hud(
     study_table.add_column("Historical Win Rate", justify="right")
     study_table.add_column("Mean Forward Return", justify="right")
     study_table.add_column("Median Forward Return", justify="right")
-    study_table.add_column("Benchmark Comparison", justify="center")
+    study_table.add_column("Benchmark Alpha (vs Baseline)", justify="center")
 
     def _color_ret(val: float) -> str:
         c = "green" if val > 0 else ("red" if val < 0 else "white")
         return f"[{c}]{val:+.2f}%[/{c}]"
 
-    study_table.add_row("1D Forward (6 Bars)", f"{es.get('win_rate_1d', 0.0):.1f}%", _color_ret(es.get('mean_ret_1d', 0.0)), _color_ret(es.get('median_ret_1d', 0.0)), "[green]+ Alpha[/green]" if es.get('mean_ret_1d', 0.0) > 0 else "[red]- Drag[/red]")
-    study_table.add_row("3D Forward (18 Bars)", f"{es.get('win_rate_3d', 0.0):.1f}%", _color_ret(es.get('mean_ret_3d', 0.0)), _color_ret(es.get('median_ret_3d', 0.0)), "[green]+ Alpha[/green]" if es.get('mean_ret_3d', 0.0) > 0 else "[red]- Drag[/red]")
-    study_table.add_row("5D Forward (30 Bars)", f"{es.get('win_rate_5d', 0.0):.1f}%", _color_ret(es.get('mean_ret_5d', 0.0)), _color_ret(es.get('median_ret_5d', 0.0)), "[green]+ Alpha[/green]" if es.get('mean_ret_5d', 0.0) > 0 else "[red]- Drag[/red]")
-    study_table.add_row("10D Forward (60 Bars)", f"{es.get('win_rate_10d', 0.0):.1f}%", _color_ret(es.get('mean_ret_10d', 0.0)), _color_ret(es.get('median_ret_10d', 0.0)), "[green]+ Alpha[/green]" if es.get('mean_ret_10d', 0.0) > 0 else "[red]- Drag[/red]")
+    def _format_alpha(alpha_val: float, baseline_val: float) -> str:
+        c = "green" if alpha_val >= 0 else "red"
+        tag = "+Alpha" if alpha_val >= 0 else "-Drag"
+        return f"vs Base ({baseline_val:+.2f}%): [{c}]{alpha_val:+.2f}% ({tag})[/{c}]"
+
+    study_table.add_row(
+        "1D Forward (6 Bars)",
+        f"{es.get('win_rate_1d', 0.0):.1f}%",
+        _color_ret(es.get('mean_ret_1d', 0.0)),
+        _color_ret(es.get('median_ret_1d', 0.0)),
+        _format_alpha(es.get('alpha_1d', 0.0), es.get('baseline_mean_1d', 0.0)),
+    )
+    study_table.add_row(
+        "3D Forward (18 Bars)",
+        f"{es.get('win_rate_3d', 0.0):.1f}%",
+        _color_ret(es.get('mean_ret_3d', 0.0)),
+        _color_ret(es.get('median_ret_3d', 0.0)),
+        _format_alpha(es.get('alpha_3d', 0.0), es.get('baseline_mean_3d', 0.0)),
+    )
+    study_table.add_row(
+        "5D Forward (30 Bars)",
+        f"{es.get('win_rate_5d', 0.0):.1f}%",
+        _color_ret(es.get('mean_ret_5d', 0.0)),
+        _color_ret(es.get('median_ret_5d', 0.0)),
+        _format_alpha(es.get('alpha_5d', 0.0), es.get('baseline_mean_5d', 0.0)),
+    )
+    study_table.add_row(
+        "10D Forward (60 Bars)",
+        f"{es.get('win_rate_10d', 0.0):.1f}%",
+        _color_ret(es.get('mean_ret_10d', 0.0)),
+        _color_ret(es.get('median_ret_10d', 0.0)),
+        _format_alpha(es.get('alpha_10d', 0.0), es.get('baseline_mean_10d', 0.0)),
+    )
 
     study_panel = Panel(
         Group(
-            Text.from_markup(f"[bold white]In-Sample 90-Day Walk-Forward Triggers:[/bold white] [bold cyan]{n_triggers} historical events[/bold cyan]  │  {caveat_str}\n"),
+            Text.from_markup(f"[bold white]90-Day De-Clustered In-Sample Event Study (5D Embargo):[/bold white] [bold cyan]{n_triggers} independent events[/bold cyan]  │  {caveat_str}\n"),
             study_table,
         ),
-        title="[bold bright_white]90-DAY IN-SAMPLE EVENT STUDY & FORWARD EXPECTANCY AUDIT[/bold bright_white]",
+        title="[bold bright_white]90-DAY DE-CLUSTERED IN-SAMPLE EVENT STUDY & BENCHMARK ALPHA[/bold bright_white]",
         box=box.ROUNDED,
         border_style="magenta",
         padding=(0, 1),

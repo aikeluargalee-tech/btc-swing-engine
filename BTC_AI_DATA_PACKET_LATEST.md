@@ -1,12 +1,12 @@
 # BTC SWING ENGINE | GLOBAL DATA-ONLY TELEMETRY PACKET ([C: AI PACKET])
-**Retrieval Time (UTC):** `2026-11-11 07:28:15 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:28:15 MYT (UTC+8)`
+**Retrieval Time (UTC):** `2026-11-11 07:51:05 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:51:05 MYT (UTC+8)`
 **Spot Price (BTCUSDT):** `$0.00`
 **Output Specification:** `DATA-ONLY (Raw Measurements, Reference Formulas & True/False Conditions Only — Zero Interpretive Prose)`
 
 ---
 
 # BTC TREND-PULLBACK v1.0 | DATA-ONLY REPORT (RESEARCH / PAPER MODE)
-**STATUS:** `UNVALIDATED`  |  **Retrieval Time (UTC):** `2026-11-11 07:28:15 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:28:15 MYT (UTC+8)`
+**STATUS:** `UNVALIDATED`  |  **Retrieval Time (UTC):** `2026-11-11 07:51:05 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:51:05 MYT (UTC+8)`
 **Spot Price (BTCUSDT):** `$0.00`
 
 ## 1. DAILY (1D)
@@ -81,8 +81,8 @@
 - **Spot <= Stop Level (`$0.00 <= $0.00`):** `False`
 
 ## 6. DATA INTEGRITY
-- **Data Retrieval Time (UTC):** `2026-11-11 07:28:15 UTC`
-- **Data Retrieval Time (MYT):** `2026-11-11 15:28:15 MYT (UTC+8)`
+- **Data Retrieval Time (UTC):** `2026-11-11 07:51:05 UTC`
+- **Data Retrieval Time (MYT):** `2026-11-11 15:51:05 MYT (UTC+8)`
 - **Data Integrity Pass:** `False`
 - **Completed 1D Candles Available:** `0` | **Last Completed 1D Status:** `UNAVAILABLE` | **Forming 1D Candle Excluded:** `False` (`None`)
 - **Completed 4H Candles Available:** `0` | **Last Completed 4H Status:** `UNAVAILABLE` | **Forming 4H Candle Excluded:** `False` (`None`)
@@ -90,7 +90,7 @@
 ---
 
 # TAB [M: MAGNET] | DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-11 07:28:15 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:28:15 MYT (UTC+8)`
+**Retrieval Time (UTC):** `2026-11-11 07:51:05 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:51:05 MYT (UTC+8)`
 **Spot Price (BTCUSDT):** `$76,000.00` (`24H Change: +0.00%`)
 
 ## 1. 5-REGIME RADAR DIAGNOSIS & MAJORITY VOTING
@@ -164,12 +164,12 @@
 | Funding Rate Normalization | +0.0100%/8h (+10.95%/yr) | +0.0100%/8h (+0.00%/yr) | 10.95%/yr delta | `INFO` | Both feeds confirm calm/neutral carry within +0.0100%/8h baseline. |
 | Lower Magnet Target Geometry | $74,860.00 | $72,540.84 | $2,319.16 | `INFO` | Cluster horizons reconciled. |
 | LSCE Sweep Confirmation State | UNTESTED | [UNTESTED] | Aligned | `INFO` | Both engines confirm current sweep state. |
-| Snapshot Synchronization | 2026-11-11 07:28:15 UTC | 2026-11-11 07:28:15 UTC | 0.0m delta (Synchronized) | `INFO` | Both telemetry feeds retrieved within acceptable synchronization window. |
+| Snapshot Synchronization | 2026-11-11 07:51:05 UTC | 2026-11-11 07:51:05 UTC | 0.0m delta (Synchronized) | `INFO` | Both telemetry feeds retrieved within acceptable synchronization window. |
 
 ---
 
 # TAB [G: GROK FLOW] | DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-11 07:28:16 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:28:16 MYT (UTC+8)`
+**Retrieval Time (UTC):** `2026-11-11 07:51:05 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:51:05 MYT (UTC+8)`
 **Spot Price (BTCUSDT):** `$0.00`
 
 ## 1. 00:00 UTC ANCHORED VWAP & STANDARD DEVIATION BANDS
@@ -207,7 +207,7 @@
 ---
 
 # TAB [R: SSRN RESEARCH] | DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-11 07:28:16 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:28:16 MYT (UTC+8)`
+**Retrieval Time (UTC):** `2026-11-11 07:51:05 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:51:05 MYT (UTC+8)`
 **Spot Price (BTCUSDT):** `$0.00`
 
 ## 1. EMPIRICAL FACTOR & GATE METRICS
@@ -243,7 +243,7 @@
 ---
 
 # TAB [P: STRUCTURE] | DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-11 07:28:16 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:28:16 MYT (UTC+8)`
+**Retrieval Time (UTC):** `2026-11-11 07:51:05 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:51:05 MYT (UTC+8)`
 **Spot Price (BTCUSDT):** `$0.00`
 
 ## 1. 5-REGIME RADAR DIAGNOSIS & MACRO SIZING
@@ -313,7 +313,7 @@
 ---
 
 # TAB [F: FOOTPRINT] | DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-11 07:28:16 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:28:16 MYT (UTC+8)`
+**Retrieval Time (UTC):** `2026-11-11 07:51:05 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:51:05 MYT (UTC+8)`
 **Spot Price (BTCUSDT):** `$0.00`
 
 ## 1. 15-MINUTE INTRA-CANDLE FOOTPRINT METRICS
@@ -339,7 +339,7 @@
 ---
 
 # TAB [W: WATERFALL] | DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-11 07:28:16 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:28:16 MYT (UTC+8)`
+**Retrieval Time (UTC):** `2026-11-11 07:51:05 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:51:05 MYT (UTC+8)`
 **Spot Price (BTCUSDT):** `$0.00`
 
 ## 1. 5-PILLAR CONDITION BOOLEANS & RAW INPUTS
@@ -353,7 +353,7 @@
 ---
 
 # TAB [0: SPOT SWING] | DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-11 07:28:16 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:28:16 MYT (UTC+8)`
+**Retrieval Time (UTC):** `2026-11-11 07:51:05 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:51:05 MYT (UTC+8)`
 **Spot Price (BTCUSDT):** `$0.00`
 
 ## 1. SPOT SWING SCREENER METRICS & GATE BOOLEANS
@@ -362,7 +362,7 @@
 ---
 
 # TAB [L: MASTER] | 8-FLAGSHIP DESK DATA-ONLY METRICS REPORT
-**Retrieval Time (UTC):** `2026-11-11 07:28:16 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:28:16 MYT (UTC+8)`
+**Retrieval Time (UTC):** `2026-11-11 07:51:05 UTC`  |  **Retrieval Time (MYT):** `2026-11-11 15:51:05 MYT (UTC+8)`
 **Spot Price (BTCUSDT):** `$0.00`
 **Desk Purpose & Scope:** `Single-screen 8-Flagship-Desk Telemetry Matrix (P, G, R, M, A, F, W, 0) & 4-Domain Readiness Overview. Keeps each strategy's reference entry, stop, and sizing calculations strictly unblended.`
 

@@ -64,6 +64,8 @@ class TestFourGateEngine(unittest.TestCase):
         self.assertIn(ev.score, [0, 1, 2, 3, 4])
         self.assertIn(ev.status, ["LIVE", "STANDBY"])
         self.assertIn(ev.verdict, ["EXECUTE SPOT LONG", "STANDBY / CASH"])
+        self.assertGreater(ev.live_spot_price, 0.0)
+        self.assertIn("UTC", ev.last_closed_bar_utc)
         self.assertGreater(ev.entry_price, 0.0)
         self.assertGreater(ev.stop_price, 0.0)
         self.assertLess(ev.stop_price, ev.entry_price)
@@ -106,6 +108,9 @@ class TestFourGateEngine(unittest.TestCase):
         # Max dollar loss at stop must equal exactly equity * 0.0075 ($750)
         dollar_loss_at_stop = ev.final_notional_usd * ev.stop_pct
         self.assertLessEqual(dollar_loss_at_stop, 750.01)
+        # Clamped between 1.25% and 4.00%
+        self.assertGreaterEqual(ev.stop_pct, 0.0125)
+        self.assertLessEqual(ev.stop_pct, 0.0401)
 
         # High DVOL throttles notional
         ev_high_dvol = self.engine.calculate_evaluation(spot_k, perp_k, fund_p, 110.0, equity_usd=equity)

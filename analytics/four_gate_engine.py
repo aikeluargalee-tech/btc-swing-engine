@@ -56,8 +56,8 @@ class FourGateEngine:
         """
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) BTC-4Gate/1.0"}
 
-        # 1. Binance Spot 4H Klines (limit=540)
-        spot_url = "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&limit=540"
+        # 1. Binance Spot 4H Klines (limit=780: 180 warmup + 540 90D eval + 60 forward horizon)
+        spot_url = "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&limit=780"
         spot_klines: Optional[List[Any]] = None
         try:
             req = urllib.request.Request(spot_url, headers=headers)
@@ -68,8 +68,8 @@ class FourGateEngine:
             logger.warning("Failed fetching Binance Spot 4H: %s", exc)
             return None, None, None, None
 
-        # 2. Binance USD-M Perp 4H Klines (limit=540)
-        perp_url = "https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=4h&limit=540"
+        # 2. Binance USD-M Perp 4H Klines (limit=780)
+        perp_url = "https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=4h&limit=780"
         perp_klines: Optional[List[Any]] = None
         try:
             req = urllib.request.Request(perp_url, headers=headers)
@@ -80,14 +80,26 @@ class FourGateEngine:
             logger.warning("Failed fetching Binance Perp 4H: %s", exc)
             return None, None, None, None
 
-        # 3. Binance Perp Funding History (limit=270)
-        fund_url = "https://fapi.binance.com/fapi/v1/fundingRate?symbol=BTCUSDT&limit=270"
+        # 3. Binance Perp Funding History (paginated: 500 + 100 to get ~600 prints / 200 days)
+        fund_url = "https://fapi.binance.com/fapi/v1/fundingRate?symbol=BTCUSDT&limit=500"
         funding_prints: Optional[List[Any]] = None
         try:
             req = urllib.request.Request(fund_url, headers=headers)
             with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
                 if resp.status == 200:
-                    funding_prints = json.loads(resp.read().decode("utf-8"))
+                    p1 = json.loads(resp.read().decode("utf-8"))
+                    funding_prints = p1
+                    if p1 and len(p1) > 0:
+                        t0 = p1[0]["fundingTime"]
+                        fund_url2 = f"https://fapi.binance.com/fapi/v1/fundingRate?symbol=BTCUSDT&limit=100&endTime={t0 - 1}"
+                        try:
+                            req2 = urllib.request.Request(fund_url2, headers=headers)
+                            with urllib.request.urlopen(req2, timeout=timeout_sec) as resp2:
+                                if resp2.status == 200:
+                                    p2 = json.loads(resp2.read().decode("utf-8"))
+                                    funding_prints = p2 + p1
+                        except Exception:
+                            pass
         except Exception as exc:
             logger.warning("Failed fetching Binance Funding Rate: %s", exc)
             return None, None, None, None
@@ -128,10 +140,11 @@ class FourGateEngine:
     ) -> FourGateEvaluation:
         """Runs the deterministic 4-Gate calculation and 90-day event study."""
         now_utc = datetime.now(timezone.utc)
-        now_ms = int(time.time() * 1000)
+        live_spot_px = float(spot_raw[-1][4]) if spot_raw and len(spot_raw[-1]) >= 5 else 0.0
 
-        # Drop incomplete forming candle if not yet closed
-        if spot_raw and now_ms < spot_raw[-1][6]:
+        # Audit Fix 1: Lock Signal Evaluation strictly to CLOSED 4H Bars (klines[:-1])
+        # Binance klines return the incomplete open candle as the last element [-1]
+        if spot_raw and len(spot_raw) > 1:
             spot_bars = spot_raw[:-1]
             perp_bars = perp_raw[:-1]
         else:
@@ -144,6 +157,8 @@ class FourGateEngine:
                 timestamp_utc=now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
                 status="HALT: DATA UNAVAILABLE",
                 verdict="HALT: DATA UNAVAILABLE",
+                score=0,
+                live_spot_price=live_spot_px,
                 raw_data_available=False,
                 error_message=f"Insufficient closed bars: {N} < 186 required.",
             )
@@ -160,10 +175,16 @@ class FourGateEngine:
                 timestamp_utc=now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
                 status="HALT: DATA UNAVAILABLE",
                 verdict="HALT: DATA UNAVAILABLE",
+                score=0,
+                live_spot_price=live_spot_px,
                 raw_data_available=False,
                 error_message="Spot and Perp 4H timestamp alignment failed.",
             )
             return ev
+
+        last_closed_bar_utc = datetime.fromtimestamp(
+            spot_ts[-1] / 1000, tz=timezone.utc
+        ).strftime("%Y-%m-%d %H:00:00 UTC")
 
         closes = np.array([float(b[4]) for b in spot_bars])
         highs = np.array([float(b[2]) for b in spot_bars])
@@ -265,22 +286,24 @@ class FourGateEngine:
             gate_3_details = f"No Structural Trigger: POC=${poc_30:,.1f}, VAL=${val_30:,.1f}, L20=${l_20:,.1f}"
 
         # -------------------------------------------------------------
-        # GATE 4: Positioning & Anti-Crowding Filter
+        # Audit Fix 3: GATE 4 - Context-Aware Positioning & Anti-Crowding Filter
         # Trailing 270 funding prints (90 days)
         # -------------------------------------------------------------
         rates = [float(f["fundingRate"]) for f in funding_raw]
         curr_funding = float(rates[-1]) if rates else 0.0
-        p90_f = (sum(r < curr_funding for r in rates) / len(rates)) * 100.0 if rates else 50.0
+        recent_rates = rates[-270:] if len(rates) >= 270 else rates
+        p90_f = (sum(r < curr_funding for r in recent_rates) / len(recent_rates)) * 100.0 if recent_rates else 50.0
 
-        if active_state == "STATE_A":
+        is_sweep_zone = (active_state == "STATE_A") or (active_state == "NONE" and closes[-1] < val_30)
+
+        if is_sweep_zone:
             gate_4_pass = bool(curr_funding <= 0.0 or p90_f < 25.0)
-            gate_4_details = f"Sweep Mode: Funding={curr_funding * 100:+.4f}%, Rank={p90_f:.1f}% (<25% required)"
-        elif active_state == "STATE_B":
-            gate_4_pass = bool(p90_f <= 75.0)
-            gate_4_details = f"Node Mode: Funding={curr_funding * 100:+.4f}%, Rank={p90_f:.1f}% (<=75% required)"
+            zone_desc = "State A (Sweep Reclaim)" if active_state == "STATE_A" else f"Below VAL_30 (${val_30:,.1f}) [Sweep Zone]"
+            gate_4_details = f"{zone_desc}: Funding={curr_funding * 100:+.4f}%, Rank={p90_f:.1f}% (<25.0% or negative required)"
         else:
             gate_4_pass = bool(p90_f <= 75.0)
-            gate_4_details = f"Telemetry Rank={p90_f:.1f}% (Funding={curr_funding * 100:+.4f}%)"
+            zone_desc = "State B (POC Node Hold)" if active_state == "STATE_B" else f"Above VAL_30 (${val_30:,.1f}) [Node Zone]"
+            gate_4_details = f"{zone_desc}: Funding={curr_funding * 100:+.4f}%, Rank={p90_f:.1f}% (<=75.0% required)"
 
         # Confluence Score
         score = int(gate_1_pass) + int(gate_2_pass) + int(gate_3_pass) + int(gate_4_pass)
@@ -289,11 +312,13 @@ class FourGateEngine:
         status = "LIVE" if is_long else "STANDBY"
 
         # -------------------------------------------------------------
-        # POSITION SIZING & 0.75% SAFETY SHIELD
+        # Audit Fix 2: POSITION SIZING & 0.75% SAFETY SHIELD (Fix min() Stop Bug)
         # -------------------------------------------------------------
         p_entry = float(closes[-1])
-        p_stop = float(min(lows[-1], p_entry * 0.96) - (0.0015 * p_entry))
-        stop_pct = max(0.002, (p_entry - p_stop) / p_entry)
+        raw_stop = float(np.min(lows[-3:])) - (0.0015 * p_entry)
+        raw_stop_pct = (p_entry - raw_stop) / p_entry
+        stop_pct = max(0.0125, min(0.0400, raw_stop_pct))
+        p_stop = p_entry * (1.0 - stop_pct)
         notional_risk = (equity_usd * 0.0075) / stop_pct
         notional_vol = equity_usd * min(1.0, 55.0 / dvol_current) if dvol_current > 0 else equity_usd
         final_notional = min(notional_risk, notional_vol, equity_usd)
@@ -305,7 +330,7 @@ class FourGateEngine:
             target_1 = p_entry + 2.0 * (p_entry - p_stop)
 
         # -------------------------------------------------------------
-        # HISTORICAL 90-DAY EVENT STUDY (In-Sample Validation)
+        # Audit Fix 4 & 5: DE-CLUSTERED 90-DAY IN-SAMPLE EVENT STUDY
         # -------------------------------------------------------------
         event_study = self._run_historical_event_study(
             closes=closes,
@@ -324,6 +349,8 @@ class FourGateEngine:
             status=status,
             verdict=verdict,
             score=score,
+            live_spot_price=live_spot_px,
+            last_closed_bar_utc=last_closed_bar_utc,
             gate_1_levy=gate_1_pass,
             gate_1_val=float(A_SP),
             gate_1_details=gate_1_details,
@@ -373,15 +400,34 @@ class FourGateEngine:
         funding_raw: List[Any],
         N: int,
     ) -> Dict[str, Any]:
-        """Calculates forward return expectancy of all historical 4/4 triggers."""
+        """Calculates forward return expectancy and benchmark alpha of de-clustered 4/4 triggers (5D Embargo)."""
         fund_times = np.array([f["fundingTime"] for f in funding_raw])
         fund_rates = np.array([float(f["fundingRate"]) for f in funding_raw])
 
-        triggers: List[Dict[str, Any]] = []
+        # Evaluate trailing 540 bars (~90 days) with 180 bars warmup and 60 bars forward horizon
+        start_idx = max(180, N - 60 - 540)
+        end_idx = N - 60
 
-        # Slide over bars k from 180 to N - 61 (ensures 60 bars of forward return)
-        for k in range(180, N - 60):
-            # Gate 1
+        # Unconditional baseline forward returns across the exact same evaluation window
+        base_1d = [(closes[k + 6] - closes[k]) / closes[k] for k in range(start_idx, end_idx)]
+        base_3d = [(closes[k + 18] - closes[k]) / closes[k] for k in range(start_idx, end_idx)]
+        base_5d = [(closes[k + 30] - closes[k]) / closes[k] for k in range(start_idx, end_idx)]
+        base_10d = [(closes[k + 60] - closes[k]) / closes[k] for k in range(start_idx, end_idx)]
+
+        baseline_mean_1d = float(np.mean(base_1d) * 100.0) if base_1d else 0.0
+        baseline_mean_3d = float(np.mean(base_3d) * 100.0) if base_3d else 0.0
+        baseline_mean_5d = float(np.mean(base_5d) * 100.0) if base_5d else 0.0
+        baseline_mean_10d = float(np.mean(base_10d) * 100.0) if base_10d else 0.0
+
+        triggers: List[Dict[str, Any]] = []
+        last_trigger_bar = -999
+
+        for k in range(start_idx, end_idx):
+            # Audit Fix 4: 30-bar (5-day) cooldown embargo to de-cluster consecutive signals
+            if k < last_trigger_bar + 30:
+                continue
+
+            # Gate 1: Rough Path Signature Engine (Lévy Signed Area)
             C_S = np.zeros(7)
             C_S[1:] = np.cumsum(dS[k - 5 : k + 1])
             L_P = np.zeros(7)
@@ -394,7 +440,7 @@ class FourGateEngine:
             if A_SP <= 0.0:
                 continue
 
-            # Gate 2
+            # Gate 2: Spot vs Perp CVD Z-Spread
             idx_start = k - 179
             dS_win = [np.sum(dS[i - 5 : i + 1]) for i in range(idx_start, k + 1)]
             dF_win = [np.sum(dF[i - 5 : i + 1]) for i in range(idx_start, k + 1)]
@@ -407,23 +453,20 @@ class FourGateEngine:
             if (z_S - z_F) < 1.0:
                 continue
 
-            # Gate 3
+            # Gate 3: 30D Executed Volume Profile Structure
             w_h = highs[idx_start : k + 1]
             w_l = lows[idx_start : k + 1]
             w_c = closes[idx_start : k + 1]
             w_v = s_vols[idx_start : k + 1]
-            p_min, p_max = np.min(w_l), np.max(w_h)
+            p_min, p_max = float(np.min(w_l)), float(np.max(w_h))
             bins = np.linspace(p_min, p_max, 51)
             vol_bins = np.zeros(50)
             for tp, v in zip((w_h + w_l + w_c) / 3.0, w_v):
-                b_idx = min(49, max(0, int((tp - p_min) / (p_max - p_min + 1e-9) * 50)))
-                vol_bins[b_idx] += v
+                vol_bins[min(49, max(0, int((tp - p_min) / (p_max - p_min + 1e-9) * 50)))] += v
             poc_idx = np.argmax(vol_bins)
             poc_30 = (bins[poc_idx] + bins[poc_idx + 1]) / 2.0
             c_vol = np.cumsum(vol_bins)
-            t_vol = c_vol[-1]
-            val_idx = np.searchsorted(c_vol, t_vol * 0.15)
-            val_30 = (bins[val_idx] + bins[min(49, val_idx + 1)]) / 2.0
+            val_30 = (bins[np.searchsorted(c_vol, c_vol[-1] * 0.15)] + bins[min(49, np.searchsorted(c_vol, c_vol[-1] * 0.15) + 1)]) / 2.0
             l_20 = np.min(lows[max(0, k - 120) : k])
 
             state_a = (lows[k] < l_20 and closes[k] > l_20) or (lows[k] < val_30 and closes[k] > val_30)
@@ -431,12 +474,16 @@ class FourGateEngine:
             if not (state_a or state_b):
                 continue
 
-            # Gate 4
-            past_rates = fund_rates[fund_times <= open_times[k]]
+            # Audit Fix 4: Zero Look-Ahead strictly from funding prints <= bar_close_time
+            bar_close_ms = int(open_times[k] + (4 * 3600 * 1000) - 1)
+            past_rates = fund_rates[fund_times <= bar_close_ms]
             if len(past_rates) == 0:
-                past_rates = fund_rates[:20]
-            curr_f = past_rates[-1]
-            p90 = (np.sum(past_rates < curr_f) / len(past_rates)) * 100.0
+                continue
+            win_rates = past_rates[-270:] if len(past_rates) >= 270 else past_rates
+            curr_f = win_rates[-1]
+            p90 = (np.sum(win_rates < curr_f) / len(win_rates)) * 100.0
+
+            # Audit Fix 3: Context-aware Gate 4
             if state_a:
                 if not (curr_f <= 0.0 or p90 < 25.0):
                     continue
@@ -444,7 +491,7 @@ class FourGateEngine:
                 if not (p90 <= 75.0):
                     continue
 
-            # Forward returns
+            # Trigger fired -> log and activate 30-bar embargo
             r1d = float((closes[k + 6] - closes[k]) / closes[k])
             r3d = float((closes[k + 18] - closes[k]) / closes[k])
             r5d = float((closes[k + 30] - closes[k]) / closes[k])
@@ -461,6 +508,7 @@ class FourGateEngine:
                     "ret_10d": r10d,
                 }
             )
+            last_trigger_bar = k
 
         count = len(triggers)
         if count == 0:
@@ -470,38 +518,59 @@ class FourGateEngine:
                 "win_rate_1d": 0.0,
                 "mean_ret_1d": 0.0,
                 "median_ret_1d": 0.0,
+                "baseline_mean_1d": baseline_mean_1d,
+                "alpha_1d": 0.0 - baseline_mean_1d,
                 "win_rate_3d": 0.0,
                 "mean_ret_3d": 0.0,
                 "median_ret_3d": 0.0,
+                "baseline_mean_3d": baseline_mean_3d,
+                "alpha_3d": 0.0 - baseline_mean_3d,
                 "win_rate_5d": 0.0,
                 "mean_ret_5d": 0.0,
                 "median_ret_5d": 0.0,
+                "baseline_mean_5d": baseline_mean_5d,
+                "alpha_5d": 0.0 - baseline_mean_5d,
                 "win_rate_10d": 0.0,
                 "mean_ret_10d": 0.0,
                 "median_ret_10d": 0.0,
+                "baseline_mean_10d": baseline_mean_10d,
+                "alpha_10d": 0.0 - baseline_mean_10d,
                 "triggers": [],
             }
 
-        r1 = [t["ret_1d"] for t in triggers]
-        r3 = [t["ret_3d"] for t in triggers]
-        r5 = [t["ret_5d"] for t in triggers]
-        r10 = [t["ret_10d"] for t in triggers]
+        r1 = [t["ret_1d"] * 100.0 for t in triggers]
+        r3 = [t["ret_3d"] * 100.0 for t in triggers]
+        r5 = [t["ret_5d"] * 100.0 for t in triggers]
+        r10 = [t["ret_10d"] * 100.0 for t in triggers]
+
+        mean_1d = float(np.mean(r1))
+        mean_3d = float(np.mean(r3))
+        mean_5d = float(np.mean(r5))
+        mean_10d = float(np.mean(r10))
 
         return {
             "count": count,
-            "small_sample": count < 30,
-            "win_rate_1d": float(np.mean([x > 0 for x in r1]) * 100.0),
-            "mean_ret_1d": float(np.mean(r1) * 100.0),
-            "median_ret_1d": float(np.median(r1) * 100.0),
-            "win_rate_3d": float(np.mean([x > 0 for x in r3]) * 100.0),
-            "mean_ret_3d": float(np.mean(r3) * 100.0),
-            "median_ret_3d": float(np.median(r3) * 100.0),
-            "win_rate_5d": float(np.mean([x > 0 for x in r5]) * 100.0),
-            "mean_ret_5d": float(np.mean(r5) * 100.0),
-            "median_ret_5d": float(np.median(r5) * 100.0),
-            "win_rate_10d": float(np.mean([x > 0 for x in r10]) * 100.0),
-            "mean_ret_10d": float(np.mean(r10) * 100.0),
-            "median_ret_10d": float(np.median(r10) * 100.0),
+            "small_sample": bool(count < 30),
+            "win_rate_1d": float(sum(x > 0 for x in r1) / count * 100.0),
+            "mean_ret_1d": mean_1d,
+            "median_ret_1d": float(np.median(r1)),
+            "baseline_mean_1d": baseline_mean_1d,
+            "alpha_1d": mean_1d - baseline_mean_1d,
+            "win_rate_3d": float(sum(x > 0 for x in r3) / count * 100.0),
+            "mean_ret_3d": mean_3d,
+            "median_ret_3d": float(np.median(r3)),
+            "baseline_mean_3d": baseline_mean_3d,
+            "alpha_3d": mean_3d - baseline_mean_3d,
+            "win_rate_5d": float(sum(x > 0 for x in r5) / count * 100.0),
+            "mean_ret_5d": mean_5d,
+            "median_ret_5d": float(np.median(r5)),
+            "baseline_mean_5d": baseline_mean_5d,
+            "alpha_5d": mean_5d - baseline_mean_5d,
+            "win_rate_10d": float(sum(x > 0 for x in r10) / count * 100.0),
+            "mean_ret_10d": mean_10d,
+            "median_ret_10d": float(np.median(r10)),
+            "baseline_mean_10d": baseline_mean_10d,
+            "alpha_10d": mean_10d - baseline_mean_10d,
             "triggers": triggers,
         }
 
@@ -547,6 +616,8 @@ class FourGateEngine:
         try:
             data = {
                 "timestamp_utc": ev.timestamp_utc,
+                "live_spot_price": ev.live_spot_price,
+                "last_closed_bar_utc": ev.last_closed_bar_utc,
                 "status": ev.status,
                 "verdict": ev.verdict,
                 "score": ev.score,
@@ -611,15 +682,17 @@ def copy_four_gate_to_clipboard(store: Any) -> Tuple[bool, str, int]:
     lines = [
         "# BTC 4-GATE QUANTITATIVE PROTOCOL TELEMETRY PACKET (TAB 19 / [Q])",
         f"**Timestamp UTC**: {ev.timestamp_utc}",
+        f"**Live Spot**: ${ev.live_spot_price:,.2f} | **Last Closed 4H Bar**: {ev.last_closed_bar_utc}",
         f"**Status**: {ev.status} | **Verdict**: {ev.verdict} | **Confluence Score**: {ev.score}/4",
         "",
         "## 1. DETERMINISTIC 4-GATE TELEMETRY READOUT",
-        f"- Gate 1 [Rough Path Lévy Area A_SP]: {'PASS' if ev.gate_1_levy else 'FAIL'} | Value: {ev.gate_1_val:+.4f} (Rule: A_SP > 0.0)",
+        f"- Gate 1 [Rough Path Levy Area A_SP]: {'PASS' if ev.gate_1_levy else 'FAIL'} | Value: {ev.gate_1_val:+.4f} (Rule: A_SP > 0.0)",
         f"- Gate 2 [Spot-Perp CVD Z-Spread]:    {'PASS' if ev.gate_2_zflow else 'FAIL'} | Value: {ev.gate_2_val:+.2f} (Rule: D_flow >= 1.0 & Spot24h > 0)",
         f"  - Details: z_S={ev.gate_2_z_s:+.2f}, z_F={ev.gate_2_z_f:+.2f}, Spot24h_Delta={ev.gate_2_ds_24h:+,.1f} BTC",
         f"- Gate 3 [30D Volume Profile Structure]: {'PASS' if ev.gate_3_structure else 'FAIL'} | Active State: {ev.gate_3_state}",
         f"  - POC_30: ${ev.gate_3_poc:,.1f} | VAL_30: ${ev.gate_3_val:,.1f} | VAH_30: ${ev.gate_3_vah:,.1f} | L20: ${ev.gate_3_l20:,.1f}",
         f"- Gate 4 [90D Funding Anti-Crowding]: {'PASS' if ev.gate_4_positioning else 'FAIL'} | Rate: {ev.gate_4_funding_rate * 100:+.4f}% | Percentile: {ev.gate_4_funding_p90:.1f}%",
+        f"  - Active Rule: {ev.gate_4_details}",
         "",
         "## 2. 0.75% SAFETY SHIELD & EXECUTION TICKET",
         f"- Entry Reference Price: ${ev.entry_price:,.2f}",
@@ -630,18 +703,18 @@ def copy_four_gate_to_clipboard(store: Any) -> Tuple[bool, str, int]:
         f"- DVOL Vol-Capped Size:  ${ev.notional_vol_usd:,.2f}",
         f"- Final Spot Allocation: ${ev.final_notional_usd:,.2f} (~{ev.btc_size:.4f} BTC)",
         "",
-        "## 3. IN-SAMPLE 90-DAY EVENT STUDY EXPECTANCY",
-        f"- Trailing 90D Triggers (N): {ev.event_study_triggers_count}",
+        "## 3. 90-DAY DE-CLUSTERED IN-SAMPLE EVENT STUDY (5D EMBARGO)",
+        f"- De-Clustered Triggers (N): {ev.event_study_triggers_count}",
         f"- Small Sample Notice: {'ACTIVE (N < 30)' if ev.event_study_small_sample else 'PASSED (N >= 30)'}",
     ]
 
     es = ev.event_study_results
     if es and es.get("count", 0) > 0:
         lines.extend([
-            f"- 1D Forward Return: Win Rate={es.get('win_rate_1d', 0.0):.1f}%, Mean={es.get('mean_ret_1d', 0.0):+.2f}%, Median={es.get('median_ret_1d', 0.0):+.2f}%",
-            f"- 3D Forward Return: Win Rate={es.get('win_rate_3d', 0.0):.1f}%, Mean={es.get('mean_ret_3d', 0.0):+.2f}%, Median={es.get('median_ret_3d', 0.0):+.2f}%",
-            f"- 5D Forward Return: Win Rate={es.get('win_rate_5d', 0.0):.1f}%, Mean={es.get('mean_ret_5d', 0.0):+.2f}%, Median={es.get('median_ret_5d', 0.0):+.2f}%",
-            f"- 10D Forward Return: Win Rate={es.get('win_rate_10d', 0.0):.1f}%, Mean={es.get('mean_ret_10d', 0.0):+.2f}%, Median={es.get('median_ret_10d', 0.0):+.2f}%",
+            f"- 1D Forward Return: Win Rate={es.get('win_rate_1d', 0.0):.1f}%, Mean={es.get('mean_ret_1d', 0.0):+.2f}% (vs Baseline {es.get('baseline_mean_1d', 0.0):+.2f}%: Alpha {es.get('alpha_1d', 0.0):+.2f}%)",
+            f"- 3D Forward Return: Win Rate={es.get('win_rate_3d', 0.0):.1f}%, Mean={es.get('mean_ret_3d', 0.0):+.2f}% (vs Baseline {es.get('baseline_mean_3d', 0.0):+.2f}%: Alpha {es.get('alpha_3d', 0.0):+.2f}%)",
+            f"- 5D Forward Return: Win Rate={es.get('win_rate_5d', 0.0):.1f}%, Mean={es.get('mean_ret_5d', 0.0):+.2f}% (vs Baseline {es.get('baseline_mean_5d', 0.0):+.2f}%: Alpha {es.get('alpha_5d', 0.0):+.2f}%)",
+            f"- 10D Forward Return: Win Rate={es.get('win_rate_10d', 0.0):.1f}%, Mean={es.get('mean_ret_10d', 0.0):+.2f}% (vs Baseline {es.get('baseline_mean_10d', 0.0):+.2f}%: Alpha {es.get('alpha_10d', 0.0):+.2f}%)",
         ])
     else:
         lines.append("- No 4/4 triggers registered in trailing lookback window.")

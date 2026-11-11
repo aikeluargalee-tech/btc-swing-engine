@@ -1,5 +1,5 @@
 {
-  "timestamp_utc": "2026-11-11 07:28:32 UTC",
+  "timestamp_utc": "2026-11-11 07:51:29 UTC",
   "status": "STANDBY",
   "verdict": "STANDBY / CASH",
   "score": 1,
@@ -32,7 +32,7 @@
     "details": "Telemetry Rank=68.9% (Funding=+0.0080%)"
   },
   "sizing": {
-    "dvol": 39.45,
+    "dvol": 39.38,
     "entry_price": 73770.16,
     "stop_price": 70708.69836000001,
     "stop_pct": 0.04149999999999992,

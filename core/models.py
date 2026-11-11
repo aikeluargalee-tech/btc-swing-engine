@@ -5296,6 +5296,8 @@ class FourGateEvaluation:
     gate_4_details: str = ""
 
     # Market & Risk Control
+    live_spot_price: float = 0.0
+    last_closed_bar_utc: str = ""
     dvol_current: Optional[float] = None
     entry_price: float = 0.0
     stop_price: float = 0.0

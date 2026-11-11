@@ -188,9 +188,9 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         else "[dim white][A: BTC STRATEGY][/dim white]"
     )
     tQ = (
-        "[bold black on bright_yellow] [Q: 4-GATE] [/bold black on bright_yellow]"
+        "[bold black on bright_yellow] [Q: DIBSE] [/bold black on bright_yellow]"
         if active_tab == 19
-        else "[dim white][Q: 4-GATE][/dim white]"
+        else "[dim white][Q: DIBSE][/dim white]"
     )
     t0 = (
         "[bold white on blue] [0: SPOT SWING] [/bold white on blue]"
@@ -223,7 +223,7 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         16: "16: SSRN RESEARCH [R]",
         17: "17: BTC MAGNET [M]",
         18: "18: TREND-PULLBACK [A]",
-        19: "19: 4-GATE PROTOCOL [Q]",
+        19: "19: DIBSE DUAL-SWING [Q]",
     }
     if active_tab in subdesk_names:
         subdesk_info = f"  │  [bold black on bright_yellow] [DEEP DIVE {subdesk_names[active_tab]}] [/bold black on bright_yellow]"
@@ -5858,7 +5858,7 @@ def _build_tab19_four_gate_hud(
     store: StateStore,
     header_panel: Panel,
 ) -> Group:
-    """Builds Desk 19 [Q: 4-GATE] - 4-Gate Quantitative Protocol (Non-Lagging Spot Radar)."""
+    """Builds Desk 19 [Q: DIBSE] - Dual-Inventory Bidirectional Swing Engine (Spot-Only Volatility Harvester)."""
     ev = getattr(store, "four_gate_evaluation", None)
     if ev is None:
         from analytics.four_gate_engine import FourGateEngine
@@ -5868,167 +5868,153 @@ def _build_tab19_four_gate_hud(
     closed_bar_str = ev.last_closed_bar_utc if (ev and ev.last_closed_bar_utc) else (ev.timestamp_utc if ev else "SYNC")
 
     # 1. Executive Sub-Ribbon Header
-    score = ev.score if ev else 0
-    score_color = "bright_green" if score == 4 else ("bright_yellow" if score >= 2 else "bright_red")
-    verdict_badge = (
-        "[bold black on bright_green] EXECUTE SPOT LONG [/bold black on bright_green]"
-        if score == 4
-        else (
-            "[bold white on red] HALT: DATA UNAVAILABLE [/bold white on red]"
-            if ev and ev.status == "HALT: DATA UNAVAILABLE"
-            else "[bold black on bright_yellow] STANDBY / 100% CASH [/bold black on bright_yellow]"
-        )
-    )
+    score_a = ev.loop_a_score if ev else 0
+    score_b = ev.loop_b_score if ev else 0
+    score_color_a = "bright_green" if score_a == 4 else ("bright_yellow" if score_a >= 2 else "bright_red")
+    score_color_b = "bright_green" if score_b == 4 else ("bright_yellow" if score_b >= 2 else "bright_red")
+
+    inv_state_str = ev.inventory_state if ev else "NEUTRAL (10% USDT / 10% BTC)"
 
     sub_grid = Table.grid(expand=True)
     sub_grid.add_column(justify="left", no_wrap=True)
     sub_grid.add_column(justify="right", no_wrap=True)
     sub_grid.add_row(
-        f"[bold bright_cyan]BTC 4-GATE PROTOCOL | TAB 19 [Q] | SPOT-ONLY (ZERO LEVERAGE)[/bold bright_cyan]  │  "
-        f"[bold {score_color}]CONFLUENCE: {score}/4 GATES[/bold {score_color}]  │  {verdict_badge}",
-        f"[bold white]Live Spot: [cyan]${live_spot:,.2f}[/cyan] • Last Closed 4H Bar: [bright_cyan]{closed_bar_str}[/bright_cyan][/bold white]",
+        f"[bold bright_cyan]BTC DIBSE PROTOCOL | TAB 19 [Q] | SPOT DUAL-INVENTORY (ZERO LEVERAGE)[/bold bright_cyan]  │  "
+        f"[bold bright_white]SANDBOX: [yellow]${ev.active_sandbox_usd:,.0f}[/yellow] (20%) • RESERVE: [green]${ev.core_reserve_usd:,.0f}[/green] (80%)[/bold bright_white]",
+        f"[bold white]Live Spot: [cyan]${live_spot:,.2f}[/cyan] • Closed 4H Bar: [bright_cyan]{closed_bar_str}[/bright_cyan][/bold white]",
     )
     sub_panel = Panel(sub_grid, box=box.ROUNDED, border_style="bright_cyan", padding=(0, 1))
 
-    # 2. Beginner Mandate & Educational Banner
-    mandate_lines = [
-        "[bold bright_yellow]▶ PURPOSE & SCOPE:[/bold bright_yellow] [white]Strict non-lagging 4H BTC spot swing engine using 4 raw primary endpoints (Binance Spot & Perp, Funding, Deribit DVOL). Zero smoothed oscillators or vendor-dependent on-chain heuristics.[/white]",
-        "[bold bright_cyan]▶ CORE MODELS:[/bold bright_cyan]    [white]1. Lévy Signed Area (A_SP > 0) • 2. Spot-Perp CVD Z-Spread (D_flow >= +1.0) • 3. 30D Volume Profile (POC/VAL) • 4. 90D Funding Anti-Crowding (<25% Sweep / <=75% Node).[/white]",
-        "[bold bright_green]▶ EXECUTION MANDATE:[/bold bright_green][white]Default 100% USDT Cash. Triggers spot long if and only if all 4 gates pass (4/4). Capped at 0.75% max loss ($750 on $100k) with forward DVOL volatility scaling (55% baseline).[/white]",
-    ]
-    mandate_panel = Panel(
-        "\n".join(mandate_lines),
-        title="[bold bright_white]OPERATOR MANDATE & PROTOCOL SPECS[/bold bright_white]",
+    # 2. Dual-Inventory Active Sandbox Allocation Banner
+    inv_table = Table.grid(expand=True)
+    inv_table.add_column(ratio=1)
+    inv_table.add_column(ratio=1)
+    inv_table.add_column(ratio=1)
+
+    usdt_badge = "[bold black on bright_green] READY / CASH [/bold black on bright_green]" if score_a < 4 else "[bold black on bright_green] DEPLOYING TO BTC [/bold black on bright_green]"
+    btc_badge = "[bold black on bright_cyan] HOLDING SPOT BTC [/bold black on bright_cyan]" if score_b < 4 else "[bold black on bright_yellow] DEPLOYING TO USDT [/bold black on bright_yellow]"
+
+    inv_table.add_row(
+        f"[bold bright_yellow]TRANCHE 1 (10% USDT SLEEVE):[/bold bright_yellow] [bold white]${ev.usdt_sleeve_usd:,.2f}[/bold white]  {usdt_badge}",
+        f"[bold bright_cyan]TRANCHE 2 (10% BTC SLEEVE):[/bold bright_cyan] [bold white]~{ev.btc_sleeve_units:.4f} BTC (${ev.btc_sleeve_usd:,.2f})[/bold white]  {btc_badge}",
+        f"[bold bright_magenta]INVENTORY STATE:[/bold bright_magenta] [bold white]{inv_state_str}[/bold white]",
+    )
+    inv_panel = Panel(
+        inv_table,
+        title="[bold bright_white]DIBSE ACTIVE SANDBOX ($20,000 DEPLOYED / 80% CORE IN COLD STORAGE)[/bold bright_white]",
         box=box.ROUNDED,
-        border_style="yellow",
+        border_style="bright_yellow",
         padding=(0, 1),
     )
 
     def _pass_badge(passed: bool) -> str:
         return "[bold black on bright_green] PASS [/bold black on bright_green]" if passed else "[bold white on red] FAIL [/bold white on red]"
 
-    g1_lines = [
-        f"[bold white]Gate Status:[/bold white]          {_pass_badge(ev.gate_1_levy if ev else False)}",
-        f"[bold white]Order N<=2 Lévy Area:[/bold white] [cyan]{ev.gate_1_val:+.4f}[/cyan] [dim](Rule: A_SP > 0.0)[/dim]" if ev else "",
-        f"[bold white]Path Integral:[/bold white]        [white]Cumulative Spot Delta vs Log-Price (6 bars)[/white]",
-        f"[bold white]Quantitative Edge:[/bold white]    [dim]{'Spot accumulation mathematically leads price' if (ev and ev.gate_1_levy) else 'Spot path is lagging price displacement'}[/dim]",
-        f"[bold white]Audit Detail:[/bold white]         [white]{ev.gate_1_details if ev else ''}[/white]",
+    # 3. Split-Sleeve Dual Cockpit: LOOP A (USDT Sleeve - Dip Harvester)
+    badge_a = (
+        "[bold black on bright_green] EXECUTE: BUY SPOT BTC [/bold black on bright_green]"
+        if score_a == 4
+        else "[bold black on bright_yellow] STANDBY IN USDT CASH [/bold black on bright_yellow]"
+    )
+    card_a_lines = [
+        f"[bold white]Loop Verdict:[/bold white]       {badge_a}  •  [bold {score_color_a}]Confluence: {score_a}/4[/bold {score_color_a}]",
+        f"[bold white]Gate 1 (Lévy Signed):[/bold white] {_pass_badge(ev.loop_a_g1_levy if ev else False)}  [cyan]{ev.loop_a_g1_val:+.4f}[/cyan] [dim](Rule: A_SP > 0.0)[/dim]",
+        f"[bold white]Gate 2 (CVD Z-Flow):[/bold white]  {_pass_badge(ev.loop_a_g2_zflow if ev else False)}  [cyan]{ev.loop_a_g2_val:+.2f}[/cyan] [dim](Rule: D_flow >= +1.0 & Spot24h > 0)[/dim]",
+        f"[bold white]Gate 3 (30D VAL/L20):[/bold white] {_pass_badge(ev.loop_a_g3_structure if ev else False)}  [yellow]{ev.loop_a_g3_state if ev else 'NONE'}[/yellow] [dim](12H Sweep Reclaim/POC Hold)[/dim]",
+        f"[bold white]Gate 4 (90D Funding):[/bold white] {_pass_badge(ev.loop_a_g4_positioning if ev else False)}  [cyan]{ev.loop_a_g4_funding_p90:.1f}%[/cyan] [dim](Req <25%/Neg if <VAL, <=75% if Node)[/dim]",
+        f"[dim]───────────────────────────────────────────────────────────────────[/dim]",
+        f"[bold bright_yellow]EXECUTION TICKET:[/bold bright_yellow]   [bold white]Deploy ${ev.usdt_sleeve_usd:,.2f} USDT → Buy Spot BTC at ${ev.loop_a_entry_price:,.2f}[/bold white]",
+        f"[bold bright_green]TAKE-PROFIT TARGET:[/bold bright_green] [green]${ev.loop_a_target_price:,.2f}[/green] [dim](+{ev.loop_a_target_pct * 100:.2f}% distance)[/dim]  │  [bold white]Gain: [bright_green]+${ev.loop_a_expected_profit_usd:,.2f} Cash[/bright_green][/bold white]",
+        f"[bold bright_cyan]RISK MANDATE:[/bold bright_cyan]       [dim]{ev.loop_a_stop_rule if ev else 'ZERO FORCED STOP-LOSS'}[/dim]",
     ]
-    g1_panel = Panel("\n".join(g1_lines), title="[bold bright_white]GATE 1: ROUGH PATH LÉVY AREA[/bold bright_white]", box=box.ROUNDED, border_style="bright_blue", padding=(0, 1))
-
-    g2_lines = [
-        f"[bold white]Gate Status:[/bold white]          {_pass_badge(ev.gate_2_zflow if ev else False)}",
-        f"[bold white]Flow Spread (D_flow):[/bold white][cyan]{ev.gate_2_val:+.2f}[/cyan] [dim](Rule: >= +1.0 & Spot24h > 0)[/dim]" if ev else "",
-        f"[bold white]Spot vs Perp Z-Score:[/bold white][white]z_Spot={ev.gate_2_z_s:+.2f}  │  z_Perp={ev.gate_2_z_f:+.2f}[/white]" if ev else "",
-        f"[bold white]24H Spot CVD Delta:[/bold white]   [white]{ev.gate_2_ds_24h:+,.1f} BTC[/white]" if ev else "",
-        f"[bold white]Audit Detail:[/bold white]         [white]{ev.gate_2_details if ev else ''}[/white]",
-    ]
-    g2_panel = Panel("\n".join(g2_lines), title="[bold bright_white]GATE 2: SPOT VS PERP CVD Z-SPREAD[/bold bright_white]", box=box.ROUNDED, border_style="bright_blue", padding=(0, 1))
-
-    g3_lines = [
-        f"[bold white]Gate Status:[/bold white]          {_pass_badge(ev.gate_3_structure if ev else False)}  •  [bold white]State:[/bold white] [yellow]{ev.gate_3_state if ev else 'NONE'}[/yellow]",
-        f"[bold white]30D Volume POC / VAL:[/bold white][cyan]${ev.gate_3_poc:,.1f}[/cyan] / [cyan]${ev.gate_3_val:,.1f}[/cyan]" if ev else "",
-        f"[bold white]30D VAH / 20D Low:[/bold white]   [cyan]${ev.gate_3_vah:,.1f}[/cyan] / [cyan]${ev.gate_3_l20:,.1f}[/cyan]" if ev else "",
-        f"[bold white]Setup Mechanics:[/bold white]      [dim]State A = 12H Sweep Reclaim  •  State B = POC Hold[/dim]",
-        f"[bold white]Audit Detail:[/bold white]         [white]{ev.gate_3_details if ev else ''}[/white]",
-    ]
-    g3_panel = Panel("\n".join(g3_lines), title="[bold bright_white]GATE 3: 30D EXECUTED VOLUME PROFILE[/bold bright_white]", box=box.ROUNDED, border_style="bright_blue", padding=(0, 1))
-
-    g4_lines = [
-        f"[bold white]Gate Status:[/bold white]          {_pass_badge(ev.gate_4_positioning if ev else False)}",
-        f"[bold white]8H Perp Funding Rate:[/bold white][cyan]{ev.gate_4_funding_rate * 100:+.4f}%[/cyan]" if ev else "",
-        f"[bold white]90D Funding Percentile:[/bold white][cyan]{ev.gate_4_funding_p90:.1f}%[/cyan] [dim](trailing 270 prints)[/dim]" if ev else "",
-        f"[bold white]Positioning Filter:[/bold white]   [dim]Sweep requires <25%/Neg (12H)  •  Node requires <=75%[/dim]",
-        f"[bold white]Audit Detail:[/bold white]         [white]{ev.gate_4_details if ev else ''}[/white]",
-    ]
-    g4_panel = Panel("\n".join(g4_lines), title="[bold bright_white]GATE 4: 90D FUNDING ANTI-CROWDING[/bold bright_white]", box=box.ROUNDED, border_style="bright_blue", padding=(0, 1))
-
-    gate_row = Table.grid(expand=True)
-    gate_row.add_column(ratio=1)
-    gate_row.add_column(ratio=1)
-    gate_row.add_row(g1_panel, g2_panel)
-    gate_row.add_row(g3_panel, g4_panel)
-
-    dvol_str = f"{ev.dvol_current:.2f}%" if (ev and ev.dvol_current) else "DATA UNAVAILABLE"
-    shield_lines = [
-        f"[bold white]Entry Reference:[/bold white]      [cyan]${ev.entry_price:,.2f}[/cyan]  •  [bold white]Inviolable Hard Stop:[/bold white] [red]${ev.stop_price:,.2f}[/red] [dim]({ev.stop_pct * 100:.2f}% distance)[/dim]" if ev else "",
-        f"[bold white]Take-Profit 1 (+2R/VAH):[/bold white][green]${ev.target_1_price:,.2f}[/green]  •  [bold white]Deribit 30D DVOL:[/bold white] [cyan]{dvol_str}[/cyan] [dim](55% target baseline)[/dim]" if ev else "",
-        f"[bold white]0.75% Risk Notional:[/bold white]  [white]${ev.notional_risk_usd:,.2f}[/white]  •  [bold white]DVOL Vol-Capped Size:[/bold white] [white]${ev.notional_vol_usd:,.2f}[/white]" if ev else "",
-        f"[bold white]Final Spot Allocation:[/bold white][bold bright_green]${ev.final_notional_usd:,.2f}[/bold bright_green] [dim](~{ev.btc_size:.4f} BTC, 0% Borrowed Leverage)[/dim]" if ev else "",
-    ]
-    shield_panel = Panel(
-        "\n".join([line for line in shield_lines if line]),
-        title="[bold bright_white]0.75% EQUITY SAFETY SHIELD & DVOL SIZING TICKET[/bold bright_white]",
+    card_a_panel = Panel(
+        "\n".join(card_a_lines),
+        title="[bold bright_green]SWING LOOP A: USDT SLEEVE (DIP HARVESTER — BUY LOW, SELL HIGH)[/bold bright_green]",
         box=box.ROUNDED,
-        border_style="bright_green" if (ev and ev.score == 4) else "bright_yellow",
+        border_style="bright_green" if score_a == 4 else "green",
         padding=(0, 1),
     )
 
-    es = (ev.event_study_results if ev else {}) or {}
-    n_triggers = ev.event_study_triggers_count if ev else 0
-    caveat_str = (
-        "[bold white on red] SMALL SAMPLE CAVEAT (N < 30) [/bold white on red]"
-        if (ev and ev.event_study_small_sample)
-        else "[bold black on green] STATISTICALLY QUALIFIED (N >= 30) [/bold black on green]"
+    # 4. Split-Sleeve Dual Cockpit: LOOP B (BTC Sleeve - Rip Harvester & Stack Accumulator)
+    badge_b = (
+        "[bold black on bright_green] EXECUTE: SELL SPOT BTC [/bold black on bright_green]"
+        if score_b == 4
+        else "[bold black on bright_yellow] HOLD BTC INVENTORY [/bold black on bright_yellow]"
+    )
+    card_b_lines = [
+        f"[bold white]Loop Verdict:[/bold white]       {badge_b}  •  [bold {score_color_b}]Confluence: {score_b}/4[/bold {score_color_b}]",
+        f"[bold white]Gate 1 (Lévy Signed):[/bold white] {_pass_badge(ev.loop_b_g1_levy if ev else False)}  [cyan]{ev.loop_b_g1_val:+.4f}[/cyan] [dim](Rule: A_SP < 0.0, Spot Dragging)[/dim]",
+        f"[bold white]Gate 2 (CVD Z-Flow):[/bold white]  {_pass_badge(ev.loop_b_g2_zflow if ev else False)}  [cyan]{ev.loop_b_g2_val:+.2f}[/cyan] [dim](Rule: D_flow <= -1.0 & Spot24h < 0)[/dim]",
+        f"[bold white]Gate 3 (30D VAH/H20):[/bold white] {_pass_badge(ev.loop_b_g3_structure if ev else False)}  [yellow]{ev.loop_b_g3_state if ev else 'NONE'}[/yellow] [dim](12H Rejection VAH/H20)[/dim]",
+        f"[bold white]Gate 4 (90D Funding):[/bold white] {_pass_badge(ev.loop_b_g4_positioning if ev else False)}  [cyan]{ev.loop_b_g4_funding_p90:.1f}%[/cyan] [dim](Req >=75% / >0.015% Euphoria Trap)[/dim]",
+        f"[dim]───────────────────────────────────────────────────────────────────[/dim]",
+        f"[bold bright_yellow]EXECUTION TICKET:[/bold bright_yellow]   [bold white]Sell ~{ev.btc_sleeve_units:.4f} BTC (${ev.btc_sleeve_usd:,.2f}) at ${ev.loop_b_sell_price:,.2f}[/bold white]",
+        f"[bold bright_cyan]BUYBACK TARGET:[/bold bright_cyan]     [cyan]${ev.loop_b_buyback_price:,.2f}[/cyan] [dim](-{ev.loop_b_discount_pct * 100:.2f}% discount)[/dim]  │  [bold white]Free Sats: [bright_cyan]+{ev.loop_b_free_satoshis_btc:.6f} BTC[/bright_cyan][/bold white]",
+        f"[bold bright_green]COMPOUNDING YIELD:[/bold bright_green]  [bright_green]+{ev.loop_b_free_satoshis_pct:.2f}% Free BTC Stack[/bright_green] [dim]OR +${ev.loop_b_surplus_cash_usd:,.2f} Surplus Cash[/dim]",
+        f"[bold bright_cyan]RISK MANDATE:[/bold bright_cyan]       [dim]{ev.loop_b_stop_rule if ev else 'ZERO FORCED STOP-BUY'}[/dim]",
+    ]
+    card_b_panel = Panel(
+        "\n".join(card_b_lines),
+        title="[bold bright_cyan]SWING LOOP B: BTC SLEEVE (RIP HARVESTER & SATOSHI ACCUMULATOR)[/bold bright_cyan]",
+        box=box.ROUNDED,
+        border_style="bright_cyan" if score_b == 4 else "blue",
+        padding=(0, 1),
     )
 
+    cockpit_grid = Table.grid(expand=True)
+    cockpit_grid.add_column(ratio=1)
+    cockpit_grid.add_column(ratio=1)
+    cockpit_grid.add_row(card_a_panel, card_b_panel)
+
+    # 5. Dual 90-Day De-Clustered In-Sample Event Study Table
+    esa = (ev.event_study_results if ev else {}) or {}
+    esb = (ev.event_study_loop_b_results if ev else {}) or {}
+    na = ev.event_study_triggers_count if ev else 0
+    nb = ev.event_study_loop_b_triggers_count if ev else 0
+
     study_table = Table(box=box.SIMPLE_HEAD, expand=True, padding=(0, 1))
-    study_table.add_column("Horizon", justify="left")
-    study_table.add_column("Historical Win Rate", justify="right")
-    study_table.add_column("Mean Forward Return", justify="right")
-    study_table.add_column("Median Forward Return", justify="right")
-    study_table.add_column("Benchmark Alpha (vs Baseline)", justify="center")
+    study_table.add_column("DIBSE Strategy Loop", justify="left")
+    study_table.add_column("Independent Triggers (5D Embargo)", justify="center")
+    study_table.add_column("1D Forward Yield", justify="right")
+    study_table.add_column("3D Forward Yield", justify="right")
+    study_table.add_column("5D Forward Yield", justify="right")
+    study_table.add_column("10D Forward Yield", justify="right")
 
     def _color_ret(val: float) -> str:
         c = "green" if val > 0 else ("red" if val < 0 else "white")
         return f"[{c}]{val:+.2f}%[/{c}]"
 
-    def _format_alpha(alpha_val: float, baseline_val: float) -> str:
+    def _format_cell(win_rate: float, mean_ret: float, alpha_val: float) -> str:
         c = "green" if alpha_val >= 0 else "red"
-        tag = "+Alpha" if alpha_val >= 0 else "-Drag"
-        return f"vs Base ({baseline_val:+.2f}%): [{c}]{alpha_val:+.2f}% ({tag})[/{c}]"
+        return f"{win_rate:.0f}% win  │  {_color_ret(mean_ret)}  │  [{c}]α {alpha_val:+.2f}%[/{c}]"
 
     study_table.add_row(
-        "1D Forward (6 Bars)",
-        f"{es.get('win_rate_1d', 0.0):.1f}%",
-        _color_ret(es.get('mean_ret_1d', 0.0)),
-        _color_ret(es.get('median_ret_1d', 0.0)),
-        _format_alpha(es.get('alpha_1d', 0.0), es.get('baseline_mean_1d', 0.0)),
+        "[bold green]Loop A: USDT Sleeve (Dip Harvester)[/bold green]",
+        f"[bold white]{na} events[/bold white] [dim]({'Small N' if na < 30 else 'N>=30'})[/dim]",
+        _format_cell(esa.get('win_rate_1d', 0.0), esa.get('mean_ret_1d', 0.0), esa.get('alpha_1d', 0.0)),
+        _format_cell(esa.get('win_rate_3d', 0.0), esa.get('mean_ret_3d', 0.0), esa.get('alpha_3d', 0.0)),
+        _format_cell(esa.get('win_rate_5d', 0.0), esa.get('mean_ret_5d', 0.0), esa.get('alpha_5d', 0.0)),
+        _format_cell(esa.get('win_rate_10d', 0.0), esa.get('mean_ret_10d', 0.0), esa.get('alpha_10d', 0.0)),
     )
     study_table.add_row(
-        "3D Forward (18 Bars)",
-        f"{es.get('win_rate_3d', 0.0):.1f}%",
-        _color_ret(es.get('mean_ret_3d', 0.0)),
-        _color_ret(es.get('median_ret_3d', 0.0)),
-        _format_alpha(es.get('alpha_3d', 0.0), es.get('baseline_mean_3d', 0.0)),
-    )
-    study_table.add_row(
-        "5D Forward (30 Bars)",
-        f"{es.get('win_rate_5d', 0.0):.1f}%",
-        _color_ret(es.get('mean_ret_5d', 0.0)),
-        _color_ret(es.get('median_ret_5d', 0.0)),
-        _format_alpha(es.get('alpha_5d', 0.0), es.get('baseline_mean_5d', 0.0)),
-    )
-    study_table.add_row(
-        "10D Forward (60 Bars)",
-        f"{es.get('win_rate_10d', 0.0):.1f}%",
-        _color_ret(es.get('mean_ret_10d', 0.0)),
-        _color_ret(es.get('median_ret_10d', 0.0)),
-        _format_alpha(es.get('alpha_10d', 0.0), es.get('baseline_mean_10d', 0.0)),
+        "[bold cyan]Loop B: BTC Sleeve (Rip Harvester)[/bold cyan]",
+        f"[bold white]{nb} events[/bold white] [dim]({'Small N' if nb < 30 else 'N>=30'})[/dim]",
+        _format_cell(esb.get('win_rate_1d', 0.0), esb.get('mean_ret_1d', 0.0), esb.get('alpha_1d', 0.0)),
+        _format_cell(esb.get('win_rate_3d', 0.0), esb.get('mean_ret_3d', 0.0), esb.get('alpha_3d', 0.0)),
+        _format_cell(esb.get('win_rate_5d', 0.0), esb.get('mean_ret_5d', 0.0), esb.get('alpha_5d', 0.0)),
+        _format_cell(esb.get('win_rate_10d', 0.0), esb.get('mean_ret_10d', 0.0), esb.get('alpha_10d', 0.0)),
     )
 
     study_panel = Panel(
-        Group(
-            Text.from_markup(f"[bold white]90-Day De-Clustered In-Sample Event Study (5D Embargo):[/bold white] [bold cyan]{n_triggers} independent events[/bold cyan]  │  {caveat_str}\n"),
-            study_table,
-        ),
-        title="[bold bright_white]90-DAY DE-CLUSTERED IN-SAMPLE EVENT STUDY & BENCHMARK ALPHA[/bold bright_white]",
+        study_table,
+        title="[bold bright_white]90-DAY DE-CLUSTERED IN-SAMPLE EVENT STUDY & BENCHMARK ALPHA (DUAL-LOOP WALK-FORWARD)[/bold bright_white]",
         box=box.ROUNDED,
         border_style="magenta",
         padding=(0, 1),
     )
 
-    return Group(header_panel, sub_panel, mandate_panel, gate_row, shield_panel, study_panel)
+    return Group(header_panel, sub_panel, inv_panel, cockpit_grid, study_panel)
+
 
 
 def build_dashboard_renderable(
@@ -6041,7 +6027,7 @@ def build_dashboard_renderable(
     if tab_override is not None:
         if isinstance(tab_override, int) and tab_override in valid_tabs:
             active_tab = tab_override
-        elif str(tab_override).lower() in ("q", "4gate", "four_gate", "19"):
+        elif str(tab_override).lower() in ("q", "4gate", "four_gate", "dibse", "19"):
             active_tab = 19
         elif str(tab_override).lower() in ("g", "grok", "grok_flow", "15"):
             active_tab = 15
@@ -6156,7 +6142,7 @@ def print_dry_run_report(
             16: "TAB [R: SSRN QUANTITATIVE ALPHA DECK & EMPIRICAL RESEARCH]",
             17: "TAB [M: BTC MAGNET · LIQUIDATION GRAVITY DECK]",
             18: "TAB [A: BTC TREND-PULLBACK v1.0 · RESEARCH / PAPER MODE]",
-            19: "TAB [Q: 4-GATE QUANTITATIVE PROTOCOL (NON-LAGGING 4H SPOT RADAR)]",
+            19: "TAB [Q: DIBSE DUAL-INVENTORY SWING PROTOCOL (SPOT-ONLY)]",
         }
         for t in (0, 19, 18, 17, 16, 15, 12, 11, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13):
             title = tab_titles.get(t, f"TAB [{t}]")
@@ -6190,7 +6176,7 @@ def print_dry_run_report(
             t_num = 17
         elif tab_lower in ("a", "k", "strategy", "trend_pullback", "btc_strategy", "18"):
             t_num = 18
-        elif tab_lower in ("q", "4gate", "four_gate", "19"):
+        elif tab_lower in ("q", "4gate", "four_gate", "dibse", "19"):
             t_num = 19
         elif tab_lower in ("p", "structure", "slsp", "pa", "13"):
             t_num = 13

@@ -138,6 +138,82 @@ class TestFourGateEngine(unittest.TestCase):
         self.assertIn("GATE_1_LEVY_SIGNED_AREA_PASS", report)
         self.assertIn("ENTRY_PRICE_USD", report)
 
+    def test_dibse_dual_sleeve_capital_allocation(self):
+        spot_k, perp_k, fund_p = _generate_synthetic_4h_bars(240, 75000.0)
+        equity = 100000.0
+        ev = self.engine.calculate_evaluation(spot_k, perp_k, fund_p, 45.0, equity_usd=equity)
+
+        # 20% Sandbox / 80% Core Reserve
+        self.assertEqual(ev.account_equity_usd, equity)
+        self.assertEqual(ev.active_sandbox_usd, 20000.0)
+        self.assertEqual(ev.core_reserve_usd, 80000.0)
+        # 10% USDT Sleeve / 10% BTC Sleeve
+        self.assertEqual(ev.usdt_sleeve_usd, 10000.0)
+        self.assertEqual(ev.btc_sleeve_usd, 10000.0)
+        self.assertGreater(ev.btc_sleeve_units, 0.0)
+        self.assertAlmostEqual(ev.btc_sleeve_units * ev.live_spot_price, 10000.0, places=2)
+        self.assertIn("NEUTRAL", ev.inventory_state)
+
+    def test_dibse_loop_a_dip_harvester_math(self):
+        spot_k, perp_k, fund_p = _generate_synthetic_4h_bars(240, 72000.0)
+        ev = self.engine.calculate_evaluation(spot_k, perp_k, fund_p, 45.0)
+
+        # Loop A properties
+        self.assertIn(ev.loop_a_score, [0, 1, 2, 3, 4])
+        self.assertIn(ev.loop_a_status, ["READY_USDT", "EXECUTE_BUY", "HOLDING_SPOT_BTC_INVENTORY"])
+        self.assertIn(ev.loop_a_verdict, ["EXECUTE: DEPLOY USDT → BUY BTC", "STANDBY IN USDT CASH"])
+        self.assertGreater(ev.loop_a_entry_price, 0.0)
+        self.assertGreater(ev.loop_a_target_price, ev.loop_a_entry_price)
+        self.assertGreater(ev.loop_a_target_pct, 0.0)
+        self.assertGreater(ev.loop_a_expected_profit_usd, 0.0)
+        self.assertIn("ZERO FORCED STOP-LOSS", ev.loop_a_stop_rule)
+
+    def test_dibse_loop_b_rip_harvester_math(self):
+        spot_k, perp_k, fund_p = _generate_synthetic_4h_bars(240, 78000.0)
+        ev = self.engine.calculate_evaluation(spot_k, perp_k, fund_p, 45.0)
+
+        # Loop B properties
+        self.assertIn(ev.loop_b_score, [0, 1, 2, 3, 4])
+        self.assertIn(ev.loop_b_status, ["HOLDING_BTC", "EXECUTE_SELL", "HOLDING_SPOT_USDT_INVENTORY"])
+        self.assertIn(ev.loop_b_verdict, ["EXECUTE: DEPLOY BTC → SELL TO USDT", "HOLD BTC INVENTORY"])
+        self.assertGreater(ev.loop_b_sell_price, 0.0)
+        self.assertLess(ev.loop_b_buyback_price, ev.loop_b_sell_price)
+        self.assertGreater(ev.loop_b_discount_pct, 0.0)
+        self.assertGreater(ev.loop_b_free_satoshis_btc, 0.0)
+        self.assertGreater(ev.loop_b_free_satoshis_pct, 0.0)
+        self.assertGreater(ev.loop_b_surplus_cash_usd, 0.0)
+        self.assertIn("ZERO FORCED STOP-BUY", ev.loop_b_stop_rule)
+
+    def test_dibse_historical_event_study_dual_loop(self):
+        spot_k, perp_k, fund_p = _generate_synthetic_4h_bars(240, 75000.0)
+        ev = self.engine.calculate_evaluation(spot_k, perp_k, fund_p, 45.0)
+
+        # Loop A and Loop B historical event studies
+        self.assertIsInstance(ev.event_study_results, dict)
+        self.assertIsInstance(ev.event_study_loop_b_results, dict)
+        self.assertIn("win_rate_1d", ev.event_study_results)
+        self.assertIn("win_rate_1d", ev.event_study_loop_b_results)
+        self.assertIn("alpha_1d", ev.event_study_results)
+        self.assertIn("alpha_1d", ev.event_study_loop_b_results)
+
+    def test_dibse_clipboard_telemetry_packet(self):
+        spot_k, perp_k, fund_p = _generate_synthetic_4h_bars(240, 75000.0)
+        ev = self.engine.calculate_evaluation(spot_k, perp_k, fund_p, 42.0)
+        self.store.four_gate_evaluation = ev
+
+        ok, msg, char_count = copy_four_gate_to_clipboard(self.store)
+        self.assertTrue(ok)
+        self.assertGreater(char_count, 500)
+
+        report = build_tab_q_data_only_report(DEFAULT_CONFIG, self.store)
+        self.assertIn("DIBSE CAPITAL SANDBOX ALLOCATION", report)
+        self.assertIn("SWING LOOP A: USDT SLEEVE", report)
+        self.assertIn("SWING LOOP B: BTC SLEEVE", report)
+        self.assertIn("LOOP_A_TARGET_PRICE_USD", report)
+        self.assertIn("LOOP_B_BUYBACK_PRICE_USD", report)
+        self.assertIn("LOOP_B_FREE_SATOSHIS_BTC", report)
+
+
 
 if __name__ == "__main__":
     unittest.main()

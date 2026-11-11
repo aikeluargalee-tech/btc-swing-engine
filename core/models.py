@@ -5261,26 +5261,86 @@ class ReconciliationAuditResult:
 
 @dataclass
 class FourGateEvaluation:
-    """Quantitative Telemetry & Execution State for the 4-Gate Quantitative Protocol (Tab 19 / [Q])."""
+    """Quantitative Telemetry & Execution State for the 4-Gate Quantitative Protocol / DIBSE (Tab 19 / [Q])."""
     timestamp_utc: str = ""
     status: str = "STANDBY"  # "LIVE", "STANDBY", "HALT: DATA UNAVAILABLE"
-    verdict: str = "STANDBY / CASH"  # "EXECUTE SPOT LONG", "STANDBY / CASH", "HALT: DATA UNAVAILABLE"
-    score: int = 0  # 0 to 4
+    verdict: str = "STANDBY / CASH"  # Legacy single-direction verdict
+    score: int = 0  # 0 to 4 (Legacy score / Loop A score)
 
-    # Gate 1: Rough Path Signature Engine (Lévy Signed Area)
+    # Capital Architecture & Dual-Sleeve Sandbox
+    account_equity_usd: float = 100000.0
+    active_sandbox_usd: float = 20000.0   # 20.0% of portfolio
+    core_reserve_usd: float = 80000.0     # 80.0% untouched core
+    usdt_sleeve_usd: float = 10000.0      # 10.0% Tranche 1 (USDT Loop A)
+    btc_sleeve_usd: float = 10000.0       # 10.0% Tranche 2 (BTC Loop B)
+    btc_sleeve_units: float = 0.0         # btc_sleeve_usd / live_spot_price
+    inventory_state: str = "NEUTRAL (10% USDT / 10% BTC)"
+
+    # SWING LOOP A: USDT SLEEVE (DIP HARVESTER: BUY LOW, SELL HIGH)
+    loop_a_score: int = 0  # 0 to 4
+    loop_a_verdict: str = "STANDBY IN USDT CASH"  # "EXECUTE: DEPLOY USDT → BUY BTC", "STANDBY IN USDT CASH", "HOLDING SPOT BTC INVENTORY"
+    loop_a_status: str = "READY_USDT"  # "READY_USDT", "EXECUTE_BUY", "HOLDING_SPOT_BTC_INVENTORY"
+    loop_a_g1_levy: bool = False
+    loop_a_g1_val: float = 0.0  # A_SP > 0.0
+    loop_a_g1_details: str = ""
+    loop_a_g2_zflow: bool = False
+    loop_a_g2_val: float = 0.0  # D_flow >= 1.0 & Spot24h > 0
+    loop_a_g2_z_s: float = 0.0
+    loop_a_g2_z_f: float = 0.0
+    loop_a_g2_ds_24h: float = 0.0
+    loop_a_g2_details: str = ""
+    loop_a_g3_structure: bool = False
+    loop_a_g3_state: str = "NONE"  # "STATE_A" (12H Sweep Reclaim), "STATE_B" (POC Hold), "NONE"
+    loop_a_g3_details: str = ""
+    loop_a_g4_positioning: bool = False
+    loop_a_g4_funding_rate: float = 0.0
+    loop_a_g4_funding_p90: float = 0.0
+    loop_a_g4_details: str = ""
+    loop_a_entry_price: float = 0.0
+    loop_a_target_price: float = 0.0
+    loop_a_target_pct: float = 0.0
+    loop_a_expected_profit_usd: float = 0.0
+    loop_a_stop_rule: str = "ZERO FORCED STOP-LOSS: ASYMMETRIC HOLDING OF SPOT BTC"
+
+    # SWING LOOP B: BTC SLEEVE (RIP HARVESTER & SATOSHI ACCUMULATOR: SELL HIGH, BUY BACK LOWER)
+    loop_b_score: int = 0  # 0 to 4
+    loop_b_verdict: str = "HOLD BTC INVENTORY"  # "EXECUTE: DEPLOY BTC → SELL TO USDT", "HOLD BTC INVENTORY", "HOLDING SPOT USDT INVENTORY"
+    loop_b_status: str = "HOLDING_BTC"  # "HOLDING_BTC", "EXECUTE_SELL", "HOLDING_SPOT_USDT_INVENTORY"
+    loop_b_g1_levy: bool = False
+    loop_b_g1_val: float = 0.0  # A_SP < 0.0 (Spot dragging behind price markup)
+    loop_b_g1_details: str = ""
+    loop_b_g2_zflow: bool = False
+    loop_b_g2_val: float = 0.0  # D_flow <= -1.0 & Spot24h < 0 (Whales distributing spot into perp longs)
+    loop_b_g2_z_s: float = 0.0
+    loop_b_g2_z_f: float = 0.0
+    loop_b_g2_ds_24h: float = 0.0
+    loop_b_g2_details: str = ""
+    loop_b_g3_structure: bool = False
+    loop_b_g3_state: str = "NONE"  # "STATE_A" (12H Sweep Rejection of VAH/H20), "STATE_B" (VAH Node Rejection), "NONE"
+    loop_b_g3_details: str = ""
+    loop_b_g3_h20: float = 0.0
+    loop_b_g4_positioning: bool = False
+    loop_b_g4_funding_rate: float = 0.0
+    loop_b_g4_funding_p90: float = 0.0
+    loop_b_g4_details: str = ""
+    loop_b_sell_price: float = 0.0
+    loop_b_buyback_price: float = 0.0
+    loop_b_discount_pct: float = 0.0
+    loop_b_free_satoshis_btc: float = 0.0
+    loop_b_free_satoshis_pct: float = 0.0
+    loop_b_surplus_cash_usd: float = 0.0
+    loop_b_stop_rule: str = "ZERO FORCED STOP-BUY: ASYMMETRIC HOLDING OF SPOT USDT"
+
+    # Legacy 4-Gate Bindings (mirrored to Loop A for backward compatibility)
     gate_1_levy: bool = False
     gate_1_val: float = 0.0  # A_SP
     gate_1_details: str = ""
-
-    # Gate 2: Spot vs Perp CVD Z-Score Divergence
     gate_2_zflow: bool = False
     gate_2_val: float = 0.0  # D_flow
     gate_2_z_s: float = 0.0
     gate_2_z_f: float = 0.0
     gate_2_ds_24h: float = 0.0
     gate_2_details: str = ""
-
-    # Gate 3: 30D Executed Volume Profile Structure
     gate_3_structure: bool = False
     gate_3_state: str = "NONE"  # "STATE_A", "STATE_B", "NONE"
     gate_3_poc: float = 0.0
@@ -5288,8 +5348,6 @@ class FourGateEvaluation:
     gate_3_vah: float = 0.0
     gate_3_l20: float = 0.0
     gate_3_details: str = ""
-
-    # Gate 4: Positioning & Anti-Crowding Filter
     gate_4_positioning: bool = False
     gate_4_funding_rate: float = 0.0
     gate_4_funding_p90: float = 0.0
@@ -5313,7 +5371,17 @@ class FourGateEvaluation:
     event_study_small_sample: bool = True
     event_study_results: Dict[str, Any] = field(default_factory=dict)
 
+    # Loop B Event Study
+    event_study_loop_b_triggers_count: int = 0
+    event_study_loop_b_small_sample: bool = True
+    event_study_loop_b_results: Dict[str, Any] = field(default_factory=dict)
+
     raw_data_available: bool = True
     error_message: str = ""
+
+
+# Canonical Alias for DIBSE Protocol
+DibseEvaluation = FourGateEvaluation
+
 
 

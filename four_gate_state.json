@@ -1,7 +1,7 @@
 {
-  "timestamp_utc": "2026-11-11 08:22:00 UTC",
-  "live_spot_price": 73960.0,
-  "last_closed_bar_utc": "2026-11-11 04:00:00 UTC",
+  "timestamp_utc": "2026-11-11 09:15:18 UTC",
+  "live_spot_price": 73672.01,
+  "last_closed_bar_utc": "2026-11-11 08:00:00 UTC",
   "status": "STANDBY",
   "verdict": "STANDBY / CASH",
   "score": 2,
@@ -25,16 +25,16 @@
     "val_30": 76013.3671,
     "vah_30": 82342.14670000001,
     "l_20": 72727.27,
-    "details": "No Structural Trigger: POC=$81,611.9, VAL=$76,013.4, L20=$72,727.3"
+    "details": "No Trigger: POC=$81,612 | VAL=$76,013 | L20=$72,727"
   },
   "gate_4": {
     "passed": false,
     "funding_rate": 8.011e-05,
     "funding_p90": 68.88888888888889,
-    "details": "Below VAL_30 ($76,013.4) [Sweep Zone]: Funding=+0.0080%, Rank=68.9% (<25.0% or negative required)"
+    "details": "Sweep Zone (<VAL): F=+0.0080% | P90=68.9% (Req <25%/Neg)"
   },
   "sizing": {
-    "dvol": 39.35,
+    "dvol": 39.27,
     "entry_price": 74089.27,
     "stop_price": 73097.986095,
     "stop_pct": 0.013379587961927602,
@@ -45,37 +45,46 @@
     "btc_size": 0.7565945499740532
   },
   "event_study": {
-    "count": 1,
+    "count": 2,
     "small_sample": true,
     "win_rate_1d": 0.0,
-    "mean_ret_1d": -1.2353348677609097,
-    "median_ret_1d": -1.2353348677609097,
+    "mean_ret_1d": -2.9490172686470113,
+    "median_ret_1d": -2.9490172686470113,
     "baseline_mean_1d": 0.24604450108741613,
-    "alpha_1d": -1.4813793688483259,
+    "alpha_1d": -3.1950617697344272,
     "win_rate_3d": 0.0,
-    "mean_ret_3d": -1.8352020689095736,
-    "median_ret_3d": -1.8352020689095736,
+    "mean_ret_3d": -2.514521001283351,
+    "median_ret_3d": -2.514521001283351,
     "baseline_mean_3d": 0.7058167527801114,
-    "alpha_3d": -2.541018821689685,
-    "win_rate_5d": 100.0,
-    "mean_ret_5d": 4.1184076873382995,
-    "median_ret_5d": 4.1184076873382995,
+    "alpha_3d": -3.220337754063462,
+    "win_rate_5d": 50.0,
+    "mean_ret_5d": -0.0005738381453770369,
+    "median_ret_5d": -0.0005738381453770369,
     "baseline_mean_5d": 1.2017568878002216,
-    "alpha_5d": 2.916650799538078,
-    "win_rate_10d": 100.0,
-    "mean_ret_10d": 8.514044531265244,
-    "median_ret_10d": 8.514044531265244,
+    "alpha_5d": -1.2023307259455986,
+    "win_rate_10d": 50.0,
+    "mean_ret_10d": 0.8483070248025437,
+    "median_ret_10d": 0.8483070248025437,
     "baseline_mean_10d": 2.235855453884239,
-    "alpha_10d": 6.278189077381004,
+    "alpha_10d": -1.3875484290816953,
     "triggers": [
       {
-        "bar_idx": 430,
-        "entry_price": 77892.24,
+        "bar_idx": 366,
+        "entry_price": 81348.0,
         "state": "STATE_B",
-        "ret_1d": -0.012353348677609097,
-        "ret_3d": -0.018352020689095735,
-        "ret_5d": 0.041184076873383,
-        "ret_10d": 0.08514044531265243
+        "ret_1d": -0.02358595171362539,
+        "ret_3d": -0.020055809608103457,
+        "ret_5d": -0.030043762600186853,
+        "ret_10d": -0.051791930963268895
+      },
+      {
+        "bar_idx": 433,
+        "entry_price": 78982.0,
+        "state": "STATE_B",
+        "ret_1d": -0.035394393659314835,
+        "ret_3d": -0.030234610417563562,
+        "ret_5d": 0.030032285837279314,
+        "ret_10d": 0.06875807145931977
       }
     ]
   },

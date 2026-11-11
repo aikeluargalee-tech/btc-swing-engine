@@ -1,0 +1,193 @@
+{
+  "timestamp_utc": "2026-11-11 09:15:13 UTC",
+  "protocol": "DIBSE v1.0",
+  "live_spot_price": 73672.0,
+  "last_closed_bar_utc": "2026-11-11 08:00:00 UTC",
+  "status": "STANDBY",
+  "verdict": "STANDBY / CASH",
+  "score": 2,
+  "capital_sandbox": {
+    "account_equity_usd": 100000.0,
+    "active_sandbox_usd": 20000.0,
+    "core_reserve_usd": 80000.0,
+    "usdt_sleeve_usd": 10000.0,
+    "btc_sleeve_usd": 10000.0,
+    "btc_sleeve_units": 0.13573677923770225,
+    "inventory_state": "NEUTRAL (10% USDT / 10% BTC)"
+  },
+  "loop_a": {
+    "score": 2,
+    "verdict": "STANDBY IN USDT CASH",
+    "status": "READY_USDT",
+    "entry_price": 74089.27,
+    "target_price": 81611.9029,
+    "target_pct": 0.10153471481093006,
+    "expected_profit_usd": 1015.3471481093005,
+    "stop_rule": "ZERO FORCED STOP-LOSS: ASYMMETRIC HOLDING OF SPOT BTC",
+    "g1_levy": {
+      "passed": true,
+      "val": 2.6923717024376725,
+      "details": "A_SP=+2.6924 > 0.0 (Spot accumulation leads price markup)"
+    },
+    "g2_zflow": {
+      "passed": true,
+      "val": 1.081591087234984,
+      "details": "D_flow=+1.08 >= +1.0 & 24h Spot CVD=+560.3 > 0"
+    },
+    "g3_structure": {
+      "passed": false,
+      "state": "NONE",
+      "details": "No Trigger: POC=$81,612 | VAL=$76,013 | L20=$72,727"
+    },
+    "g4_positioning": {
+      "passed": false,
+      "rate": 8.011e-05,
+      "p90": 68.88888888888889,
+      "details": "Sweep Zone (<VAL): F=+0.0080% | P90=68.9% (Req <25%/Neg)"
+    }
+  },
+  "loop_b": {
+    "score": 0,
+    "verdict": "HOLD BTC INVENTORY",
+    "status": "HOLDING_BTC",
+    "sell_price": 74089.27,
+    "buyback_price": 71125.6992,
+    "discount_pct": 0.040000000000000015,
+    "free_satoshis_btc": 0.00565569913490427,
+    "free_satoshis_pct": 4.166666666666674,
+    "surplus_cash_usd": 402.2655554349008,
+    "stop_rule": "ZERO FORCED STOP-BUY: ASYMMETRIC HOLDING OF SPOT USDT",
+    "g1_levy": {
+      "passed": false,
+      "val": 2.6923717024376725,
+      "details": "A_SP=+2.6924 >= 0.0 (Spot accumulation is backing price)"
+    },
+    "g2_zflow": {
+      "passed": false,
+      "val": 1.081591087234984,
+      "details": "D_flow=+1.08 (z_S=+0.23, z_F=-0.85, Spot24h=+560.3)"
+    },
+    "g3_structure": {
+      "passed": false,
+      "state": "NONE",
+      "h20": 84847.31,
+      "details": "No Trigger: VAH=$82,342 | POC=$81,612 | H20=$84,847"
+    },
+    "g4_positioning": {
+      "passed": false,
+      "rate": 8.011e-05,
+      "p90": 68.88888888888889,
+      "details": "Node Zone (<=VAH): F=+0.0080% | P90=68.9% (Req >=75.0%)"
+    }
+  },
+  "gate_1": {
+    "passed": true,
+    "A_SP": 2.6923717024376725,
+    "details": "A_SP=+2.6924 > 0.0 (Spot accumulation leads price markup)"
+  },
+  "gate_2": {
+    "passed": true,
+    "D_flow": 1.081591087234984,
+    "z_S": 0.22786904509816744,
+    "z_F": -0.8537220421368167,
+    "dS_24h": 560.2995800000006,
+    "details": "D_flow=+1.08 >= +1.0 & 24h Spot CVD=+560.3 > 0"
+  },
+  "gate_3": {
+    "passed": false,
+    "state": "NONE",
+    "poc_30": 81611.9029,
+    "val_30": 76013.3671,
+    "vah_30": 82342.14670000001,
+    "l_20": 72727.27,
+    "details": "No Trigger: POC=$81,612 | VAL=$76,013 | L20=$72,727"
+  },
+  "gate_4": {
+    "passed": false,
+    "funding_rate": 8.011e-05,
+    "funding_p90": 68.88888888888889,
+    "details": "Sweep Zone (<VAL): F=+0.0080% | P90=68.9% (Req <25%/Neg)"
+  },
+  "sizing": {
+    "dvol": 39.27,
+    "entry_price": 74089.27,
+    "stop_price": 73097.986095,
+    "stop_pct": 0.013379587961927602,
+    "target_1_price": 76071.83781000001,
+    "notional_risk_usd": 56055.537893556124,
+    "notional_vol_usd": 100000.0,
+    "final_notional_usd": 56055.537893556124,
+    "btc_size": 0.7565945499740532
+  },
+  "event_study": {
+    "count": 2,
+    "small_sample": true,
+    "win_rate_1d": 0.0,
+    "mean_ret_1d": -2.9490172686470113,
+    "median_ret_1d": -2.9490172686470113,
+    "baseline_mean_1d": 0.24604450108741613,
+    "alpha_1d": -3.1950617697344272,
+    "win_rate_3d": 0.0,
+    "mean_ret_3d": -2.514521001283351,
+    "median_ret_3d": -2.514521001283351,
+    "baseline_mean_3d": 0.7058167527801114,
+    "alpha_3d": -3.220337754063462,
+    "win_rate_5d": 50.0,
+    "mean_ret_5d": -0.0005738381453770369,
+    "median_ret_5d": -0.0005738381453770369,
+    "baseline_mean_5d": 1.2017568878002216,
+    "alpha_5d": -1.2023307259455986,
+    "win_rate_10d": 50.0,
+    "mean_ret_10d": 0.8483070248025437,
+    "median_ret_10d": 0.8483070248025437,
+    "baseline_mean_10d": 2.235855453884239,
+    "alpha_10d": -1.3875484290816953,
+    "triggers": [
+      {
+        "bar_idx": 366,
+        "entry_price": 81348.0,
+        "state": "STATE_B",
+        "ret_1d": -0.02358595171362539,
+        "ret_3d": -0.020055809608103457,
+        "ret_5d": -0.030043762600186853,
+        "ret_10d": -0.051791930963268895
+      },
+      {
+        "bar_idx": 433,
+        "entry_price": 78982.0,
+        "state": "STATE_B",
+        "ret_1d": -0.035394393659314835,
+        "ret_3d": -0.030234610417563562,
+        "ret_5d": 0.030032285837279314,
+        "ret_10d": 0.06875807145931977
+      }
+    ]
+  },
+  "event_study_loop_b": {
+    "count": 0,
+    "small_sample": true,
+    "win_rate_1d": 0.0,
+    "mean_ret_1d": 0.0,
+    "median_ret_1d": 0.0,
+    "baseline_mean_1d": -0.24604450108741613,
+    "alpha_1d": 0.24604450108741613,
+    "win_rate_3d": 0.0,
+    "mean_ret_3d": 0.0,
+    "median_ret_3d": 0.0,
+    "baseline_mean_3d": -0.7058167527801114,
+    "alpha_3d": 0.7058167527801114,
+    "win_rate_5d": 0.0,
+    "mean_ret_5d": 0.0,
+    "median_ret_5d": 0.0,
+    "baseline_mean_5d": -1.2017568878002216,
+    "alpha_5d": 1.2017568878002216,
+    "win_rate_10d": 0.0,
+    "mean_ret_10d": 0.0,
+    "median_ret_10d": 0.0,
+    "baseline_mean_10d": -2.235855453884239,
+    "alpha_10d": 2.235855453884239,
+    "triggers": []
+  },
+  "raw_data_available": true,
+  "error_message": ""
+}

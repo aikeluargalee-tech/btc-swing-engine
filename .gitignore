@@ -25,3 +25,7 @@ Thumbs.db
 spot_swing_state.json
 btc_metrics_latest.json
 BTC_AI_DATA_PACKET_LATEST.md
+
+# Local historical cache archives
+data/cache/
+

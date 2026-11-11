@@ -1,20 +1,22 @@
 {
-  "timestamp_utc": "2026-11-11 07:51:29 UTC",
+  "timestamp_utc": "2026-11-11 08:22:00 UTC",
+  "live_spot_price": 73960.0,
+  "last_closed_bar_utc": "2026-11-11 04:00:00 UTC",
   "status": "STANDBY",
   "verdict": "STANDBY / CASH",
-  "score": 1,
+  "score": 2,
   "gate_1": {
-    "passed": false,
-    "A_SP": -0.24318551514171782,
-    "details": "A_SP=-0.2432 <= 0.0 (Spot path lagging or drag)"
+    "passed": true,
+    "A_SP": 2.6923717024376725,
+    "details": "A_SP=+2.6924 > 0.0 (Spot accumulation leads price markup)"
   },
   "gate_2": {
-    "passed": false,
-    "D_flow": 0.7777992650291925,
-    "z_S": 0.11087281367617716,
-    "z_F": -0.6669264513530153,
-    "dS_24h": 413.8375500000002,
-    "details": "D_flow=+0.78 (z_S=+0.11, z_F=-0.67, Spot24h=+413.8)"
+    "passed": true,
+    "D_flow": 1.081591087234984,
+    "z_S": 0.22786904509816744,
+    "z_F": -0.8537220421368167,
+    "dS_24h": 560.2995800000006,
+    "details": "D_flow=+1.08 >= +1.0 & 24h Spot CVD=+560.3 > 0"
   },
   "gate_3": {
     "passed": false,
@@ -26,73 +28,54 @@
     "details": "No Structural Trigger: POC=$81,611.9, VAL=$76,013.4, L20=$72,727.3"
   },
   "gate_4": {
-    "passed": true,
-    "funding_rate": 7.999e-05,
+    "passed": false,
+    "funding_rate": 8.011e-05,
     "funding_p90": 68.88888888888889,
-    "details": "Telemetry Rank=68.9% (Funding=+0.0080%)"
+    "details": "Below VAL_30 ($76,013.4) [Sweep Zone]: Funding=+0.0080%, Rank=68.9% (<25.0% or negative required)"
   },
   "sizing": {
-    "dvol": 39.38,
-    "entry_price": 73770.16,
-    "stop_price": 70708.69836000001,
-    "stop_pct": 0.04149999999999992,
-    "target_1_price": 79893.08327999999,
-    "notional_risk_usd": 18072.289156626543,
+    "dvol": 39.35,
+    "entry_price": 74089.27,
+    "stop_price": 73097.986095,
+    "stop_pct": 0.013379587961927602,
+    "target_1_price": 76071.83781000001,
+    "notional_risk_usd": 56055.537893556124,
     "notional_vol_usd": 100000.0,
-    "final_notional_usd": 18072.289156626543,
-    "btc_size": 0.24498102154891005
+    "final_notional_usd": 56055.537893556124,
+    "btc_size": 0.7565945499740532
   },
   "event_study": {
-    "count": 4,
+    "count": 1,
     "small_sample": true,
-    "win_rate_1d": 25.0,
-    "mean_ret_1d": -0.17373646064870132,
-    "median_ret_1d": -1.155101860953077,
-    "win_rate_3d": 25.0,
-    "mean_ret_3d": -0.18646968405472505,
-    "median_ret_3d": -1.7494771916240937,
+    "win_rate_1d": 0.0,
+    "mean_ret_1d": -1.2353348677609097,
+    "median_ret_1d": -1.2353348677609097,
+    "baseline_mean_1d": 0.24604450108741613,
+    "alpha_1d": -1.4813793688483259,
+    "win_rate_3d": 0.0,
+    "mean_ret_3d": -1.8352020689095736,
+    "median_ret_3d": -1.8352020689095736,
+    "baseline_mean_3d": 0.7058167527801114,
+    "alpha_3d": -2.541018821689685,
     "win_rate_5d": 100.0,
-    "mean_ret_5d": 5.811865203804305,
-    "median_ret_5d": 4.326374950437308,
+    "mean_ret_5d": 4.1184076873382995,
+    "median_ret_5d": 4.1184076873382995,
+    "baseline_mean_5d": 1.2017568878002216,
+    "alpha_5d": 2.916650799538078,
     "win_rate_10d": 100.0,
-    "mean_ret_10d": 7.485398590226875,
-    "median_ret_10d": 7.392353197221927,
+    "mean_ret_10d": 8.514044531265244,
+    "median_ret_10d": 8.514044531265244,
+    "baseline_mean_10d": 2.235855453884239,
+    "alpha_10d": 6.278189077381004,
     "triggers": [
       {
-        "bar_idx": 191,
+        "bar_idx": 430,
         "entry_price": 77892.24,
         "state": "STATE_B",
         "ret_1d": -0.012353348677609097,
         "ret_3d": -0.018352020689095735,
         "ret_5d": 0.041184076873383,
         "ret_10d": 0.08514044531265243
-      },
-      {
-        "bar_idx": 192,
-        "entry_price": 77776.0,
-        "state": "STATE_B",
-        "ret_1d": -0.010748688541452443,
-        "ret_3d": -0.016637523143386134,
-        "ret_5d": 0.04534342213536315,
-        "ret_10d": 0.07352628060069946
-      },
-      {
-        "bar_idx": 193,
-        "entry_price": 78578.02,
-        "state": "STATE_B",
-        "ret_1d": -0.026292594290362674,
-        "ret_3d": -0.02288184405766408,
-        "ret_5d": 0.038916607977650626,
-        "ret_10d": 0.07432078334373907
-      },
-      {
-        "bar_idx": 215,
-        "entry_price": 77798.01,
-        "state": "STATE_B",
-        "ret_1d": 0.04244517308347616,
-        "ret_3d": 0.05041260052795695,
-        "ret_5d": 0.10703050116577545,
-        "ret_10d": 0.06642843435198408
       }
     ]
   },

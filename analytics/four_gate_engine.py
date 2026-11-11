@@ -182,8 +182,9 @@ class FourGateEngine:
             )
             return ev
 
+        # Refinement 2: Display 4H bar CLOSE time (+4h / 14,400,000 ms) rather than open time
         last_closed_bar_utc = datetime.fromtimestamp(
-            spot_ts[-1] / 1000, tz=timezone.utc
+            (spot_ts[-1] + 14400000) / 1000, tz=timezone.utc
         ).strftime("%Y-%m-%d %H:00:00 UTC")
 
         closes = np.array([float(b[4]) for b in spot_bars])
@@ -271,22 +272,30 @@ class FourGateEngine:
         vah_idx = int(np.searchsorted(cum_vol, tot_vol * 0.85))
         vah_30 = float((bins[vah_idx] + bins[min(49, vah_idx + 1)]) / 2.0)
 
-        l_20 = float(np.min(lows[-121:-1]))
+        # Refinement 1: Anchor L_20 strictly prior to the 3-bar (12H) window
+        l_20 = float(np.min(lows[-123:-3])) if len(lows) >= 123 else (float(np.min(lows[:-3])) if len(lows) > 3 else float(np.min(lows)))
+        window_low = float(np.min(lows[-3:]))
 
-        state_a = bool((lows[-1] < l_20 and closes[-1] > l_20) or (lows[-1] < val_30 and closes[-1] > val_30))
-        state_b = bool((closes[-1] > poc_30) and (abs(lows[-1] - poc_30) / poc_30 <= 0.005) and (closes[-2] > poc_30))
+        # Gate 3 — State A (12H Sweep & Hold Reclaim)
+        sweep_L20 = bool((window_low < l_20) and (closes[-1] > l_20) and (lows[-1] >= window_low))
+        sweep_VAL = bool((window_low < val_30) and (closes[-1] > val_30) and (lows[-1] >= window_low))
+        state_a = sweep_L20 or sweep_VAL
+
+        # Gate 3 — State B (POC Node Hold)
+        state_b = bool((closes[-1] > poc_30) and (abs(float(np.min(lows[-2:])) - poc_30) / poc_30 <= 0.005) and (closes[-2] > poc_30))
         gate_3_pass = state_a or state_b
         active_state = "STATE_A" if state_a else ("STATE_B" if state_b else "NONE")
 
         if state_a:
-            gate_3_details = f"State A (Sweep Reclaim): Swept Low (${lows[-1]:,.1f} < L20/VAL) Reclaimed (${closes[-1]:,.1f})"
+            target_swept = "L20" if sweep_L20 else "VAL30"
+            gate_3_details = f"State A (12H Sweep {target_swept}): Low=${window_low:,.0f} Reclaimed Close=${closes[-1]:,.0f}"
         elif state_b:
-            gate_3_details = f"State B (POC Node Hold): Price tested within 0.5% of POC (${poc_30:,.1f}) and closed above"
+            gate_3_details = f"State B (POC Hold): Low=${float(np.min(lows[-2:])):,.0f} tested POC=${poc_30:,.0f}"
         else:
-            gate_3_details = f"No Structural Trigger: POC=${poc_30:,.1f}, VAL=${val_30:,.1f}, L20=${l_20:,.1f}"
+            gate_3_details = f"No Trigger: POC=${poc_30:,.0f} | VAL=${val_30:,.0f} | L20=${l_20:,.0f}"
 
         # -------------------------------------------------------------
-        # Audit Fix 3: GATE 4 - Context-Aware Positioning & Anti-Crowding Filter
+        # Refinement 1 & 3: GATE 4 - 12H Funding Flush Memory & Compact Detail (Under 62 chars)
         # Trailing 270 funding prints (90 days)
         # -------------------------------------------------------------
         rates = [float(f["fundingRate"]) for f in funding_raw]
@@ -294,16 +303,21 @@ class FourGateEngine:
         recent_rates = rates[-270:] if len(rates) >= 270 else rates
         p90_f = (sum(r < curr_funding for r in recent_rates) / len(recent_rates)) * 100.0 if recent_rates else 50.0
 
+        prev_funding = float(rates[-2]) if len(rates) >= 2 else curr_funding
+        p90_prev = (sum(r < prev_funding for r in recent_rates) / len(recent_rates)) * 100.0 if recent_rates else 50.0
+
+        f_recent = min(prev_funding, curr_funding)
+        p90_recent = min(p90_prev, p90_f)
+
         is_sweep_zone = (active_state == "STATE_A") or (active_state == "NONE" and closes[-1] < val_30)
 
         if is_sweep_zone:
-            gate_4_pass = bool(curr_funding <= 0.0 or p90_f < 25.0)
-            zone_desc = "State A (Sweep Reclaim)" if active_state == "STATE_A" else f"Below VAL_30 (${val_30:,.1f}) [Sweep Zone]"
-            gate_4_details = f"{zone_desc}: Funding={curr_funding * 100:+.4f}%, Rank={p90_f:.1f}% (<25.0% or negative required)"
+            # 12H Flush Condition: flush occurred within window and not re-crowded above 50%
+            gate_4_pass = bool(((f_recent <= 0.0) or (p90_recent < 25.0)) and (p90_f <= 50.0))
+            gate_4_details = f"Sweep Zone (<VAL): F={curr_funding * 100:+.4f}% | P90={p90_f:.1f}% (Req <25%/Neg)"
         else:
             gate_4_pass = bool(p90_f <= 75.0)
-            zone_desc = "State B (POC Node Hold)" if active_state == "STATE_B" else f"Above VAL_30 (${val_30:,.1f}) [Node Zone]"
-            gate_4_details = f"{zone_desc}: Funding={curr_funding * 100:+.4f}%, Rank={p90_f:.1f}% (<=75.0% required)"
+            gate_4_details = f"Node Zone (>=VAL): F={curr_funding * 100:+.4f}% | P90={p90_f:.1f}% (Req <=75.0%)"
 
         # Confluence Score
         score = int(gate_1_pass) + int(gate_2_pass) + int(gate_3_pass) + int(gate_4_pass)
@@ -467,28 +481,36 @@ class FourGateEngine:
             poc_30 = (bins[poc_idx] + bins[poc_idx + 1]) / 2.0
             c_vol = np.cumsum(vol_bins)
             val_30 = (bins[np.searchsorted(c_vol, c_vol[-1] * 0.15)] + bins[min(49, np.searchsorted(c_vol, c_vol[-1] * 0.15) + 1)]) / 2.0
-            l_20 = np.min(lows[max(0, k - 120) : k])
+            # Refinement 1: Anchor L_20 strictly prior to 3-bar window
+            l_20 = float(np.min(lows[max(0, k - 122) : max(0, k - 2)]))
+            window_low = float(np.min(lows[k - 2 : k + 1]))
 
-            state_a = (lows[k] < l_20 and closes[k] > l_20) or (lows[k] < val_30 and closes[k] > val_30)
-            state_b = (closes[k] > poc_30) and (abs(lows[k] - poc_30) / poc_30 <= 0.005) and (closes[k - 1] > poc_30)
+            sweep_L20 = (window_low < l_20) and (closes[k] > l_20) and (lows[k] >= window_low)
+            sweep_VAL = (window_low < val_30) and (closes[k] > val_30) and (lows[k] >= window_low)
+            state_a = sweep_L20 or sweep_VAL
+            state_b = (closes[k] > poc_30) and (abs(float(np.min(lows[k - 1 : k + 1])) - poc_30) / poc_30 <= 0.005) and (closes[k - 1] > poc_30)
             if not (state_a or state_b):
                 continue
 
-            # Audit Fix 4: Zero Look-Ahead strictly from funding prints <= bar_close_time
+            # Audit Fix 4 & Refinement 1: Zero Look-Ahead with 12H Funding Flush Memory
             bar_close_ms = int(open_times[k] + (4 * 3600 * 1000) - 1)
             past_rates = fund_rates[fund_times <= bar_close_ms]
             if len(past_rates) == 0:
                 continue
             win_rates = past_rates[-270:] if len(past_rates) >= 270 else past_rates
             curr_f = win_rates[-1]
-            p90 = (np.sum(win_rates < curr_f) / len(win_rates)) * 100.0
+            prev_f = win_rates[-2] if len(win_rates) >= 2 else curr_f
+            p90_curr = (np.sum(win_rates < curr_f) / len(win_rates)) * 100.0
+            p90_prev = (np.sum(win_rates < prev_f) / len(win_rates)) * 100.0
+            f_rec = min(prev_f, curr_f)
+            p90_rec = min(p90_prev, p90_curr)
 
-            # Audit Fix 3: Context-aware Gate 4
-            if state_a:
-                if not (curr_f <= 0.0 or p90 < 25.0):
+            # Context-aware Gate 4 with 12H flush memory
+            if state_a or (not state_b and closes[k] < val_30):
+                if not (((f_rec <= 0.0) or (p90_rec < 25.0)) and (p90_curr <= 50.0)):
                     continue
             else:
-                if not (p90 <= 75.0):
+                if not (p90_curr <= 75.0):
                     continue
 
             # Trigger fired -> log and activate 30-bar embargo

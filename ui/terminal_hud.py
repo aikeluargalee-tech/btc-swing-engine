@@ -5929,7 +5929,7 @@ def _build_tab19_four_gate_hud(
         f"[bold white]Gate Status:[/bold white]          {_pass_badge(ev.gate_3_structure if ev else False)}  •  [bold white]State:[/bold white] [yellow]{ev.gate_3_state if ev else 'NONE'}[/yellow]",
         f"[bold white]30D Volume POC / VAL:[/bold white][cyan]${ev.gate_3_poc:,.1f}[/cyan] / [cyan]${ev.gate_3_val:,.1f}[/cyan]" if ev else "",
         f"[bold white]30D VAH / 20D Low:[/bold white]   [cyan]${ev.gate_3_vah:,.1f}[/cyan] / [cyan]${ev.gate_3_l20:,.1f}[/cyan]" if ev else "",
-        f"[bold white]Setup Mechanics:[/bold white]      [dim]State A = Sweep Reclaim (L20/VAL)  •  State B = POC Hold[/dim]",
+        f"[bold white]Setup Mechanics:[/bold white]      [dim]State A = 12H Sweep Reclaim  •  State B = POC Hold[/dim]",
         f"[bold white]Audit Detail:[/bold white]         [white]{ev.gate_3_details if ev else ''}[/white]",
     ]
     g3_panel = Panel("\n".join(g3_lines), title="[bold bright_white]GATE 3: 30D EXECUTED VOLUME PROFILE[/bold bright_white]", box=box.ROUNDED, border_style="bright_blue", padding=(0, 1))
@@ -5937,8 +5937,8 @@ def _build_tab19_four_gate_hud(
     g4_lines = [
         f"[bold white]Gate Status:[/bold white]          {_pass_badge(ev.gate_4_positioning if ev else False)}",
         f"[bold white]8H Perp Funding Rate:[/bold white][cyan]{ev.gate_4_funding_rate * 100:+.4f}%[/cyan]" if ev else "",
-        f"[bold white]90D Funding Percentile:[/bold white][cyan]{ev.gate_4_funding_p90:.1f}%[/cyan] [dim](270 prints)[/dim]" if ev else "",
-        f"[bold white]Positioning Filter:[/bold white]   [dim]Sweep requires <25% / Negative  •  Node requires <=75%[/dim]",
+        f"[bold white]90D Funding Percentile:[/bold white][cyan]{ev.gate_4_funding_p90:.1f}%[/cyan] [dim](trailing 270 prints)[/dim]" if ev else "",
+        f"[bold white]Positioning Filter:[/bold white]   [dim]Sweep requires <25%/Neg (12H)  •  Node requires <=75%[/dim]",
         f"[bold white]Audit Detail:[/bold white]         [white]{ev.gate_4_details if ev else ''}[/white]",
     ]
     g4_panel = Panel("\n".join(g4_lines), title="[bold bright_white]GATE 4: 90D FUNDING ANTI-CROWDING[/bold bright_white]", box=box.ROUNDED, border_style="bright_blue", padding=(0, 1))

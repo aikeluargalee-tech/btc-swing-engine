@@ -5983,25 +5983,27 @@ def _build_tab19_four_gate_hud(
         c = "green" if val > 0 else ("red" if val < 0 else "white")
         return f"[{c}]{val:+.2f}%[/{c}]"
 
-    def _format_cell(win_rate: float, mean_ret: float, alpha_val: float) -> str:
+    def _format_cell(count: int, win_rate: float, mean_ret: float, alpha_val: float) -> str:
+        if count <= 0:
+            return "[dim]-- (0 events)[/dim]"
         c = "green" if alpha_val >= 0 else "red"
         return f"{win_rate:.0f}% win  │  {_color_ret(mean_ret)}  │  [{c}]α {alpha_val:+.2f}%[/{c}]"
 
     study_table.add_row(
         "[bold green]Loop A: USDT Sleeve (Dip Harvester)[/bold green]",
         f"[bold white]{na} events[/bold white] [dim]({'Small N' if na < 30 else 'N>=30'})[/dim]",
-        _format_cell(esa.get('win_rate_1d', 0.0), esa.get('mean_ret_1d', 0.0), esa.get('alpha_1d', 0.0)),
-        _format_cell(esa.get('win_rate_3d', 0.0), esa.get('mean_ret_3d', 0.0), esa.get('alpha_3d', 0.0)),
-        _format_cell(esa.get('win_rate_5d', 0.0), esa.get('mean_ret_5d', 0.0), esa.get('alpha_5d', 0.0)),
-        _format_cell(esa.get('win_rate_10d', 0.0), esa.get('mean_ret_10d', 0.0), esa.get('alpha_10d', 0.0)),
+        _format_cell(na, esa.get('win_rate_1d', 0.0), esa.get('mean_ret_1d', 0.0), esa.get('alpha_1d', 0.0)),
+        _format_cell(na, esa.get('win_rate_3d', 0.0), esa.get('mean_ret_3d', 0.0), esa.get('alpha_3d', 0.0)),
+        _format_cell(na, esa.get('win_rate_5d', 0.0), esa.get('mean_ret_5d', 0.0), esa.get('alpha_5d', 0.0)),
+        _format_cell(na, esa.get('win_rate_10d', 0.0), esa.get('mean_ret_10d', 0.0), esa.get('alpha_10d', 0.0)),
     )
     study_table.add_row(
-        "[bold cyan]Loop B: BTC Sleeve (Rip Harvester)[/bold cyan]",
+        "[bold cyan]Loop B: BTC Sleeve (Telemetry Only)[/bold cyan]",
         f"[bold white]{nb} events[/bold white] [dim]({'Small N' if nb < 30 else 'N>=30'})[/dim]",
-        _format_cell(esb.get('win_rate_1d', 0.0), esb.get('mean_ret_1d', 0.0), esb.get('alpha_1d', 0.0)),
-        _format_cell(esb.get('win_rate_3d', 0.0), esb.get('mean_ret_3d', 0.0), esb.get('alpha_3d', 0.0)),
-        _format_cell(esb.get('win_rate_5d', 0.0), esb.get('mean_ret_5d', 0.0), esb.get('alpha_5d', 0.0)),
-        _format_cell(esb.get('win_rate_10d', 0.0), esb.get('mean_ret_10d', 0.0), esb.get('alpha_10d', 0.0)),
+        _format_cell(nb, esb.get('win_rate_1d', 0.0), esb.get('mean_ret_1d', 0.0), esb.get('alpha_1d', 0.0)),
+        _format_cell(nb, esb.get('win_rate_3d', 0.0), esb.get('mean_ret_3d', 0.0), esb.get('alpha_3d', 0.0)),
+        _format_cell(nb, esb.get('win_rate_5d', 0.0), esb.get('mean_ret_5d', 0.0), esb.get('alpha_5d', 0.0)),
+        _format_cell(nb, esb.get('win_rate_10d', 0.0), esb.get('mean_ret_10d', 0.0), esb.get('alpha_10d', 0.0)),
     )
 
     study_panel = Panel(

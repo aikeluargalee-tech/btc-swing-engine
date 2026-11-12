@@ -1,6 +1,7 @@
 """Unit tests for the 4-Gate Quantitative Protocol Engine (Tab 19 / [Q])."""
 
 import json
+from pathlib import Path
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -224,15 +225,30 @@ class TestFourGateEngine(unittest.TestCase):
         self.assertIn("win_rate_1d", ev.event_study_loop_b_results)
         self.assertIn("alpha_1d", ev.event_study_results)
         self.assertIn("alpha_1d", ev.event_study_loop_b_results)
+        if ev.event_study_loop_b_results.get("count", 0) == 0:
+            self.assertEqual(ev.event_study_loop_b_results.get("alpha_1d"), 0.0)
+            self.assertEqual(ev.event_study_loop_b_results.get("alpha_10d"), 0.0)
 
     def test_dibse_clipboard_telemetry_packet(self):
         spot_k, perp_k, fund_p = _generate_synthetic_4h_bars(240, 75000.0)
         ev = self.engine.calculate_evaluation(spot_k, perp_k, fund_p, 42.0)
         self.store.four_gate_evaluation = ev
 
-        ok, msg, char_count = copy_four_gate_to_clipboard(self.store)
+        with patch("analytics.data_only_reports.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            ok, msg, char_count = copy_four_gate_to_clipboard(self.store)
         self.assertTrue(ok)
         self.assertGreater(char_count, 500)
+        if mock_run.called:
+            passed_bytes = mock_run.call_args.kwargs.get("input", b"")
+            self.assertIn("Diagnostic Reference (DISABLED)", passed_bytes.decode("utf-16le", errors="ignore"))
+
+        log_pkt = Path(__file__).resolve().parent.parent / "logs" / "dibse_packet_latest.md"
+        if log_pkt.exists():
+            txt = log_pkt.read_text(encoding="utf-8")
+            self.assertIn("DIAGNOSTIC TELEMETRY ONLY", txt)
+            self.assertIn("Diagnostic Reference (DISABLED)", txt)
+            self.assertNotIn("Execution Ticket: Sell", txt)
 
         report = build_tab_q_data_only_report(DEFAULT_CONFIG, self.store)
         self.assertIn("DIBSE CAPITAL SANDBOX ALLOCATION", report)

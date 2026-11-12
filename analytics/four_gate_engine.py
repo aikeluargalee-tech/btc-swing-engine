@@ -743,22 +743,22 @@ class FourGateEngine:
                     "mean_ret_1d": 0.0,
                     "median_ret_1d": 0.0,
                     "baseline_mean_1d": b1,
-                    "alpha_1d": 0.0 - b1,
+                    "alpha_1d": 0.0,
                     "win_rate_3d": 0.0,
                     "mean_ret_3d": 0.0,
                     "median_ret_3d": 0.0,
                     "baseline_mean_3d": b3,
-                    "alpha_3d": 0.0 - b3,
+                    "alpha_3d": 0.0,
                     "win_rate_5d": 0.0,
                     "mean_ret_5d": 0.0,
                     "median_ret_5d": 0.0,
                     "baseline_mean_5d": b5,
-                    "alpha_5d": 0.0 - b5,
+                    "alpha_5d": 0.0,
                     "win_rate_10d": 0.0,
                     "mean_ret_10d": 0.0,
                     "median_ret_10d": 0.0,
                     "baseline_mean_10d": b10,
-                    "alpha_10d": 0.0 - b10,
+                    "alpha_10d": 0.0,
                     "triggers": [],
                 }
             r1 = [t["ret_1d"] * 100.0 for t in triggers]
@@ -975,9 +975,9 @@ def copy_four_gate_to_clipboard(store: Any) -> Tuple[bool, str, int]:
         f"  - POC_30: ${ev.gate_3_poc:,.1f} | VAL_30: ${ev.gate_3_val:,.1f} | VAH_30: ${ev.gate_3_vah:,.1f} | H20: ${ev.loop_b_g3_h20:,.1f}",
         f"- Gate 4 [90D Funding Euphoria]:      {'PASS' if ev.loop_b_g4_positioning else 'FAIL'} | Rate: {ev.loop_b_g4_funding_rate * 100:+.4f}% | Percentile: {ev.loop_b_g4_funding_p90:.1f}%",
         f"  - Active Rule: {ev.loop_b_g4_details}",
-        f"- Execution Ticket: Sell ~{ev.btc_sleeve_units:.4f} BTC (${ev.btc_sleeve_usd:,.2f}) at ${ev.loop_b_sell_price:,.2f}",
-        f"- Buyback Target: ${ev.loop_b_buyback_price:,.2f} (-{ev.loop_b_discount_pct * 100:.2f}% discount)",
-        f"- Satoshi Compounding: +{ev.loop_b_free_satoshis_btc:.6f} BTC (+{ev.loop_b_free_satoshis_pct:.2f}% Stack) OR +${ev.loop_b_surplus_cash_usd:,.2f} Surplus USDT Cash",
+        f"- Diagnostic Reference (DISABLED): Hypothetical Sell ~{ev.btc_sleeve_units:.4f} BTC (${ev.btc_sleeve_usd:,.2f}) at ${ev.loop_b_sell_price:,.2f}",
+        f"- Hypothetical Rebuy Target: ${ev.loop_b_buyback_price:,.2f} (-{ev.loop_b_discount_pct * 100:.2f}% discount)",
+        f"- Hypothetical Compounding: +{ev.loop_b_free_satoshis_btc:.6f} BTC (+{ev.loop_b_free_satoshis_pct:.2f}% Stack) OR +${ev.loop_b_surplus_cash_usd:,.2f} Surplus USDT Cash",
         f"- Risk Mandate: {ev.loop_b_stop_rule}",
         "",
         "## 3. IN-SAMPLE 90-DAY DE-CLUSTERED EVENT STUDY (5D EMBARGO)",
@@ -1008,16 +1008,17 @@ def copy_four_gate_to_clipboard(store: Any) -> Tuple[bool, str, int]:
         lines.append("  - No Loop B 4/4 triggers registered in lookback window.")
 
     packet = "\n".join(lines)
-    char_count = len(packet)
+    from analytics.data_only_reports import copy_text_to_clipboard_and_log
 
-    # Windows clipboard copy
-    try:
-        proc = subprocess.Popen(["clip"], stdin=subprocess.PIPE, shell=True)
-        proc.communicate(input=packet.encode("utf-8"))
-    except Exception:
-        pass
-
-    return True, "Copied Tab 19 DIBSE packet to clipboard.", char_count
+    copied_ok, log_path, char_count = copy_text_to_clipboard_and_log(
+        packet, "dibse_packet_latest.md", store if hasattr(store, "last_packet_copied_utc") else None
+    )
+    msg = (
+        f"Copied Tab 19 DIBSE packet to clipboard ({char_count:,} chars)."
+        if copied_ok
+        else f"Saved Tab 19 DIBSE packet to {log_path} ({char_count:,} chars)."
+    )
+    return True, msg, char_count
 
 
 # Canonical Aliases

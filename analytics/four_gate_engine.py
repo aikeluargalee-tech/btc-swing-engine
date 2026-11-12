@@ -966,8 +966,8 @@ def copy_four_gate_to_clipboard(store: Any) -> Tuple[bool, str, int]:
         f"- Profit Target: ${ev.loop_a_target_price:,.2f} (+{ev.loop_a_target_pct * 100:.2f}%) | Projected Gain: +${ev.loop_a_expected_profit_usd:,.2f} USDT Cash",
         f"- Risk Mandate: {ev.loop_a_stop_rule}",
         "",
-        "## 2. SWING LOOP B: BTC SLEEVE (RIP HARVESTER & SATOSHI ACCUMULATOR)",
-        f"- Loop B Status: {ev.loop_b_status} | Verdict: {ev.loop_b_verdict} | Confluence: {ev.loop_b_score}/4",
+        "## 2. SWING LOOP B: BTC SLEEVE (DIAGNOSTIC TELEMETRY ONLY — G1 AUTO-SELL GATED OFF)",
+        f"- Loop B Status: {ev.loop_b_status} | Verdict: {ev.loop_b_verdict} | Telemetry: {ev.loop_b_score}/4",
         f"- Gate 1 [Rough Path Lévy Area A_SP]: {'PASS' if ev.loop_b_g1_levy else 'FAIL'} | Value: {ev.loop_b_g1_val:+.4f} (Rule: A_SP < 0.0)",
         f"- Gate 2 [Spot-Perp CVD Z-Spread]:    {'PASS' if ev.loop_b_g2_zflow else 'FAIL'} | Value: {ev.loop_b_g2_val:+.2f} (Rule: D_flow <= -1.0 & Spot24h < 0)",
         f"  - Details: z_S={ev.loop_b_g2_z_s:+.2f}, z_F={ev.loop_b_g2_z_f:+.2f}, Spot24h_Delta={ev.loop_b_g2_ds_24h:+,.1f} BTC",
@@ -1040,21 +1040,3 @@ if __name__ == "__main__":
     else:
         print("API Fetch Failed -> DATA UNAVAILABLE")
 
-
-
-if __name__ == "__main__":
-    print("Testing FourGateEngine live fetch & math...")
-    engine = FourGateEngine()
-    spot_k, perp_k, fund_p, dvol_v = engine.fetch_primary_feeds()
-    if spot_k and perp_k and fund_p and dvol_v is not None:
-        ev = engine.calculate_evaluation(spot_k, perp_k, fund_p, dvol_v)
-        engine.persist_state(ev)
-        print(f"SUCCESS! Timestamp: {ev.timestamp_utc}")
-        print(f"Score: {ev.score}/4 | Verdict: {ev.verdict}")
-        print(f"Gate 1 (Lévy A_SP): {ev.gate_1_val:+.4f} ({ev.gate_1_levy})")
-        print(f"Gate 2 (D_flow):    {ev.gate_2_val:+.2f} ({ev.gate_2_zflow})")
-        print(f"Gate 3 (Profile):   {ev.gate_3_state} ({ev.gate_3_structure})")
-        print(f"Gate 4 (Funding):   {ev.gate_4_funding_p90:.1f}% ({ev.gate_4_positioning})")
-        print(f"Event Study Count:  {ev.event_study_triggers_count} (Small sample: {ev.event_study_small_sample})")
-    else:
-        print("API Fetch Failed -> DATA UNAVAILABLE")

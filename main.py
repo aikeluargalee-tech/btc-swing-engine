@@ -77,8 +77,8 @@ async def _run_engine(
         store.active_tab = 17
     elif tab_arg.lower() in ("a", "k", "strategy", "trend_pullback", "btc_strategy", "18"):
         store.active_tab = 18
-    elif tab_arg.lower() in ("q", "four_gate", "4gate", "19"):
-        store.active_tab = 19  # Tab [Q: 4-GATE PROTOCOL]
+    elif tab_arg.lower() in ("q", "four_gate", "4gate", "dibse", "19"):
+        store.active_tab = 19  # Tab [Q: DIBSE]
     elif tab_arg.lower() in ("s4", "t", "trap", "sfp"):
         store.active_tab = 8
     elif tab_arg.lower() in ("s5", "e", "exhaust", "td"):

@@ -2,6 +2,8 @@
 
 import asyncio
 import logging
+import weakref
+from collections import deque
 from datetime import datetime, timezone
 from typing import Any, List, Optional
 
@@ -123,6 +125,7 @@ async def fetch_initial_oi_and_funding(
 ) -> None:
     """Backfills 4H Open Interest history, current Open Interest, and Funding Rate."""
     base_url = config.binance_perp_rest_urls[0]
+    bn_oi_ok = False
     try:
         # 1. Current Funding Rate & Mark Price (first, so record_oi_sample computes USD OI accurately)
         prem_url = f"{base_url}/fapi/v1/premiumIndex"
@@ -167,6 +170,7 @@ async def fetch_initial_oi_and_funding(
                 if oi_btc > 0:
                     store.record_oi_sample(oi_btc)
                     store.perp_source = "Binance USD-M"
+                    bn_oi_ok = True
 
         # 4. 5m Taker Long/Short Volume Ratio
         taker_url = f"{base_url}/futures/data/takerlongshortRatio"
@@ -218,8 +222,30 @@ async def fetch_initial_oi_and_funding(
     except Exception as exc:
         logger.debug("Primary Binance futures OI/Funding warmup failed: %s", exc)
 
-    if store.binance_perp_price == 0.0 or store.funding_rate_pct == 0.0:
+    if not bn_oi_ok or store.binance_perp_price == 0.0 or store.funding_rate_pct == 0.0:
         await fetch_okx_oi_and_funding(session, config, store)
+
+    if not bn_oi_ok:
+        try:
+            from .macro_collector import extract_coingecko_perp_venue, fetch_coingecko_derivatives
+
+            cg_rows = await fetch_coingecko_derivatives(session)
+            cg_bn = extract_coingecko_perp_venue(cg_rows, "Binance (Futures)", config.binance_symbol, "BN")
+            if cg_bn is not None:
+                _, bn_oi_btc, bn_oi_usd, bn_fund = cg_bn
+                if store.open_interest_btc > 0 and store.oi_history:
+                    scale = bn_oi_btc / store.open_interest_btc
+                    store.oi_history = deque(
+                        ((ts, val * scale) for ts, val in store.oi_history),
+                        maxlen=store.oi_history.maxlen,
+                    )
+                store.open_interest_btc = bn_oi_btc
+                store.open_interest_usd = bn_oi_usd
+                if bn_fund is not None:
+                    store.funding_rate_pct = bn_fund
+                store.perp_source = "Binance USD-M (CoinGecko)"
+        except Exception as exc:
+            logger.debug("CoinGecko Binance OI fallback failed: %s", exc)
 
 
 # ---------------- OKX BTC-USDT-SWAP fallback (used when Binance USD-M / Bybit are geo-blocked) ----------------
@@ -227,19 +253,51 @@ async def fetch_initial_oi_and_funding(
 OKX_SOURCE_LABEL = "OKX BTC-USDT-SWAP"
 _OKX_BAR = {"15m": "15m", "1h": "1H", "4h": "4H", "1d": "1Dutc", "1w": "1Wutc"}
 _OKX_TAKER_PERIOD = {"15m": "15m", "1h": "1H", "1d": "1D"}
+_OKX_SEMS: "weakref.WeakKeyDictionary[Any, asyncio.Semaphore]" = weakref.WeakKeyDictionary()
+
+
+def _get_okx_sem() -> asyncio.Semaphore:
+    loop = asyncio.get_running_loop()
+    sem = _OKX_SEMS.get(loop)
+    if sem is None:
+        sem = asyncio.Semaphore(2)
+        _OKX_SEMS[loop] = sem
+    return sem
 
 
 async def _okx_get(session: aiohttp.ClientSession, config: EngineConfig, path: str, params: dict) -> Optional[list]:
-    try:
-        async with session.get(
-            f"{config.okx_rest_url}{path}", params=params, timeout=aiohttp.ClientTimeout(total=10)
-        ) as resp:
-            if resp.status == 200:
-                payload = await resp.json()
-                if str(payload.get("code")) == "0":
-                    return payload.get("data", [])
-    except Exception as exc:
-        logger.debug("OKX GET %s failed: %s", path, exc)
+    headers = {"User-Agent": "curl/8.5.0", "Accept": "application/json"}
+    sem = _get_okx_sem()
+    for attempt in range(3):
+        retry_delay: Optional[float] = None
+        try:
+            async with sem:
+                async with session.get(
+                    f"{config.okx_rest_url}{path}",
+                    params=params,
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp:
+                    if resp.status == 429:
+                        retry_delay = 0.45 * (attempt + 1)
+                    elif resp.status == 200:
+                        payload = await resp.json()
+                        code = str(payload.get("code"))
+                        if code == "0":
+                            return payload.get("data", [])
+                        if code == "50011":
+                            retry_delay = 0.45 * (attempt + 1)
+                        else:
+                            return None
+                    else:
+                        return None
+        except Exception as exc:
+            logger.debug("OKX GET %s failed (attempt %d): %s", path, attempt + 1, exc)
+            retry_delay = 0.3 * (attempt + 1)
+        if retry_delay is not None and attempt < 2:
+            await asyncio.sleep(retry_delay)
+        elif retry_delay is None:
+            return None
     return None
 
 
@@ -251,8 +309,7 @@ async def fetch_okx_perp_klines(
 ) -> List[KlineBar]:
     """OKX BTC-USDT-SWAP candles (volCcy = BTC) with taker-buy volume from rubik taker-volume-contract.
 
-    Rubik returns at most 100 recent bars; older bars fall back to the candle-body taker approximation
-    (same method the engine already uses for its Bybit fallback).
+    Older bars beyond rubik depth fall back to the candle-body taker approximation.
     """
     bar = _OKX_BAR.get(interval)
     if not bar:
@@ -303,15 +360,27 @@ async def fetch_okx_perp_klines(
             if len(tv) < 100 or (end_cursor is not None and int(next_end) >= int(end_cursor)):
                 break
             end_cursor = next_end
+            await asyncio.sleep(0.12)
 
     bars: List[KlineBar] = []
+    latest_open_ts = int(rows[0][0])
+    latest_tv_ratio = taker_buy[max(taker_buy)] if taker_buy else None
     for row in reversed(rows):  # oldest first
         ts = int(row[0])
         o, h, l, c = float(row[1]), float(row[2]), float(row[3]), float(row[4])
         v = float(row[6])  # volCcy = BTC
-        estimated = ts not in taker_buy
+        ratio = taker_buy.get(ts)
+        # OKX rubik period=1D indexes at 00:00 UTC+8 (ts - 8h relative to 1Dutc candle open)
+        if ratio is None and interval == "1d":
+            for off in (-28_800_000, 57_600_000):
+                if (ts + off) in taker_buy:
+                    ratio = taker_buy[ts + off]
+                    break
+        if ratio is None and latest_tv_ratio is not None and ts == latest_open_ts:
+            ratio = latest_tv_ratio
+        estimated = ratio is None
         if not estimated:
-            tb = v * taker_buy[ts]
+            tb = v * ratio
         else:
             rng = max(h - l, 1e-6)
             buy_ratio = min(0.95, max(0.05, 0.5 + 0.4 * ((c - o) / rng)))
@@ -327,7 +396,7 @@ async def fetch_okx_oi_and_funding(
     config: EngineConfig,
     store: StateStore,
 ) -> bool:
-    """OKX fallback for OI (BTC via oiCcy), OI history, funding, mark price and 5m taker ratio."""
+    """OKX fallback for OI (BTC via oiCcy), OI history, funding, mark price, 5m taker & L/S ratios."""
     inst = config.okx_perp_inst_id
     ok = False
     tk = await _okx_get(session, config, "/api/v5/market/ticker", {"instId": inst})
@@ -366,6 +435,28 @@ async def fetch_okx_oi_and_funding(
         sell_v, buy_v = float(tv[0][1]), float(tv[0][2])
         store.taker_long_short_ratio_5m = (buy_v / sell_v) if sell_v > 0 else 1.0
         store.perp_5m_delta_btc = buy_v - sell_v
+    glb_ls = await _okx_get(
+        session, config, "/api/v5/rubik/stat/contracts/long-short-account-ratio",
+        {"ccy": "BTC", "period": "5m"},
+    )
+    if glb_ls:
+        try:
+            store.global_account_ls_ratio = float(glb_ls[0][1])
+        except (TypeError, ValueError, IndexError):
+            pass
+    top_ls = await _okx_get(
+        session, config, "/api/v5/rubik/stat/contracts/long-short-account-ratio-contract-top-trader",
+        {"instId": inst, "period": "5m"},
+    )
+    if top_ls:
+        try:
+            r_top = float(top_ls[0][1])
+            if r_top > 0:
+                store.top_trader_ls_ratio = r_top
+                store.top_trader_long_pct = (r_top / (1.0 + r_top)) * 100.0
+                store.top_trader_short_pct = 100.0 - store.top_trader_long_pct
+        except (TypeError, ValueError, IndexError):
+            pass
     if ok:
         store.perp_source = OKX_SOURCE_LABEL
     return ok

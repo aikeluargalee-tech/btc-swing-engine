@@ -544,7 +544,7 @@ def render_dashboard_html(
 def _format_telegram_panel_block(title: str, rows: Sequence[DataMetricRow]) -> str:
     lines = [f"[{title}]"]
     for r in rows:
-        tag = f" [{r.status}]" if r.status != "OK" else ""
+        tag = f" [{r.status}]" if (r.status != "OK" and f"[{r.status}]" not in r.value) else ""
         lines.append(f"• {r.label}: {r.value}{tag}")
     return "\n".join(lines)
 

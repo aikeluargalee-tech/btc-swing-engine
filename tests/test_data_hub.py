@@ -545,6 +545,70 @@ class TestDataHub(unittest.TestCase):
             self.assertTrue(posted_urls[1].endswith("/sendMessage"))
             self.assertTrue(posted_urls[2].endswith("/sendDocument"))
 
+    def test_us_runner_parity_fixes(self) -> None:
+        from analytics.data_hub_engine import _canonical_4h_utc
+        from collectors.macro_collector import extract_coingecko_perp_venue
+        from scripts.publish_dd_hub import _format_telegram_panel_block
+
+        self.assertEqual(_canonical_4h_utc("2026-11-14 12:00Z"), "2026-11-14 12:00:00 UTC")
+        self.assertEqual(_canonical_4h_utc("2026-11-14 12:00:00 UTC"), "2026-11-14 12:00:00 UTC")
+
+        store = StateStore()
+        store.binance_spot_price = 65_667.51
+        store.futures_v4_evaluation = SimpleNamespace(last_4h_close_utc="2026-11-14 12:00Z")
+        store.macro_intermarket = MacroIntermarketSnapshot(
+            etf_proxy_vol_1d_usd=2_280_000_000.0,
+            etf_proxy_flow_5d_usd=-6_190_000_000.0,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db_file = Path(tmp) / "legacy_z.sqlite"
+            # Seed a legacy 12:00Z row (plus another where canonical also exists)
+            conn = sqlite3.connect(str(db_file))
+            conn.execute(
+                """
+                CREATE TABLE telemetry_snapshots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    closed_4h_bar_utc TEXT NOT NULL UNIQUE,
+                    retrieval_utc TEXT NOT NULL,
+                    spot_price REAL NOT NULL,
+                    ok_count INTEGER NOT NULL,
+                    unavailable_count INTEGER NOT NULL,
+                    stale_count INTEGER NOT NULL,
+                    proxy_or_static_count INTEGER NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                "INSERT INTO telemetry_snapshots (closed_4h_bar_utc, retrieval_utc, spot_price, ok_count, unavailable_count, stale_count, proxy_or_static_count, payload_json) "
+                "VALUES ('2026-11-14 12:00Z', '2026-11-14 15:51:28 UTC', 65667.51, 60, 4, 1, 1, '{}')"
+            )
+            conn.commit()
+            conn.close()
+
+            ev = DataHubEngine(self.cfg, db_path=db_file, write_archive=True).evaluate(store)
+            self.assertEqual(ev.archive_snapshots_count, 1)
+            self.assertEqual(ev.archive_last_bar_utc, "2026-11-14 12:00:00 UTC")
+            p6 = {r.label: r for r in ev.panel_6_macro_onchain}
+            self.assertEqual(p6["Closed 4H Anchor (Tab 19/20)"].value, "2026-11-14 12:00:00 UTC")
+
+            blk = _format_telegram_panel_block("4. ON-CHAIN, ETF & STABLECOIN FLOWS", ev.panel_4_flow_quant)
+            self.assertIn("1DVol:$2.28B · 5D:-$6.19B [PROXY]", blk)
+            self.assertNotIn("[PROXY] [PROXY]", blk)
+
+        cg_sample = [
+            {"market": "Binance (Futures)", "symbol": "BTCUSDT", "price": "65000.0", "open_interest": 6500000000.0, "funding_rate": 0.0042},
+            {"market": "Bybit (Futures)", "symbol": "BTCUSDT", "price": "65000.0", "open_interest": 3250000000.0, "funding_rate": 0.0051},
+        ]
+        bn = extract_coingecko_perp_venue(cg_sample, "Binance (Futures)", "BTCUSDT", "BN")
+        byb = extract_coingecko_perp_venue(cg_sample, "Bybit (Futures)", "BTCUSDT", "BYB")
+        self.assertIsNotNone(bn)
+        self.assertAlmostEqual(bn[1], 100_000.0)
+        self.assertAlmostEqual(bn[3], 0.0042)
+        self.assertIsNotNone(byb)
+        self.assertAlmostEqual(byb[1], 50_000.0)
+
 
 if __name__ == "__main__":
     unittest.main()

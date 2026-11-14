@@ -170,6 +170,21 @@ def _is_test_runner() -> bool:
     return main_file.startswith("test_")
 
 
+def _canonical_4h_utc(val: Optional[str]) -> Optional[str]:
+    """Normalizes closed 4H bar timestamps (e.g. `YYYY-MM-DD HH:MMZ` -> `YYYY-MM-DD HH:MM:00 UTC`)."""
+    if not val:
+        return None
+    s = str(val).strip()
+    if not s:
+        return None
+    if s.endswith("Z"):
+        core = s[:-1].strip()
+        if len(core) == 16 and core[10] in (" ", "T"):
+            core = f"{core[:10]} {core[11:]}:00"
+        return f"{core} UTC"
+    return s
+
+
 def record_and_query_telemetry_archive(
     ev: DataHubEvaluation,
     closed_4h_utc: Optional[str],
@@ -183,7 +198,7 @@ def record_and_query_telemetry_archive(
     """
     db = pathlib.Path(db_path) if db_path is not None else DEFAULT_ARCHIVE_DB_PATH
     db_key = str(db.resolve())
-    bar_key = (closed_4h_utc or "").strip()
+    bar_key = _canonical_4h_utc(closed_4h_utc) or ""
     can_write = bool(write_enabled and bar_key and ev.spot_price > 0.0)
 
     cached = _LAST_ARCHIVED_STATE_BY_DB.get(db_key)
@@ -214,6 +229,23 @@ def record_and_query_telemetry_archive(
             """
         )
         if can_write:
+            legacy_rows = conn.execute(
+                "SELECT id, closed_4h_bar_utc FROM telemetry_snapshots WHERE closed_4h_bar_utc LIKE '%Z'"
+            ).fetchall()
+            for lid, lbar in legacy_rows:
+                canon = _canonical_4h_utc(lbar)
+                if canon and canon != lbar:
+                    exists = conn.execute(
+                        "SELECT 1 FROM telemetry_snapshots WHERE closed_4h_bar_utc = ?",
+                        (canon,),
+                    ).fetchone()
+                    if exists:
+                        conn.execute("DELETE FROM telemetry_snapshots WHERE id = ?", (lid,))
+                    else:
+                        conn.execute(
+                            "UPDATE telemetry_snapshots SET closed_4h_bar_utc = ? WHERE id = ?",
+                            (canon, lid),
+                        )
             payload = {
                 "schema_version": "dd_v2",
                 "instrument": "BTCUSDT",
@@ -330,7 +362,9 @@ class DataHubEngine:
         sp_ws_s, sp_ws_st = _tick_age_str(bool(store.spot_ws_connected), store.last_spot_tick_ts, now_ts)
         pp_ws_s, pp_ws_st = _tick_age_str(bool(store.perp_ws_connected), store.last_perp_tick_ts, now_ts)
         cb_ws_s, cb_ws_st = _tick_age_str(bool(store.coinbase_ws_connected), store.last_cb_tick_ts, now_ts)
-        closed_4h_utc = getattr(fg, "last_closed_bar_utc", None) or getattr(fv4, "last_4h_close_utc", None)
+        closed_4h_utc = _canonical_4h_utc(
+            getattr(fg, "last_closed_bar_utc", None) or getattr(fv4, "last_4h_close_utc", None)
+        )
 
         excl_bars = getattr(store, "perp_estimated_bars_excluded", {}) or {}
         excl_total = sum(excl_bars.values()) if isinstance(excl_bars, dict) else 0

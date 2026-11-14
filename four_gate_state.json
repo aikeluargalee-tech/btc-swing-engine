@@ -1,8 +1,8 @@
 {
-  "timestamp_utc": "2026-11-14 15:40:06 UTC",
+  "timestamp_utc": "2026-11-14 16:09:05 UTC",
   "protocol": "DIBSE v1.0",
-  "live_spot_price": 65236.36,
-  "last_closed_bar_utc": "2026-11-14 12:00:00 UTC",
+  "live_spot_price": 65491.88,
+  "last_closed_bar_utc": "2026-11-14 16:00:00 UTC",
   "status": "STANDBY",
   "verdict": "STANDBY / CASH",
   "score": 0,
@@ -12,112 +12,112 @@
     "core_reserve_usd": 80000.0,
     "usdt_sleeve_usd": 10000.0,
     "btc_sleeve_usd": 10000.0,
-    "btc_sleeve_units": 0.15328874878978532,
+    "btc_sleeve_units": 0.15269068470778363,
     "inventory_state": "G1: LOOP A ACTIVE / SLEEVE B HOLD"
   },
   "loop_a": {
     "score": 0,
     "verdict": "STANDBY IN USDT CASH",
     "status": "READY_USDT",
-    "entry_price": 67272.79,
-    "target_price": 81762.86,
-    "target_pct": 0.21539273159326391,
-    "expected_profit_usd": 2153.927315932639,
+    "entry_price": 65742.01,
+    "target_price": 81526.6722,
+    "target_pct": 0.24010008516624312,
+    "expected_profit_usd": 2401.000851662431,
     "stop_rule": "ZERO FORCED STOP-LOSS: ASYMMETRIC HOLDING OF SPOT BTC",
     "g1_levy": {
       "passed": false,
-      "val": -2.543413931551831,
-      "details": "A_SP=-2.5434 <= 0.0 (Spot path lagging or drag)"
+      "val": -0.35761695794128,
+      "details": "A_SP=-0.3576 <= 0.0 (Spot path lagging or drag)"
     },
     "g2_zflow": {
       "passed": false,
-      "val": 0.6376391614320099,
-      "details": "D_flow=+0.64 (z_S=-0.94, z_F=-1.58, Spot24h=-894.2)"
+      "val": -0.32565033046825365,
+      "details": "D_flow=-0.33 (z_S=-2.01, z_F=-1.69, Spot24h=-2,255.2)"
     },
     "g3_structure": {
       "passed": false,
       "state": "NONE",
-      "details": "No Trigger: POC=$81,763 | VAL=$73,648 | L20=$67,568"
+      "details": "No Trigger: POC=$81,527 | VAL=$73,594 | L20=$66,614"
     },
     "g4_positioning": {
       "passed": false,
-      "rate": 4.461e-05,
-      "p90": 35.55555555555556,
-      "details": "Sweep Zone (<VAL): F=+0.0045% | P90=35.6% (Req <25%/Neg)"
+      "rate": 3.872e-05,
+      "p90": 31.851851851851855,
+      "details": "Sweep Zone (<VAL): F=+0.0039% | P90=31.9% (Req <25%/Neg)"
     }
   },
   "loop_b": {
     "score": 1,
     "verdict": "HOLD BTC INVENTORY (G1 GATE: AUTO-SELL OFF)",
     "status": "GATED_OFF_HOLD_BTC",
-    "sell_price": 67272.79,
-    "buyback_price": 64581.878399999994,
-    "discount_pct": 0.039999999999999994,
-    "free_satoshis_btc": 0.0063870311995744,
+    "sell_price": 65742.01,
+    "buyback_price": 63112.32959999999,
+    "discount_pct": 0.04000000000000008,
+    "free_satoshis_btc": 0.0063621118628243295,
     "free_satoshis_pct": 4.166666666666674,
-    "surplus_cash_usd": 412.4864722679192,
+    "surplus_cash_usd": 401.5277008386391,
     "stop_rule": "G1 GATE: PASSIVE BTC HOLD (LOOP B AUTO-SELL DISABLED AFTER N=2 / -79.1% BTC LOSS)",
     "g1_levy": {
       "passed": true,
-      "val": -2.543413931551831,
-      "details": "A_SP=-2.5434 < 0.0 (Spot path lagging / unbacked retail markup)"
+      "val": -0.35761695794128,
+      "details": "A_SP=-0.3576 < 0.0 (Spot path lagging / unbacked retail markup)"
     },
     "g2_zflow": {
       "passed": false,
-      "val": 0.6376391614320099,
-      "details": "D_flow=+0.64 (z_S=-0.94, z_F=-1.58, Spot24h=-894.2)"
+      "val": -0.32565033046825365,
+      "details": "D_flow=-0.33 (z_S=-2.01, z_F=-1.69, Spot24h=-2,255.2)"
     },
     "g3_structure": {
       "passed": false,
       "state": "NONE",
       "h20": 81971.0,
-      "details": "No Trigger: VAH=$81,763 | POC=$81,763 | H20=$81,971"
+      "details": "No Trigger: VAH=$81,923 | POC=$81,527 | H20=$81,971"
     },
     "g4_positioning": {
       "passed": false,
-      "rate": 4.461e-05,
-      "p90": 35.55555555555556,
-      "details": "Node Zone (<=VAH): F=+0.0045% | P90=35.6% (Req >=75.0%)"
+      "rate": 3.872e-05,
+      "p90": 31.851851851851855,
+      "details": "Node Zone (<=VAH): F=+0.0039% | P90=31.9% (Req >=75.0%)"
     }
   },
   "gate_1": {
     "passed": false,
-    "A_SP": -2.543413931551831,
-    "details": "A_SP=-2.5434 <= 0.0 (Spot path lagging or drag)"
+    "A_SP": -0.35761695794128,
+    "details": "A_SP=-0.3576 <= 0.0 (Spot path lagging or drag)"
   },
   "gate_2": {
     "passed": false,
-    "D_flow": 0.6376391614320099,
-    "z_S": -0.9393472341021899,
-    "z_F": -1.5769863955341998,
-    "dS_24h": -894.2205799999995,
-    "details": "D_flow=+0.64 (z_S=-0.94, z_F=-1.58, Spot24h=-894.2)"
+    "D_flow": -0.32565033046825365,
+    "z_S": -2.0134563618609307,
+    "z_F": -1.687806031392677,
+    "dS_24h": -2255.1874,
+    "details": "D_flow=-0.33 (z_S=-2.01, z_F=-1.69, Spot24h=-2,255.2)"
   },
   "gate_3": {
     "passed": false,
     "state": "NONE",
-    "poc_30": 81762.86,
-    "val_30": 73648.38,
-    "vah_30": 81762.86,
-    "l_20": 67568.0,
-    "details": "No Trigger: POC=$81,763 | VAL=$73,648 | L20=$67,568"
+    "poc_30": 81526.6722,
+    "val_30": 73594.13620000001,
+    "vah_30": 81923.299,
+    "l_20": 66613.55,
+    "details": "No Trigger: POC=$81,527 | VAL=$73,594 | L20=$66,614"
   },
   "gate_4": {
     "passed": false,
-    "funding_rate": 4.461e-05,
-    "funding_p90": 35.55555555555556,
-    "details": "Sweep Zone (<VAL): F=+0.0045% | P90=35.6% (Req <25%/Neg)"
+    "funding_rate": 3.872e-05,
+    "funding_p90": 31.851851851851855,
+    "details": "Sweep Zone (<VAL): F=+0.0039% | P90=31.9% (Req <25%/Neg)"
   },
   "sizing": {
-    "dvol": 46.24,
-    "entry_price": 67272.79,
-    "stop_price": 66355.090815,
-    "stop_pct": 0.01364146165188021,
-    "target_1_price": 69108.18836999997,
-    "notional_risk_usd": 54979.44568840445,
+    "dvol": 41.78,
+    "entry_price": 65742.01,
+    "stop_price": 64920.234874999995,
+    "stop_pct": 0.0125,
+    "target_1_price": 67385.56025,
+    "notional_risk_usd": 60000.0,
     "notional_vol_usd": 100000.0,
-    "final_notional_usd": 54979.44568840445,
-    "btc_size": 0.817261268462397
+    "final_notional_usd": 60000.0,
+    "btc_size": 0.912658435603049
   },
   "event_study": {
     "count": 2,
@@ -125,26 +125,26 @@
     "win_rate_1d": 0.0,
     "mean_ret_1d": -2.9490172686470113,
     "median_ret_1d": -2.9490172686470113,
-    "baseline_mean_1d": 0.26391921451275496,
-    "alpha_1d": -3.2129364831597664,
+    "baseline_mean_1d": 0.25258078769384057,
+    "alpha_1d": -3.2015980563408517,
     "win_rate_3d": 0.0,
     "mean_ret_3d": -2.514521001283351,
     "median_ret_3d": -2.514521001283351,
-    "baseline_mean_3d": 0.6650441603956081,
-    "alpha_3d": -3.1795651616789593,
+    "baseline_mean_3d": 0.6524438810723138,
+    "alpha_3d": -3.1669648823556646,
     "win_rate_5d": 50.0,
     "mean_ret_5d": -0.0005738381453770369,
     "median_ret_5d": -0.0005738381453770369,
-    "baseline_mean_5d": 1.0851184903882043,
-    "alpha_5d": -1.0856923285335813,
+    "baseline_mean_5d": 1.0767342248836953,
+    "alpha_5d": -1.0773080630290723,
     "win_rate_10d": 50.0,
     "mean_ret_10d": 0.8483070248025437,
     "median_ret_10d": 0.8483070248025437,
-    "baseline_mean_10d": 1.9870717782139933,
-    "alpha_10d": -1.1387647534114496,
+    "baseline_mean_10d": 1.9572934225299834,
+    "alpha_10d": -1.1089863977274397,
     "triggers": [
       {
-        "bar_idx": 347,
+        "bar_idx": 346,
         "entry_price": 81348.0,
         "state": "STATE_B",
         "ret_1d": -0.02358595171362539,
@@ -153,7 +153,7 @@
         "ret_10d": -0.051791930963268895
       },
       {
-        "bar_idx": 414,
+        "bar_idx": 413,
         "entry_price": 78982.0,
         "state": "STATE_B",
         "ret_1d": -0.035394393659314835,
@@ -169,22 +169,22 @@
     "win_rate_1d": 0.0,
     "mean_ret_1d": 0.0,
     "median_ret_1d": 0.0,
-    "baseline_mean_1d": -0.26391921451275496,
+    "baseline_mean_1d": -0.25258078769384057,
     "alpha_1d": 0.0,
     "win_rate_3d": 0.0,
     "mean_ret_3d": 0.0,
     "median_ret_3d": 0.0,
-    "baseline_mean_3d": -0.6650441603956081,
+    "baseline_mean_3d": -0.6524438810723138,
     "alpha_3d": 0.0,
     "win_rate_5d": 0.0,
     "mean_ret_5d": 0.0,
     "median_ret_5d": 0.0,
-    "baseline_mean_5d": -1.0851184903882043,
+    "baseline_mean_5d": -1.0767342248836953,
     "alpha_5d": 0.0,
     "win_rate_10d": 0.0,
     "mean_ret_10d": 0.0,
     "median_ret_10d": 0.0,
-    "baseline_mean_10d": -1.9870717782139933,
+    "baseline_mean_10d": -1.9572934225299834,
     "alpha_10d": 0.0,
     "triggers": []
   },

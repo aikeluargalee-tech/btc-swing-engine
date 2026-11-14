@@ -11,6 +11,7 @@ Fetches non-exchange macro, sentiment, order book depth, and intermarket data:
 
 import asyncio
 import logging
+import weakref
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -421,6 +422,56 @@ async def _fetch_deribit_options_summary(session: aiohttp.ClientSession) -> Dict
     return {}
 
 
+_CG_DERIV_SESSION_CACHE: "weakref.WeakKeyDictionary[Any, List[Dict[str, Any]]]" = weakref.WeakKeyDictionary()
+
+
+async def fetch_coingecko_derivatives(session: aiohttp.ClientSession) -> List[Dict[str, Any]]:
+    """Fetches CoinGecko derivatives list, memoized per ClientSession to avoid duplicate calls."""
+    try:
+        cached = _CG_DERIV_SESSION_CACHE.get(session)
+        if cached is not None:
+            return cached
+    except TypeError:
+        pass
+
+    url = "https://api.coingecko.com/api/v3/derivatives"
+    headers = {"User-Agent": "curl/8.5.0", "Accept": "application/json"}
+    try:
+        async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=8.0)) as r:
+            if r.status == 200:
+                data = await r.json()
+                if isinstance(data, list):
+                    try:
+                        _CG_DERIV_SESSION_CACHE[session] = data
+                    except TypeError:
+                        pass
+                    return data
+    except Exception as exc:
+        logger.debug("Failed CoinGecko derivatives fetch: %s", exc)
+    return []
+
+
+def extract_coingecko_perp_venue(
+    rows: List[Dict[str, Any]],
+    market_name: str,
+    symbol: str,
+    code: str,
+) -> Optional[Tuple[str, float, float, Optional[float]]]:
+    """Extracts `(code, oi_btc, oi_usd, funding_8h_pct)` for a perp contract from CoinGecko rows."""
+    for it in rows:
+        if it.get("market") == market_name and it.get("symbol") == symbol:
+            try:
+                oi_u = float(it.get("open_interest") or 0.0)
+                px = float(it.get("price") or 0.0)
+                raw_fr = it.get("funding_rate")
+                f_p = float(raw_fr) if raw_fr is not None else None
+                if oi_u > 0.0 and px > 0.0:
+                    return (code, oi_u / px, oi_u, f_p)
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
 async def _fetch_cross_exchange_perps_and_cb_vol(session: aiohttp.ClientSession) -> Dict[str, Any]:
     """Fetches Binance+Bybit+OKX perp OI/funding + Coinbase 24H Spot volume concurrently."""
     out: Dict[str, Any] = {}
@@ -478,6 +529,20 @@ async def _fetch_cross_exchange_perps_and_cb_vol(session: aiohttp.ClientSession)
         return None
 
     bn_res, byb_res, okx_res, cb_vol = await asyncio.gather(_bn(), _byb(), _okx(), _cb(), return_exceptions=True)
+
+    # US geo-block fallback: fapi.binance.com (451) and api.bybit.com (403) fall back to CoinGecko Derivatives
+    if not isinstance(bn_res, tuple) or not isinstance(byb_res, tuple):
+        cg_rows = await fetch_coingecko_derivatives(session)
+        if cg_rows:
+            if not isinstance(bn_res, tuple):
+                bn_fb = extract_coingecko_perp_venue(cg_rows, "Binance (Futures)", "BTCUSDT", "BN")
+                if bn_fb is not None:
+                    bn_res = bn_fb
+            if not isinstance(byb_res, tuple):
+                byb_fb = extract_coingecko_perp_venue(cg_rows, "Bybit (Futures)", "BTCUSDT", "BYB")
+                if byb_fb is not None:
+                    byb_res = byb_fb
+
     venues = [x for x in (bn_res, byb_res, okx_res) if isinstance(x, tuple)]
     if venues:
         out["agg_oi_btc"] = round(sum(v[1] for v in venues), 1)

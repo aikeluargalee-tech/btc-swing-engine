@@ -46,29 +46,171 @@ class FourGateEngine:
         self._cache_duration_sec: float = 25.0  # Throttle REST calls to avoid 429
         self._cached_eval: Optional[FourGateEvaluation] = None
 
+    def _fetch_okx_4h_perp_klines(
+        self,
+        spot_klines: List[Any],
+        headers: Dict[str, str],
+        timeout_sec: float,
+    ) -> Optional[List[Any]]:
+        """US geo-block fallback for Binance Perp 4H klines via OKX BTC-USDT-SWAP + rubik taker volume."""
+        if not spot_klines or len(spot_klines) < 2:
+            return None
+        need_count = len(spot_klines)
+        candle_rows: List[Any] = []
+        after: Optional[str] = None
+        for _ in range(9):
+            if len(candle_rows) >= need_count:
+                break
+            url = "https://www.okx.com/api/v5/market/history-candles?instId=BTC-USDT-SWAP&bar=4H&limit=100"
+            if after:
+                url += f"&after={after}"
+            try:
+                req = urllib.request.Request(url, headers=headers)
+                with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+                    if resp.status != 200:
+                        break
+                    payload = json.loads(resp.read().decode("utf-8"))
+                    if str(payload.get("code")) != "0":
+                        break
+                    data = payload.get("data", [])
+            except Exception as exc:
+                logger.warning("Failed fetching OKX Perp 4H candles: %s", exc)
+                break
+            if not data:
+                break
+            candle_rows.extend(data)
+            after = str(data[-1][0])
+            if len(data) < 100:
+                break
+            time.sleep(0.1)
+
+        if not candle_rows:
+            return None
+        row_by_ts: Dict[int, Any] = {int(r[0]): r for r in candle_rows}
+
+        taker_buy: Dict[int, float] = {}
+        end_cursor: Optional[str] = None
+        for _ in range(8):
+            url = (
+                "https://www.okx.com/api/v5/rubik/stat/taker-volume-contract"
+                "?instId=BTC-USDT-SWAP&period=4H&unit=0&limit=100"
+            )
+            if end_cursor:
+                url += f"&end={end_cursor}"
+            try:
+                req = urllib.request.Request(url, headers=headers)
+                with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+                    if resp.status != 200:
+                        break
+                    payload = json.loads(resp.read().decode("utf-8"))
+                    if str(payload.get("code")) != "0":
+                        break
+                    tv = payload.get("data", [])
+            except Exception:
+                break
+            if not tv:
+                break
+            for r in tv:
+                sell_v, buy_v = float(r[1]), float(r[2])
+                if sell_v + buy_v > 0:
+                    taker_buy[int(r[0])] = buy_v / (sell_v + buy_v)
+            next_end = str(tv[-1][0])
+            if len(tv) < 100 or (end_cursor is not None and int(next_end) >= int(end_cursor)):
+                break
+            end_cursor = next_end
+            time.sleep(0.12)
+
+        perp_klines: List[Any] = []
+        for idx, sb in enumerate(spot_klines):
+            ts = int(sb[0])
+            r = row_by_ts.get(ts)
+            if r is None:
+                # Open trailing bar may lag by a moment at 4H boundary; spot_raw[:-1] drops [-1]
+                if idx == len(spot_klines) - 1 and perp_klines:
+                    last_bar = list(perp_klines[-1])
+                    last_bar[0] = ts
+                    last_bar[6] = ts + 14399999
+                    perp_klines.append(last_bar)
+                    continue
+                return None
+            o, h, l, c, v = float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[6])
+            ratio = taker_buy.get(ts)
+            if ratio is not None:
+                tb = v * ratio
+            else:
+                rng = max(h - l, 1e-6)
+                buy_ratio = min(0.95, max(0.05, 0.5 + 0.4 * ((c - o) / rng)))
+                tb = v * buy_ratio
+            perp_klines.append([ts, o, h, l, c, v, ts + 14399999, v * c, 0, tb, 0])
+        return perp_klines if len(perp_klines) == len(spot_klines) else None
+
+    def _fetch_okx_funding_history(
+        self,
+        headers: Dict[str, str],
+        timeout_sec: float,
+    ) -> Optional[List[Dict[str, Any]]]:
+        """US geo-block fallback for Binance funding history via OKX BTC-USDT-SWAP."""
+        rows: List[Dict[str, Any]] = []
+        after: Optional[str] = None
+        for _ in range(6):
+            url = "https://www.okx.com/api/v5/public/funding-rate-history?instId=BTC-USDT-SWAP&limit=100"
+            if after:
+                url += f"&after={after}"
+            try:
+                req = urllib.request.Request(url, headers=headers)
+                with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+                    if resp.status != 200:
+                        break
+                    payload = json.loads(resp.read().decode("utf-8"))
+                    if str(payload.get("code")) != "0":
+                        break
+                    data = payload.get("data", [])
+            except Exception as exc:
+                logger.warning("Failed fetching OKX funding history: %s", exc)
+                break
+            if not data:
+                break
+            rows.extend(data)
+            after = str(data[-1]["fundingTime"])
+            if len(data) < 100:
+                break
+            time.sleep(0.1)
+        if not rows:
+            return None
+        return [
+            {"fundingTime": int(r["fundingTime"]), "fundingRate": float(r["fundingRate"])}
+            for r in reversed(rows)
+        ]
+
     def fetch_primary_feeds(
         self, timeout_sec: float = 6.0
     ) -> Tuple[Optional[List[Any]], Optional[List[Any]], Optional[List[Any]], Optional[float]]:
-        """Pulls the 4 public REST endpoints directly from primary exchanges.
+        """Pulls the 4 public REST endpoints directly from primary exchanges (with US-runner fallbacks).
         
         Returns:
             (spot_klines, perp_klines, funding_prints, dvol_current) or None on failure.
         """
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) BTC-4Gate/1.0"}
+        headers = {"User-Agent": "curl/8.5.0", "Accept": "application/json"}
 
         # 1. Binance Spot 4H Klines (limit=780: 180 warmup + 540 90D eval + 60 forward horizon)
-        spot_url = "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&limit=780"
         spot_klines: Optional[List[Any]] = None
-        try:
-            req = urllib.request.Request(spot_url, headers=headers)
-            with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
-                if resp.status == 200:
-                    spot_klines = json.loads(resp.read().decode("utf-8"))
-        except Exception as exc:
-            logger.warning("Failed fetching Binance Spot 4H: %s", exc)
+        for base in ("https://data-api.binance.vision", "https://api.binance.com"):
+            spot_url = f"{base}/api/v3/klines?symbol=BTCUSDT&interval=4h&limit=780"
+            try:
+                req = urllib.request.Request(spot_url, headers=headers)
+                with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+                    if resp.status == 200:
+                        data = json.loads(resp.read().decode("utf-8"))
+                        if isinstance(data, list) and data:
+                            spot_klines = data
+                            break
+            except Exception as exc:
+                logger.debug("Failed fetching Spot 4H from %s: %s", base, exc)
+        if not spot_klines:
+            logger.warning("Failed fetching Binance Spot 4H across all endpoints.")
             return None, None, None, None
 
-        # 2. Binance USD-M Perp 4H Klines (limit=780)
+        # 2. Binance USD-M Perp 4H Klines (limit=780, OKX BTC-USDT-SWAP fallback on US HTTP 451)
         perp_url = "https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=4h&limit=780"
         perp_klines: Optional[List[Any]] = None
         try:
@@ -77,10 +219,13 @@ class FourGateEngine:
                 if resp.status == 200:
                     perp_klines = json.loads(resp.read().decode("utf-8"))
         except Exception as exc:
-            logger.warning("Failed fetching Binance Perp 4H: %s", exc)
+            logger.debug("Binance Perp 4H unavailable (%s), trying OKX 4H fallback", exc)
+        if not perp_klines:
+            perp_klines = self._fetch_okx_4h_perp_klines(spot_klines, headers, timeout_sec)
+        if not perp_klines:
             return None, None, None, None
 
-        # 3. Binance Perp Funding History (paginated: 500 + 100 to get ~600 prints / 200 days)
+        # 3. Binance Perp Funding History (paginated: 500 + 100, OKX fallback on US HTTP 451)
         fund_url = "https://fapi.binance.com/fapi/v1/fundingRate?symbol=BTCUSDT&limit=500"
         funding_prints: Optional[List[Any]] = None
         try:
@@ -101,7 +246,10 @@ class FourGateEngine:
                         except Exception:
                             pass
         except Exception as exc:
-            logger.warning("Failed fetching Binance Funding Rate: %s", exc)
+            logger.debug("Binance Funding History unavailable (%s), trying OKX fallback", exc)
+        if not funding_prints:
+            funding_prints = self._fetch_okx_funding_history(headers, timeout_sec)
+        if not funding_prints:
             return None, None, None, None
 
         # 4. Deribit BTC DVOL Index Data

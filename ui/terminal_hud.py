@@ -192,6 +192,16 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         if active_tab == 19
         else "[dim white][Q: DIBSE][/dim white]"
     )
+    tX = (
+        "[bold black on bright_yellow] [X: v4.0 FUTURES] [/bold black on bright_yellow]"
+        if active_tab == 20
+        else "[dim white][X: v4.0 FUTURES][/dim white]"
+    )
+    tD = (
+        "[bold black on bright_cyan] [D: DATA] [/bold black on bright_cyan]"
+        if active_tab == 21
+        else "[dim white][D: DATA][/dim white]"
+    )
     t0 = (
         "[bold white on blue] [0: SPOT SWING] [/bold white on blue]"
         if active_tab == 0
@@ -224,6 +234,8 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         17: "17: BTC MAGNET [M]",
         18: "18: TREND-PULLBACK [A]",
         19: "19: DIBSE DUAL-SWING [Q]",
+        20: "20: 4H FUTURES v4.0 [X]",
+        21: "21: UNIFIED DATA HUB [D]",
     }
     if active_tab in subdesk_names:
         subdesk_info = f"  │  [bold black on bright_yellow] [DEEP DIVE {subdesk_names[active_tab]}] [/bold black on bright_yellow]"
@@ -239,14 +251,13 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
     nav_grid.add_column(justify="right", no_wrap=True)
     nav_grid.add_row(
         f"[bold white]BTC-USD[/bold white] | Spot: [bold cyan]${spot_px:,.2f}[/bold cyan] | Regime: {regime_str} ({score_str}) | Feeds: Spot {spot_ws_dot} • Perp {perp_ws_dot} • CB {cb_ws_dot}",
-        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: P Structure • G Grok Flow • R SSRN • M Magnet • A Strategy • Q 4-Gate • F Footprint • W Waterfall • 0 Screener • L Master • C Packet • H Guide[/dim]",
+        f"[bold white]{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}[/bold white]  •  [dim]Keys: P Structure • G Grok • R SSRN • M Magnet • A Strategy • Q DIBSE • X v4.0 • D Data • F Footprint • W Waterfall • 0 Screener • L Master • C Packet • H Guide[/dim]",
     )
 
     tab_grid = Table.grid(expand=True)
-    tab_grid.add_column(justify="left", no_wrap=True)
-    tab_grid.add_row(
-        f"{tP}  {tG}  {tR}  {tM}  {tA}  {tQ}  {tF}  {tW}  {t0}  {tL}  │  {tC}  {tH}{subdesk_info}"
-    )
+    tab_grid.add_column(justify="left")
+    tab_grid.add_row(f"{tP}  {tG}  {tR}  {tM}  {tA}  {tQ}  {tX}  {tD}  {tF}  {tW}")
+    tab_grid.add_row(f"{t0}  {tL}  │  {tC}  {tH}{subdesk_info}")
     nav_panel = Panel(Group(nav_grid, tab_grid), border_style="bright_blue", box=box.ROUNDED, padding=(0, 1))
 
     # --- Panel 2: Dedicated Regional Market Sessions & World Clocks ---
@@ -6017,6 +6028,226 @@ def _build_tab19_four_gate_hud(
     return Group(header_panel, sub_panel, inv_panel, cockpit_grid, study_panel)
 
 
+def _build_tab20_futures_v4_hud(
+    config: EngineConfig,
+    store: StateStore,
+    header_panel: Any,
+) -> Group:
+    """Tab [20 / X]: BTC Short-Term Futures + Inventory Protocol v4.0 (4H Day-Trade Only)."""
+    ev = getattr(store, "futures_v4_evaluation", None)
+    if ev is None:
+        from analytics.futures_v4_engine import FuturesV4Engine
+        ev = FuturesV4Engine(config, read_only=True).evaluate(store)
+
+    sig_col = "green" if ev.futures_status == "LONG" else ("red" if ev.futures_status == "SHORT" else ("magenta" if ev.sell_inventory_active else "yellow"))
+    act_str = " + ".join(ev.active_signals)
+    sub_text = (
+        f"[bold white]PROTOCOL:[/bold white] [cyan]v4.0 4H DAY-TRADE (MAX 1:2 LEV · 4-24h HOLD)[/cyan]  │  "
+        f"[bold white]ACTION:[/bold white] [bold {sig_col}]{act_str}[/bold {sig_col}]  │  "
+        f"[bold white]REGIME:[/bold white] [bold]{ev.regime_score:.1f}/100[/bold] ({ev.regime_bias}, 1D={ev.daily_bias})  │  "
+        f"[bold white]4H CLOSE:[/bold white] [dim]{ev.last_4h_close_utc}[/dim]"
+    )
+    sub_panel = Panel(sub_text, box=box.ROUNDED, border_style="bright_cyan", padding=(0, 1))
+
+    # Row 1: 4H Multi-Factor Regime Breakdown (left) + Sell Inventory Option (right)
+    reg_tbl = Table.grid(expand=True)
+    reg_tbl.add_column(ratio=3)
+    reg_tbl.add_column(ratio=1, justify="right")
+    reg_tbl.add_column(ratio=4)
+    for k, lbl in (
+        ("trend_structure", "1. Trend Structure (30%)"),
+        ("momentum", "2. Momentum 4H (25%)"),
+        ("volatility_liquidity", "3. Vol & Liquidity 4H (25%)"),
+        ("session_context", "4. Session / Context (20%)"),
+    ):
+        sc = ev.factor_scores.get(k, 50.0)
+        sc_c = "green" if sc >= ev.long_threshold else ("red" if sc <= ev.short_threshold else "yellow")
+        reg_tbl.add_row(
+            f"[white]{lbl}[/white]",
+            f"[bold {sc_c}]{sc:5.1f}[/bold {sc_c}]",
+            f"[dim]{ev.factor_summaries.get(k, '—')}[/dim]",
+        )
+    wk_badge = f"[yellow]WEEKEND 80/20 HALF[/yellow]" if ev.is_weekend_utc else f"L≥{ev.long_threshold:.0f} · Flat · S≤{ev.short_threshold:.0f}"
+    reg_panel = Panel(
+        reg_tbl,
+        title=f"[bold bright_white]4H MULTI-FACTOR REGIME ({wk_badge})[/bold bright_white]",
+        box=box.ROUNDED,
+        border_style="blue",
+        padding=(0, 1),
+    )
+
+    inv_tbl = Table.grid(expand=True)
+    inv_tbl.add_column(ratio=2)
+    inv_tbl.add_column(ratio=3, justify="right")
+    inv_badge = "[bold red]SELL INVENTORY ACTIVE[/bold red]" if ev.sell_inventory_active else "[dim]HOLD SPOT INVENTORY[/dim]"
+    inv_tbl.add_row("Spot Action Status", inv_badge)
+    inv_tbl.add_row("Spot Inventory Held", f"{config.futures_v4_spot_inventory_btc:.2f} BTC (0% Futures Heat)")
+    inv_tbl.add_row("Recommended Trim", f"{ev.sell_inventory_pct:.0f}% -> {ev.sell_inventory_btc:.4f} BTC (${ev.sell_inventory_usd:,.0f})")
+    inv_tbl.add_row("4H Structural Ref", f"{ev.sell_inventory_ref}")
+    inv_tbl.add_row("Exempt From", "Futures Checks 3-9 & Halts")
+    inv_panel = Panel(
+        inv_tbl,
+        title="[bold bright_yellow]SELL INVENTORY OPTION (SEC 2 & 6)[/bold bright_yellow]",
+        box=box.ROUNDED,
+        border_style="red" if ev.sell_inventory_active else "dim",
+        padding=(0, 1),
+    )
+
+    top_grid = Table.grid(expand=True)
+    top_grid.add_column(ratio=1)
+    top_grid.add_column(ratio=1)
+    top_grid.add_row(reg_panel, inv_panel)
+
+    # Row 2: 9-Point Futures Checklist (left) + Order Sizing & Hold Rules (right)
+    chk_tbl = Table(box=box.SIMPLE_HEAVY, expand=True, padding=(0, 1))
+    chk_tbl.add_column("#", width=3)
+    chk_tbl.add_column("Qualification Rule")
+    chk_tbl.add_column("St", width=4, justify="center")
+    chk_tbl.add_column("Detail")
+    for item in ev.checklist:
+        st_s = "[bold green]PASS[/bold green]" if item.passed else "[bold red]FAIL[/bold red]"
+        chk_tbl.add_row(str(item.id), item.rule, st_s, f"[dim]{item.detail[:48]}[/dim]")
+    chk_panel = Panel(
+        chk_tbl,
+        title="[bold bright_white]9-POINT FUTURES QUALIFICATION CHECKLIST[/bold bright_white]",
+        box=box.ROUNDED,
+        border_style="bright_blue",
+        padding=(0, 0),
+    )
+
+    prop_tbl = Table.grid(expand=True)
+    prop_tbl.add_column(ratio=2)
+    prop_tbl.add_column(ratio=3, justify="right")
+    prop_tbl.add_row("Eval Dir / Method", f"[bold]{ev.eval_direction}[/bold] ({ev.entry_method})")
+    prop_tbl.add_row("Entry / Hard Stop", f"${ev.entry_price:,.1f} / [red]${ev.stop_price:,.1f}[/red] ({ev.stop_distance_pct:.2f}% ≤ 2.2%)")
+    prop_tbl.add_row("Target 1 (45% @ 1.5R)", f"[green]${ev.target1_price:,.1f}[/green] ({ev.target1_label})")
+    prop_tbl.add_row("Raw / Fund-Adj R:R", f"{ev.raw_rr:.2f}:1 / {ev.funding_adj_rr:.2f}:1 (≥ {config.futures_v4_min_rr:.1f}:1)")
+    prop_tbl.add_row("Risk Sizing / Lev", f"{ev.size_btc:.4f} BTC (${ev.notional_usd:,.0f}, {ev.leverage:.2f}x/2x)")
+    prop_tbl.add_row("Actual Risk", f"{ev.actual_risk_pct:.3f}% (${ev.actual_risk_usd:,.2f})")
+    prop_tbl.add_row("Time / Hold Rules", "BE @ +1R · 8h -50% · 12h Exit (<1R) · 24h Max")
+    if ev.open_positions:
+        op = ev.open_positions[0]
+        prop_tbl.add_row(
+            "[bold cyan]Open Futures Pos[/bold cyan]",
+            f"[bold]{op['direction']}[/bold] {op['size_btc']} BTC ({op['current_r']:+.2f}R, {op['hold_hours']:.1f}h/24h)",
+        )
+    else:
+        prop_tbl.add_row("Open Futures Pos", "[dim]FLAT (0 / 1 Concurrent)[/dim]")
+    prop_panel = Panel(
+        prop_tbl,
+        title="[bold bright_white]PROPOSED SIZING & TRADE MANAGEMENT[/bold bright_white]",
+        box=box.ROUNDED,
+        border_style="green" if ev.futures_status != "FLAT" else "yellow",
+        padding=(0, 1),
+    )
+
+    mid_grid = Table.grid(expand=True)
+    mid_grid.add_column(ratio=6)
+    mid_grid.add_column(ratio=4)
+    mid_grid.add_row(chk_panel, prop_panel)
+
+    # Row 3: 5-Tier Circuit Breakers & Paper Ledger Review
+    b = ev.breakers or {}
+    cb_badges = [
+        f"Intra(-1.2%):{'[red]HALT[/red]' if b.get('intraday_halted') else '[green]OK[/green]'} {ev.intraday_pnl_pct:+.2f}%",
+        f"Day(-2%):{'[red]HALT[/red]' if b.get('daily_halted') else '[green]OK[/green]'} {ev.daily_pnl_pct:+.2f}%",
+        f"Wk(-4%):{'[red]FLAT[/red]' if b.get('weekly_halted') else '[green]OK[/green]'} {ev.weekly_pnl_pct:+.2f}%",
+        f"DD1(-6%):{'[yellow]0.2%/75-25[/yellow]' if b.get('dd_tier1_active') else '[green]OK[/green]'}",
+        f"DD2(-10%):{'[red]LOCKED[/red]' if b.get('dd_tier2_locked') else '[green]OK[/green]'} {ev.drawdown_pct:+.2f}%",
+    ]
+    foot_tbl = Table.grid(expand=True)
+    foot_tbl.add_row(
+        f"[bold]Equity:[/bold] ${ev.equity_usd:,.2f}  │  [bold]Heat:[/bold] {ev.open_heat_pct:.2f}% / {ev.max_heat_pct:.1f}% max  │  "
+        + "  •  ".join(cb_badges)
+    )
+    last_ev = ev.audit_log[0] if ev.audit_log else None
+    audit_str = f"{last_ev['ts']} {last_ev['event']}: {last_ev['detail']}" if last_ev else "No audit events"
+    foot_tbl.add_row(
+        f"[bold]Closed Legs:[/bold] {ev.total_closed_legs} (WR {ev.review_win_rate_pct:.1f}% · PF {ev.review_profit_factor:.2f} · Exp {ev.review_expectancy_r:+.2f}R)  │  [dim]{audit_str}[/dim]"
+    )
+    foot_panel = Panel(
+        foot_tbl,
+        title="[bold bright_white]PAPER LEDGER & 5-TIER CIRCUIT BREAKERS (SEC 8)[/bold bright_white]",
+        box=box.ROUNDED,
+        border_style="magenta",
+        padding=(0, 1),
+    )
+
+    return Group(header_panel, sub_panel, top_grid, mid_grid, foot_panel)
+
+
+def _render_data_hub_panel(title: str, rows: list, border_style: str) -> Panel:
+    """Renders one compact neutral telemetry table inside Tab [21: D]."""
+    tbl = Table(box=box.SIMPLE_HEAD, expand=True, padding=(0, 1), show_edge=False)
+    tbl.add_column("Metric", style="bold white", ratio=3, no_wrap=True)
+    tbl.add_column("Live Value", justify="right", ratio=4, no_wrap=True)
+    tbl.add_column("Tabs", style="dim white", justify="right", ratio=1, no_wrap=True)
+    tbl.add_column("St", justify="center", width=6, no_wrap=True)
+
+    badge_map = {
+        "OK": "[bold black on bright_green] OK [/bold black on bright_green]",
+        "UNAVAILABLE": "[bold white on red] N/A [/bold white on red]",
+        "STALE": "[bold black on bright_yellow] STALE [/bold black on bright_yellow]",
+        "PROXY": "[bold black on bright_yellow] PROXY [/bold black on bright_yellow]",
+        "STATIC": "[bold white on magenta] STATC [/bold white on magenta]",
+    }
+    for r in rows:
+        val_style = "bold bright_cyan" if r.status == "OK" else ("dim red" if r.status == "UNAVAILABLE" else "yellow")
+        tbl.add_row(
+            r.label,
+            f"[{val_style}]{r.value}[/{val_style}]",
+            r.tabs,
+            badge_map.get(r.status, r.status),
+        )
+    return Panel(tbl, title=title, box=box.ROUNDED, border_style=border_style, padding=(0, 1))
+
+
+def _build_tab21_data_hub_hud(
+    config: EngineConfig,
+    store: StateStore,
+    header_panel: Panel,
+) -> Group:
+    """Builds Desk 21 [D: DATA HUB] — Canonical Raw Telemetry & Indicator Matrix across Tabs 0-20."""
+    from analytics.data_hub_engine import DataHubEngine
+
+    ev = getattr(store, "data_hub_evaluation", None)
+    if ev is None:
+        ev = DataHubEngine(config).evaluate(store)
+
+    sub_grid = Table.grid(expand=True)
+    sub_grid.add_column(justify="left", no_wrap=True)
+    sub_grid.add_column(justify="right", no_wrap=True)
+    sub_grid.add_row(
+        f"[bold bright_cyan]UNIFIED DATA HUB | TAB 21 [D] | ZERO-BIAS CROSS-TAB TELEMETRY MATRIX[/bold bright_cyan]  │  "
+        f"[green]OK:{ev.ok_count}[/green] · [red]N/A:{ev.unavailable_count}[/red] · [yellow]STALE:{ev.stale_count}[/yellow] · [magenta]PROXY/STATIC:{ev.proxy_or_static_count}[/magenta] / {ev.total_metrics}",
+        "[bold black on yellow] [PRESS 'D' AGAIN: COPY DATA REPORT TO CLIPBOARD] [/bold black on yellow]",
+    )
+    sub_panel = Panel(sub_grid, box=box.ROUNDED, border_style="bright_cyan", padding=(0, 1))
+
+    p1 = _render_data_hub_panel("[bold bright_cyan]1. PRICE, TREND & MARKET STRUCTURE[/bold bright_cyan]", ev.panel_1_feeds, "bright_cyan")
+    p2 = _render_data_hub_panel("[bold bright_yellow]2. ORDER FLOW, FOOTPRINT & LIQUIDITY[/bold bright_yellow]", ev.panel_2_trend_vol, "bright_yellow")
+    p3 = _render_data_hub_panel("[bold bright_green]3. DERIVATIVES, OPTIONS & LIQUIDATIONS[/bold bright_green]", ev.panel_3_structure_magnets, "bright_green")
+    p4 = _render_data_hub_panel("[bold bright_magenta]4. ON-CHAIN, ETF & STABLECOIN FLOWS[/bold bright_magenta]", ev.panel_4_flow_quant, "bright_magenta")
+    p5 = _render_data_hub_panel("[bold bright_blue]5. MACRO, CREDIT & US LIQUIDITY[/bold bright_blue]", ev.panel_5_derivs_liq, "bright_blue")
+    p6 = _render_data_hub_panel("[bold white]6. QUANT FEATURES, FEED HEALTH & ARCHIVE[/bold white]", ev.panel_6_macro_onchain, "white")
+
+    row1 = Table.grid(expand=True)
+    row1.add_column(ratio=1)
+    row1.add_column(ratio=1)
+    row1.add_row(p1, p2)
+
+    row2 = Table.grid(expand=True)
+    row2.add_column(ratio=1)
+    row2.add_column(ratio=1)
+    row2.add_row(p3, p4)
+
+    row3 = Table.grid(expand=True)
+    row3.add_column(ratio=1)
+    row3.add_column(ratio=1)
+    row3.add_row(p5, p6)
+
+    return Group(header_panel, sub_panel, row1, row2, row3)
+
 
 def build_dashboard_renderable(
     config: EngineConfig,
@@ -6024,12 +6255,16 @@ def build_dashboard_renderable(
     tab_override: Optional[int] = None,
 ) -> Group:
     """Builds the active tab's 5-panel Rich renderable for the live terminal HUD."""
-    valid_tabs = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19)
+    valid_tabs = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)
     if tab_override is not None:
         if isinstance(tab_override, int) and tab_override in valid_tabs:
             active_tab = tab_override
         elif str(tab_override).lower() in ("q", "4gate", "four_gate", "dibse", "19"):
             active_tab = 19
+        elif str(tab_override).lower() in ("x", "futures_v4", "v4", "20"):
+            active_tab = 20
+        elif str(tab_override).lower() in ("d", "data", "data_hub", "telemetry", "21"):
+            active_tab = 21
         elif str(tab_override).lower() in ("g", "grok", "grok_flow", "15"):
             active_tab = 15
         elif str(tab_override).lower() in ("r", "ssrn", "research", "alpha", "16"):
@@ -6072,6 +6307,10 @@ def build_dashboard_renderable(
     if getattr(store, "show_help", False):
         return _build_help_overlay(store, header_panel)
 
+    if active_tab == 21:
+        return _build_tab21_data_hub_hud(config, store, header_panel)
+    if active_tab == 20:
+        return _build_tab20_futures_v4_hud(config, store, header_panel)
     if active_tab == 19:
         return _build_tab19_four_gate_hud(config, store, header_panel)
     if active_tab == 18:
@@ -6144,8 +6383,10 @@ def print_dry_run_report(
             17: "TAB [M: BTC MAGNET · LIQUIDATION GRAVITY DECK]",
             18: "TAB [A: BTC TREND-PULLBACK v1.0 · RESEARCH / PAPER MODE]",
             19: "TAB [Q: DIBSE DUAL-INVENTORY SWING PROTOCOL (SPOT-ONLY)]",
+            20: "TAB [X: 4H FUTURES + INVENTORY PROTOCOL v4.0]",
+            21: "TAB [D: UNIFIED DATA HUB · CANONICAL TELEMETRY MATRIX]",
         }
-        for t in (0, 19, 18, 17, 16, 15, 12, 11, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13):
+        for t in (0, 21, 20, 19, 18, 17, 16, 15, 12, 11, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13):
             title = tab_titles.get(t, f"TAB [{t}]")
             console.print(f"\n[bold cyan]=== VERIFICATION SNAPSHOT: {title} ===[/bold cyan]")
             console.print(build_dashboard_renderable(config, store, tab_override=t))
@@ -6179,6 +6420,10 @@ def print_dry_run_report(
             t_num = 18
         elif tab_lower in ("q", "4gate", "four_gate", "dibse", "19"):
             t_num = 19
+        elif tab_lower in ("x", "futures_v4", "v4", "20"):
+            t_num = 20
+        elif tab_lower in ("d", "data", "data_hub", "telemetry", "21"):
+            t_num = 21
         elif tab_lower in ("p", "structure", "slsp", "pa", "13"):
             t_num = 13
         else:
@@ -6186,9 +6431,9 @@ def print_dry_run_report(
                 t_num = int(tab_arg)
             except ValueError:
                 t_num = 0
-        store.active_tab = t_num if t_num in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19) else 0
+        store.active_tab = t_num if t_num in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21) else 0
         console.print(build_dashboard_renderable(config, store, tab_override=store.active_tab))
-        if store.active_tab in (0, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19):
+        if store.active_tab in (0, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21):
             try:
                 from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
                 copy_tab_data_only_report_to_clipboard(store.active_tab, config, store)
@@ -6241,20 +6486,22 @@ def _poll_keyboard_tab_switch(
                         store.last_packet_copied_ts = time.time()
                         store.last_packet_char_count = char_count
                         changed = True
-                elif ch in ("q", "Q"):
+                elif ch in ("x", "X"):
                     store.show_help = False
-                    if store.active_tab != 19:
-                        store.active_tab = 19
-                        changed = True
-                    else:
-                        from analytics.four_gate_engine import copy_four_gate_to_clipboard
-                        ok, msg, char_count = copy_four_gate_to_clipboard(store)
-                        store.last_packet_copied_utc = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
-                        store.last_packet_copied_ts = time.time()
-                        store.last_packet_char_count = char_count
+                    if store.active_tab != 20:
+                        store.active_tab = 20
                         changed = True
                     rlist, _, _ = select.select([sys.stdin], [], [], 0.0)
                     continue
+                elif ch in ("d", "D"):
+                    store.show_help = False
+                    if store.active_tab != 21:
+                        store.active_tab = 21
+                        changed = True
+                    else:
+                        from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
+                        copy_tab_data_only_report_to_clipboard(21, config, store)
+                        changed = True
                 elif ch in ("p", "P"):
                     store.show_help = False
                     if store.active_tab != 13:
@@ -6405,6 +6652,22 @@ def _poll_keyboard_tab_switch(
                         changed = True
                     rlist, _, _ = select.select([sys.stdin], [], [], 0.0)
                     continue
+                elif ch in ("x", "X"):
+                    store.show_help = False
+                    if store.active_tab != 20:
+                        store.active_tab = 20
+                        changed = True
+                    rlist, _, _ = select.select([sys.stdin], [], [], 0.0)
+                    continue
+                elif ch in ("d", "D"):
+                    store.show_help = False
+                    if store.active_tab != 21:
+                        store.active_tab = 21
+                        changed = True
+                    else:
+                        from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
+                        copy_tab_data_only_report_to_clipboard(21, config, store)
+                        changed = True
                 elif ch in ("p", "P"):
                     store.show_help = False
                     if store.active_tab != 13:

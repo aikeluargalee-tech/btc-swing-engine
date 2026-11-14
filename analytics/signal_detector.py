@@ -42,6 +42,8 @@ from .grok_quant_engine import GrokQuantEngine
 from .ssrn_research_engine import SSRNResearchEngine
 from .btc_magnet_engine import BTCMagnetEngine
 from .four_gate_engine import FourGateEngine
+from .futures_v4_engine import FuturesV4Engine
+from .data_hub_engine import DataHubEngine
 from .strategy_trend_pullback import TrendPullbackEngine
 from .trap_engine import TrapEngine
 from .exhaustion_engine import ExhaustionEngine
@@ -70,6 +72,8 @@ class SignalDetector:
         self.btc_magnet_engine = BTCMagnetEngine(config)
         self.trend_pullback_engine = TrendPullbackEngine(config)
         self.four_gate_engine = FourGateEngine(config)
+        self.futures_v4_engine = FuturesV4Engine(config, read_only=True)
+        self.data_hub_engine = DataHubEngine(config)
         # Side-effect free by default (no state writes / alerts). Only the live HUD opts in via set_read_only(False).
         self.spot_swing_engine = SpotSwingEngine(config, read_only=True)
         fsm_db_path = os.path.join(
@@ -406,6 +410,12 @@ class SignalDetector:
             self.four_gate_engine.evaluate(store)
         except Exception:
             logging.getLogger("four_gate").exception("4-Gate Protocol evaluation failed")
+
+        # 2m. Evaluate Tab [20: X]: BTC SHORT-TERM FUTURES + INVENTORY PROTOCOL v4.0
+        try:
+            self.futures_v4_engine.evaluate(store)
+        except Exception:
+            logging.getLogger("futures_v4").exception("Futures Protocol v4.0 evaluation failed")
 
         c_vah = active_vp.c_vah
         c_poc = active_vp.c_poc
@@ -892,6 +902,10 @@ class SignalDetector:
                 deriv=deriv,
             )
         self._maybe_log_signal(evaluation, flow, deriv)
+        try:
+            self.data_hub_engine.evaluate(store)
+        except Exception:
+            logging.getLogger("data_hub").exception("Unified Data Hub evaluation failed")
         return evaluation
 
     def _maybe_log_signal(

@@ -264,7 +264,10 @@ class MasterSynthesisEvaluator:
         fp = getattr(store, "footprint_evaluation", None)
         if fp is not None:
             fp_sig = str(getattr(fp, "signal_state", None) or getattr(fp, "verdict", "OBSERVING")).upper()
-            fp_delta = float(getattr(fp, "current_bar_delta", 0.0) or 0.0)
+            raw_fp_delta = getattr(fp, "active_bar_delta", None)
+            if raw_fp_delta is None:
+                raw_fp_delta = getattr(fp, "current_bar_delta", 0.0)
+            fp_delta = float(raw_fp_delta or 0.0)
             if "BUY" in fp_sig or "LONG" in fp_sig or "TRIGGER" in fp_sig:
                 f_light = "GREEN"
             elif "VETO" in fp_sig or "LOCKED" in fp_sig:

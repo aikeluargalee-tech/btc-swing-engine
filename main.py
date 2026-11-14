@@ -79,6 +79,10 @@ async def _run_engine(
         store.active_tab = 18
     elif tab_arg.lower() in ("q", "four_gate", "4gate", "dibse", "19"):
         store.active_tab = 19  # Tab [Q: DIBSE]
+    elif tab_arg.lower() in ("x", "futures_v4", "v4", "20"):
+        store.active_tab = 20  # Tab [X: 4H FUTURES v4.0]
+    elif tab_arg.lower() in ("d", "data", "data_hub", "telemetry", "21"):
+        store.active_tab = 21  # Tab [D: UNIFIED DATA HUB]
     elif tab_arg.lower() in ("s4", "t", "trap", "sfp"):
         store.active_tab = 8
     elif tab_arg.lower() in ("s5", "e", "exhaust", "td"):
@@ -88,6 +92,7 @@ async def _run_engine(
     detector = SignalDetector(config)
     # Tab [0] persists trade state and fires alerts only in the live HUD; --dry-run stays side-effect free.
     detector.spot_swing_engine.set_read_only(dry_run)
+    detector.futures_v4_engine.set_read_only(dry_run)
 
     console.print(
         "[bold cyan][1/3] Running Zero-Cold-Start Historical Backfill "
@@ -165,7 +170,7 @@ def parse_args() -> argparse.Namespace:
         "--tab",
         type=str,
         default="0",
-        choices=["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "m", "M", "l", "L", "f", "F", "footprint", "11", "w", "W", "waterfall", "12", "s0", "S0", "s1", "S1", "s2", "S2", "s3", "S3", "s4", "S4", "s5", "S5", "s", "S", "v", "V", "g", "G", "t", "T", "e", "E", "p", "P", "13", "structure", "slsp", "15", "grok", "16", "r", "R", "ssrn", "research", "17", "magnet", "18", "a", "A", "k", "K", "strategy", "trend_pullback", "btc_strategy", "19", "q", "Q", "four_gate", "4gate", "dibse", "DIBSE", "all"],
+        choices=["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "m", "M", "l", "L", "f", "F", "footprint", "11", "w", "W", "waterfall", "12", "s0", "S0", "s1", "S1", "s2", "S2", "s3", "S3", "s4", "S4", "s5", "S5", "s", "S", "v", "V", "g", "G", "t", "T", "e", "E", "p", "P", "13", "structure", "slsp", "15", "grok", "16", "r", "R", "ssrn", "research", "17", "magnet", "18", "a", "A", "k", "K", "strategy", "trend_pullback", "btc_strategy", "19", "q", "Q", "four_gate", "4gate", "dibse", "DIBSE", "20", "x", "X", "futures_v4", "v4", "21", "d", "D", "data", "data_hub", "telemetry", "all"],
         help="Initial active HUD tab (0=BTC Spot Swing Screener, W=Waterfall, F=Footprint, L/m=Master, 1=Swing Engine, 2=Protocol v1.3, 3=Macro Radar, 4=Regime Matrix A-J, 5/s=MM-BTC, 6/v=72H Cone, 7/g=Gartley, 8/t=SFP Trap, 9/e=Terminal Exhaustion, P/13=Structure & SLSP, or 'all').",
     )
     parser.add_argument(

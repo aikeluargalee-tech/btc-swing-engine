@@ -46,9 +46,9 @@ class StateStore:
 
         # --- Historical + Developing Kline Ring Buffers ---
         self.spot_klines_1w: Deque[KlineBar] = deque(maxlen=120)
-        self.spot_klines_1d: Deque[KlineBar] = deque(maxlen=300)
-        self.perp_klines_1d: Deque[KlineBar] = deque(maxlen=300)
-        self.spot_klines_4h: Deque[KlineBar] = deque(maxlen=300)
+        self.spot_klines_1d: Deque[KlineBar] = deque(maxlen=600)
+        self.perp_klines_1d: Deque[KlineBar] = deque(maxlen=600)
+        self.spot_klines_4h: Deque[KlineBar] = deque(maxlen=600)
         self.spot_klines_1h: Deque[KlineBar] = deque(maxlen=800)
         self.perp_klines_1h: Deque[KlineBar] = deque(maxlen=800)
         self.spot_klines_15m: Deque[KlineBar] = deque(maxlen=400)
@@ -138,6 +138,8 @@ class StateStore:
 
         # --- Connection & System Health ---
         self.warmup_complete: bool = False
+        self.futures_v4_evaluation: Optional[Any] = None
+        self.data_hub_evaluation: Optional[Any] = None
         self.spot_ws_connected: bool = False
         self.perp_ws_connected: bool = False
         self.coinbase_ws_connected: bool = False

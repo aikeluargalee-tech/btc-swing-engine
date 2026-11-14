@@ -180,6 +180,7 @@ async def poll_rest_metrics(config: EngineConfig, store: StateStore) -> None:
                     (
                         spot_1w,
                         spot_1d,
+                        spot_4h,
                         perp_1d,
                         spot_1h,
                         perp_1h,
@@ -191,6 +192,9 @@ async def poll_rest_metrics(config: EngineConfig, store: StateStore) -> None:
                         ),
                         fetch_binance_spot_klines(
                             session, config, interval="1d", limit=config.daily_kline_limit
+                        ),
+                        fetch_binance_spot_klines(
+                            session, config, interval="4h", limit=getattr(config, "four_hour_kline_limit", 500)
                         ),
                         fetch_binance_perp_klines(
                             session, config, interval="1d", limit=config.daily_kline_limit
@@ -208,6 +212,8 @@ async def poll_rest_metrics(config: EngineConfig, store: StateStore) -> None:
                         await store.set_klines("spot", "1w", spot_1w)
                     if spot_1d:
                         await store.set_klines("spot", "1d", spot_1d)
+                    if spot_4h:
+                        await store.set_klines("spot", "4h", spot_4h)
                     if perp_1d:
                         await store.set_klines("perp", "1d", perp_1d)
                     if spot_1h:

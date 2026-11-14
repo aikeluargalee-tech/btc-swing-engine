@@ -17,7 +17,7 @@ import pathlib
 import re
 import subprocess
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from config.settings import DEFAULT_CONFIG, EngineConfig
 from core.state_store import StateStore
@@ -76,8 +76,8 @@ def build_tab_p_data_only_report(config: Optional[EngineConfig], store: StateSto
     slsp = getattr(store, "slsp_evaluation", None)
     if slsp is None:
         from analytics.slsp_engine import SLSPEngine
-        spot_1d = getattr(store, "spot_klines_1d", []) or []
-        bars_4h = getattr(store, "spot_klines_4h", []) or []
+        spot_1d = list(getattr(store, "spot_klines_1d", []) or [])
+        bars_4h = list(getattr(store, "spot_klines_4h", []) or [])
         slsp = SLSPEngine(cfg).evaluate(store, spot_1d, bars_4h, current_price=spot_px)
     ema_snap = getattr(store, "ema_strategy", None)
     liq_rep = getattr(slsp, "liq_detector_report", None) if slsp else getattr(store, "liquidation_report", None)
@@ -937,6 +937,44 @@ def copy_text_to_clipboard_and_log(
     return copied_ok, str(log_path), char_count
 
 
+def build_tab_d_data_only_report(
+    config: Optional[EngineConfig],
+    store: StateStore,
+) -> str:
+    """Builds the pure DATA-ONLY consolidated telemetry report for Tab [21: D]."""
+    from analytics.data_hub_engine import DataHubEngine
+
+    cfg = config or DEFAULT_CONFIG
+    ev = getattr(store, "data_hub_evaluation", None) or DataHubEngine(cfg).evaluate(store)
+    utc_str, myt_str = _timestamps_utc_myt()
+
+    lines: List[str] = [
+        "# TAB [D: DATA HUB] | CONSOLIDATED DATA-ONLY TELEMETRY REPORT",
+        f"**Retrieval Time (UTC):** `{utc_str}`  |  **Retrieval Time (MYT):** `{myt_str}`",
+        f"**Spot Price (BTCUSDT):** `${ev.spot_price:,.2f}`  |  "
+        f"**Coverage:** `OK={ev.ok_count}/{ev.total_metrics} | UNAVAILABLE={ev.unavailable_count} | STALE={ev.stale_count} | PROXY/STATIC={ev.proxy_or_static_count}`",
+        f"**Archive (SQLite):** `{ev.archive_snapshots_count} closed-4H snapshots (Last: {ev.archive_last_bar_utc or 'N/A'})`",
+        "",
+    ]
+    sections = (
+        ("1. PRICE, TREND & MARKET STRUCTURE", ev.panel_1_feeds),
+        ("2. ORDER FLOW, FOOTPRINT & LIQUIDITY", ev.panel_2_trend_vol),
+        ("3. DERIVATIVES, OPTIONS & LIQUIDATIONS", ev.panel_3_structure_magnets),
+        ("4. ON-CHAIN, ETF & STABLECOIN FLOWS", ev.panel_4_flow_quant),
+        ("5. MACRO, CREDIT & US LIQUIDITY", ev.panel_5_derivs_liq),
+        ("6. QUANT FEATURES, FEED HEALTH & ARCHIVE", ev.panel_6_macro_onchain),
+    )
+    for title, rows in sections:
+        lines.append(f"## {title}")
+        lines.append("| Metric | Value | Source Tabs | Status |")
+        lines.append("|---|---|---|---|")
+        for r in rows:
+            lines.append(f"| {r.label} | `{r.value}` | `{r.tabs}` | `{r.status}` |")
+        lines.append("")
+
+    return sanitize_data_only_text("\n".join(lines))
+
+
 def copy_tab_data_only_report_to_clipboard(
     tab_id: int,
     config: Optional[EngineConfig],
@@ -944,21 +982,22 @@ def copy_tab_data_only_report_to_clipboard(
 ) -> Tuple[bool, str, int]:
     """Builds and copies the DATA-ONLY report for the given primary tab ID."""
     cfg = config or DEFAULT_CONFIG
-    dispatch: Dict[int, Tuple[str, str]] = {
-        13: (build_tab_p_data_only_report(cfg, store), "btc_structure_latest.md"),
-        15: (build_tab_g_data_only_report(cfg, store), "grok_master_prompt_latest.md"),
-        16: (build_tab_r_data_only_report(cfg, store), "ssrn_research_brief_latest.md"),
-        17: (build_tab_m_data_only_report(cfg, store), "btc_magnet_latest.md"),
-        18: (build_tab_a_data_only_report(cfg, store), "btc_trend_pullback_latest.md"),
-        19: (build_tab_q_data_only_report(cfg, store), "btc_four_gate_latest.md"),
-        11: (build_tab_f_data_only_report(cfg, store), "btc_footprint_latest.md"),
-        12: (build_tab_w_data_only_report(cfg, store), "btc_waterfall_latest.md"),
-        0: (build_tab_0_data_only_report(cfg, store), "btc_spot_swing_latest.md"),
-        10: (build_tab_l_data_only_report(cfg, store), "btc_master_latest.md"),
+    dispatch: Dict[int, Tuple[Callable[[Optional[EngineConfig], StateStore], str], str]] = {
+        13: (build_tab_p_data_only_report, "btc_structure_latest.md"),
+        15: (build_tab_g_data_only_report, "grok_master_prompt_latest.md"),
+        16: (build_tab_r_data_only_report, "ssrn_research_brief_latest.md"),
+        17: (build_tab_m_data_only_report, "btc_magnet_latest.md"),
+        18: (build_tab_a_data_only_report, "btc_trend_pullback_latest.md"),
+        19: (build_tab_q_data_only_report, "btc_four_gate_latest.md"),
+        11: (build_tab_f_data_only_report, "btc_footprint_latest.md"),
+        12: (build_tab_w_data_only_report, "btc_waterfall_latest.md"),
+        0: (build_tab_0_data_only_report, "btc_spot_swing_latest.md"),
+        10: (build_tab_l_data_only_report, "btc_master_latest.md"),
+        21: (build_tab_d_data_only_report, "btc_data_hub_latest.md"),
     }
     if tab_id not in dispatch:
         text = build_global_data_only_packet(cfg, store)
         return copy_text_to_clipboard_and_log(text, "latest_ai_data_packet.md", store, also_write_root_and_downloads=True)
 
-    text, filename = dispatch[tab_id]
-    return copy_text_to_clipboard_and_log(text, filename, store)
+    builder, filename = dispatch[tab_id]
+    return copy_text_to_clipboard_and_log(builder(cfg, store), filename, store)

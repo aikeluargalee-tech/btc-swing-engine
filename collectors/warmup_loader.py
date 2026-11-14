@@ -124,7 +124,21 @@ async def fetch_initial_oi_and_funding(
     """Backfills 4H Open Interest history, current Open Interest, and Funding Rate."""
     base_url = config.binance_perp_rest_urls[0]
     try:
-        # 1. Historical 15m Open Interest for immediate 15m/1H/4H delta calculation
+        # 1. Current Funding Rate & Mark Price (first, so record_oi_sample computes USD OI accurately)
+        prem_url = f"{base_url}/fapi/v1/premiumIndex"
+        async with session.get(
+            prem_url,
+            params={"symbol": config.binance_symbol},
+            timeout=aiohttp.ClientTimeout(total=8),
+        ) as resp:
+            if resp.status == 200:
+                prem_data = await resp.json()
+                store.funding_rate_pct = float(prem_data.get("lastFundingRate", 0.0)) * 100.0
+                mark_p = float(prem_data.get("markPrice", 0.0))
+                if mark_p > 0 and store.binance_perp_price == 0.0:
+                    store.binance_perp_price = mark_p
+
+        # 2. Historical 15m Open Interest for immediate 15m/1H/4H delta calculation
         hist_url = f"{base_url}/futures/data/openInterestHist"
         async with session.get(
             hist_url,
@@ -140,7 +154,7 @@ async def fetch_initial_oi_and_funding(
                         if oi_btc > 0:
                             store.record_oi_sample(oi_btc, ts_sec=ts_sec)
 
-        # 2. Live Current Open Interest
+        # 3. Live Current Open Interest
         oi_url = f"{base_url}/fapi/v1/openInterest"
         async with session.get(
             oi_url,
@@ -153,20 +167,6 @@ async def fetch_initial_oi_and_funding(
                 if oi_btc > 0:
                     store.record_oi_sample(oi_btc)
                     store.perp_source = "Binance USD-M"
-
-        # 3. Current Funding Rate & Mark Price
-        prem_url = f"{base_url}/fapi/v1/premiumIndex"
-        async with session.get(
-            prem_url,
-            params={"symbol": config.binance_symbol},
-            timeout=aiohttp.ClientTimeout(total=8),
-        ) as resp:
-            if resp.status == 200:
-                prem_data = await resp.json()
-                store.funding_rate_pct = float(prem_data.get("lastFundingRate", 0.0)) * 100.0
-                mark_p = float(prem_data.get("markPrice", 0.0))
-                if mark_p > 0 and store.binance_perp_price == 0.0:
-                    store.binance_perp_price = mark_p
 
         # 4. 5m Taker Long/Short Volume Ratio
         taker_url = f"{base_url}/futures/data/takerlongshortRatio"
@@ -277,18 +277,32 @@ async def fetch_okx_perp_klines(
     taker_buy: dict = {}
     period = _OKX_TAKER_PERIOD.get(interval)
     if period:
-        tv = await _okx_get(
-            session,
-            config,
-            "/api/v5/rubik/stat/taker-volume-contract",
-            {"instId": config.okx_perp_inst_id, "period": period, "unit": "0", "limit": "100"},
-        )
-        for r in tv or []:
-            # [ts, sellVol, buyVol] in BTC -> measured buy share (rubik totals != candle volCcy,
-            # so apply the measured buy/sell ratio to candle volume instead of raw buyVol)
-            sell_v, buy_v = float(r[1]), float(r[2])
-            if sell_v + buy_v > 0:
-                taker_buy[int(r[0])] = buy_v / (sell_v + buy_v)
+        target_tv = min(limit, 800)
+        end_cursor: Optional[str] = None
+        for _ in range(8):
+            if len(taker_buy) >= target_tv:
+                break
+            tv_params = {"instId": config.okx_perp_inst_id, "period": period, "unit": "0", "limit": "100"}
+            if end_cursor:
+                tv_params["end"] = end_cursor
+            tv = await _okx_get(
+                session,
+                config,
+                "/api/v5/rubik/stat/taker-volume-contract",
+                tv_params,
+            )
+            if not tv:
+                break
+            for r in tv:
+                # [ts, sellVol, buyVol] in BTC -> measured buy share (rubik totals != candle volCcy,
+                # so apply the measured buy/sell ratio to candle volume instead of raw buyVol)
+                sell_v, buy_v = float(r[1]), float(r[2])
+                if sell_v + buy_v > 0:
+                    taker_buy[int(r[0])] = buy_v / (sell_v + buy_v)
+            next_end = str(tv[-1][0])
+            if len(tv) < 100 or (end_cursor is not None and int(next_end) >= int(end_cursor)):
+                break
+            end_cursor = next_end
 
     bars: List[KlineBar] = []
     for row in reversed(rows):  # oldest first
@@ -421,7 +435,7 @@ async def run_initial_warmup(config: EngineConfig, store: StateStore) -> None:
             session, config, interval="1d", limit=config.daily_kline_limit
         )
         spot_4h_task = fetch_binance_spot_klines(
-            session, config, interval="4h", limit=300
+            session, config, interval="4h", limit=getattr(config, "four_hour_kline_limit", 500)
         )
         perp_1d_task = fetch_binance_perp_klines(
             session, config, interval="1d", limit=config.daily_kline_limit
@@ -470,6 +484,12 @@ async def run_initial_warmup(config: EngineConfig, store: StateStore) -> None:
         await store.set_klines("perp", "1h", perp_1h)
         await store.set_klines("spot", "15m", spot_15m)
         await store.set_klines("perp", "15m", perp_15m)
+
+        # Ensure open_interest_usd is populated once spot/perp reference prices are known
+        if store.open_interest_btc > 0 and store.open_interest_usd <= 0:
+            ref_px = store.binance_perp_price or store.binance_spot_price
+            if ref_px > 0:
+                store.open_interest_usd = store.open_interest_btc * ref_px
 
         # Warm up Coinbase price & historical CPI basis Z-score
         await fetch_initial_coinbase_basis(session, config, store)

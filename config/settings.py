@@ -195,9 +195,11 @@ class EngineConfig:
 
     # --- Protocol v1.3 & Macro Cycle Radar Parameters ---
 
-    daily_kline_limit: int = 255              # 255x 1D candles for 200D SMA + 5D slope + 14D RSI
+    daily_kline_limit: int = 500              # 500x 1D candles (~1.4y) for 200D SMA + 20D slope + 180D BBW rank + 60D corr
 
-    weekly_kline_limit: int = 60              # 60x 1W candles for Weekly structure & Cycle High
+    weekly_kline_limit: int = 100             # 100x 1W candles (~2y) for 1W EMA50 warmup & Cycle High
+
+    four_hour_kline_limit: int = 500          # 500x 4H candles (~83d) to eliminate recursive seed drift on 4H EMA 200
 
     protocol_oi_high_threshold_btc: float = 90_000.0  # Protocol v1.3 8A OI threshold in strict BTC
 
@@ -310,6 +312,42 @@ class EngineConfig:
 
 
 
+
+    # --- Tab [20: X] BTC Short-Term Futures + Inventory Protocol v4.0 ---
+    futures_v4_equity_usd: float = 100000.0
+    futures_v4_spot_inventory_btc: float = 2.0
+    futures_v4_max_leverage: float = 2.0
+    futures_v4_risk_per_trade_pct: float = 0.004
+    futures_v4_max_heat_pct: float = 0.015
+    futures_v4_max_concurrent: int = 1
+    futures_v4_max_stop_pct: float = 0.022
+    futures_v4_min_rr: float = 1.6
+    futures_v4_macro_blackout_min: float = 60.0
+    futures_v4_long_threshold: float = 68.0
+    futures_v4_short_threshold: float = 32.0
+    futures_v4_weekend_long: float = 80.0
+    futures_v4_weekend_short: float = 20.0
+    futures_v4_weekend_size_mult: float = 0.5
+    futures_v4_sell_inv_default_pct: float = 0.20
+    futures_v4_sell_inv_min_pct: float = 0.15
+    futures_v4_sell_inv_max_pct: float = 0.25
+    futures_v4_be_r: float = 1.0
+    futures_v4_partial_r: float = 1.5
+    futures_v4_partial_pct: float = 0.45
+    futures_v4_time_reduce_hours: float = 8.0
+    futures_v4_time_exit_hours: float = 12.0
+    futures_v4_max_hold_hours: float = 24.0
+    futures_v4_intraday_loss_pct: float = -0.012
+    futures_v4_daily_loss_pct: float = -0.020
+    futures_v4_weekly_loss_pct: float = -0.040
+    futures_v4_dd_tier1_pct: float = -0.060
+    futures_v4_dd_tier1_risk_pct: float = 0.002
+    futures_v4_dd_tier1_long: float = 75.0
+    futures_v4_dd_tier1_short: float = 25.0
+    futures_v4_dd_tier2_pct: float = -0.100
+    futures_v4_ledger_path: Path = field(
+        default_factory=lambda: BASE_DIR / "data" / "futures_v4_ledger.json"
+    )
 
     # --- Logging ---
 

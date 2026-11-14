@@ -1,0 +1,41 @@
+{
+  "protocol_version": "4.0",
+  "initial_equity": 100000.0,
+  "realized_equity": 100000.0,
+  "equity": 100000.0,
+  "high_water_mark": 100000.0,
+  "drawdown_pct": 0.0,
+  "spot_inventory_btc": 2.0,
+  "day_key": "2026-11-14",
+  "day_start_equity": 100000.0,
+  "intraday_peak_equity": 100000.0,
+  "week_key": "2026-W46",
+  "week_start_equity": 100000.0,
+  "breakers": {
+    "intraday_halted": false,
+    "daily_halted": false,
+    "weekly_halted": false,
+    "dd_tier1_active": false,
+    "dd_tier2_locked": false
+  },
+  "last_sell_inventory_4h_ts": 1794657600000.0,
+  "open_positions": [],
+  "closed_trades": [],
+  "audit_log": [
+    {
+      "ts": "2026-11-14T11:20:08Z",
+      "event": "LEDGER_INIT_V4",
+      "detail": "Initialized v4.0 paper ledger $100,000.00 / 2.00 BTC spot"
+    },
+    {
+      "ts": "2026-11-14T11:20:21Z",
+      "event": "SELL_INVENTORY_SIGNAL",
+      "detail": "Reduce 20% spot (0.4000 BTC \u2248 $26,922) @ Prior 4H High @ $67,523.1"
+    },
+    {
+      "ts": "2026-11-14T14:17:47Z",
+      "event": "SELL_INVENTORY_SIGNAL",
+      "detail": "Reduce 20% spot (0.4000 BTC \u2248 $26,607) @ Prior 1D Low @ $66,268.3"
+    }
+  ]
+}

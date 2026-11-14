@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import pathlib
+import socket
 import sqlite3
 import sys
 from datetime import datetime, timedelta, timezone
@@ -614,6 +615,39 @@ def build_telegram_messages(
     return messages
 
 
+async def _post_telegram_with_retry(
+    request_factory: Any,
+    step_label: str,
+    attempts: int = 3,
+) -> None:
+    """Executes a Telegram Bot API POST with backoff retries on transient timeouts/errors."""
+    last_exc: Optional[BaseException] = None
+    for attempt in range(1, attempts + 1):
+        try:
+            async with request_factory() as resp:
+                if resp.status == 200:
+                    return
+                err_body = await resp.text()
+                if resp.status not in (429, 500, 502, 503, 504):
+                    raise RuntimeError(f"Telegram {step_label} failed ({resp.status}): {err_body}")
+                last_exc = RuntimeError(f"Telegram {step_label} failed ({resp.status}): {err_body}")
+        except (asyncio.TimeoutError, aiohttp.ClientError) as exc:
+            last_exc = exc
+        if attempt < attempts:
+            delay = 1.5 * attempt
+            logger.warning(
+                "Telegram %s attempt %d/%d failed (%s); retrying in %.1fs...",
+                step_label,
+                attempt,
+                attempts,
+                last_exc,
+                delay,
+            )
+            await asyncio.sleep(delay)
+    if last_exc is not None:
+        raise last_exc
+
+
 async def send_dd_to_telegram(
     token: str,
     chat_id: str,
@@ -627,43 +661,51 @@ async def send_dd_to_telegram(
     """Delivers split Tab D summary messages + `btc_data_hub_latest.md` attachment via Telegram Bot API."""
     base_api = f"https://api.telegram.org/bot{token}"
     messages = build_telegram_messages(ev, utc_str, myt_str, pages_url, repo_url)
+    timeout = aiohttp.ClientTimeout(total=20, connect=8, sock_connect=8, sock_read=15)
+    # Force IPv4 & single-use connections so Azure/GitHub Ubuntu runners avoid IPv6 hang on api.telegram.org
+    connector = aiohttp.TCPConnector(family=socket.AF_INET, force_close=True)
+    md_bytes = md_path.read_bytes()
+    caption = (
+        f"BTC Tab [D: DATA HUB] | Spot ${ev.spot_price:,.2f} | OK={ev.ok_count}/{ev.total_metrics} | {utc_str}"
+    )
 
-    async with aiohttp.ClientSession() as session:
-        for i, text in enumerate(messages, 1):
-            async with session.post(
-                f"{base_api}/sendMessage",
-                json={
-                    "chat_id": chat_id,
-                    "text": text,
-                    "parse_mode": "HTML",
-                    "disable_web_page_preview": True,
-                },
-                timeout=aiohttp.ClientTimeout(total=15),
-            ) as resp:
-                if resp.status != 200:
-                    err_body = await resp.text()
-                    raise RuntimeError(f"Telegram sendMessage part {i} failed ({resp.status}): {err_body}")
+    try:
+        async with aiohttp.ClientSession(connector=connector) as session:
+            for i, text in enumerate(messages, 1):
+                await _post_telegram_with_retry(
+                    lambda t=text: session.post(
+                        f"{base_api}/sendMessage",
+                        json={
+                            "chat_id": chat_id,
+                            "text": t,
+                            "parse_mode": "HTML",
+                            "disable_web_page_preview": True,
+                        },
+                        timeout=timeout,
+                    ),
+                    step_label=f"sendMessage part {i}",
+                )
 
-        form = aiohttp.FormData()
-        form.add_field("chat_id", chat_id)
-        form.add_field(
-            "caption",
-            f"BTC Tab [D: DATA HUB] | Spot ${ev.spot_price:,.2f} | OK={ev.ok_count}/{ev.total_metrics} | {utc_str}",
-        )
-        form.add_field(
-            "document",
-            md_path.read_bytes(),
-            filename=md_path.name,
-            content_type="text/markdown",
-        )
-        async with session.post(
-            f"{base_api}/sendDocument",
-            data=form,
-            timeout=aiohttp.ClientTimeout(total=20),
-        ) as resp:
-            if resp.status != 200:
-                err_body = await resp.text()
-                raise RuntimeError(f"Telegram sendDocument failed ({resp.status}): {err_body}")
+            def _build_document_post() -> Any:
+                form = aiohttp.FormData()
+                form.add_field("chat_id", chat_id)
+                form.add_field("caption", caption)
+                form.add_field(
+                    "document",
+                    md_bytes,
+                    filename=md_path.name,
+                    content_type="text/markdown",
+                )
+                return session.post(
+                    f"{base_api}/sendDocument",
+                    data=form,
+                    timeout=timeout,
+                )
+
+            await _post_telegram_with_retry(_build_document_post, step_label="sendDocument")
+    finally:
+        if not connector.closed:
+            await connector.close()
 
 
 def write_dashboard_artifacts(
@@ -759,17 +801,23 @@ async def run_publisher(
         if not token or not chat_id:
             logger.info("Telegram skipped (no TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID configured)")
         else:
-            await send_dd_to_telegram(
-                token=token,
-                chat_id=chat_id,
-                ev=ev,
-                md_path=paths["md"],
-                utc_str=utc_str,
-                myt_str=myt_str,
-                pages_url=pages_url,
-                repo_url=repo_url,
-            )
-            logger.info("Delivered Tab [D] messages and %s to Telegram.", paths["md"].name)
+            try:
+                await send_dd_to_telegram(
+                    token=token,
+                    chat_id=chat_id,
+                    ev=ev,
+                    md_path=paths["md"],
+                    utc_str=utc_str,
+                    myt_str=myt_str,
+                    pages_url=pages_url,
+                    repo_url=repo_url,
+                )
+                logger.info("Delivered Tab [D] messages and %s to Telegram.", paths["md"].name)
+            except Exception as exc:
+                logger.warning(
+                    "Telegram delivery failed after retries (%s); GitHub Pages artifacts preserved.",
+                    exc,
+                )
     else:
         logger.info("Telegram skipped (no TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID configured)")
 

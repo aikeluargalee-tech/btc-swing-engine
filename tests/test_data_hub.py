@@ -310,6 +310,7 @@ class TestDataHub(unittest.TestCase):
             self.assertIn("## 5. MACRO, CREDIT & US LIQUIDITY", report)
             self.assertIn("## 7. RECENT CLOSED-4H SNAPSHOT TRAJECTORY (SQLITE ARCHIVE)", report)
             self.assertIn("## 8. METRIC FORMULA LEGEND & AI ANALYSIS PROMPT", report)
+            self.assertIn("Direct AI Instruction", report)
             self.assertIn("`2026-11-14 08:00:00 UTC` | `$73,650.00`", report)
             self.assertNotIn("OIPositioningQuadrant.", report)
             self.assertIn("NEUTRAL_CHURN`", report)

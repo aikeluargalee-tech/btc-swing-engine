@@ -624,28 +624,29 @@ class _TelegramPermanentError(RuntimeError):
 async def _curl_telegram_request(
     url: str,
     step_label: str,
-    ip_flag: str,
+    ip_flag: str = "--ipv4",
     json_payload: Optional[Dict[str, Any]] = None,
     form_fields: Optional[Dict[str, str]] = None,
     file_field: Optional[Tuple[str, pathlib.Path, str]] = None,
 ) -> None:
-    """Executes a Telegram Bot API POST using curl (HTTP/2) over the specified IP family."""
+    """Executes a Telegram Bot API POST using curl (HTTP/1.1 without Expect: 100-continue)."""
     curl_bin = shutil.which("curl")
     if not curl_bin:
         raise RuntimeError("curl binary not available")
 
     tmp_json_path: Optional[pathlib.Path] = None
     try:
-        max_time = "12" if json_payload is not None else "15"
         cmd: List[str] = [
             curl_bin,
             "-sS",
-            "--http2",
+            "--http1.1",
             ip_flag,
+            "-H",
+            "Expect:",
             "--connect-timeout",
             "5",
             "--max-time",
-            max_time,
+            "10",
         ]
         if json_payload is not None:
             with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".json") as tmp_f:
@@ -673,7 +674,7 @@ async def _curl_telegram_request(
             stderr=asyncio.subprocess.PIPE,
         )
         try:
-            stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=20.0)
+            stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=15.0)
         except asyncio.TimeoutError as exc:
             proc.kill()
             await proc.communicate()
@@ -706,8 +707,9 @@ async def _curl_telegram_request(
                 pass
 
 
-async def _aiohttp_telegram_request(
-    family: socket.AddressFamily,
+async def _post_on_session(
+    session: Any,
+    timeout: aiohttp.ClientTimeout,
     url: str,
     step_label: str,
     json_payload: Optional[Dict[str, Any]] = None,
@@ -715,41 +717,31 @@ async def _aiohttp_telegram_request(
     file_bytes: Optional[bytes] = None,
     file_name: Optional[str] = None,
 ) -> None:
-    """Executes a single Telegram Bot API POST via aiohttp on the given address family."""
-    timeout = aiohttp.ClientTimeout(total=10, connect=5, sock_connect=5, sock_read=8)
-    connector = aiohttp.TCPConnector(family=family, force_close=True)
-    try:
-        async with aiohttp.ClientSession(
-            connector=connector,
-            headers={"User-Agent": "curl/8.5.0"},
-        ) as session:
-            post_kwargs: Dict[str, Any] = {"timeout": timeout}
-            if json_payload is not None:
-                post_kwargs["json"] = json_payload
-            else:
-                form = aiohttp.FormData()
-                for key, val in (form_fields or {}).items():
-                    form.add_field(key, val)
-                if file_bytes is not None and file_name is not None:
-                    form.add_field(
-                        "document",
-                        file_bytes,
-                        filename=file_name,
-                        content_type="text/markdown",
-                    )
-                post_kwargs["data"] = form
+    """Executes one Telegram Bot API POST on an existing Keep-Alive aiohttp session."""
+    post_kwargs: Dict[str, Any] = {"timeout": timeout}
+    if json_payload is not None:
+        post_kwargs["json"] = json_payload
+    else:
+        form = aiohttp.FormData()
+        for key, val in (form_fields or {}).items():
+            form.add_field(key, val)
+        if file_bytes is not None and file_name is not None:
+            form.add_field(
+                "document",
+                file_bytes,
+                filename=file_name,
+                content_type="text/markdown",
+            )
+        post_kwargs["data"] = form
 
-            async with session.post(url, **post_kwargs) as resp:
-                if resp.status == 200:
-                    return
-                err_body = await resp.text()
-                msg = f"Telegram {step_label} failed ({resp.status}): {err_body}"
-                if resp.status not in (429, 500, 502, 503, 504):
-                    raise _TelegramPermanentError(msg)
-                raise RuntimeError(msg)
-    finally:
-        if not connector.closed:
-            await connector.close()
+    async with session.post(url, **post_kwargs) as resp:
+        if resp.status == 200:
+            return
+        err_body = await resp.text()
+        msg = f"Telegram {step_label} failed ({resp.status}): {err_body}"
+        if resp.status not in (429, 500, 502, 503, 504):
+            raise _TelegramPermanentError(msg)
+        raise RuntimeError(msg)
 
 
 async def send_dd_to_telegram(
@@ -762,18 +754,46 @@ async def send_dd_to_telegram(
     pages_url: str,
     repo_url: str,
 ) -> None:
-    """Delivers split Tab D summary messages + `btc_data_hub_latest.md` via dual-stack aiohttp + curl fallback."""
+    """Delivers split Tab D summary messages + `btc_data_hub_latest.md` over a shared IPv4 Keep-Alive TLS session."""
     base_api = f"https://api.telegram.org/bot{token}"
     messages = build_telegram_messages(ev, utc_str, myt_str, pages_url, repo_url)
     md_bytes = md_path.read_bytes()
     caption = (
         f"BTC Tab [D: DATA HUB] | Spot ${ev.spot_price:,.2f} | OK={ev.ok_count}/{ev.total_metrics} | {utc_str}"
     )
+    timeout = aiohttp.ClientTimeout(total=8, connect=4, sock_connect=4, sock_read=6)
+    has_curl = bool(shutil.which("curl"))
+    max_attempts = 5 if has_curl else 4
 
-    transports: List[str] = ["aiohttp:ipv4", "aiohttp:ipv6"]
-    if shutil.which("curl"):
-        transports.extend(["curl:--ipv4", "curl:--ipv6"])
-    preferred_transport: Optional[str] = None
+    session: Any = None
+    connector: Optional[aiohttp.TCPConnector] = None
+
+    async def _ensure_session() -> Any:
+        nonlocal session, connector
+        if session is None:
+            connector = aiohttp.TCPConnector(family=socket.AF_INET, force_close=False)
+            raw_session = aiohttp.ClientSession(
+                connector=connector,
+                headers={"User-Agent": "curl/8.5.0"},
+            )
+            session = await raw_session.__aenter__()
+        return session
+
+    async def _reset_session() -> None:
+        nonlocal session, connector
+        cur_sess, cur_conn = session, connector
+        session = None
+        connector = None
+        if cur_sess is not None:
+            try:
+                await cur_sess.__aexit__(None, None, None)
+            except Exception:
+                pass
+        if cur_conn is not None and not cur_conn.closed:
+            try:
+                await cur_conn.close()
+            except Exception:
+                pass
 
     async def _send_step(
         url: str,
@@ -781,28 +801,14 @@ async def send_dd_to_telegram(
         json_payload: Optional[Dict[str, Any]] = None,
         form_fields: Optional[Dict[str, str]] = None,
     ) -> None:
-        nonlocal preferred_transport
-        ordered = (
-            [preferred_transport] + [t for t in transports if t != preferred_transport]
-            if preferred_transport in transports
-            else list(transports)
-        )
         last_exc: Optional[BaseException] = None
-        for idx, transport in enumerate(ordered, 1):
+        for attempt in range(1, max_attempts + 1):
             try:
-                if transport == "aiohttp:ipv4":
-                    await _aiohttp_telegram_request(
-                        socket.AF_INET,
-                        url,
-                        step_label,
-                        json_payload=json_payload,
-                        form_fields=form_fields,
-                        file_bytes=None if json_payload is not None else md_bytes,
-                        file_name=None if json_payload is not None else md_path.name,
-                    )
-                elif transport == "aiohttp:ipv6":
-                    await _aiohttp_telegram_request(
-                        socket.AF_INET6,
+                if attempt <= 4:
+                    active_session = await _ensure_session()
+                    await _post_on_session(
+                        active_session,
+                        timeout,
                         url,
                         step_label,
                         json_payload=json_payload,
@@ -811,55 +817,60 @@ async def send_dd_to_telegram(
                         file_name=None if json_payload is not None else md_path.name,
                     )
                 else:
-                    ip_flag = "--ipv4" if transport == "curl:--ipv4" else "--ipv6"
                     await _curl_telegram_request(
                         url,
                         step_label,
-                        ip_flag=ip_flag,
+                        ip_flag="--ipv4",
                         json_payload=json_payload,
                         form_fields=form_fields,
                         file_field=None
                         if json_payload is not None
                         else ("document", md_path, "text/markdown"),
                     )
-                preferred_transport = transport
-                if idx > 1:
-                    logger.info("Telegram %s succeeded via fallback transport %s", step_label, transport)
+                if attempt > 1:
+                    via = "curl:--ipv4" if attempt == 5 else f"aiohttp:ipv4#{attempt}"
+                    logger.info("Telegram %s succeeded on attempt %d/%d (%s)", step_label, attempt, max_attempts, via)
                 return
             except _TelegramPermanentError:
                 raise
             except Exception as exc:
                 last_exc = exc
-                if idx < len(ordered):
+                if attempt <= 4:
+                    await _reset_session()
+                if attempt < max_attempts:
+                    via = "curl:--ipv4" if attempt == 5 else f"aiohttp:ipv4#{attempt}"
                     logger.warning(
-                        "Telegram %s attempt %d/%d (%s) failed (%s); trying next transport...",
+                        "Telegram %s attempt %d/%d (%s) failed (%s); rotating connection...",
                         step_label,
-                        idx,
-                        len(ordered),
-                        transport,
+                        attempt,
+                        max_attempts,
+                        via,
                         exc,
                     )
                     await asyncio.sleep(0.5)
         if last_exc is not None:
             raise last_exc
 
-    for i, text in enumerate(messages, 1):
-        await _send_step(
-            f"{base_api}/sendMessage",
-            step_label=f"sendMessage part {i}",
-            json_payload={
-                "chat_id": chat_id,
-                "text": text,
-                "parse_mode": "HTML",
-                "disable_web_page_preview": True,
-            },
-        )
+    try:
+        for i, text in enumerate(messages, 1):
+            await _send_step(
+                f"{base_api}/sendMessage",
+                step_label=f"sendMessage part {i}",
+                json_payload={
+                    "chat_id": chat_id,
+                    "text": text,
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": True,
+                },
+            )
 
-    await _send_step(
-        f"{base_api}/sendDocument",
-        step_label="sendDocument",
-        form_fields={"chat_id": chat_id, "caption": caption},
-    )
+        await _send_step(
+            f"{base_api}/sendDocument",
+            step_label="sendDocument",
+            form_fields={"chat_id": chat_id, "caption": caption},
+        )
+    finally:
+        await _reset_session()
 
 
 def write_dashboard_artifacts(

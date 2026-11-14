@@ -688,6 +688,12 @@ def write_dashboard_artifacts(
         logs_dir = BASE_DIR / "logs"
         logs_dir.mkdir(parents=True, exist_ok=True)
         (logs_dir / "btc_data_hub_latest.md").write_text(md_report, encoding="utf-8")
+        downloads_dir = pathlib.Path.home() / "Downloads"
+        if downloads_dir.exists():
+            try:
+                (downloads_dir / "btc_data_hub_latest.md").write_text(md_report, encoding="utf-8")
+            except Exception:
+                pass
 
     recent_archive = query_recent_archive(db_path, limit=30)
     payload = build_dd_json_payload(ev, md_report, recent_archive, utc_str, myt_str)
@@ -719,7 +725,7 @@ async def run_publisher(
     detector.evaluate(store)
 
     ev = DataHubEngine(cfg, db_path=db_path, write_archive=True).evaluate(store)
-    md_report = build_tab_d_data_only_report(cfg, store)
+    md_report = build_tab_d_data_only_report(cfg, store, db_path=db_path)
 
     now_utc = datetime.now(timezone.utc)
     utc_str = now_utc.strftime("%Y-%m-%d %H:%M:%S UTC")

@@ -12,9 +12,11 @@ Design Rule:
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import json
 import os
 import pathlib
 import re
+import sqlite3
 import subprocess
 import time
 from typing import Callable, Dict, List, Optional, Tuple
@@ -937,22 +939,109 @@ def copy_text_to_clipboard_and_log(
     return copied_ok, str(log_path), char_count
 
 
+def _extract_panel_row(panels: dict, panel_key: str, label: str, fallback: str = "N/A") -> str:
+    for item in panels.get(panel_key, []) or []:
+        if item.get("label") == label:
+            val = str(item.get("value") or "").strip()
+            return val if val else fallback
+    return fallback
+
+
+def _query_tab_d_trajectory_rows(db_path: pathlib.Path, limit: int = 6) -> List[Tuple[str, str, str, str, str, str]]:
+    """Reads up to `limit` closed-4H snapshots from SQLite for Section 7 trajectory context."""
+    if not db_path.exists():
+        return []
+    conn: Optional[sqlite3.Connection] = None
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=2.0)
+        raw_rows = conn.execute(
+            """
+            SELECT closed_4h_bar_utc, spot_price, payload_json
+            FROM telemetry_snapshots
+            ORDER BY closed_4h_bar_utc DESC
+            LIMIT ?
+            """,
+            (int(limit),),
+        ).fetchall()
+    except sqlite3.Error:
+        return []
+    finally:
+        if conn is not None:
+            conn.close()
+
+    out: List[Tuple[str, str, str, str, str, str]] = []
+    for bar_utc, spot_px, payload_raw in raw_rows:
+        panels: dict = {}
+        try:
+            panels = json.loads(payload_raw).get("panels", {}) or {}
+        except Exception:
+            panels = {}
+
+        cvd_str = _extract_panel_row(panels, "2_order_flow_liquidity", "Spot/Perp CVD (4h / 24h)")
+        if "24h:" in cvd_str:
+            cvd_str = "24h:" + cvd_str.split("24h:", 1)[1].strip()
+        xexch_oi = _extract_panel_row(panels, "3_derivatives_options_liq", "Cross-Exch Perp OI & Funding")
+        fund_p90 = _extract_panel_row(panels, "3_derivatives_options_liq", "Funding 8H% / Ann% / P90")
+        mvrv_s = _extract_panel_row(panels, "4_onchain_etf_stablecoins", "MVRV Ratio (On-Chain / Proxy)")
+        out.append((
+            str(bar_utc),
+            f"${float(spot_px):,.2f}",
+            cvd_str,
+            xexch_oi,
+            fund_p90,
+            mvrv_s,
+        ))
+    return out
+
+
 def build_tab_d_data_only_report(
     config: Optional[EngineConfig],
     store: StateStore,
+    db_path: Optional[pathlib.Path] = None,
 ) -> str:
-    """Builds the pure DATA-ONLY consolidated telemetry report for Tab [21: D]."""
-    from analytics.data_hub_engine import DataHubEngine
+    """Builds the self-contained consolidated telemetry & AI-ready report for Tab [21: D]."""
+    from analytics.data_hub_engine import DEFAULT_ARCHIVE_DB_PATH, DataHubEngine, _is_test_runner
 
     cfg = config or DEFAULT_CONFIG
     ev = getattr(store, "data_hub_evaluation", None) or DataHubEngine(cfg).evaluate(store)
     utc_str, myt_str = _timestamps_utc_myt()
 
+    spot_px = float(ev.spot_price or 0.0)
+    bars_1h = list(getattr(store, "spot_klines_1h", []) or [])
+    bars_1d = list(getattr(store, "spot_klines_1d", []) or [])
+
+    if len(bars_1h) >= 24 and spot_px > 0.0:
+        w24 = bars_1h[-24:]
+        low_24h = min(float(b.low) for b in w24)
+        high_24h = max(float(b.high) for b in w24)
+        range_24h_str = f"${low_24h:,.2f} - ${high_24h:,.2f}"
+        base_24h = float(w24[0].open)
+        r24_str = f"{((spot_px / base_24h) - 1.0) * 100.0:+.2f}%" if base_24h > 0 else "N/A"
+    elif bars_1d and spot_px > 0.0:
+        last_d = bars_1d[-1]
+        range_24h_str = f"${float(last_d.low):,.2f} - ${float(last_d.high):,.2f}"
+        r24_str = "N/A"
+    else:
+        range_24h_str = "N/A"
+        r24_str = "N/A"
+
+    r7_str = (
+        f"{((spot_px / float(bars_1d[-8].close)) - 1.0) * 100.0:+.2f}%"
+        if (len(bars_1d) >= 8 and spot_px > 0.0 and float(bars_1d[-8].close) > 0.0)
+        else "N/A"
+    )
+    r30_str = (
+        f"{((spot_px / float(bars_1d[-31].close)) - 1.0) * 100.0:+.2f}%"
+        if (len(bars_1d) >= 31 and spot_px > 0.0 and float(bars_1d[-31].close) > 0.0)
+        else "N/A"
+    )
+
     lines: List[str] = [
         "# TAB [D: DATA HUB] | CONSOLIDATED DATA-ONLY TELEMETRY REPORT",
         f"**Retrieval Time (UTC):** `{utc_str}`  |  **Retrieval Time (MYT):** `{myt_str}`",
-        f"**Spot Price (BTCUSDT):** `${ev.spot_price:,.2f}`  |  "
+        f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}`  |  "
         f"**Coverage:** `OK={ev.ok_count}/{ev.total_metrics} | UNAVAILABLE={ev.unavailable_count} | STALE={ev.stale_count} | PROXY/STATIC={ev.proxy_or_static_count}`",
+        f"**24H Range:** `{range_24h_str}`  |  **Returns (24H / 7D / 30D):** `{r24_str} / {r7_str} / {r30_str}`",
         f"**Archive (SQLite):** `{ev.archive_snapshots_count} closed-4H snapshots (Last: {ev.archive_last_bar_utc or 'N/A'})`",
         "",
     ]
@@ -971,6 +1060,30 @@ def build_tab_d_data_only_report(
         for r in rows:
             lines.append(f"| {r.label} | `{r.value}` | `{r.tabs}` | `{r.status}` |")
         lines.append("")
+
+    archive_db = db_path if db_path is not None else (None if _is_test_runner() else DEFAULT_ARCHIVE_DB_PATH)
+    traj_rows = _query_tab_d_trajectory_rows(archive_db, limit=6) if archive_db is not None else []
+    lines.extend([
+        "## 7. RECENT CLOSED-4H SNAPSHOT TRAJECTORY (SQLITE ARCHIVE)",
+        "| Closed 4H Bar (UTC) | Spot ($) | 24H Spot/Perp CVD | Cross-Exch Perp OI & Funding | Funding 8H% / P90 | MVRV Ratio |",
+        "|---|---|---|---|---|---|",
+    ])
+    if traj_rows:
+        for bar_u, sp_u, cvd_u, oi_u, fp_u, mv_u in traj_rows:
+            lines.append(f"| `{bar_u}` | `{sp_u}` | `{cvd_u}` | `{oi_u}` | `{fp_u}` | `{mv_u}` |")
+    else:
+        lines.append("| `N/A` | `N/A` | `N/A` | `N/A` | `N/A` | `N/A` |")
+
+    lines.extend([
+        "",
+        "## 8. METRIC FORMULA LEGEND & AI ANALYSIS PROMPT",
+        "- **Rough Path Lévy (`4H A_SP`)**: Lévy signed area over 6 closed 4H bars (`> 0`: Spot path leads price markup; `< 0`: Spot path lags price / distribution).",
+        "- **24H Z-Scores (`z_S / z_F / D`)**: 30-day rolling Z-scores of 24H Spot (`z_S`) and Perp (`z_F`) cumulative delta; `D = z_S - z_F` (`D > 0` = Spot buying divergence vs Perps).",
+        "- **Volume Profile & Structure**: `VA Pos% = (Spot - VAL) / (VAH - VAL) * 100`; `L20/H20` = 20-bar (80H) 4H range boundaries; `SLSP` = structural liquidity pool S/R.",
+        "- **Quant & Volatility**: `H` = Hurst exponent (`>0.5` trending, `<0.5` mean-reverting); `VCR 72H` = 72H Volatility Compression Ratio; `TSFM Disp%` = horizon dispersion; `LSCE` = liquidation sweep state.",
+        "- **AI Analysis Task (For Uploaded File)**: Synthesize all 6 domains + the 4H archive trajectory into: (1) Multi-Timeframe Regime & Structural Map (`1W/1D/4H/1H`), (2) Spot Absorption vs Perpetual Leverage Alignment, (3) Derivatives & Options Skew/IV Pricing, (4) On-Chain, Stablecoin & US Macro Liquidity Impulse, and (5) Concrete Upside/Downside Scenarios with Key Invalidation Levels.",
+        "",
+    ])
 
     return sanitize_data_only_text("\n".join(lines))
 
@@ -1000,4 +1113,15 @@ def copy_tab_data_only_report_to_clipboard(
         return copy_text_to_clipboard_and_log(text, "latest_ai_data_packet.md", store, also_write_root_and_downloads=True)
 
     builder, filename = dispatch[tab_id]
-    return copy_text_to_clipboard_and_log(builder(cfg, store), filename, store)
+    text = builder(cfg, store)
+    if tab_id == 21:
+        from analytics.data_hub_engine import _is_test_runner
+
+        if not _is_test_runner():
+            downloads_dir = pathlib.Path.home() / "Downloads"
+            if downloads_dir.exists():
+                try:
+                    (downloads_dir / filename).write_text(text, encoding="utf-8")
+                except Exception:
+                    pass
+    return copy_text_to_clipboard_and_log(text, filename, store)

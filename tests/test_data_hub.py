@@ -302,10 +302,15 @@ class TestDataHub(unittest.TestCase):
                 self.assertIn("6. QUANT FEATURES, FEED HEALTH & ARCHIVE", rendered)
 
             # Pure DATA-ONLY markdown report check (0 forbidden interpretive words)
-            report = build_tab_d_data_only_report(self.cfg, store)
+            report = build_tab_d_data_only_report(self.cfg, store, db_path=db_file)
             self.assertIn("TAB [D: DATA HUB] | CONSOLIDATED DATA-ONLY TELEMETRY REPORT", report)
+            self.assertIn("**24H Range:**", report)
+            self.assertIn("**Returns (24H / 7D / 30D):**", report)
             self.assertIn("1 closed-4H snapshots (Last: 2026-11-14 08:00:00 UTC)", report)
             self.assertIn("## 5. MACRO, CREDIT & US LIQUIDITY", report)
+            self.assertIn("## 7. RECENT CLOSED-4H SNAPSHOT TRAJECTORY (SQLITE ARCHIVE)", report)
+            self.assertIn("## 8. METRIC FORMULA LEGEND & AI ANALYSIS PROMPT", report)
+            self.assertIn("`2026-11-14 08:00:00 UTC` | `$73,650.00`", report)
             self.assertNotIn("OIPositioningQuadrant.", report)
             self.assertIn("NEUTRAL_CHURN`", report)
             self.assertNotIn("Top participant", report)
@@ -457,7 +462,7 @@ class TestDataHub(unittest.TestCase):
             db_file = tmp_path / "pub.sqlite"
             out_dir = tmp_path / "docs"
             ev = DataHubEngine(self.cfg, db_path=db_file, write_archive=True).evaluate(store)
-            md_report = build_tab_d_data_only_report(self.cfg, store)
+            md_report = build_tab_d_data_only_report(self.cfg, store, db_path=db_file)
 
             paths = write_dashboard_artifacts(
                 output_dir=out_dir,

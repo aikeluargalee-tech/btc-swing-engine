@@ -643,12 +643,10 @@ async def _curl_telegram_request(
             ip_flag,
             "-H",
             "Expect:",
-            "--limit-rate",
-            "4k",
             "--connect-timeout",
-            "5",
+            "10",
             "--max-time",
-            "15",
+            "45",
         ]
         if json_payload is not None:
             with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".json") as tmp_f:
@@ -676,7 +674,7 @@ async def _curl_telegram_request(
             stderr=asyncio.subprocess.PIPE,
         )
         try:
-            stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=20.0)
+            stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=50.0)
         except asyncio.TimeoutError as exc:
             proc.kill()
             await proc.communicate()
@@ -765,8 +763,7 @@ async def send_dd_to_telegram(
     caption = (
         f"BTC Tab [D: DATA HUB] | Spot ${ev.spot_price:,.2f} | OK={ev.ok_count}/{ev.total_metrics} | {utc_str}"
     )
-    timeout = aiohttp.ClientTimeout(total=8, connect=4, sock_connect=4, sock_read=6)
-    doc_multipart_timeout = aiohttp.ClientTimeout(total=6, connect=4, sock_connect=4, sock_read=4)
+    timeout = aiohttp.ClientTimeout(total=45, connect=10, sock_connect=10, sock_read=40)
     has_curl = bool(shutil.which("curl"))
     raw_md_url = os.getenv("DD_RAW_MD_URL", "").strip()
 
@@ -816,15 +813,17 @@ async def send_dd_to_telegram(
                 if via.startswith("aiohttp:"):
                     await _reset_session()
                 if idx < total:
+                    delay = 3.0 if idx == 1 else 5.0
                     logger.warning(
-                        "Telegram %s attempt %d/%d (%s) failed (%s); trying next fallback...",
+                        "Telegram %s attempt %d/%d (%s) failed (%s); waiting %.1fs before retry...",
                         step_label,
                         idx,
                         total,
                         via,
                         exc,
+                        delay,
                     )
-                    await asyncio.sleep(0.5 if idx == 1 else 1.0)
+                    await asyncio.sleep(delay)
         if last_exc is not None:
             raise last_exc
 
@@ -844,7 +843,7 @@ async def send_dd_to_telegram(
                         _ensure_session, timeout, f"{base_api}/sendMessage", lbl, json_payload=p
                     ),
                 )
-                for attempt in range(1, 5)
+                for attempt in range(1, 3)
             ]
             if has_curl:
                 msg_attempts.append(
@@ -856,6 +855,7 @@ async def send_dd_to_telegram(
                     )
                 )
             await _run_attempts(step_label, msg_attempts)
+            await asyncio.sleep(1.2)
 
         doc_url = f"{base_api}/sendDocument"
         doc_fields = {"chat_id": chat_id, "caption": caption}
@@ -864,7 +864,7 @@ async def send_dd_to_telegram(
                 "aiohttp:multipart",
                 lambda: _post_step_via_session(
                     _ensure_session,
-                    doc_multipart_timeout,
+                    timeout,
                     doc_url,
                     "sendDocument",
                     form_fields=doc_fields,
@@ -875,19 +875,33 @@ async def send_dd_to_telegram(
         ]
         if raw_md_url:
             json_doc_payload = {"chat_id": chat_id, "document": raw_md_url, "caption": caption}
-            for idx in range(1, 3):
-                doc_attempts.append(
-                    (
-                        f"aiohttp:json_url#{idx}",
-                        lambda jp=json_doc_payload: _post_step_via_session(
-                            _ensure_session, timeout, doc_url, "sendDocument", json_payload=jp
-                        ),
-                    )
+            doc_attempts.append(
+                (
+                    "aiohttp:json_url",
+                    lambda jp=json_doc_payload: _post_step_via_session(
+                        _ensure_session, timeout, doc_url, "sendDocument", json_payload=jp
+                    ),
                 )
+            )
+        else:
+            doc_attempts.append(
+                (
+                    "aiohttp:multipart#2",
+                    lambda: _post_step_via_session(
+                        _ensure_session,
+                        timeout,
+                        doc_url,
+                        "sendDocument",
+                        form_fields=doc_fields,
+                        file_bytes=md_bytes,
+                        file_name=md_path.name,
+                    ),
+                )
+            )
         if has_curl:
             doc_attempts.append(
                 (
-                    "curl:--ipv4-4k",
+                    "curl:--ipv4",
                     lambda: _curl_telegram_request(
                         doc_url,
                         "sendDocument",

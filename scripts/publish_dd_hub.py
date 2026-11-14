@@ -643,10 +643,12 @@ async def _curl_telegram_request(
             ip_flag,
             "-H",
             "Expect:",
+            "--limit-rate",
+            "4k",
             "--connect-timeout",
             "5",
             "--max-time",
-            "10",
+            "15",
         ]
         if json_payload is not None:
             with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".json") as tmp_f:
@@ -674,7 +676,7 @@ async def _curl_telegram_request(
             stderr=asyncio.subprocess.PIPE,
         )
         try:
-            stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=15.0)
+            stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=20.0)
         except asyncio.TimeoutError as exc:
             proc.kill()
             await proc.communicate()
@@ -739,6 +741,8 @@ async def _post_on_session(
             return
         err_body = await resp.text()
         msg = f"Telegram {step_label} failed ({resp.status}): {err_body}"
+        if resp.status == 400 and json_payload is not None and "failed to get" in err_body.lower():
+            raise RuntimeError(msg)
         if resp.status not in (429, 500, 502, 503, 504):
             raise _TelegramPermanentError(msg)
         raise RuntimeError(msg)
@@ -754,7 +758,7 @@ async def send_dd_to_telegram(
     pages_url: str,
     repo_url: str,
 ) -> None:
-    """Delivers split Tab D summary messages + `btc_data_hub_latest.md` over a shared IPv4 Keep-Alive TLS session."""
+    """Delivers split Tab D summary messages + `btc_data_hub_latest.md` over IPv4 Keep-Alive with URL fallback."""
     base_api = f"https://api.telegram.org/bot{token}"
     messages = build_telegram_messages(ev, utc_str, myt_str, pages_url, repo_url)
     md_bytes = md_path.read_bytes()
@@ -762,8 +766,9 @@ async def send_dd_to_telegram(
         f"BTC Tab [D: DATA HUB] | Spot ${ev.spot_price:,.2f} | OK={ev.ok_count}/{ev.total_metrics} | {utc_str}"
     )
     timeout = aiohttp.ClientTimeout(total=8, connect=4, sock_connect=4, sock_read=6)
+    doc_multipart_timeout = aiohttp.ClientTimeout(total=6, connect=4, sock_connect=4, sock_read=4)
     has_curl = bool(shutil.which("curl"))
-    max_attempts = 5 if has_curl else 4
+    raw_md_url = os.getenv("DD_RAW_MD_URL", "").strip()
 
     session: Any = None
     connector: Optional[aiohttp.TCPConnector] = None
@@ -795,82 +800,129 @@ async def send_dd_to_telegram(
             except Exception:
                 pass
 
-    async def _send_step(
-        url: str,
-        step_label: str,
-        json_payload: Optional[Dict[str, Any]] = None,
-        form_fields: Optional[Dict[str, str]] = None,
-    ) -> None:
+    async def _run_attempts(step_label: str, attempts: List[Tuple[str, Any]]) -> None:
         last_exc: Optional[BaseException] = None
-        for attempt in range(1, max_attempts + 1):
+        total = len(attempts)
+        for idx, (via, runner) in enumerate(attempts, 1):
             try:
-                if attempt <= 4:
-                    active_session = await _ensure_session()
-                    await _post_on_session(
-                        active_session,
-                        timeout,
-                        url,
-                        step_label,
-                        json_payload=json_payload,
-                        form_fields=form_fields,
-                        file_bytes=None if json_payload is not None else md_bytes,
-                        file_name=None if json_payload is not None else md_path.name,
-                    )
-                else:
-                    await _curl_telegram_request(
-                        url,
-                        step_label,
-                        ip_flag="--ipv4",
-                        json_payload=json_payload,
-                        form_fields=form_fields,
-                        file_field=None
-                        if json_payload is not None
-                        else ("document", md_path, "text/markdown"),
-                    )
-                if attempt > 1:
-                    via = "curl:--ipv4" if attempt == 5 else f"aiohttp:ipv4#{attempt}"
-                    logger.info("Telegram %s succeeded on attempt %d/%d (%s)", step_label, attempt, max_attempts, via)
+                await runner()
+                if idx > 1:
+                    logger.info("Telegram %s succeeded on attempt %d/%d (%s)", step_label, idx, total, via)
                 return
             except _TelegramPermanentError:
                 raise
             except Exception as exc:
                 last_exc = exc
-                if attempt <= 4:
+                if via.startswith("aiohttp:"):
                     await _reset_session()
-                if attempt < max_attempts:
-                    via = "curl:--ipv4" if attempt == 5 else f"aiohttp:ipv4#{attempt}"
+                if idx < total:
                     logger.warning(
-                        "Telegram %s attempt %d/%d (%s) failed (%s); rotating connection...",
+                        "Telegram %s attempt %d/%d (%s) failed (%s); trying next fallback...",
                         step_label,
-                        attempt,
-                        max_attempts,
+                        idx,
+                        total,
                         via,
                         exc,
                     )
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(0.5 if idx == 1 else 1.0)
         if last_exc is not None:
             raise last_exc
 
     try:
         for i, text in enumerate(messages, 1):
-            await _send_step(
-                f"{base_api}/sendMessage",
-                step_label=f"sendMessage part {i}",
-                json_payload={
-                    "chat_id": chat_id,
-                    "text": text,
-                    "parse_mode": "HTML",
-                    "disable_web_page_preview": True,
-                },
-            )
+            step_label = f"sendMessage part {i}"
+            msg_payload = {
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True,
+            }
+            msg_attempts: List[Tuple[str, Any]] = [
+                (
+                    f"aiohttp:ipv4#{attempt}",
+                    lambda p=msg_payload, lbl=step_label: _post_step_via_session(
+                        _ensure_session, timeout, f"{base_api}/sendMessage", lbl, json_payload=p
+                    ),
+                )
+                for attempt in range(1, 5)
+            ]
+            if has_curl:
+                msg_attempts.append(
+                    (
+                        "curl:--ipv4",
+                        lambda p=msg_payload, lbl=step_label: _curl_telegram_request(
+                            f"{base_api}/sendMessage", lbl, ip_flag="--ipv4", json_payload=p
+                        ),
+                    )
+                )
+            await _run_attempts(step_label, msg_attempts)
 
-        await _send_step(
-            f"{base_api}/sendDocument",
-            step_label="sendDocument",
-            form_fields={"chat_id": chat_id, "caption": caption},
-        )
+        doc_url = f"{base_api}/sendDocument"
+        doc_fields = {"chat_id": chat_id, "caption": caption}
+        doc_attempts: List[Tuple[str, Any]] = [
+            (
+                "aiohttp:multipart",
+                lambda: _post_step_via_session(
+                    _ensure_session,
+                    doc_multipart_timeout,
+                    doc_url,
+                    "sendDocument",
+                    form_fields=doc_fields,
+                    file_bytes=md_bytes,
+                    file_name=md_path.name,
+                ),
+            )
+        ]
+        if raw_md_url:
+            json_doc_payload = {"chat_id": chat_id, "document": raw_md_url, "caption": caption}
+            for idx in range(1, 3):
+                doc_attempts.append(
+                    (
+                        f"aiohttp:json_url#{idx}",
+                        lambda jp=json_doc_payload: _post_step_via_session(
+                            _ensure_session, timeout, doc_url, "sendDocument", json_payload=jp
+                        ),
+                    )
+                )
+        if has_curl:
+            doc_attempts.append(
+                (
+                    "curl:--ipv4-4k",
+                    lambda: _curl_telegram_request(
+                        doc_url,
+                        "sendDocument",
+                        ip_flag="--ipv4",
+                        form_fields=doc_fields,
+                        file_field=("document", md_path, "text/markdown"),
+                    ),
+                )
+            )
+        await _run_attempts("sendDocument", doc_attempts)
     finally:
         await _reset_session()
+
+
+async def _post_step_via_session(
+    ensure_session_fn: Any,
+    timeout: aiohttp.ClientTimeout,
+    url: str,
+    step_label: str,
+    json_payload: Optional[Dict[str, Any]] = None,
+    form_fields: Optional[Dict[str, str]] = None,
+    file_bytes: Optional[bytes] = None,
+    file_name: Optional[str] = None,
+) -> None:
+    active_session = await ensure_session_fn()
+    await _post_on_session(
+        active_session,
+        timeout,
+        url,
+        step_label,
+        json_payload=json_payload,
+        form_fields=form_fields,
+        file_bytes=file_bytes,
+        file_name=file_name,
+    )
 
 
 def write_dashboard_artifacts(
@@ -909,6 +961,36 @@ def write_dashboard_artifacts(
     return {"md": md_path, "json": json_path, "html": html_path}
 
 
+def load_evaluation_from_json(json_path: pathlib.Path) -> Tuple[DataHubEvaluation, str, str]:
+    """Reconstructs a `DataHubEvaluation` and UTC/MYT timestamps from an existing `dd_latest.json`."""
+    payload = json.loads(json_path.read_text(encoding="utf-8"))
+    panels = payload.get("panels") or {}
+    kw: Dict[str, Any] = {
+        "timestamp_utc": str(payload.get("retrieval_utc", "")),
+        "spot_price": float(payload.get("spot_price", 0.0)),
+        "total_metrics": int(payload.get("total_metrics", 0)),
+        "ok_count": int(payload.get("ok_count", 0)),
+        "unavailable_count": int(payload.get("unavailable_count", 0)),
+        "stale_count": int(payload.get("stale_count", 0)),
+        "proxy_or_static_count": int(payload.get("proxy_or_static_count", 0)),
+        "archive_snapshots_count": int(payload.get("archive_snapshots_count", 0)),
+        "archive_last_bar_utc": str(payload.get("archive_last_bar_utc", "")),
+    }
+    for panel_key, _, attr in PANEL_SPECS:
+        rows = (panels.get(panel_key) or {}).get("rows") or []
+        kw[attr] = [
+            DataMetricRow(
+                label=str(r["label"]),
+                value=str(r["value"]),
+                tabs=str(r.get("tabs", "")),
+                status=str(r.get("status", "OK")),
+            )
+            for r in rows
+        ]
+    ev = DataHubEvaluation(**kw)
+    return ev, str(payload.get("retrieval_utc", "")), str(payload.get("retrieval_myt", ""))
+
+
 async def run_publisher(
     output_dir: pathlib.Path,
     db_path: pathlib.Path,
@@ -917,49 +999,56 @@ async def run_publisher(
     repo_url: str,
     pages_url: str,
     config: Optional[EngineConfig] = None,
+    telegram_only: bool = False,
 ) -> DataHubEvaluation:
     """Runs one-shot warmup + read-only engine evaluation, publishes dashboard files, and notifies Telegram."""
-    cfg = config or DEFAULT_CONFIG
-    store = StateStore()
-    detector = SignalDetector(cfg)
-    detector.spot_swing_engine.set_read_only(True)
-    detector.futures_v4_engine.set_read_only(True)
-    # Defer archive write inside SignalDetector so custom --db-path receives the canonical write below
-    detector.data_hub_engine = DataHubEngine(cfg, db_path=db_path, write_archive=False)
+    if telegram_only:
+        json_path = output_dir / "dd_latest.json"
+        md_path = output_dir / "btc_data_hub_latest.md"
+        ev, utc_str, myt_str = load_evaluation_from_json(json_path)
+        paths: Dict[str, pathlib.Path] = {"md": md_path, "json": json_path}
+    else:
+        cfg = config or DEFAULT_CONFIG
+        store = StateStore()
+        detector = SignalDetector(cfg)
+        detector.spot_swing_engine.set_read_only(True)
+        detector.futures_v4_engine.set_read_only(True)
+        # Defer archive write inside SignalDetector so custom --db-path receives the canonical write below
+        detector.data_hub_engine = DataHubEngine(cfg, db_path=db_path, write_archive=False)
 
-    logger.info("Running zero-cold-start REST & macro warmup...")
-    await run_initial_warmup(cfg, store)
-    detector.evaluate(store)
+        logger.info("Running zero-cold-start REST & macro warmup...")
+        await run_initial_warmup(cfg, store)
+        detector.evaluate(store)
 
-    ev = DataHubEngine(cfg, db_path=db_path, write_archive=True).evaluate(store)
-    md_report = build_tab_d_data_only_report(cfg, store, db_path=db_path)
+        ev = DataHubEngine(cfg, db_path=db_path, write_archive=True).evaluate(store)
+        md_report = build_tab_d_data_only_report(cfg, store, db_path=db_path)
 
-    now_utc = datetime.now(timezone.utc)
-    utc_str = now_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
-    myt_str = now_utc.astimezone(MYT_TZ).strftime("%Y-%m-%d %H:%M:%S MYT (UTC+8)")
+        now_utc = datetime.now(timezone.utc)
+        utc_str = now_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
+        myt_str = now_utc.astimezone(MYT_TZ).strftime("%Y-%m-%d %H:%M:%S MYT (UTC+8)")
 
-    paths = write_dashboard_artifacts(
-        output_dir=output_dir,
-        ev=ev,
-        md_report=md_report,
-        db_path=db_path,
-        repo_url=repo_url,
-        pages_url=pages_url,
-        utc_str=utc_str,
-        myt_str=myt_str,
-    )
-    logger.info(
-        "Published Tab [D]: Spot=$%.2f | OK=%d/%d | Archive=%d | Files=%s",
-        ev.spot_price,
-        ev.ok_count,
-        ev.total_metrics,
-        ev.archive_snapshots_count,
-        ", ".join(p.name for p in paths.values()),
-    )
+        paths = write_dashboard_artifacts(
+            output_dir=output_dir,
+            ev=ev,
+            md_report=md_report,
+            db_path=db_path,
+            repo_url=repo_url,
+            pages_url=pages_url,
+            utc_str=utc_str,
+            myt_str=myt_str,
+        )
+        logger.info(
+            "Published Tab [D]: Spot=$%.2f | OK=%d/%d | Archive=%d | Files=%s",
+            ev.spot_price,
+            ev.ok_count,
+            ev.total_metrics,
+            ev.archive_snapshots_count,
+            ", ".join(p.name for p in paths.values()),
+        )
 
     token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
-    should_send_tg = (not no_telegram) and (send_telegram or (bool(token) and bool(chat_id)))
+    should_send_tg = (not no_telegram) and (send_telegram or telegram_only or (bool(token) and bool(chat_id)))
     if no_telegram:
         logger.info("Telegram delivery disabled (--no-telegram).")
     elif should_send_tg:
@@ -1011,6 +1100,11 @@ def parse_args() -> argparse.Namespace:
         help="Send split Tab D summary and .md document to Telegram (requires TELEGRAM_BOT_TOKEN & TELEGRAM_CHAT_ID).",
     )
     parser.add_argument(
+        "--telegram-only",
+        action="store_true",
+        help="Skip warmup/artifact generation and deliver existing output-dir artifacts to Telegram.",
+    )
+    parser.add_argument(
         "--no-telegram",
         action="store_true",
         help="Skip Telegram delivery even if TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID are set.",
@@ -1049,6 +1143,7 @@ def main() -> None:
             no_telegram=args.no_telegram,
             repo_url=args.repo_url,
             pages_url=args.pages_url,
+            telegram_only=args.telegram_only,
         )
     )
 

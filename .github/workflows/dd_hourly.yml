@@ -38,18 +38,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Headless Tab D Publisher
+      - name: Run Headless Tab D Publisher (Generate Artifacts)
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GITHUB_REPOSITORY_URL: https://github.com/${{ github.repository }}
           DD_DASHBOARD_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.send_telegram }}" = "false" ]; then
-            python scripts/publish_dd_hub.py --no-telegram
-          else
-            python scripts/publish_dd_hub.py --send-telegram
-          fi
+          python scripts/publish_dd_hub.py --no-telegram
 
       - name: Commit and push updated Tab D dashboard & 4H SQLite archive
         run: |
@@ -63,3 +57,15 @@ jobs:
           git commit -m "chore(dd-hub): update Tab D dashboard & 4H telemetry snapshot [skip ci]"
           git pull --rebase --autostash origin main
           git push origin main
+
+      - name: Deliver Tab D Report to Telegram
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.send_telegram == false) }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_REPOSITORY_URL: https://github.com/${{ github.repository }}
+          DD_DASHBOARD_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+        run: |
+          COMMIT_SHA="$(git rev-parse HEAD)"
+          export DD_RAW_MD_URL="https://raw.githubusercontent.com/${{ github.repository }}/${COMMIT_SHA}/docs/btc_data_hub_latest.md"
+          python scripts/publish_dd_hub.py --telegram-only

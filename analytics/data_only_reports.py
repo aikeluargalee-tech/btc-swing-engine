@@ -947,6 +947,186 @@ def _extract_panel_row(panels: dict, panel_key: str, label: str, fallback: str =
     return fallback
 
 
+def _closed_kline_bars(bars: list, interval_ms: int, now_ms: Optional[int] = None) -> list:
+    """Returns time-sorted closed KlineBar entries, dropping an actively forming candle."""
+    valid = [b for b in bars if getattr(b, "close", 0.0) > 0.0 and getattr(b, "timestamp_ms", 0) > 0]
+    if not valid:
+        return []
+    valid.sort(key=lambda b: int(b.timestamp_ms))
+    ref_ms = int(now_ms if now_ms is not None else time.time() * 1000)
+    closed = [b for b in valid if (int(b.timestamp_ms) + int(interval_ms)) <= ref_ms]
+    if not closed and len(valid) >= 2:
+        closed = valid[:-1]
+    return closed
+
+
+def _detect_swing_pivots(bars: list, left: int, right: int) -> Tuple[List[Tuple[int, float, int]], List[Tuple[int, float, int]]]:
+    """Detects fractal swing highs and lows as (index, price, timestamp_ms)."""
+    n = len(bars)
+    swing_highs: List[Tuple[int, float, int]] = []
+    swing_lows: List[Tuple[int, float, int]] = []
+    if n < left + right + 1:
+        return swing_highs, swing_lows
+    for i in range(left, n - right):
+        hi = float(bars[i].high)
+        lo = float(bars[i].low)
+        ts = int(bars[i].timestamp_ms)
+        if all(hi > float(bars[j].high) for j in range(i - left, i)) and all(
+            hi >= float(bars[j].high) for j in range(i + 1, i + right + 1)
+        ):
+            swing_highs.append((i, hi, ts))
+        if all(lo < float(bars[j].low) for j in range(i - left, i)) and all(
+            lo <= float(bars[j].low) for j in range(i + 1, i + right + 1)
+        ):
+            swing_lows.append((i, lo, ts))
+    return swing_highs, swing_lows
+
+
+def _cluster_sr_zones(pivots: List[Tuple[int, float, int]], tolerance_pct: float = 0.01) -> List[Tuple[float, int]]:
+    """Groups nearby swing pivot prices into (mean_price, touch_count) clusters."""
+    if not pivots:
+        return []
+    ordered = sorted(float(p[1]) for p in pivots if p[1] > 0.0)
+    if not ordered:
+        return []
+    clusters: List[List[float]] = [[ordered[0]]]
+    for px in ordered[1:]:
+        anchor = sum(clusters[-1]) / len(clusters[-1])
+        if anchor > 0.0 and abs(px - anchor) / anchor <= tolerance_pct:
+            clusters[-1].append(px)
+        else:
+            clusters.append([px])
+    return [(sum(c) / len(c), len(c)) for c in clusters]
+
+
+def _fmt_ts_utc(ts_ms: int, fmt: str) -> str:
+    return datetime.fromtimestamp(int(ts_ms) / 1000.0, tz=timezone.utc).strftime(fmt)
+
+
+def _summarize_kline_structure(
+    bars: list,
+    spot_px: float,
+    tf_label: str,
+    interval_ms: int,
+    lookback: int = 500,
+    now_ms: Optional[int] = None,
+) -> Dict[str, str]:
+    """Computes full-lookback HH/HL/LH/LL structure, latest BOS, and clustered S/R zones."""
+    closed = _closed_kline_bars(bars, interval_ms, now_ms=now_ms)[-lookback:]
+    if len(closed) < 12:
+        return {
+            "tf": tf_label,
+            "bars": str(len(closed)),
+            "structure": "INSUFFICIENT_DATA",
+            "pivots": "N/A",
+            "bos": "N/A",
+            "res": "N/A",
+            "sup": "N/A",
+        }
+
+    lr = 5 if len(closed) >= 40 else 2
+    sh_list, sl_list = _detect_swing_pivots(closed, lr, lr)
+    if (len(sh_list) < 2 or len(sl_list) < 2) and lr > 2:
+        sh_list, sl_list = _detect_swing_pivots(closed, 2, 2)
+
+    t_fmt = "%m-%d" if interval_ms >= 86_400_000 else "%m-%d %H:%M"
+    if len(sh_list) >= 2 and len(sl_list) >= 2:
+        prev_sh, last_sh = sh_list[-2], sh_list[-1]
+        prev_sl, last_sl = sl_list[-2], sl_list[-1]
+        h_tag = "HH" if last_sh[1] > prev_sh[1] else "LH"
+        l_tag = "HL" if last_sl[1] > prev_sl[1] else "LL"
+        if h_tag == "HH" and l_tag == "HL":
+            struct_str = "UPTREND (HH/HL)"
+        elif h_tag == "LH" and l_tag == "LL":
+            struct_str = "DOWNTREND (LH/LL)"
+        else:
+            struct_str = f"MIXED ({h_tag}/{l_tag})"
+        pivots_str = (
+            f"SH:${last_sh[1]:,.2f} ({_fmt_ts_utc(last_sh[2], t_fmt)}) · "
+            f"SL:${last_sl[1]:,.2f} ({_fmt_ts_utc(last_sl[2], t_fmt)})"
+        )
+    else:
+        win_hi = max(float(b.high) for b in closed[-min(len(closed), 20):])
+        win_lo = min(float(b.low) for b in closed[-min(len(closed), 20):])
+        struct_str = "RANGE / DEVELOPING"
+        pivots_str = f"Hi:${win_hi:,.2f} · Lo:${win_lo:,.2f}"
+
+    # Chronological BOS scan across confirmed fractal pivots
+    bos_str = "None in window"
+    if sh_list and sl_list:
+        sh_by_idx = {idx: px for idx, px, _ in sh_list}
+        sl_by_idx = {idx: px for idx, px, _ in sl_list}
+        active_sh: Optional[float] = None
+        active_sl: Optional[float] = None
+        broken_sh_val: Optional[float] = None
+        broken_sl_val: Optional[float] = None
+        last_bos_txt = ""
+        for idx, bar in enumerate(closed):
+            if idx in sh_by_idx:
+                active_sh = sh_by_idx[idx]
+            if idx in sl_by_idx:
+                active_sl = sl_by_idx[idx]
+            c_px = float(bar.close)
+            if active_sh is not None and active_sh != broken_sh_val and c_px > active_sh:
+                broken_sh_val = active_sh
+                last_bos_txt = f"BOS Up > ${active_sh:,.2f} ({_fmt_ts_utc(bar.timestamp_ms, t_fmt)})"
+            elif active_sl is not None and active_sl != broken_sl_val and c_px < active_sl:
+                broken_sl_val = active_sl
+                last_bos_txt = f"BOS Down < ${active_sl:,.2f} ({_fmt_ts_utc(bar.timestamp_ms, t_fmt)})"
+        if last_bos_txt:
+            bos_str = last_bos_txt
+
+    ref_px = spot_px if spot_px > 0.0 else float(closed[-1].close)
+    zones = _cluster_sr_zones(sh_list + sl_list, tolerance_pct=0.01)
+    res_zones = sorted((z for z in zones if z[0] > ref_px * 1.001), key=lambda z: z[0])[:3]
+    sup_zones = sorted((z for z in zones if z[0] < ref_px * 0.999), key=lambda z: z[0], reverse=True)[:3]
+
+    res_str = ", ".join(f"${px:,.2f} ({cnt}x)" for px, cnt in res_zones) if res_zones else "None above in lookback"
+    sup_str = ", ".join(f"${px:,.2f} ({cnt}x)" for px, cnt in sup_zones) if sup_zones else "None below in lookback"
+    return {
+        "tf": tf_label,
+        "bars": str(len(closed)),
+        "structure": struct_str,
+        "pivots": pivots_str,
+        "bos": bos_str,
+        "res": res_str,
+        "sup": sup_str,
+    }
+
+
+def _build_recent_ohlcv_lines(
+    bars: list,
+    tf_label: str,
+    interval_ms: int,
+    count: int,
+    now_ms: Optional[int] = None,
+) -> List[str]:
+    """Formats the most recent `count` closed OHLCV bars (newest first)."""
+    all_closed = _closed_kline_bars(bars, interval_ms, now_ms=now_ms)
+    closed = all_closed[-count:]
+    t_fmt = "%Y-%m-%d" if interval_ms >= 86_400_000 else "%Y-%m-%d %H:%M"
+    out = [
+        f"**{tf_label} Closed Candles (Last {len(closed)} of {len(all_closed)} available, Newest First):**",
+        "| Open Time (UTC) | Open | High | Low | Close | Chg% | Vol (BTC) |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    if not closed:
+        out.append("| `N/A` | `N/A` | `N/A` | `N/A` | `N/A` | `N/A` | `N/A` |")
+        return out
+    for b in reversed(closed):
+        o = float(b.open)
+        h = float(b.high)
+        l = float(b.low)
+        c = float(b.close)
+        v = float(b.volume)
+        chg = ((c / o) - 1.0) * 100.0 if o > 0.0 else 0.0
+        out.append(
+            f"| `{_fmt_ts_utc(b.timestamp_ms, t_fmt)}` | `${o:,.2f}` | `${h:,.2f}` | "
+            f"`${l:,.2f}` | `${c:,.2f}` | `{chg:+.2f}%` | `{v:,.0f}` |"
+        )
+    return out
+
+
 def _query_tab_d_trajectory_rows(db_path: pathlib.Path, limit: int = 6) -> List[Tuple[str, str, str, str, str, str]]:
     """Reads up to `limit` closed-4H snapshots from SQLite for Section 7 trajectory context."""
     if not db_path.exists():
@@ -1008,6 +1188,7 @@ def build_tab_d_data_only_report(
 
     spot_px = float(ev.spot_price or 0.0)
     bars_1h = list(getattr(store, "spot_klines_1h", []) or [])
+    bars_4h = list(getattr(store, "spot_klines_4h", []) or [])
     bars_1d = list(getattr(store, "spot_klines_1d", []) or [])
 
     if len(bars_1h) >= 24 and spot_px > 0.0:
@@ -1074,15 +1255,43 @@ def build_tab_d_data_only_report(
     else:
         lines.append("| `N/A` | `N/A` | `N/A` | `N/A` | `N/A` | `N/A` |")
 
+    struct_rows = [
+        _summarize_kline_structure(bars_1d, spot_px, "1D", 86_400_000, lookback=500),
+        _summarize_kline_structure(bars_4h, spot_px, "4H", 14_400_000, lookback=500),
+        _summarize_kline_structure(bars_1h, spot_px, "1H", 3_600_000, lookback=500),
+    ]
     lines.extend([
         "",
+        "### 7A. 500-BAR MARKET STRUCTURE & HISTORICAL S/R ZONES (`1D / 4H / 1H`)",
+        "| TF (Bars) | Swing Structure | Last Swing Pivots | Latest BOS | Resistance Zones (Above Spot) | Support Zones (Below Spot) |",
+        "|---|---|---|---|---|---|",
+    ])
+    for sr in struct_rows:
+        lines.append(
+            f"| `{sr['tf']} ({sr['bars']})` | `{sr['structure']}` | `{sr['pivots']}` | "
+            f"`{sr['bos']}` | `{sr['res']}` | `{sr['sup']}` |"
+        )
+
+    lines.extend([
+        "",
+        "### 7B. RECENT CLOSED KLINES — OHLCV PRICE ACTION (`1D`×7, `4H`×12, `1H`×12)",
+    ])
+    for bars_tf, tf_lbl, iv_ms, cnt in (
+        (bars_1d, "1D", 86_400_000, 7),
+        (bars_4h, "4H", 14_400_000, 12),
+        (bars_1h, "1H", 3_600_000, 12),
+    ):
+        lines.extend(_build_recent_ohlcv_lines(bars_tf, tf_lbl, iv_ms, cnt))
+        lines.append("")
+
+    lines.extend([
         "## 8. METRIC FORMULA LEGEND & AI ANALYSIS PROMPT",
         "- **Rough Path Lévy (`4H A_SP`)**: Lévy signed area over 6 closed 4H bars (`> 0`: Spot path leads price markup; `< 0`: Spot path lags price / distribution).",
         "- **24H Z-Scores (`z_S / z_F / D`)**: 30-day rolling Z-scores of 24H Spot (`z_S`) and Perp (`z_F`) cumulative delta; `D = z_S - z_F` (`D > 0` = Spot buying divergence vs Perps).",
-        "- **Volume Profile & Structure**: `VA Pos% = (Spot - VAL) / (VAH - VAL) * 100`; `L20/H20` = 20-bar (80H) 4H range boundaries; `SLSP` = structural liquidity pool S/R.",
+        "- **Volume Profile & Structure**: `VA Pos% = (Spot - VAL) / (VAH - VAL) * 100`; `L20/H20` = 20-bar (80H) 4H range boundaries; `SLSP` = structural liquidity pool S/R; `7A` scans 500 closed bars (`5x5` pivots) for `HH/HL/LH/LL`, `BOS`, and `1%`-clustered S/R zones.",
         "- **Quant & Volatility**: `H` = Hurst exponent (`>0.5` trending, `<0.5` mean-reverting); `VCR 72H` = 72H Volatility Compression Ratio; `TSFM Disp%` = horizon dispersion; `LSCE` = liquidation sweep state.",
         "- **Headless Snapshot Note**: Scheduled/GitHub Actions runs execute a one-shot REST warmup (`Warm:YES`) without a persistent WebSocket loop, so `WebSocket Feeds & Warmup` reporting `STALE` (`no tick`) is expected by design and does not indicate stale REST, orderbook, CVD, or derivatives data.",
-        "- **AI Analysis Task (5-Part Framework)**: Synthesize all 6 domains + the 4H archive trajectory into: (1) Multi-Timeframe Regime & Structural Map (`1W/1D/4H/1H`), (2) Spot Absorption vs Perpetual Leverage Alignment, (3) Derivatives & Options Skew/IV Pricing, (4) On-Chain, Stablecoin & US Macro Liquidity Impulse, and (5) Concrete Upside/Downside Scenarios with Key Invalidation Levels.",
+        "- **AI Analysis Task (5-Part Framework)**: Synthesize all 6 domains + Section 7's 4H archive, 500-bar Swing/S&R structure (`7A`), and closed `1D/4H/1H` OHLCV candles (`7B`) into: (1) Multi-Timeframe Regime & Structural Map (`1W/1D/4H/1H`), (2) Spot Absorption vs Perpetual Leverage Alignment, (3) Derivatives & Options Skew/IV Pricing, (4) On-Chain, Stablecoin & US Macro Liquidity Impulse, and (5) Concrete Upside/Downside Scenarios with Key Invalidation Levels.",
         "- **Direct AI Instruction (Execute Immediately on Paste)**: Analyze BTC using the telemetry report above. Follow the 5-part analysis framework in Section 8 and give me a clear bull vs. bear probability, key support/resistance & liquidation levels, and actionable swing / intraday setups with invalidation levels.",
         "",
     ])

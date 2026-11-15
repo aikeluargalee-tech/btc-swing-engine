@@ -615,6 +615,47 @@ class TestDataHub(unittest.TestCase):
         self.assertIsNotNone(byb)
         self.assertAlmostEqual(byb[1], 50_000.0)
 
+    def test_500_bar_structure_and_recent_ohlcv_sections(self) -> None:
+        import math
+
+        store = StateStore()
+        now_ms = int(time.time() * 1000)
+
+        def _wave_klines(n: int, step_ms: int) -> list:
+            # Align last bar to the active (unclosed) period so it must be excluded cleanly
+            cur_open = (now_ms // step_ms) * step_ms
+            bars = []
+            for i in range(n):
+                wave = 2500.0 * math.sin(i * 0.45) - (i * 35.0)
+                mid = 72_000.0 + wave
+                bars.append(
+                    KlineBar(
+                        timestamp_ms=cur_open - (n - 1 - i) * step_ms,
+                        open=mid - 120.0,
+                        high=mid + 420.0,
+                        low=mid - 390.0,
+                        close=mid + 80.0,
+                        volume=1500.0 + i,
+                        taker_buy_volume=750.0,
+                    )
+                )
+            return bars
+
+        store.spot_klines_1d.extend(_wave_klines(60, 86_400_000))
+        store.spot_klines_4h.extend(_wave_klines(80, 14_400_000))
+        store.spot_klines_1h.extend(_wave_klines(80, 3_600_000))
+        store.binance_spot_price = float(store.spot_klines_1h[-2].close)
+
+        report = build_tab_d_data_only_report(self.cfg, store, db_path=Path(tempfile.gettempdir()) / "nonexistent_dd_test.sqlite")
+        self.assertIn("### 7A. 500-BAR MARKET STRUCTURE & HISTORICAL S/R ZONES", report)
+        self.assertIn("### 7B. RECENT CLOSED KLINES — OHLCV PRICE ACTION", report)
+        self.assertIn("**1D Closed Candles (Last 7 of 59 available, Newest First):**", report)
+        self.assertIn("**4H Closed Candles (Last 12 of 79 available, Newest First):**", report)
+        self.assertIn("**1H Closed Candles (Last 12 of 79 available, Newest First):**", report)
+        self.assertIn("BOS ", report)
+        for bad in ("verdict", "bullish", "bearish", "recommend"):
+            self.assertNotIn(bad, report.lower())
+
 
 if __name__ == "__main__":
     unittest.main()

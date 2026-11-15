@@ -277,8 +277,8 @@ class TestDataHub(unittest.TestCase):
 
             # New DD v2 free-feed panels populated accurately
             self.assertIn("CB:14,820", all_rows["Cross-Exch 24H Spot Vol (BN/CB)"].value)
-            self.assertIn("Spr:0.14bps", all_rows["L2 Depth ±1%/±2%, OBI & Spread"].value)
-            self.assertIn("[BN+BYB+OKX]", all_rows["Cross-Exch Perp OI & Funding"].value)
+            self.assertIn("Spr:0.1400bps", all_rows["L2 Depth ±1%/±2%, OBI & Spread"].value)
+            self.assertIn("[BN+BYB+OKX 3/3]", all_rows["Cross-Exch Perp OI & Funding"].value)
             self.assertIn("P/C:0.625", all_rows["Options OI & Put/Call (Deribit)"].value)
             self.assertIn("+3.6%", all_rows["Options IV Term & Skew (Deribit)"].value)
             self.assertIn("-2,700.0 BTC", all_rows["Exchange Netflow 24H (CM)"].value)
@@ -309,8 +309,10 @@ class TestDataHub(unittest.TestCase):
             self.assertIn("1 closed-4H snapshots (Last: 2026-11-14 08:00:00 UTC)", report)
             self.assertIn("## 5. MACRO, CREDIT & US LIQUIDITY", report)
             self.assertIn("## 7. RECENT CLOSED-4H SNAPSHOT TRAJECTORY (SQLITE ARCHIVE)", report)
-            self.assertIn("## 8. METRIC FORMULA LEGEND & AI ANALYSIS PROMPT", report)
-            self.assertIn("Direct AI Instruction", report)
+            self.assertIn("| Funding 8H% / 90D Pct |", report)
+            self.assertIn("## 8. METRIC FORMULA LEGEND & CORTEX DESK LITE PROTOCOL", report)
+            self.assertIn("DIRECT AI EXECUTION PROTOCOL: CORTEX BTC DESK LITE v1.0", report)
+            self.assertIn("100% USDT CASH — NO ENTRY", report)
             self.assertIn("`2026-11-14 08:00:00 UTC` | `$73,650.00`", report)
             self.assertNotIn("OIPositioningQuadrant.", report)
             self.assertIn("NEUTRAL_CHURN`", report)
@@ -379,7 +381,7 @@ class TestDataHub(unittest.TestCase):
         # Daily VWAP must come from grok.vwap_daily to match vwap_stretch_z (-1.44σ), not rm.daily_vwap
         self.assertIn("D:$67,187.69 (-1.44σ)", p1["Daily / Weekly VWAP (Z)"].value)
         # ADX(14) 1D and 4H must be cleanly separated instead of mislabeling 1D ADX as ADX4H
-        self.assertIn("ADX 1D:28.1 4H:34.6", p1["ADX(14) 1D/4H & ATR(14)"].value)
+        self.assertIn("ADX 1D:28.1 4H:34.6", p1["ADX(14) 1D/4H & ATR(14) 1D/4H/1H"].value)
 
         # MasterSynthesisEvaluator must read fp.active_bar_delta rather than nonexistent current_bar_delta
         eval_store = StateStore()
@@ -655,6 +657,104 @@ class TestDataHub(unittest.TestCase):
         self.assertIn("BOS ", report)
         for bad in ("verdict", "bullish", "bearish", "recommend"):
             self.assertNotIn(bad, report.lower())
+
+    def test_cortex_desk_lite_labels_partial_venue_and_archive_backcompat(self) -> None:
+        from analytics.data_only_reports import _query_tab_d_trajectory_rows
+
+        store = StateStore()
+        store.binance_spot_price = 64_080.59
+        store.derivatives_snapshot = DerivativesSnapshot(
+            open_interest_btc=98_404.0,
+            open_interest_usd=6_170_000_000.0,
+            oi_change_15m_pct=-0.24,
+            oi_regime_quadrant=OIPositioningQuadrant.SHORT_COVERING_BOUNCE,
+            funding_rate_pct=0.0059,
+        )
+        store.four_gate_evaluation = FourGateEvaluation(loop_a_g4_funding_p90=0.7)
+        store.macro_intermarket = MacroIntermarketSnapshot(
+            orderbook_depth_ratio_1pct=0.79,
+            orderbook_depth_ratio_2pct=0.77,
+            orderbook_spread_bps=0.0016,
+            agg_perp_oi_btc=167_154.0,
+            agg_perp_oi_usd=10_500_000_000.0,
+            agg_perp_funding_8h_pct=0.0026,
+            agg_perp_venues_str="BN+OKX",
+            agg_perp_venues_count=2,
+            agg_perp_venues_expected=3,
+        )
+
+        ev = DataHubEngine(self.cfg, write_archive=False).evaluate(store)
+        all_rows = {
+            r.label: r
+            for r in (
+                ev.panel_1_feeds
+                + ev.panel_2_trend_vol
+                + ev.panel_3_structure_magnets
+                + ev.panel_4_flow_quant
+                + ev.panel_5_derivs_liq
+                + ev.panel_6_macro_onchain
+            )
+        }
+        self.assertIn("30D VA Pos% & Dist to VAL", all_rows)
+        self.assertIn("Spr:0.0016bps", all_rows["L2 Depth ±1%/±2%, OBI & Spread"].value)
+        self.assertIn("[BN+OKX 2/3 PARTIAL_VENUE]", all_rows["Cross-Exch Perp OI & Funding"].value)
+        self.assertIn("PARTIAL_VENUE (2/3)", all_rows["OI Δ% (15m/1h/4h/24h) & Quad"].value)
+        self.assertNotIn("SHORT_COVERING_BOUNCE", all_rows["OI Δ% (15m/1h/4h/24h) & Quad"].value)
+        self.assertIn("Funding 8H% / Ann% / 90D Pct", all_rows)
+        self.assertIn("90D Pct:0.7%", all_rows["Funding 8H% / Ann% / 90D Pct"].value)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db_file = Path(tmp) / "compat.sqlite"
+            conn = sqlite3.connect(str(db_file))
+            conn.execute(
+                """
+                CREATE TABLE telemetry_snapshots (
+                    closed_4h_bar_utc TEXT PRIMARY KEY,
+                    collected_at_utc TEXT NOT NULL,
+                    spot_price REAL NOT NULL,
+                    ok_count INTEGER NOT NULL,
+                    unavailable_count INTEGER NOT NULL,
+                    stale_count INTEGER NOT NULL,
+                    proxy_count INTEGER NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+                """
+            )
+            legacy_payload = json.dumps({
+                "panels": {
+                    "2_order_flow_liquidity": [],
+                    "3_derivatives_options_liq": [
+                        {"label": "Cross-Exch Perp OI & Funding", "value": "167k [BN+OKX 2/3 PARTIAL_VENUE]"},
+                        {"label": "Funding 8H% / Ann% / P90", "value": "+0.0050% (+5.5%) · P90:12.0%"},
+                    ],
+                    "4_onchain_etf_stablecoins": [],
+                }
+            })
+            new_payload = json.dumps({
+                "panels": {
+                    "2_order_flow_liquidity": [],
+                    "3_derivatives_options_liq": [
+                        {"label": "Cross-Exch Perp OI & Funding", "value": "200k [BN+BYB+OKX 3/3]"},
+                        {"label": "Funding 8H% / Ann% / 90D Pct", "value": "+0.0059% (+6.5%) · 90D Pct:0.7%"},
+                    ],
+                    "4_onchain_etf_stablecoins": [],
+                }
+            })
+            conn.execute(
+                "INSERT INTO telemetry_snapshots VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                ("2026-11-14 16:00:00 UTC", "2026-11-14T16:05:00+00:00", 65000.0, 60, 3, 1, 2, legacy_payload),
+            )
+            conn.execute(
+                "INSERT INTO telemetry_snapshots VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                ("2026-11-14 20:00:00 UTC", "2026-11-14T20:05:00+00:00", 64000.0, 60, 3, 1, 2, new_payload),
+            )
+            conn.commit()
+            conn.close()
+
+            rows = _query_tab_d_trajectory_rows(db_file, limit=6)
+            self.assertEqual(len(rows), 2)
+            self.assertEqual(rows[0][4], "+0.0059% (+6.5%) · 90D Pct:0.7%")
+            self.assertEqual(rows[1][4], "+0.0050% (+5.5%) · P90:12.0%")
 
 
 if __name__ == "__main__":

@@ -85,6 +85,8 @@ class MacroIntermarketSnapshot:
     agg_perp_oi_usd: Optional[float] = None
     agg_perp_funding_8h_pct: Optional[float] = None
     agg_perp_venues_str: Optional[str] = None
+    agg_perp_venues_count: Optional[int] = None
+    agg_perp_venues_expected: int = 3
     # ETF Flows (Farside + Yahoo IBIT/FBTC proxy)
     etf_daily_net_flow_usd: Optional[float] = None
     etf_daily_net_flow_status: str = "unavailable"
@@ -272,7 +274,7 @@ async def _fetch_depth_from(
                 asks = [(float(p), float(q)) for p, q in d.get("asks", [])]
                 if bids and asks:
                     mid = (bids[0][0] + asks[0][0]) / 2.0
-                    spread_bps = round(((asks[0][0] - bids[0][0]) / mid) * 10000.0, 2) if mid > 0 else None
+                    spread_bps = round(((asks[0][0] - bids[0][0]) / mid) * 10000.0, 4) if mid > 0 else None
                     bids_1pct = sum(q for p, q in bids if p >= mid * 0.99)
                     asks_1pct = sum(q for p, q in asks if p <= mid * 1.01)
                     ratio_1pct = (bids_1pct / asks_1pct) if asks_1pct > 0 else 1.0
@@ -548,6 +550,7 @@ async def _fetch_cross_exchange_perps_and_cb_vol(session: aiohttp.ClientSession)
         out["agg_oi_btc"] = round(sum(v[1] for v in venues), 1)
         out["agg_oi_usd"] = round(sum(v[2] for v in venues), 0)
         out["venues_str"] = "+".join(v[0] for v in venues)
+        out["venues_count"] = len(venues)
         w_num = sum(v[3] * v[2] for v in venues if v[3] is not None)
         w_den = sum(v[2] for v in venues if v[3] is not None)
         if w_den > 0:
@@ -743,6 +746,7 @@ async def fetch_macro_and_intermarket_snapshot(
         snap.agg_perp_oi_usd = perp_res.get("agg_oi_usd")
         snap.agg_perp_funding_8h_pct = perp_res.get("agg_funding_8h_pct")
         snap.agg_perp_venues_str = perp_res.get("venues_str")
+        snap.agg_perp_venues_count = perp_res.get("venues_count")
         snap.coinbase_spot_vol_24h_btc = perp_res.get("cb_vol_24h_btc")
 
     # Populate NY Fed Liquidity

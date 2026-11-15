@@ -437,7 +437,7 @@ class DataHubEngine:
             _row("Grok EMA 9/21 & 1H SMA200", f"9:{_fmt_price(ema9_g) or 'N/A'} · 21:{_fmt_price(ema21_g) or 'N/A'} · 1H:{_fmt_price(sma200_1h) or 'N/A'}" if (ema9_g or ema21_g or sma200_1h) else None, "5,15"),
             _row("Daily / Weekly VWAP (Z)", f"D:{_fmt_price(d_vwap) or 'N/A'} ({_fmt_num(vwap_z, '+.2f', True, 'σ') or 'N/A'}) | W:{_fmt_price(w_vwap) or 'N/A'}" if (d_vwap or w_vwap) else None, "4,11,15"),
             _row("RSI(14) 1D / 4H & 4H ROC12", f"1D:{_fmt_num(rsi_1d, '.1f') or 'N/A'} · 4H:{_fmt_num(rsi_4h, '.1f') or 'N/A'} · ROC:{_fmt_num(roc12_4h, '+.2f', True, '%') or 'N/A'}" if (rsi_1d is not None or rsi_4h is not None) else None, "3,7,20"),
-            _row("ADX(14) 1D/4H & ATR(14)", f"ADX 1D:{_fmt_num(adx_1d, '.1f') or 'N/A'} 4H:{_fmt_num(adx_4h, '.1f') or 'N/A'} | ATR:{_fmt_price(atr_1d) or 'N/A'}/{_fmt_price(atr_4h) or 'N/A'}/{_fmt_price(atr_1h) or 'N/A'}" if (adx_1d or adx_4h or atr_1d or atr_4h or atr_1h) else None, "0,1,2,8,13,18,20"),
+            _row("ADX(14) 1D/4H & ATR(14) 1D/4H/1H", f"ADX 1D:{_fmt_num(adx_1d, '.1f') or 'N/A'} 4H:{_fmt_num(adx_4h, '.1f') or 'N/A'} | ATR:{_fmt_price(atr_1d) or 'N/A'}/{_fmt_price(atr_4h) or 'N/A'}/{_fmt_price(atr_1h) or 'N/A'}" if (adx_1d or adx_4h or atr_1d or atr_4h or atr_1h) else None, "0,1,2,8,13,18,20"),
             _row("Macro 30D VAH / POC / VAL", f"{_fmt_price(mv.c_vah)} / {_fmt_price(mv.c_poc)} / {_fmt_price(mv.c_val)}" if mv else None, "1,3,6,11,19"),
             _row("Structure (L20/H20, PW, Asia)", struct_str, "0,8,11,19"),
         ]
@@ -470,10 +470,7 @@ class DataHubEngine:
         spread_bps = _first_num(getattr(mi, "orderbook_spread_bps", None))
         obi_pct = _first_num(getattr(ssrn, "live_obi_ratio_pct", None))
         depth_ok = any(x is not None for x in (depth_1p, depth_2p, spread_bps, obi_pct))
-        if spread_bps is not None and 0.0 < abs(spread_bps) < 0.01:
-            spread_fmt: Optional[str] = f"{spread_bps:.4f}bps"
-        else:
-            spread_fmt = _fmt_num(spread_bps, '.2f', True, 'bps')
+        spread_fmt: Optional[str] = f"{spread_bps:.4f}bps" if spread_bps is not None else None
         depth_str = (
             f"1%:{_fmt_num(depth_1p, '.2f', False, 'x') or 'N/A'} · 2%:{_fmt_num(depth_2p, '.2f', False, 'x') or 'N/A'} · "
             f"Spr:{spread_fmt or 'N/A'} · OBI:{_fmt_num(obi_pct, '+.1f', True, '%') or 'N/A'}"
@@ -503,7 +500,7 @@ class DataHubEngine:
             _row("Cross-Exch 24H Spot Vol (BN/CB)", xexch_vol_str, "1,11,Macro"),
             _row("L2 Depth ±1%/±2%, OBI & Spread", depth_str, "16,Macro"),
             _row("Tactical 7D / Session 24H VP", vp_pair_str, "1,11"),
-            _row("VA Pos% & Dist to VAL", f"{_fmt_num(getattr(sig, 'va_position_pct', None), '.1f', True, '%')} | {_fmt_num(getattr(sig, 'distance_to_val_pct', None), '+.2f', True, '%')} ({_fmt_num(getattr(sig, 'distance_to_val_atr', None), '+.2f', True, ' ATR')})" if sig else None, "1"),
+            _row("30D VA Pos% & Dist to VAL", f"{_fmt_num(getattr(sig, 'va_position_pct', None), '.1f', True, '%')} | {_fmt_num(getattr(sig, 'distance_to_val_pct', None), '+.2f', True, '%')} ({_fmt_num(getattr(sig, 'distance_to_val_atr', None), '+.2f', True, ' ATR')})" if sig else None, "1"),
             _row("SLSP Support / Resistance", f"Sup:{_fmt_price(nsup) or 'N/A'} | Res:{_fmt_price(nres) or 'N/A'}" if (nsup or nres) else None, "13"),
         ]
 
@@ -514,6 +511,23 @@ class DataHubEngine:
         agg_oi_u = _first_num(getattr(mi, "agg_perp_oi_usd", None), allow_zero=False)
         agg_fund = _first_num(getattr(mi, "agg_perp_funding_8h_pct", None))
         agg_venues = getattr(mi, "agg_perp_venues_str", None) or "Agg"
+        raw_vcount = getattr(mi, "agg_perp_venues_count", None)
+        agg_venues_expected = int(getattr(mi, "agg_perp_venues_expected", 3) or 3)
+        if raw_vcount is not None:
+            agg_venues_count: Optional[int] = int(raw_vcount)
+        elif agg_venues != "Agg":
+            agg_venues_count = len([p for p in str(agg_venues).split("+") if p.strip()])
+        else:
+            agg_venues_count = None
+        is_partial_venue = agg_venues_count is not None and 0 < agg_venues_count < agg_venues_expected
+        if agg_venues_count is not None:
+            agg_venues_tag = (
+                f"{agg_venues} {agg_venues_count}/{agg_venues_expected} PARTIAL_VENUE"
+                if is_partial_venue
+                else f"{agg_venues} {agg_venues_count}/{agg_venues_expected}"
+            )
+        else:
+            agg_venues_tag = str(agg_venues)
 
         oi_15 = _first_num(getattr(deriv, "oi_change_15m_pct", None))
         oi_1h = _first_num(getattr(deriv, "oi_change_1h_pct", None))
@@ -521,6 +535,16 @@ class DataHubEngine:
         oi_24h = _first_num(getattr(rm, "oi_change_24h_pct", None), getattr(getattr(ss, "magnet", None), "oi_change_24h_pct", None))
         quad_raw = getattr(deriv, "oi_regime_quadrant", None)
         quad_val = getattr(quad_raw, "value", getattr(quad_raw, "name", str(quad_raw))) if quad_raw is not None else None
+        is_short_covering = (
+            getattr(quad_raw, "name", "") == "SHORT_COVERING_BOUNCE"
+            or (isinstance(quad_val, str) and quad_val.startswith("SHORT_COVERING_BOUNCE"))
+        )
+        if is_partial_venue and is_short_covering:
+            quad_display: Optional[str] = f"PARTIAL_VENUE ({agg_venues_count}/{agg_venues_expected})"
+        elif is_partial_venue and quad_val:
+            quad_display = f"{quad_val} (PARTIAL_VENUE {agg_venues_count}/{agg_venues_expected})"
+        else:
+            quad_display = quad_val
         oi_deltas_ok = any(x is not None for x in (oi_15, oi_1h, oi_4h, oi_24h))
 
         fund_8h = _first_num(store.funding_rate_pct, getattr(deriv, "funding_rate_pct", None))
@@ -580,9 +604,9 @@ class DataHubEngine:
 
         panel_3 = [
             _row("BN Open Interest (BTC / USD)", f"{oi_btc:,.0f} BTC ({_fmt_usd_compact(oi_usd) or 'N/A'})" if oi_btc else None, "0,1,4,15,17"),
-            _row("Cross-Exch Perp OI & Funding", f"{_fmt_num(agg_oi_b, ',.0f', False, ' BTC') or 'N/A'} ({_fmt_usd_compact(agg_oi_u) or 'N/A'}) · F:{_fmt_num(agg_fund, '+.4f', True, '%') or 'N/A'} [{agg_venues}]" if (agg_oi_b or agg_fund is not None) else None, "Macro,15"),
-            _row("OI Δ% (15m/1h/4h/24h) & Quad", f"{_fmt_num(oi_15, '+.2f', True, '%') or 'N/A'}/{_fmt_num(oi_1h, '+.2f', True, '%') or 'N/A'}/{_fmt_num(oi_4h, '+.2f', True, '%') or 'N/A'}/{_fmt_num(oi_24h, '+.2f', True, '%') or 'N/A'} | {quad_val or 'N/A'}" if (oi_deltas_ok or quad_val) else None, "1,4,8,11,12,15,17"),
-            _row("Funding 8H% / Ann% / P90", f"{_fmt_num(fund_8h, '+.4f', True, '%') or 'N/A'} ({_fmt_num(fund_ann, '+.1f', True, '%/yr') or 'N/A'}) · P90:{_fmt_num(fund_p90, '.1f', True, '%') or 'N/A'}" if (fund_8h is not None or fund_p90 is not None) else None, "0,4,9,11,15,16,19,20"),
+            _row("Cross-Exch Perp OI & Funding", f"{_fmt_num(agg_oi_b, ',.0f', False, ' BTC') or 'N/A'} ({_fmt_usd_compact(agg_oi_u) or 'N/A'}) · F:{_fmt_num(agg_fund, '+.4f', True, '%') or 'N/A'} [{agg_venues_tag}]" if (agg_oi_b or agg_fund is not None) else None, "Macro,15"),
+            _row("OI Δ% (15m/1h/4h/24h) & Quad", f"{_fmt_num(oi_15, '+.2f', True, '%') or 'N/A'}/{_fmt_num(oi_1h, '+.2f', True, '%') or 'N/A'}/{_fmt_num(oi_4h, '+.2f', True, '%') or 'N/A'}/{_fmt_num(oi_24h, '+.2f', True, '%') or 'N/A'} | {quad_display or 'N/A'}" if (oi_deltas_ok or quad_display) else None, "1,4,8,11,12,15,17"),
+            _row("Funding 8H% / Ann% / 90D Pct", f"{_fmt_num(fund_8h, '+.4f', True, '%') or 'N/A'} ({_fmt_num(fund_ann, '+.1f', True, '%/yr') or 'N/A'}) · 90D Pct:{_fmt_num(fund_p90, '.1f', True, '%') or 'N/A'}" if (fund_8h is not None or fund_p90 is not None) else None, "0,4,9,11,15,16,19,20"),
             _row("Perp Basis ($ / Ann %)", basis_str, "1,4"),
             _row("5m Taker L/S & Top/Glb Acct", acct_str, "1,2,15,16"),
             _row("Options OI & Put/Call (Deribit)", f"P/C:{_fmt_num(pc_oi, '.3f', False) or 'N/A'} · TotOI:{_fmt_num(opt_oi, ',.0f', False, ' BTC') or 'N/A'}" if (pc_oi is not None or opt_oi is not None) else None, "Macro,19"),

@@ -1161,7 +1161,9 @@ def _query_tab_d_trajectory_rows(db_path: pathlib.Path, limit: int = 6) -> List[
         if "24h:" in cvd_str:
             cvd_str = "24h:" + cvd_str.split("24h:", 1)[1].strip()
         xexch_oi = _extract_panel_row(panels, "3_derivatives_options_liq", "Cross-Exch Perp OI & Funding")
-        fund_p90 = _extract_panel_row(panels, "3_derivatives_options_liq", "Funding 8H% / Ann% / P90")
+        fund_p90 = _extract_panel_row(panels, "3_derivatives_options_liq", "Funding 8H% / Ann% / 90D Pct")
+        if fund_p90 == "N/A":
+            fund_p90 = _extract_panel_row(panels, "3_derivatives_options_liq", "Funding 8H% / Ann% / P90")
         mvrv_s = _extract_panel_row(panels, "4_onchain_etf_stablecoins", "MVRV Ratio (On-Chain / Proxy)")
         out.append((
             str(bar_utc),
@@ -1246,7 +1248,7 @@ def build_tab_d_data_only_report(
     traj_rows = _query_tab_d_trajectory_rows(archive_db, limit=6) if archive_db is not None else []
     lines.extend([
         "## 7. RECENT CLOSED-4H SNAPSHOT TRAJECTORY (SQLITE ARCHIVE)",
-        "| Closed 4H Bar (UTC) | Spot ($) | 24H Spot/Perp CVD | Cross-Exch Perp OI & Funding | Funding 8H% / P90 | MVRV Ratio |",
+        "| Closed 4H Bar (UTC) | Spot ($) | 24H Spot/Perp CVD | Cross-Exch Perp OI & Funding | Funding 8H% / 90D Pct | MVRV Ratio |",
         "|---|---|---|---|---|---|",
     ])
     if traj_rows:
@@ -1285,14 +1287,37 @@ def build_tab_d_data_only_report(
         lines.append("")
 
     lines.extend([
-        "## 8. METRIC FORMULA LEGEND & AI ANALYSIS PROMPT",
+        "## 8. METRIC FORMULA LEGEND & CORTEX DESK LITE PROTOCOL",
         "- **Rough Path Lévy (`4H A_SP`)**: Lévy signed area over 6 closed 4H bars (`> 0`: Spot path leads price markup; `< 0`: Spot path lags price / distribution).",
         "- **24H Z-Scores (`z_S / z_F / D`)**: 30-day rolling Z-scores of 24H Spot (`z_S`) and Perp (`z_F`) cumulative delta; `D = z_S - z_F` (`D > 0` = Spot buying divergence vs Perps).",
-        "- **Volume Profile & Structure**: `VA Pos% = (Spot - VAL) / (VAH - VAL) * 100`; `L20/H20` = 20-bar (80H) 4H range boundaries; `SLSP` = structural liquidity pool S/R; `7A` scans 500 closed bars (`5x5` pivots) for `HH/HL/LH/LL`, `BOS`, and `1%`-clustered S/R zones.",
-        "- **Quant & Volatility**: `H` = Hurst exponent (`>0.5` trending, `<0.5` mean-reverting); `VCR 72H` = 72H Volatility Compression Ratio; `TSFM Disp%` = horizon dispersion; `LSCE` = liquidation sweep state.",
+        "- **Volume Profile & Structure**: `30D VA Pos% = (Spot - VAL) / (VAH - VAL) * 100` (Macro 30D Value Area); `ATR(14) 1D/4H/1H`; `L20/H20` = 20-bar (80H) 4H range boundaries; `SLSP` = structural liquidity pool S/R; `7A` scans 500 closed bars (`5x5` pivots) for `HH/HL/LH/LL`, `BOS`, and `1%`-clustered S/R zones.",
+        "- **Derivatives & Quant**: `90D Pct` = 0-100 rolling 90-day percentile rank of 8H funding; `[... X/3 PARTIAL_VENUE]` suppresses OI quadrant tagging when `<3` venues report; `H` = Hurst exponent (`>0.5` trending, `<0.5` mean-reverting); `VCR 72H` = Volatility Compression Ratio; `TSFM Disp%` = horizon dispersion; `LSCE` = liquidation sweep state.",
         "- **Headless Snapshot Note**: Scheduled/GitHub Actions runs execute a one-shot REST warmup (`Warm:YES`) without a persistent WebSocket loop, so `WebSocket Feeds & Warmup` reporting `STALE` (`no tick`) is expected by design and does not indicate stale REST, orderbook, CVD, or derivatives data.",
-        "- **AI Analysis Task (5-Part Framework)**: Synthesize all 6 domains + Section 7's 4H archive, 500-bar Swing/S&R structure (`7A`), and closed `1D/4H/1H` OHLCV candles (`7B`) into: (1) Multi-Timeframe Regime & Structural Map (`1W/1D/4H/1H`), (2) Spot Absorption vs Perpetual Leverage Alignment, (3) Derivatives & Options Skew/IV Pricing, (4) On-Chain, Stablecoin & US Macro Liquidity Impulse, and (5) Concrete Upside/Downside Scenarios with Key Invalidation Levels.",
-        "- **Direct AI Instruction (Execute Immediately on Paste)**: Analyze BTC using the telemetry report above. Follow the 5-part analysis framework in Section 8 and give me a clear bull vs. bear probability, key support/resistance & liquidation levels, and actionable swing / intraday setups with invalidation levels.",
+        "",
+        "### DIRECT AI EXECUTION PROTOCOL: CORTEX BTC DESK LITE v1.0",
+        "Analyze BTC using the telemetry snapshot above. Operate as **CORTEX BTC DESK LITE v1.0** — a Spot-Only Institutional Capital Preservation & Swing Execution Workstation. Apply strict **zero-hallucination** rules using only metrics explicitly reported above (`7`, `7A`, `7B`, and Sections `1-6`).",
+        "",
+        "**Step 1 — Mandatory Data Hygiene Gate (Run First):**",
+        "- Verify `Coverage` and isolate all `UNAVAILABLE`, `STALE`, and `PROXY/STATIC` feeds before scoring.",
+        "- Verify whether `WebSocket Feeds & Warmup` (`STALE`) is a headless REST warmup (`Warm:YES`), distinguishing expected one-shot snapshot behavior from genuine REST staleness.",
+        "- Flag `[... PARTIAL_VENUE]` on `Cross-Exch Perp OI & Funding` or Section `7` history — never treat partial venue counts (`< 3/3`) as genuine deleveraging.",
+        "- Read `90D Pct` strictly as a `0-100` rolling 90-day funding rank, `30D VA Pos%` strictly vs Macro 30D VAH/VAL, and `ATR(14) 1D/4H/1H` across matching timeframes.",
+        "- Do not cite missing metrics or external prices outside this telemetry snapshot.",
+        "",
+        "**Step 2 — 5-Function Deterministic Synthesis:**",
+        "1. **Multi-Timeframe Regime Classifier:** Integrate Section `1`, `7A` (`1D/4H/1H` swing structure & BOS), `7B` closed OHLCV price action, `1D/4H` ADX, `RSI(14)`, EMA/SMA stack, and Hurst `H` -> classify as `UPTREND`, `DOWNTREND`, `RANGE-BOUND`, or `TRANSITIONAL`.",
+        "2. **Spot Flow & Liquidity Inspector:** Evaluate `Spot/Perp CVD` across `15m/1h/4h/24h`, `z_S / z_F / D`, `Coinbase Premium`, `L2 Depth`, `OBI`, `Spr`, `30D VA Pos%`, `SLSP`, and `7A` S/R clusters -> classify true spot accumulation vs distribution or passive absorption.",
+        "3. **Derivatives & Squeeze Risk Profiler:** Evaluate `BN OI`, `Cross-Exch OI` (only when `3/3` venues valid), `OI Δ%` & Quad, `Funding 8H% / Ann% / 90D Pct`, `DVOL`, `25d RR Skew`, and liquidation clusters -> classify leverage fragility and squeeze asymmetry.",
+        "4. **Macro, On-Chain & ETF Gatekeeper:** Synthesize `MVRV`, `SOPR`, `ETF Net Flow`, `Stablecoin Supply`, `DXY`, `US10Y`, `VIX`, `SPX`, and `Net Liquidity` -> assign macro backdrop (`Tailwind`, `Neutral`, or `Headwind`).",
+        "5. **Spot-Only Risk & Decision Arbiter:** Enforce hard capital-preservation gates: if `1D` closes below `1D SMA 200` and `4H` shows active downtrend / broken structure, or trend conviction fails multi-gate alignment, enforce `100% USDT CASH — NO ENTRY`. Never force an entry in chop (`ADX < 20` or `TRANSITIONAL`). For any qualified spot setup, cap maximum portfolio risk at `0.75%` per position.",
+        "",
+        "**Step 3 — Mandatory Output Contract:**",
+        "- **1. EXECUTIVE SUMMARY & DESK POSTURE** (Spot Price, Regime State, Posture: `ACTIVE SPOT LONG` or `100% USDT CASH — NO ENTRY`, Confidence `/100`).",
+        "- **2. DATA HYGIENE AUDIT** (Exact `OK/UNAVAILABLE/STALE/PROXY` tally, headless WS clarification, any `PARTIAL_VENUE` anomalies, degraded-signal list).",
+        "- **3. MULTI-TIMEFRAME REGIME & FLOW SYNTHESIS** (Price/EMA/ADX structure vs Spot CVD, Coinbase Premium, and 4H SQLite Section `7` + `7A/7B` trajectory).",
+        "- **4. DERIVATIVES, LIQUIDITY & MACRO CONTEXT** (OI venue-integrity check, funding `90D Pct`, options skew, liquidity pools, macro/ETF headwind vs tailwind).",
+        "- **5. CRITICAL LEVELS MAP** (Immediate & Major Support, Immediate & Major Resistance, Hard Invalidation Levels tied to `7A/7B` & `SLSP`).",
+        "- **6. SPOT EXECUTION PLAN (OR NO-ENTRY GATE)** (Exact Entry Zone, Stop Loss, Take Profit Targets, Position Size at `<= 0.75%` portfolio risk, and explicit Multi-Gate Validation Triggers required to shift posture).",
         "",
     ])
 

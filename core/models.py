@@ -5017,7 +5017,7 @@ class TrendPullbackEvaluation:
     mode_label: str = "RESEARCH / PAPER MODE"
 
     timestamp_utc: str = ""
-    timestamp_myt: str = ""
+    timestamp_sgt: str = ""
     spot_price: float = 0.0
 
     # 1. Market Regime & 4H Trend

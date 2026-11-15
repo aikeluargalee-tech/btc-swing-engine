@@ -42,7 +42,7 @@ from config.settings import DEFAULT_CONFIG, EngineConfig  # noqa: E402
 from core.state_store import StateStore  # noqa: E402
 
 logger = logging.getLogger("publish_dd_hub")
-MYT_TZ = timezone(timedelta(hours=8))
+SGT_TZ = timezone(timedelta(hours=8))
 TELEGRAM_MAX_LEN = 3900
 
 PANEL_SPECS: Tuple[Tuple[str, str, str], ...] = (
@@ -104,7 +104,7 @@ def build_dd_json_payload(
     md_report: str,
     recent_archive: List[Dict[str, Any]],
     utc_str: str,
-    myt_str: str,
+    sgt_str: str,
 ) -> Dict[str, Any]:
     """Builds the structured `dd_latest.json` payload for GitHub Pages and downstream bots."""
     panels: Dict[str, Any] = {}
@@ -119,7 +119,7 @@ def build_dd_json_payload(
         "schema_version": "dd_v2",
         "instrument": "BTCUSDT",
         "retrieval_utc": utc_str,
-        "retrieval_myt": myt_str,
+        "retrieval_sgt": sgt_str,
         "spot_price": float(ev.spot_price),
         "total_metrics": int(ev.total_metrics),
         "ok_count": int(ev.ok_count),
@@ -153,7 +153,7 @@ def render_dashboard_html(
     """Renders a self-contained retro-Bloomberg dark-mode HTML dashboard for GitHub Pages."""
     spot = float(payload.get("spot_price", 0.0) or 0.0)
     utc_s = html.escape(str(payload.get("retrieval_utc", "")))
-    myt_s = html.escape(str(payload.get("retrieval_myt", "")))
+    sgt_s = html.escape(str(payload.get("retrieval_sgt") or payload.get("retrieval_myt") or ""))
     ok_c = int(payload.get("ok_count", 0))
     tot_c = int(payload.get("total_metrics", 0))
     na_c = int(payload.get("unavailable_count", 0))
@@ -450,7 +450,7 @@ def render_dashboard_html(
       <div class="meta-line">
         <span>Spot: <span class="spot-pill">${spot:,.2f}</span></span>
         <span>UTC: <strong>{utc_s}</strong></span>
-        <span>MYT: <strong>{myt_s}</strong></span>
+        <span>SGT: <strong>{sgt_s}</strong></span>
         <span>Coverage: <strong>OK={ok_c}/{tot_c}</strong> · N/A={na_c} · STALE={st_c} · PROXY={px_c}</span>
         <span>SQLite 4H Archive: <strong>{arch_c}</strong> (Last: {arch_last})</span>
       </div>
@@ -557,7 +557,7 @@ def _format_telegram_panel_block(title: str, rows: Sequence[DataMetricRow]) -> s
 def build_telegram_messages(
     ev: DataHubEvaluation,
     utc_str: str,
-    myt_str: str,
+    sgt_str: str,
     pages_url: str,
     repo_url: str,
     max_len: int = TELEGRAM_MAX_LEN,
@@ -569,13 +569,13 @@ def build_telegram_messages(
         f"OK=<code>{ev.ok_count}/{ev.total_metrics}</code> "
         f"(N/A={ev.unavailable_count}, STALE={ev.stale_count}, PROXY={ev.proxy_or_static_count})\n"
         f"UTC: <code>{html.escape(utc_str)}</code>\n"
-        f"MYT: <code>{html.escape(myt_str)}</code>\n"
+        f"SGT: <code>{html.escape(sgt_str)}</code>\n"
         f"4H SQLite: <code>{ev.archive_snapshots_count}</code> bars "
         f"(Last: <code>{html.escape(ev.archive_last_bar_utc or 'N/A')}</code>)"
     )
     header_2 = (
         f"<b>BTC TAB [D: DATA HUB] (2/2)</b> — Spot: <b>${ev.spot_price:,.2f}</b> "
-        f"(<code>{html.escape(myt_str)}</code>)"
+        f"(<code>{html.escape(sgt_str)}</code>)"
     )
     footer_2 = (
         f"<a href=\"{html.escape(pages_url)}\">Live Dashboard (1-Tap Copy)</a> | "
@@ -754,13 +754,13 @@ async def send_dd_to_telegram(
     ev: DataHubEvaluation,
     md_path: pathlib.Path,
     utc_str: str,
-    myt_str: str,
+    sgt_str: str,
     pages_url: str,
     repo_url: str,
 ) -> None:
     """Delivers split Tab D summary messages + `btc_data_hub_latest.md` over IPv4 Keep-Alive with URL fallback."""
     base_api = f"https://api.telegram.org/bot{token}"
-    messages = build_telegram_messages(ev, utc_str, myt_str, pages_url, repo_url)
+    messages = build_telegram_messages(ev, utc_str, sgt_str, pages_url, repo_url)
     md_bytes = md_path.read_bytes()
     caption = (
         f"BTC Tab [D: DATA HUB] | Spot ${ev.spot_price:,.2f} | OK={ev.ok_count}/{ev.total_metrics} | {utc_str}"
@@ -949,7 +949,7 @@ def write_dashboard_artifacts(
     repo_url: str,
     pages_url: str,
     utc_str: str,
-    myt_str: str,
+    sgt_str: str,
     also_write_logs: bool = True,
 ) -> Dict[str, pathlib.Path]:
     """Writes `btc_data_hub_latest.md`, `dd_latest.json`, and `index.html` into `output_dir`."""
@@ -971,14 +971,14 @@ def write_dashboard_artifacts(
                 pass
 
     recent_archive = query_recent_archive(db_path, limit=30)
-    payload = build_dd_json_payload(ev, md_report, recent_archive, utc_str, myt_str)
+    payload = build_dd_json_payload(ev, md_report, recent_archive, utc_str, sgt_str)
     json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     html_path.write_text(render_dashboard_html(payload, repo_url=repo_url, pages_url=pages_url), encoding="utf-8")
     return {"md": md_path, "json": json_path, "html": html_path}
 
 
 def load_evaluation_from_json(json_path: pathlib.Path) -> Tuple[DataHubEvaluation, str, str]:
-    """Reconstructs a `DataHubEvaluation` and UTC/MYT timestamps from an existing `dd_latest.json`."""
+    """Reconstructs a `DataHubEvaluation` and UTC/SGT timestamps from an existing `dd_latest.json`."""
     payload = json.loads(json_path.read_text(encoding="utf-8"))
     panels = payload.get("panels") or {}
     kw: Dict[str, Any] = {
@@ -1004,7 +1004,7 @@ def load_evaluation_from_json(json_path: pathlib.Path) -> Tuple[DataHubEvaluatio
             for r in rows
         ]
     ev = DataHubEvaluation(**kw)
-    return ev, str(payload.get("retrieval_utc", "")), str(payload.get("retrieval_myt", ""))
+    return ev, str(payload.get("retrieval_utc", "")), str(payload.get("retrieval_sgt") or payload.get("retrieval_myt") or "")
 
 
 async def run_publisher(
@@ -1021,7 +1021,7 @@ async def run_publisher(
     if telegram_only:
         json_path = output_dir / "dd_latest.json"
         md_path = output_dir / "btc_data_hub_latest.md"
-        ev, utc_str, myt_str = load_evaluation_from_json(json_path)
+        ev, utc_str, sgt_str = load_evaluation_from_json(json_path)
         paths: Dict[str, pathlib.Path] = {"md": md_path, "json": json_path}
     else:
         cfg = config or DEFAULT_CONFIG
@@ -1041,7 +1041,7 @@ async def run_publisher(
 
         now_utc = datetime.now(timezone.utc)
         utc_str = now_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
-        myt_str = now_utc.astimezone(MYT_TZ).strftime("%Y-%m-%d %H:%M:%S MYT (UTC+8)")
+        sgt_str = now_utc.astimezone(SGT_TZ).strftime("%Y-%m-%d %H:%M:%S SGT (UTC+8)")
 
         paths = write_dashboard_artifacts(
             output_dir=output_dir,
@@ -1051,7 +1051,7 @@ async def run_publisher(
             repo_url=repo_url,
             pages_url=pages_url,
             utc_str=utc_str,
-            myt_str=myt_str,
+            sgt_str=sgt_str,
         )
         logger.info(
             "Published Tab [D]: Spot=$%.2f | OK=%d/%d | Archive=%d | Files=%s",
@@ -1078,7 +1078,7 @@ async def run_publisher(
                     ev=ev,
                     md_path=paths["md"],
                     utc_str=utc_str,
-                    myt_str=myt_str,
+                    sgt_str=sgt_str,
                     pages_url=pages_url,
                     repo_url=repo_url,
                 )

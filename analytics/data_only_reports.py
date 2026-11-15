@@ -24,7 +24,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 from config.settings import DEFAULT_CONFIG, EngineConfig
 from core.state_store import StateStore
 
-MYT_TZ = timezone(timedelta(hours=8))
+SGT_TZ = timezone(timedelta(hours=8))
 
 FORBIDDEN_WORDS_REPLACEMENTS: Tuple[Tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"verdict", re.IGNORECASE), "status"),
@@ -52,12 +52,12 @@ def sanitize_data_only_text(text: str) -> str:
     return out
 
 
-def _timestamps_utc_myt() -> Tuple[str, str]:
+def _timestamps_utc_sgt() -> Tuple[str, str]:
     now_utc = datetime.now(timezone.utc)
-    now_myt = now_utc.astimezone(MYT_TZ)
+    now_sgt = now_utc.astimezone(SGT_TZ)
     return (
         now_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
-        now_myt.strftime("%Y-%m-%d %H:%M:%S MYT (UTC+8)"),
+        now_sgt.strftime("%Y-%m-%d %H:%M:%S SGT (UTC+8)"),
     )
 
 
@@ -73,7 +73,7 @@ def _spot_price(store: StateStore) -> float:
 # ==============================================================================
 def build_tab_p_data_only_report(config: Optional[EngineConfig], store: StateStore) -> str:
     cfg = config or DEFAULT_CONFIG
-    ts_utc, ts_myt = _timestamps_utc_myt()
+    ts_utc, ts_sgt = _timestamps_utc_sgt()
     spot_px = _spot_price(store)
     slsp = getattr(store, "slsp_evaluation", None)
     if slsp is None:
@@ -86,7 +86,7 @@ def build_tab_p_data_only_report(config: Optional[EngineConfig], store: StateSto
 
     lines = [
         "# TAB [P: STRUCTURE] | DATA-ONLY METRICS REPORT",
-        f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (MYT):** `{ts_myt}`",
+        f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (SGT):** `{ts_sgt}`",
         f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}`",
         "",
         "## 1. 5-REGIME RADAR DIAGNOSIS & MACRO SIZING",
@@ -227,7 +227,7 @@ def build_tab_p_data_only_report(config: Optional[EngineConfig], store: StateSto
 # 3. TAB [G: GROK FLOW] DATA-ONLY REPORT
 # ==============================================================================
 def build_tab_g_data_only_report(config: Optional[EngineConfig], store: StateStore) -> str:
-    ts_utc, ts_myt = _timestamps_utc_myt()
+    ts_utc, ts_sgt = _timestamps_utc_sgt()
     grok = getattr(store, "grok_quant_evaluation", None)
     if grok is None:
         from analytics.grok_quant_engine import GrokQuantEngine
@@ -252,7 +252,7 @@ def build_tab_g_data_only_report(config: Optional[EngineConfig], store: StateSto
 
     lines = [
         "# TAB [G: GROK FLOW] | DATA-ONLY METRICS REPORT",
-        f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (MYT):** `{ts_myt}`",
+        f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (SGT):** `{ts_sgt}`",
         f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}`",
         "",
         "## 1. 00:00 UTC ANCHORED VWAP & STANDARD DEVIATION BANDS",
@@ -294,7 +294,7 @@ def build_tab_g_data_only_report(config: Optional[EngineConfig], store: StateSto
 # 4. TAB [R: SSRN RESEARCH] DATA-ONLY REPORT
 # ==============================================================================
 def build_tab_r_data_only_report(config: Optional[EngineConfig], store: StateStore) -> str:
-    ts_utc, ts_myt = _timestamps_utc_myt()
+    ts_utc, ts_sgt = _timestamps_utc_sgt()
     ssrn = getattr(store, "ssrn_alpha_evaluation", None)
     if ssrn is None:
         from analytics.ssrn_research_engine import SSRNResearchEngine
@@ -303,7 +303,7 @@ def build_tab_r_data_only_report(config: Optional[EngineConfig], store: StateSto
     spot_px = round(float(ssrn.spot_price), 2)
     lines = [
         "# TAB [R: SSRN RESEARCH] | DATA-ONLY METRICS REPORT",
-        f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (MYT):** `{ts_myt}`",
+        f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (SGT):** `{ts_sgt}`",
         f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}`",
         "",
         "## 1. EMPIRICAL FACTOR & GATE METRICS",
@@ -344,7 +344,7 @@ def build_tab_r_data_only_report(config: Optional[EngineConfig], store: StateSto
 # 5. TAB [M: MAGNET] DATA-ONLY REPORT
 # ==============================================================================
 def build_tab_m_data_only_report(config: Optional[EngineConfig], store: StateStore) -> str:
-    ts_utc, ts_myt = _timestamps_utc_myt()
+    ts_utc, ts_sgt = _timestamps_utc_sgt()
     mag = getattr(store, "btc_magnet_evaluation", None)
     if mag is None:
         from analytics.btc_magnet_engine import BTCMagnetEngine
@@ -359,7 +359,7 @@ def build_tab_m_data_only_report(config: Optional[EngineConfig], store: StateSto
 
     lines = [
         "# TAB [M: MAGNET] | DATA-ONLY METRICS REPORT",
-        f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (MYT):** `{ts_myt}`",
+        f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (SGT):** `{ts_sgt}`",
         f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}` (`24H Change: {mag.price_change_24h_pct:+.2f}%`)",
         "",
         "## 1. 5-REGIME RADAR DIAGNOSIS & MAJORITY VOTING",
@@ -602,7 +602,7 @@ def build_tab_q_data_only_report(config: Optional[EngineConfig], store: StateSto
 # 7. TAB [F: FOOTPRINT] DATA-ONLY REPORT
 # ==============================================================================
 def build_tab_f_data_only_report(config: Optional[EngineConfig], store: StateStore) -> str:
-    ts_utc, ts_myt = _timestamps_utc_myt()
+    ts_utc, ts_sgt = _timestamps_utc_sgt()
     spot_px = _spot_price(store)
     f_ev = getattr(store, "footprint_evaluation", None)
     if f_ev is None and hasattr(store, "footprint_engine") and store.footprint_engine is not None:
@@ -614,7 +614,7 @@ def build_tab_f_data_only_report(config: Optional[EngineConfig], store: StateSto
 
     lines = [
         "# TAB [F: FOOTPRINT] | DATA-ONLY METRICS REPORT",
-        f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (MYT):** `{ts_myt}`",
+        f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (SGT):** `{ts_sgt}`",
         f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}`",
         "",
         "## 1. 15-MINUTE INTRA-CANDLE FOOTPRINT METRICS",
@@ -653,7 +653,7 @@ def build_tab_f_data_only_report(config: Optional[EngineConfig], store: StateSto
 # 8. TAB [W: WATERFALL] DATA-ONLY REPORT
 # ==============================================================================
 def build_tab_w_data_only_report(config: Optional[EngineConfig], store: StateStore) -> str:
-    ts_utc, ts_myt = _timestamps_utc_myt()
+    ts_utc, ts_sgt = _timestamps_utc_sgt()
     spot_px = _spot_price(store)
     sig = getattr(store, "latest_signal", None)
     mp = getattr(store, "macro_profile", None)
@@ -676,7 +676,7 @@ def build_tab_w_data_only_report(config: Optional[EngineConfig], store: StateSto
 
     lines = [
         "# TAB [W: WATERFALL] | DATA-ONLY METRICS REPORT",
-        f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (MYT):** `{ts_myt}`",
+        f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (SGT):** `{ts_sgt}`",
         f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}`",
         "",
         "## 1. 5-PILLAR CONDITION BOOLEANS & RAW INPUTS",
@@ -694,13 +694,13 @@ def build_tab_w_data_only_report(config: Optional[EngineConfig], store: StateSto
 # 9. TAB [0: SPOT SWING] DATA-ONLY REPORT
 # ==============================================================================
 def build_tab_0_data_only_report(config: Optional[EngineConfig], store: StateStore) -> str:
-    ts_utc, ts_myt = _timestamps_utc_myt()
+    ts_utc, ts_sgt = _timestamps_utc_sgt()
     spot_px = _spot_price(store)
     sw = getattr(store, "spot_swing_evaluation", None)
 
     lines = [
         "# TAB [0: SPOT SWING] | DATA-ONLY METRICS REPORT",
-        f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (MYT):** `{ts_myt}`",
+        f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (SGT):** `{ts_sgt}`",
         f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}`",
         "",
         "## 1. SPOT SWING SCREENER METRICS & GATE BOOLEANS",
@@ -735,7 +735,7 @@ def build_tab_0_data_only_report(config: Optional[EngineConfig], store: StateSto
 # 10. TAB [L: MASTER] DATA-ONLY REPORT (9-FLAGSHIP TOP-RIBBON MATRIX)
 # ==============================================================================
 def build_tab_l_data_only_report(config: Optional[EngineConfig], store: StateStore) -> str:
-    ts_utc, ts_myt = _timestamps_utc_myt()
+    ts_utc, ts_sgt = _timestamps_utc_sgt()
     spot_px = _spot_price(store)
     ms = getattr(store, "master_synthesis_evaluation", None)
     tpb = getattr(store, "trend_pullback_evaluation", None)
@@ -744,7 +744,7 @@ def build_tab_l_data_only_report(config: Optional[EngineConfig], store: StateSto
 
     lines = [
         "# TAB [L: MASTER] | 8-FLAGSHIP DESK DATA-ONLY METRICS REPORT",
-        f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (MYT):** `{ts_myt}`",
+        f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (SGT):** `{ts_sgt}`",
         f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}`",
         "**Desk Purpose & Scope:** `Single-screen 8-Flagship-Desk Telemetry Matrix (P, G, R, M, A, F, W, 0) & 4-Domain Readiness Overview. Keeps each strategy's reference entry, stop, and sizing calculations strictly unblended.`",
         "",
@@ -823,12 +823,12 @@ def build_tab_l_data_only_report(config: Optional[EngineConfig], store: StateSto
 def build_global_data_only_packet(config: Optional[EngineConfig], store: StateStore) -> str:
     """Combines all 10 primary top-ribbon DATA-ONLY reports into a single master packet."""
     cfg = config or DEFAULT_CONFIG
-    ts_utc, ts_myt = _timestamps_utc_myt()
+    ts_utc, ts_sgt = _timestamps_utc_sgt()
     spot_px = _spot_price(store)
 
     sections = [
         "# BTC SWING ENGINE | GLOBAL DATA-ONLY TELEMETRY PACKET ([C: AI PACKET])",
-        f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (MYT):** `{ts_myt}`",
+        f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (SGT):** `{ts_sgt}`",
         f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}`",
         "**Output Specification:** `DATA-ONLY (Raw Measurements, Reference Formulas & True/False Conditions Only — Zero Interpretive Prose)`",
         "",
@@ -1186,7 +1186,7 @@ def build_tab_d_data_only_report(
 
     cfg = config or DEFAULT_CONFIG
     ev = getattr(store, "data_hub_evaluation", None) or DataHubEngine(cfg).evaluate(store)
-    utc_str, myt_str = _timestamps_utc_myt()
+    utc_str, sgt_str = _timestamps_utc_sgt()
 
     spot_px = float(ev.spot_price or 0.0)
     bars_1h = list(getattr(store, "spot_klines_1h", []) or [])
@@ -1221,7 +1221,7 @@ def build_tab_d_data_only_report(
 
     lines: List[str] = [
         "# TAB [D: DATA HUB] | CONSOLIDATED DATA-ONLY TELEMETRY REPORT",
-        f"**Retrieval Time (UTC):** `{utc_str}`  |  **Retrieval Time (MYT):** `{myt_str}`",
+        f"**Retrieval Time (UTC):** `{utc_str}`  |  **Retrieval Time (SGT):** `{sgt_str}`",
         f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}`  |  "
         f"**Coverage:** `OK={ev.ok_count}/{ev.total_metrics} | UNAVAILABLE={ev.unavailable_count} | STALE={ev.stale_count} | PROXY/STATIC={ev.proxy_or_static_count}`",
         f"**24H Range:** `{range_24h_str}`  |  **Returns (24H / 7D / 30D):** `{r24_str} / {r7_str} / {r30_str}`",

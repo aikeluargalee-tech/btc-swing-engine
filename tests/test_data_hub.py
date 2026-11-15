@@ -475,7 +475,7 @@ class TestDataHub(unittest.TestCase):
                 repo_url="https://github.com/example/btc-swing-engine",
                 pages_url="https://example.github.io/btc-swing-engine/",
                 utc_str="2026-11-14 15:30:00 UTC",
-                myt_str="2026-11-14 23:30:00 MYT (UTC+8)",
+                sgt_str="2026-11-14 23:30:00 SGT (UTC+8)",
                 also_write_logs=False,
             )
 
@@ -496,7 +496,7 @@ class TestDataHub(unittest.TestCase):
             msgs = build_telegram_messages(
                 ev,
                 utc_str="2026-11-14 15:30:00 UTC",
-                myt_str="2026-11-14 23:30:00 MYT (UTC+8)",
+                sgt_str="2026-11-14 23:30:00 SGT (UTC+8)",
                 pages_url="https://example.github.io/btc-swing-engine/",
                 repo_url="https://github.com/example/btc-swing-engine",
             )
@@ -508,7 +508,7 @@ class TestDataHub(unittest.TestCase):
             chunked = build_telegram_messages(
                 ev,
                 utc_str="2026-11-14 15:30:00 UTC",
-                myt_str="2026-11-14 23:30:00 MYT (UTC+8)",
+                sgt_str="2026-11-14 23:30:00 SGT (UTC+8)",
                 pages_url="https://example.github.io/btc-swing-engine/",
                 repo_url="https://github.com/example/btc-swing-engine",
                 max_len=1400,
@@ -543,7 +543,7 @@ class TestDataHub(unittest.TestCase):
                         ev=ev,
                         md_path=paths["md"],
                         utc_str="2026-11-14 15:30:00 UTC",
-                        myt_str="2026-11-14 23:30:00 MYT (UTC+8)",
+                        sgt_str="2026-11-14 23:30:00 SGT (UTC+8)",
                         pages_url="https://example.github.io/btc-swing-engine/",
                         repo_url="https://github.com/example/btc-swing-engine",
                     )
@@ -859,6 +859,8 @@ class TestDataHub(unittest.TestCase):
         self.assertIn("Hyperliquid Perp OI & Funding", report)
         self.assertIn("6-Tier Modeled Liq Ladder (7C)", report)
         self.assertIn("USD Macro Calendar (High)", report)
+        self.assertIn("**Retrieval Time (SGT):**", report)
+        self.assertNotIn("MYT", report)
         for bad in ("verdict", "bullish", "bearish", "recommend"):
             self.assertNotIn(bad, report.lower())
 

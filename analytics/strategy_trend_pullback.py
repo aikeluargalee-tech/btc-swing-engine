@@ -33,7 +33,7 @@ TF_1H_MS = 3_600_000
 TF_4H_MS = 4 * TF_1H_MS
 TF_1D_MS = 24 * TF_1H_MS
 
-MYT_TZ = timezone(timedelta(hours=8))
+SGT_TZ = timezone(timedelta(hours=8))
 
 
 @dataclass
@@ -1044,9 +1044,9 @@ class TrendPullbackEngine:
             now_ms = int(time.time() * 1000)
 
         now_dt_utc = datetime.fromtimestamp(now_ms / 1000.0, tz=timezone.utc)
-        now_dt_myt = now_dt_utc.astimezone(MYT_TZ)
+        now_dt_sgt = now_dt_utc.astimezone(SGT_TZ)
         ts_utc_str = now_dt_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
-        ts_myt_str = now_dt_myt.strftime("%Y-%m-%d %H:%M:%S MYT (UTC+8)")
+        ts_sgt_str = now_dt_sgt.strftime("%Y-%m-%d %H:%M:%S SGT (UTC+8)")
 
         # 1. Spot Price resolution
         raw_1d = list(getattr(store, "spot_klines_1d", []) or [])
@@ -1408,7 +1408,7 @@ class TrendPullbackEngine:
             strategy_status="UNVALIDATED",
             mode_label="RESEARCH / PAPER MODE",
             timestamp_utc=ts_utc_str,
-            timestamp_myt=ts_myt_str,
+            timestamp_sgt=ts_sgt_str,
             spot_price=spot_px,
             daily_regime=reg_res["regime"],
             daily_close_completed=daily_close_val,
@@ -1566,7 +1566,7 @@ class TrendPullbackEngine:
 
         lines = [
             f"# {ev.strategy_name} | DATA-ONLY REPORT ({ev.mode_label})",
-            f"**STATUS:** `{ev.strategy_status}`  |  **Retrieval Time (UTC):** `{ev.timestamp_utc}`  |  **Retrieval Time (MYT):** `{ev.timestamp_myt}`",
+            f"**STATUS:** `{ev.strategy_status}`  |  **Retrieval Time (UTC):** `{ev.timestamp_utc}`  |  **Retrieval Time (SGT):** `{ev.timestamp_sgt}`",
             f"**Spot Price (BTCUSDT):** `${ev.spot_price:,.2f}`",
             "",
             "## 1. DAILY (1D)",
@@ -1642,7 +1642,7 @@ class TrendPullbackEngine:
             "",
             "## 6. DATA INTEGRITY",
             f"- **Data Retrieval Time (UTC):** `{ev.timestamp_utc}`",
-            f"- **Data Retrieval Time (MYT):** `{ev.timestamp_myt}`",
+            f"- **Data Retrieval Time (SGT):** `{ev.timestamp_sgt}`",
             f"- **Data Integrity Pass:** `{ev.data_integrity_ok}`",
             f"- **Completed 1D Candles Available:** `{ev.completed_1d_count}` | **Last Completed 1D Status:** `{ev.daily_candle_status}` | **Forming 1D Candle Excluded:** `{ev.daily_forming_excluded}` (`{ev.daily_forming_open_utc}`)",
             f"- **Completed 4H Candles Available:** `{ev.completed_4h_count}` | **Last Completed 4H Status:** `{ev.candle_4h_status}` | **Forming 4H Candle Excluded:** `{ev.candle_4h_forming_excluded}` (`{ev.candle_4h_forming_open_utc}`)",

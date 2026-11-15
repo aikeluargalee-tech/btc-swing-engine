@@ -5689,7 +5689,7 @@ def _build_tab18_trend_pullback_hud(
     sub_grid.add_row(
         f"[bold bright_cyan]{tp_eval.strategy_name} | DATA-ONLY | {tp_eval.mode_label}[/bold bright_cyan]  │  "
         f"[bold black on bright_yellow] STATUS: {tp_eval.strategy_status} [/bold black on bright_yellow]",
-        f"[bold white]Spot: [cyan]${spot_p:,.2f}[/cyan] • [bright_cyan]{tp_eval.timestamp_myt}[/bright_cyan][/bold white]",
+        f"[bold white]Spot: [cyan]${spot_p:,.2f}[/cyan] • [bright_cyan]{tp_eval.timestamp_sgt}[/bright_cyan][/bold white]",
     )
     sub_panel = Panel(sub_grid, box=box.ROUNDED, border_style="bright_cyan", padding=(0, 1))
 
@@ -5793,7 +5793,7 @@ def _build_tab18_trend_pullback_hud(
     data_lines = [
         f"[bold white]Data Integrity OK:[/bold white]    [bold {di_col}]{tp_eval.data_integrity_ok}[/bold {di_col}]",
         f"[bold white]Retrieval (UTC):[/bold white]      [white]{tp_eval.timestamp_utc}[/white]",
-        f"[bold white]Retrieval (MYT):[/bold white]      [white]{tp_eval.timestamp_myt}[/white]",
+        f"[bold white]Retrieval (SGT):[/bold white]      [white]{tp_eval.timestamp_sgt}[/white]",
         f"[bold white]1D Series Count:[/bold white]      [cyan]{tp_eval.completed_1d_count}[/cyan] [dim](Forming Excl: {tp_eval.daily_forming_excluded} [{tp_eval.daily_forming_open_utc}])[/dim]",
         f"[bold white]4H Series Count:[/bold white]      [cyan]{tp_eval.completed_4h_count}[/cyan] [dim](Forming Excl: {tp_eval.candle_4h_forming_excluded} [{tp_eval.candle_4h_forming_open_utc}])[/dim]",
         f"[bold white]1D Candle Status:[/bold white]     [white]{tp_eval.daily_candle_status}[/white]",

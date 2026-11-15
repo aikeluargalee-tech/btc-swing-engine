@@ -1286,12 +1286,63 @@ def build_tab_d_data_only_report(
         lines.extend(_build_recent_ohlcv_lines(bars_tf, tf_lbl, iv_ms, cnt))
         lines.append("")
 
+    mag = getattr(store, "btc_magnet_evaluation", None)
+    tiers_6 = (getattr(mag, "levels_ladder", None) or {}).get("tiers_6") if mag is not None else None
+    lines.extend([
+        "### 7C. MODELED LIQUIDATION LADDER (`10x-100x`) & USD MACRO CALENDAR",
+        "**6-Tier Modeled Liquidation Ladder:**",
+        "| Tier | Side | Level ($) | Dist% | Est Pool ($M) |",
+        "|---|---|---|---|---|",
+    ])
+    if isinstance(tiers_6, list) and tiers_6:
+        for t in tiers_6:
+            tier_name = str(t.get("tier") or "N/A")
+            side = str(t.get("side") or "N/A").upper()
+            px = t.get("price")
+            dp = t.get("distance_pct")
+            vm = t.get("estimated_vol_m")
+            px_s = f"${float(px):,.2f}" if isinstance(px, (int, float)) else "N/A"
+            dp_s = f"{float(dp):+.2f}%" if isinstance(dp, (int, float)) else "N/A"
+            vm_s = f"${float(vm):.1f}M" if isinstance(vm, (int, float)) else "N/A"
+            lines.append(f"| `{tier_name}` | `{side}` | `{px_s}` | `{dp_s}` | `{vm_s}` |")
+    else:
+        lines.append("| `DATA UNAVAILABLE` | `N/A` | `N/A` | `N/A` | `N/A` |")
+
+    mi = getattr(store, "macro_intermarket", None)
+    cal_events = (getattr(mi, "macro_calendar_events", None) or []) if mi is not None else []
+    cal_fetched = bool(getattr(mi, "macro_calendar_fetched", False)) if mi is not None else False
+    lines.extend([
+        "",
+        "**Upcoming USD High-Impact Macro Events (`-60m` to `+7d`):**",
+        "| Event | Time (UTC) | Countdown | Forecast | Previous |",
+        "|---|---|---|---|---|",
+    ])
+    if isinstance(cal_events, list) and cal_events:
+        for cev in cal_events[:6]:
+            mins = cev.get("minutes_away")
+            if isinstance(mins, (int, float)):
+                cd_s = f"{abs(mins):.0f}m ago" if mins < 0 else (f"in {mins:.0f}m" if mins < 120 else f"in {mins / 60.0:.1f}h")
+            else:
+                cd_s = "N/A"
+            fc_s = str(cev.get("forecast") or "-")
+            pr_s = str(cev.get("previous") or "-")
+            lines.append(
+                f"| `{cev.get('title', 'USD Event')}` | `{cev.get('time_utc', 'N/A')}` | "
+                f"`{cd_s}` | `{fc_s}` | `{pr_s}` |"
+            )
+    elif cal_fetched:
+        lines.append("| `NONE (next 7d)` | `-` | `CLEAR` | `-` | `-` |")
+    else:
+        lines.append("| `DATA UNAVAILABLE` | `N/A` | `N/A` | `N/A` | `N/A` |")
+    lines.append("")
+
     lines.extend([
         "## 8. METRIC FORMULA LEGEND & CORTEX DESK LITE PROTOCOL",
         "- **Rough Path Lévy (`4H A_SP`)**: Lévy signed area over 6 closed 4H bars (`> 0`: Spot path leads price markup; `< 0`: Spot path lags price / distribution).",
         "- **24H Z-Scores (`z_S / z_F / D`)**: 30-day rolling Z-scores of 24H Spot (`z_S`) and Perp (`z_F`) cumulative delta; `D = z_S - z_F` (`D > 0` = Spot buying divergence vs Perps).",
+        "- **Spot CVD Slopes (`7D / 14D`) & 4H Vol Context**: Cumulative spot taker-delta over last `7`/`14` closed `1D` bars; `4H ATR(14)% Pctile` ranks current closed `4H` ATR% against the trailing `120` closed `4H` bars, paired with `RelVol(20)` (`closed 4H volume / 20-bar SMA`).",
         "- **Volume Profile & Structure**: `30D VA Pos% = (Spot - VAL) / (VAH - VAL) * 100` (Macro 30D Value Area); `ATR(14) 1D/4H/1H`; `L20/H20` = 20-bar (80H) 4H range boundaries; `SLSP` = structural liquidity pool S/R; `7A` scans 500 closed bars (`5x5` pivots) for `HH/HL/LH/LL`, `BOS`, and `1%`-clustered S/R zones.",
-        "- **Derivatives & Quant**: `90D Pct` = 0-100 rolling 90-day percentile rank of 8H funding; `[... X/3 PARTIAL_VENUE]` suppresses OI quadrant tagging when `<3` venues report; `H` = Hurst exponent (`>0.5` trending, `<0.5` mean-reverting); `VCR 72H` = Volatility Compression Ratio; `TSFM Disp%` = horizon dispersion; `LSCE` = liquidation sweep state.",
+        "- **Derivatives, Modeled Ladder & Quant**: `90D Pct` = 0-100 rolling 90-day percentile rank of 8H funding; `[... X/3 PARTIAL_VENUE]` suppresses OI quadrant tagging when `<3` venues report; `Hyperliquid Perp` reports DEX OI and 8H-normalized funding independently; `Modeled Liq Ladder (7C)` estimates 10x-100x leverage shelves (not private exchange orderbooks); `USD Macro Calendar` tracks high-impact USD releases; `H` = Hurst exponent (`>0.5` trending, `<0.5` mean-reverting); `VCR 72H` = Volatility Compression Ratio; `TSFM Disp%` = horizon dispersion; `LSCE` = liquidation sweep state.",
         "- **Headless Snapshot Note**: Scheduled/GitHub Actions runs execute a one-shot REST warmup (`Warm:YES`) without a persistent WebSocket loop, so `WebSocket Feeds & Warmup` reporting `STALE` (`no tick`) is expected by design and does not indicate stale REST, orderbook, CVD, or derivatives data.",
         "",
         "### DIRECT AI EXECUTION PROTOCOL: CORTEX BTC DESK LITE v1.0",

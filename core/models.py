@@ -4984,6 +4984,8 @@ class BTCMagnetEvaluation:
     total_ladder_ratio: float = 1.0
     total_l_vol: float = 0.0
     total_u_vol: float = 0.0
+    spot_cvd_slope_7d: float = 0.0
+    spot_cvd_slope_14d: float = 0.0
     six_factors: Dict[str, str] = field(default_factory=dict)
     levels_ladder: Dict[str, Any] = field(default_factory=dict)
 

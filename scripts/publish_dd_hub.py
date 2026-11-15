@@ -446,7 +446,7 @@ def render_dashboard_html(
 <header class="topbar">
   <div class="top-row">
     <div class="brand">
-      <div class="brand-title">BTC SWING ENGINE // TAB [D: DATA HUB] — 66-ROW TELEMETRY MATRIX</div>
+      <div class="brand-title">BTC SWING ENGINE // TAB [D: DATA HUB] — {tot_c}-ROW TELEMETRY MATRIX</div>
       <div class="meta-line">
         <span>Spot: <span class="spot-pill">${spot:,.2f}</span></span>
         <span>UTC: <strong>{utc_s}</strong></span>
@@ -535,7 +535,7 @@ def render_dashboard_html(
       }}
     }}
     statusEl.textContent = copied
-      ? "✓ COPIED " + mdText.length.toLocaleString() + " CHARS (66-ROW DD REPORT) TO CLIPBOARD"
+      ? "✓ COPIED " + mdText.length.toLocaleString() + " CHARS ({tot_c}-ROW DD REPORT) TO CLIPBOARD"
       : "Select & copy from the Raw Markdown box below.";
     setTimeout(function () {{ statusEl.textContent = ""; }}, 4500);
   }});
@@ -580,7 +580,7 @@ def build_telegram_messages(
     footer_2 = (
         f"<a href=\"{html.escape(pages_url)}\">Live Dashboard (1-Tap Copy)</a> | "
         f"<a href=\"{html.escape(repo_url.rstrip('/') + '/actions/workflows/dd_hourly.yml')}\">Trigger Fresh Run</a>\n"
-        f"Full 66-row Markdown attached below (<code>btc_data_hub_latest.md</code>)."
+        f"Full {ev.total_metrics}-row Markdown attached below (<code>btc_data_hub_latest.md</code>)."
     )
 
     p_blocks = [

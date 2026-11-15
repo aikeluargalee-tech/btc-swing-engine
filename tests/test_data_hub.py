@@ -70,7 +70,7 @@ class TestDataHub(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             ev = DataHubEngine(self.cfg, db_path=Path(tmp) / "cold.sqlite", write_archive=False).evaluate(store)
 
-        self.assertEqual(ev.total_metrics, 66)
+        self.assertEqual(ev.total_metrics, 71)
         self.assertGreater(ev.unavailable_count, 40)
         self.assertEqual(
             ev.ok_count + ev.unavailable_count + ev.stale_count + ev.proxy_or_static_count,
@@ -250,7 +250,7 @@ class TestDataHub(unittest.TestCase):
             db_file = Path(tmp) / "dd_test.sqlite"
             ev = DataHubEngine(self.cfg, db_path=db_file, write_archive=True).evaluate(store)
 
-            self.assertEqual(ev.total_metrics, 66)
+            self.assertEqual(ev.total_metrics, 71)
             self.assertGreater(ev.ok_count, 50)
             self.assertEqual(ev.proxy_or_static_count, 1)  # ETF tape proxy only; live CoinMetrics MVRV is OK, static SOPR retired
             self.assertEqual(ev.archive_snapshots_count, 1)
@@ -755,6 +755,107 @@ class TestDataHub(unittest.TestCase):
             self.assertEqual(len(rows), 2)
             self.assertEqual(rows[0][4], "+0.0059% (+6.5%) · 90D Pct:0.7%")
             self.assertEqual(rows[1][4], "+0.0050% (+5.5%) · P90:12.0%")
+
+    def test_ported_metrics_farside_hyperliquid_atr_pctile_cvd_ladder_calendar(self) -> None:
+        from analytics.btc_magnet_engine import BTCMagnetEngine
+
+        store = StateStore()
+        store.binance_spot_price = 91_250.0
+        store.open_interest_btc = 92_000.0
+        store.spot_klines_1d.extend(_make_klines(n=240, step_ms=86_400_000, base_px=88_000.0))
+        store.spot_klines_4h.extend(_make_klines(n=160, step_ms=14_400_000, base_px=89_500.0))
+        store.spot_klines_1h.extend(_make_klines(n=60, step_ms=3_600_000, base_px=90_800.0))
+
+        mag_ev = BTCMagnetEngine(self.cfg).evaluate(store)
+        self.assertNotEqual(mag_ev.spot_cvd_slope_7d, 0.0)
+        self.assertNotEqual(mag_ev.spot_cvd_slope_14d, 0.0)
+        tiers = mag_ev.levels_ladder.get("tiers_6", [])
+        self.assertEqual(len(tiers), 6)
+        tier_prices = [t["price"] for t in tiers]
+        self.assertEqual(tier_prices, sorted(tier_prices, reverse=True))
+
+        store.macro_intermarket = MacroIntermarketSnapshot(
+            agg_perp_oi_btc=210_000.0,
+            agg_perp_oi_usd=19_162_500_000.0,
+            agg_perp_funding_8h_pct=0.0102,
+            agg_perp_venues_str="BN+BYB+OKX",
+            agg_perp_venues_count=3,
+            hyperliquid_oi_btc=18_450.0,
+            hyperliquid_oi_usd=1_683_562_500.0,
+            hyperliquid_funding_8h_pct=0.0115,
+            etf_daily_net_flow_usd=315_000_000.0,
+            etf_daily_net_flow_status="CONFIRMED (Farside 14 Nov 2026)",
+            etf_3d_cumulative_flow_usd=640_000_000.0,
+            etf_3d_cumulative_flow_status="CONFIRMED (Farside 3D to 14 Nov 2026)",
+            etf_5d_cumulative_flow_usd=920_000_000.0,
+            macro_calendar_fetched=True,
+            macro_calendar_events=[
+                {
+                    "title": "CPI m/m",
+                    "time_utc": "2026-11-17T13:30:00Z",
+                    "minutes_away": 180.0,
+                    "forecast": "0.3%",
+                    "previous": "0.2%",
+                }
+            ],
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db_file = Path(tmp) / "ported.sqlite"
+            ev = DataHubEngine(self.cfg, db_path=db_file, write_archive=False).evaluate(store)
+
+        all_rows = {
+            r.label: r
+            for r in (
+                ev.panel_1_feeds
+                + ev.panel_2_trend_vol
+                + ev.panel_3_structure_magnets
+                + ev.panel_4_flow_quant
+                + ev.panel_5_derivs_liq
+                + ev.panel_6_macro_onchain
+            )
+        }
+        self.assertEqual(ev.total_metrics, 71)
+        # 1. Farside CONFIRMED status no longer dropped to UNAVAILABLE
+        self.assertEqual(all_rows["US Spot ETF Flow (Farside 1D/3D)"].status, "OK")
+        self.assertIn("1D:+$315.0M | 3D:+$640.0M | 5D:+$920.0M", all_rows["US Spot ETF Flow (Farside 1D/3D)"].value)
+        # 2. Hyperliquid DEX row alongside intact BN+BYB+OKX 3/3
+        self.assertIn("[BN+BYB+OKX 3/3]", all_rows["Cross-Exch Perp OI & Funding"].value)
+        self.assertEqual(all_rows["Hyperliquid Perp OI & Funding"].status, "OK")
+        self.assertIn("18,450 BTC", all_rows["Hyperliquid Perp OI & Funding"].value)
+        self.assertIn("[HL DEX]", all_rows["Hyperliquid Perp OI & Funding"].value)
+        # 3. 4H ATR% percentile & RelVol(20)
+        self.assertEqual(all_rows["4H ATR(14)% Pctile & RelVol(20)"].status, "OK")
+        self.assertIn("pct/120b", all_rows["4H ATR(14)% Pctile & RelVol(20)"].value)
+        self.assertIn("RelVol:", all_rows["4H ATR(14)% Pctile & RelVol(20)"].value)
+        # 4. Spot CVD 7D / 14D slopes
+        self.assertEqual(all_rows["Spot CVD Slopes (7D / 14D)"].status, "OK")
+        self.assertIn("7D:", all_rows["Spot CVD Slopes (7D / 14D)"].value)
+        self.assertIn("14D:", all_rows["Spot CVD Slopes (7D / 14D)"].value)
+        # 5. Modeled Liq Ladder
+        self.assertEqual(all_rows["Modeled Liq Ladder (10x-100x)"].status, "OK")
+        self.assertIn("[Modeled]", all_rows["Modeled Liq Ladder (10x-100x)"].value)
+        # 6. USD Macro Calendar (High)
+        self.assertEqual(all_rows["USD Macro Calendar (High)"].status, "OK")
+        self.assertIn("CPI m/m", all_rows["USD Macro Calendar (High)"].value)
+
+        # Empty-but-fetched calendar renders OK + NONE (next 7d)
+        store.macro_intermarket.macro_calendar_events = []
+        ev_clear = DataHubEngine(self.cfg, write_archive=False).evaluate(store)
+        cal_clear = next(r for r in ev_clear.panel_5_derivs_liq if r.label == "USD Macro Calendar (High)")
+        self.assertEqual(cal_clear.status, "OK")
+        self.assertEqual(cal_clear.value, "NONE (next 7d)")
+
+        # Restore event and verify Tab D Section 7C + zero forbidden words
+        store.macro_intermarket.macro_calendar_events = [
+            {"title": "CPI m/m", "time_utc": "2026-11-17T13:30:00Z", "minutes_away": 180.0, "forecast": "0.3%", "previous": "0.2%"}
+        ]
+        report = build_tab_d_data_only_report(self.cfg, store)
+        self.assertIn("### 7C. MODELED LIQUIDATION LADDER (`10x-100x`) & USD MACRO CALENDAR", report)
+        self.assertIn("`10x Shorts`", report)
+        self.assertIn("`CPI m/m`", report)
+        for bad in ("verdict", "bullish", "bearish", "recommend"):
+            self.assertNotIn(bad, report.lower())
 
 
 if __name__ == "__main__":

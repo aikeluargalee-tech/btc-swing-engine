@@ -15,6 +15,28 @@ from core.state_store import StateStore
 logger = logging.getLogger(__name__)
 
 
+def compute_spot_cvd_slopes(bars_1d: Any) -> Tuple[Optional[float], Optional[float]]:
+    """Computes 7D and 14D cumulative spot taker-delta slopes (BTC) from closed 1D bars."""
+    bars = list(bars_1d or [])
+    if not bars:
+        return None, None
+    now_ms = int(time.time() * 1000)
+    last_ts = int(getattr(bars[-1], "timestamp_ms", 0) or 0)
+    closed = bars[:-1] if (len(bars) > 1 and last_ts > 0 and (last_ts + 86_400_000) > now_ms) else bars
+
+    def _bar_delta(b: Any) -> float:
+        vol = float(getattr(b, "volume", 0.0) or 0.0)
+        tb = getattr(b, "taker_buy_volume", None)
+        if tb is not None and float(tb) > 0.0:
+            return 2.0 * float(tb) - vol
+        return float(getattr(b, "delta", 0.0) or 0.0)
+
+    deltas = [_bar_delta(b) for b in closed]
+    s7 = round(sum(deltas[-7:]), 2) if len(deltas) >= 7 else None
+    s14 = round(sum(deltas[-14:]), 2) if len(deltas) >= 14 else None
+    return s7, s14
+
+
 class BTCMagnetEngine:
     """Evaluates real-time liquidation clusters, 5-Regime Radar with majority voting,
     Liquidation Sweep Confirmation Engine (LSCE), and the 7 locked speaking rules.
@@ -93,8 +115,9 @@ class BTCMagnetEngine:
         # 5. Spot CVD & Flow Metrics
         spot_cvd_4h_btc = 0.0
         spot_cvd_ratio = 1.0
-        spot_cvd_slope_7d = 0.0
-        spot_cvd_slope_14d = 0.0
+        s7, s14 = compute_spot_cvd_slopes(getattr(store, "spot_klines_1d", None))
+        spot_cvd_slope_7d = float(s7) if s7 is not None else 0.0
+        spot_cvd_slope_14d = float(s14) if s14 is not None else 0.0
         perp_cvd_trend = "Neutral"
 
         flow_snap = getattr(store, "flow_snapshot", None)
@@ -145,6 +168,15 @@ class BTCMagnetEngine:
 
         # 7. Liquidation Clusters & Multi-Tier Ladder
         upper_magnet, lower_magnet, ladder = self._get_liquidation_magnets_and_ladder(spot_price, store=store)
+        ladder["tiers_6"] = self._build_six_tier_ladder(
+            spot_price=spot_price,
+            swing_high_4h=swing_high_4h,
+            swing_low_4h=swing_low_4h,
+            upper=upper_magnet,
+            lower=lower_magnet,
+            long_short_ratio=long_short_ratio,
+            store=store,
+        )
 
         # 8. Dual Imbalance Accounting (Immediate vs Total Ladder)
         imm_u = ladder.get("immediate_upper_usd", upper_magnet.usd_volume) / 1e6
@@ -334,6 +366,8 @@ class BTCMagnetEngine:
             total_ladder_ratio=total_ladder_ratio,
             total_l_vol=tot_l,
             total_u_vol=tot_u,
+            spot_cvd_slope_7d=spot_cvd_slope_7d,
+            spot_cvd_slope_14d=spot_cvd_slope_14d,
             six_factors=six_factors,
             levels_ladder=ladder,
             # Capital Sizing & Stops
@@ -431,6 +465,71 @@ class BTCMagnetEngine:
             "bands": bands,
         }
         return upper, lower, ladder
+
+    def _build_six_tier_ladder(
+        self,
+        spot_price: float,
+        swing_high_4h: float,
+        swing_low_4h: float,
+        upper: BTCMagnetLevel,
+        lower: BTCMagnetLevel,
+        long_short_ratio: float,
+        store: Optional[StateStore] = None,
+    ) -> List[Dict[str, Any]]:
+        """Builds canonical 6-tier modeled liquidation ladder (10x/25x/50-100x upper & lower)."""
+        cur_p = max(spot_price, 1.0)
+        oi_btc = 0.0
+        if store is not None:
+            oi_btc = float(getattr(store, "open_interest_btc", 0.0) or 0.0)
+            if oi_btc <= 0.0 and getattr(store, "derivatives_snapshot", None) is not None:
+                oi_btc = float(getattr(store.derivatives_snapshot, "open_interest_btc", 0.0) or 0.0)
+        oi_notional_m = max(10.0, (oi_btc * cur_p) / 1e6) if oi_btc > 0.0 else 5000.0
+        ls = long_short_ratio if long_short_ratio > 0.0 else 1.0
+        long_share = ls / (1.0 + ls)
+        l_crowd_w = max(0.50, long_share / 0.50)
+        u_crowd_w = max(0.50, (1.0 - long_share) / 0.50)
+
+        u_near_vol = round(upper.usd_volume / 1e6, 1)
+        l_near_vol = round(lower.usd_volume / 1e6, 1)
+        u_25_vol = round(max(1.0, oi_notional_m * 0.032 * u_crowd_w), 1)
+        u_10_vol = round(max(1.0, oi_notional_m * 0.024 * u_crowd_w), 1)
+        l_25_vol = round(max(1.0, oi_notional_m * 0.040 * l_crowd_w), 1)
+        l_10_vol = round(max(1.0, oi_notional_m * 0.028 * l_crowd_w), 1)
+
+        hi_ref = max(swing_high_4h, cur_p)
+        lo_ref = min(swing_low_4h, cur_p)
+        use_up_near = (cur_p * 1.002) <= upper.price <= (hi_ref * 1.035)
+        use_lo_near = (lo_ref * 0.965) <= lower.price <= (cur_p * 0.998)
+        u_near_p = round(upper.price, 2) if use_up_near else round(max(swing_high_4h * 1.005, cur_p * 1.008), 2)
+        s25_p = round(max(swing_high_4h * 1.012, u_near_p * 1.010), 2)
+        s10_p = round(max(swing_high_4h * 1.025, s25_p * 1.015), 2)
+        l_near_p = round(lower.price, 2) if use_lo_near else round(min(swing_low_4h * 0.995, cur_p * 0.992), 2)
+        l25_p = round(min(swing_low_4h * 0.988, l_near_p * 0.990), 2)
+        l10_p = round(min(swing_low_4h * 0.975, l25_p * 0.985), 2)
+
+        def _tier(tier: str, lev: str, side: str, lvl: float, vol_m: float, dist_override: Optional[float] = None, is_nearest: bool = False) -> Dict[str, Any]:
+            signed_pct = ((lvl - cur_p) / cur_p) * 100.0
+            if dist_override is not None:
+                signed_pct = abs(float(dist_override)) if side == "upper" else -abs(float(dist_override))
+            return {
+                "tier": tier,
+                "leverage": lev,
+                "side": side,
+                "price": lvl,
+                "distance_pct": round(signed_pct, 2),
+                "estimated_vol_m": round(vol_m, 1),
+                "modeled": True,
+                "is_nearest": is_nearest,
+            }
+
+        return [
+            _tier("10x Shorts", "10x", "upper", s10_p, u_10_vol),
+            _tier("25x Shorts", "25x", "upper", s25_p, u_25_vol),
+            _tier("50-100x Shorts", "50-100x", "upper", u_near_p, u_near_vol, upper.dist_pct if use_up_near else None, is_nearest=True),
+            _tier("100x Longs", "100x", "lower", l_near_p, l_near_vol, lower.dist_pct if use_lo_near else None, is_nearest=True),
+            _tier("25x Longs", "25x", "lower", l25_p, l_25_vol),
+            _tier("10x Longs", "10x", "lower", l10_p, l_10_vol),
+        ]
 
     def _evaluate_six_factors(
         self,

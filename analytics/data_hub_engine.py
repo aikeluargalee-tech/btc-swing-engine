@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from analytics.btc_magnet_engine import compute_spot_cvd_slopes
 from config.settings import DEFAULT_CONFIG, EngineConfig
 from core.state_store import StateStore
 
@@ -140,6 +141,135 @@ def _compute_4h_rsi_roc(store: StateStore) -> Tuple[Optional[float], Optional[fl
     rsi = 100.0 if avg_l == 0.0 else round(100.0 - (100.0 / (1.0 + (avg_g / avg_l))), 2)
     roc12 = ((closes[-1] / closes[-13]) - 1.0) * 100.0 if len(closes) >= 13 and closes[-13] > 0 else None
     return rsi, roc12
+
+
+def _compute_4h_atr_pctile_relvol(
+    store: StateStore,
+) -> Tuple[Optional[float], Optional[float], Optional[float]]:
+    """Computes closed-4H ATR(14)%, 120-bar ATR% percentile rank, and 20-bar RelVol."""
+    bars = list(getattr(store, "spot_klines_4h", []) or [])
+    closed = [
+        b
+        for b in bars[:-1]
+        if getattr(b, "close", 0) > 0
+        and getattr(b, "high", 0) > 0
+        and getattr(b, "low", 0) > 0
+    ]
+    if len(closed) < 16:
+        return None, None, None
+
+    trs: List[float] = []
+    for prev, cur in zip(closed, closed[1:]):
+        tr = max(
+            float(cur.high) - float(cur.low),
+            abs(float(cur.high) - float(prev.close)),
+            abs(float(cur.low) - float(prev.close)),
+        )
+        trs.append(tr)
+
+    atr_pct: Optional[float] = None
+    atr_pctile: Optional[float] = None
+    if len(trs) >= 14:
+        atr_val = sum(trs[:14]) / 14.0
+        atr_series_vals = [atr_val]
+        for tr in trs[14:]:
+            atr_val = (atr_val * 13.0 + tr) / 14.0
+            atr_series_vals.append(atr_val)
+        tail_closes = [float(b.close) for b in closed[-len(atr_series_vals) :]]
+        atr_pct_series = [
+            (a / c) * 100.0 for c, a in zip(tail_closes, atr_series_vals) if c > 0.0
+        ]
+        if atr_pct_series:
+            atr_pct = round(atr_pct_series[-1], 2)
+            pop = atr_pct_series[-120:]
+            below = sum(1 for x in pop if x <= atr_pct_series[-1])
+            atr_pctile = round((below / len(pop)) * 100.0, 1)
+
+    vols = [float(getattr(b, "volume", 0.0) or 0.0) for b in closed]
+    rel_vol: Optional[float] = None
+    if len(vols) >= 21:
+        vol_sma = sum(vols[-21:-1]) / 20.0
+        if vol_sma > 0.0:
+            rel_vol = round(vols[-1] / vol_sma, 2)
+
+    return atr_pct, atr_pctile, rel_vol
+
+
+def _format_modeled_liq_ladder(mag: Any) -> Optional[str]:
+    """Formats a compact single-line summary of the modeled 10x-100x liquidation ladder."""
+    ladder = getattr(mag, "levels_ladder", None) if mag is not None else None
+    if not isinstance(ladder, dict) or not ladder:
+        return None
+    tiers_6 = ladder.get("tiers_6")
+    if isinstance(tiers_6, list) and len(tiers_6) >= 6:
+        up_parts = []
+        dn_parts = []
+        for t in tiers_6:
+            if not isinstance(t, dict):
+                continue
+            lev = str(t.get("leverage", ""))
+            px = _first_num(t.get("price"), allow_zero=False)
+            vm = _first_num(t.get("estimated_vol_m"))
+            part = f"{lev}:{_fmt_price(px) or 'N/A'}(${vm:.0f}M)" if vm is not None else f"{lev}:{_fmt_price(px) or 'N/A'}"
+            if t.get("side") == "upper":
+                up_parts.append(part)
+            elif t.get("side") == "lower":
+                dn_parts.append(part)
+        if up_parts and dn_parts:
+            return f"Up[{' / '.join(up_parts)}] | Dn[{' / '.join(dn_parts)}] [Modeled]"
+
+    bands = ladder.get("bands")
+    if isinstance(bands, dict) and bands:
+        up_keys = ("100x_short", "25x_short", "10x_short")
+        dn_keys = ("100x_long", "25x_long", "10x_long")
+        up_parts = []
+        dn_parts = []
+        for k in up_keys:
+            b = bands.get(k)
+            if isinstance(b, dict) and _valid_num(b.get("price")):
+                vm = float(b.get("usd", 0.0)) / 1e6
+                up_parts.append(f"{k.split('_')[0]}:${float(b['price']):,.0f}(${vm:.0f}M)")
+        for k in dn_keys:
+            b = bands.get(k)
+            if isinstance(b, dict) and _valid_num(b.get("price")):
+                vm = float(b.get("usd", 0.0)) / 1e6
+                dn_parts.append(f"{k.split('_')[0]}:${float(b['price']):,.0f}(${vm:.0f}M)")
+        if up_parts and dn_parts:
+            return f"Up[{' / '.join(up_parts)}] | Dn[{' / '.join(dn_parts)}] [Modeled]"
+    return None
+
+
+def _format_macro_calendar_summary(mi: Any) -> Tuple[Optional[str], str]:
+    """Formats upcoming high-impact USD macro events with honest fetched-vs-offline status."""
+    if mi is None:
+        return None, "UNAVAILABLE"
+    events = getattr(mi, "macro_calendar_events", None) or []
+    fetched = bool(getattr(mi, "macro_calendar_fetched", False))
+    if isinstance(events, list) and events:
+        parts: List[str] = []
+        for ev in events[:2]:
+            if not isinstance(ev, dict):
+                continue
+            title = str(ev.get("title") or "USD Event")
+            mins = _first_num(ev.get("minutes_away"))
+            if mins is None:
+                when = str(ev.get("time_utc") or "")
+            elif mins < 0:
+                when = f"{abs(mins):.0f}m ago"
+            elif mins < 120:
+                when = f"in {mins:.0f}m"
+            else:
+                when = f"in {mins / 60.0:.1f}h"
+            fc = str(ev.get("forecast") or "").strip()
+            extra = f" Fc:{fc}" if fc else ""
+            parts.append(f"{title} ({when}{extra})")
+        if parts:
+            rem = len(events) - len(parts)
+            suffix = f" (+{rem} more)" if rem > 0 else ""
+            return " | ".join(parts) + suffix, "OK"
+    if fetched:
+        return "NONE (next 7d)", "OK"
+    return None, "UNAVAILABLE"
 
 
 def _fmt_usd_compact(val: Any, signed: bool = False) -> Optional[str]:
@@ -402,6 +532,7 @@ class DataHubEngine:
 
         rsi_1d = _first_num(getattr(macro_ev, "rsi_14_1d", None), allow_zero=False)
         rsi_4h, roc12_4h = _compute_4h_rsi_roc(store)
+        atr4h_pct, atr4h_pctile, rel_vol_4h = _compute_4h_atr_pctile_relvol(store)
         adx_1d = _first_num(getattr(getattr(sig, "ema_strategy", None), "daily_adx", None), getattr(slsp, "ema_3_adx", None), allow_zero=False)
         adx_4h = _first_num(getattr(getattr(sig, "ema_strategy", None), "adx_4h", None), allow_zero=False)
         atr_1d = _first_num(getattr(proto, "atr_14_1d", None), allow_zero=False)
@@ -438,6 +569,7 @@ class DataHubEngine:
             _row("Daily / Weekly VWAP (Z)", f"D:{_fmt_price(d_vwap) or 'N/A'} ({_fmt_num(vwap_z, '+.2f', True, 'σ') or 'N/A'}) | W:{_fmt_price(w_vwap) or 'N/A'}" if (d_vwap or w_vwap) else None, "4,11,15"),
             _row("RSI(14) 1D / 4H & 4H ROC12", f"1D:{_fmt_num(rsi_1d, '.1f') or 'N/A'} · 4H:{_fmt_num(rsi_4h, '.1f') or 'N/A'} · ROC:{_fmt_num(roc12_4h, '+.2f', True, '%') or 'N/A'}" if (rsi_1d is not None or rsi_4h is not None) else None, "3,7,20"),
             _row("ADX(14) 1D/4H & ATR(14) 1D/4H/1H", f"ADX 1D:{_fmt_num(adx_1d, '.1f') or 'N/A'} 4H:{_fmt_num(adx_4h, '.1f') or 'N/A'} | ATR:{_fmt_price(atr_1d) or 'N/A'}/{_fmt_price(atr_4h) or 'N/A'}/{_fmt_price(atr_1h) or 'N/A'}" if (adx_1d or adx_4h or atr_1d or atr_4h or atr_1h) else None, "0,1,2,8,13,18,20"),
+            _row("4H ATR(14)% Pctile & RelVol(20)", f"ATR%:{_fmt_num(atr4h_pct, '.2f', False, '%') or 'N/A'} ({_fmt_num(atr4h_pctile, '.0f', False, 'th') or 'N/A'} pct/120b) · RelVol:{_fmt_num(rel_vol_4h, '.2f', False, 'x') or 'N/A'}" if (atr4h_pct is not None or rel_vol_4h is not None) else None, "0,1,2,20"),
             _row("Macro 30D VAH / POC / VAL", f"{_fmt_price(mv.c_vah)} / {_fmt_price(mv.c_poc)} / {_fmt_price(mv.c_val)}" if mv else None, "1,3,6,11,19"),
             _row("Structure (L20/H20, PW, Asia)", struct_str, "0,8,11,19"),
         ]
@@ -490,9 +622,22 @@ class DataHubEngine:
         sess_cvd_tabs = "Live WS" if ws_trades_active else ("REST 15m" if day_cvd_seeded else "Live WS")
         sess_cvd_status = "OK" if (ws_trades_active or day_cvd_seeded) else "UNAVAILABLE"
 
+        s7_slope, s14_slope = compute_spot_cvd_slopes(getattr(store, "spot_klines_1d", None))
+        if s7_slope is None and mag is not None and _valid_num(getattr(mag, "spot_cvd_slope_7d", None)) and float(mag.spot_cvd_slope_7d) != 0.0:
+            s7_slope = float(mag.spot_cvd_slope_7d)
+        if s14_slope is None and mag is not None and _valid_num(getattr(mag, "spot_cvd_slope_14d", None)) and float(mag.spot_cvd_slope_14d) != 0.0:
+            s14_slope = float(mag.spot_cvd_slope_14d)
+        cvd_slope_str = (
+            f"7D:{_fmt_num(s7_slope, '+,.1f', True, ' BTC') or 'N/A'} | "
+            f"14D:{_fmt_num(s14_slope, '+,.1f', True, ' BTC') or 'N/A'}"
+            if (s7_slope is not None or s14_slope is not None)
+            else None
+        )
+
         panel_2 = [
             _row("Spot/Perp CVD (15m / 1h)", f"15m:{_fmt_num(getattr(w15, 'spot_delta_btc', None), '+.1f')}/{_fmt_num(getattr(w15, 'perp_delta_btc', None), '+.1f')} | 1h:{_fmt_num(getattr(w1h, 'spot_delta_btc', None), '+.1f')}/{_fmt_num(getattr(w1h, 'perp_delta_btc', None), '+.1f')} BTC" if (w15 and w1h) else None, "1,8,15"),
             _row("Spot/Perp CVD (4h / 24h)", f"4h:{_fmt_num(getattr(w4h, 'spot_delta_btc', None), '+.1f')}/{_fmt_num(getattr(w4h, 'perp_delta_btc', None), '+.1f')} | 24h:{_fmt_num(getattr(w24, 'spot_delta_btc', None), '+.1f')}/{_fmt_num(getattr(w24, 'perp_delta_btc', None), '+.1f')} BTC" if (w4h and w24) else None, "0,1,15,16,17"),
+            _row("Spot CVD Slopes (7D / 14D)", cvd_slope_str, "17"),
             _row("Session / UTC-Day CVD", f"Sess S:{store.session_spot_cvd:+.1f} P:{store.session_perp_cvd:+.1f} | Day S:{store.utc_day_spot_cvd:+.1f} P:{store.utc_day_perp_cvd:+.1f}", sess_cvd_tabs, sess_cvd_status),
             _row("24H Z-Scores (z_S / z_F / D)", f"z_S:{_fmt_num(z_s_24, '+.2f') or 'N/A'} · z_F:{_fmt_num(z_f_24, '+.2f') or 'N/A'} · D:{_fmt_num(d_flow, '+.2f') or 'N/A'}", "1,19", "OK" if d_flow is not None else "UNAVAILABLE"),
             _row("15m Footprint Delta / Stack", f"Δ:{_fmt_num(getattr(fp, 'active_bar_delta', None), '+.1f', True, ' BTC')} (Prev:{_fmt_num(getattr(fp, 'prev_bar_delta', None), '+.1f')}) · Stacks:{getattr(fp, 'stacked_imbalances_count', 0)}" if fp else None, "1,11"),
@@ -602,9 +747,22 @@ class DataHubEngine:
         liq_24h_s = f"${w_24h_liq.total_usd/1e6:.2f}M (x{getattr(liq_rep, 'liquidation_multiple_24h', 0.0):.2f})" if w_24h_liq else None
         pf_s = getattr(getattr(liq_rep, "post_flush_price_structure", None), "status", None) if liq_rep and getattr(liq_rep, "is_available", False) else None
 
+        hl_oi_b = _first_num(getattr(mi, "hyperliquid_oi_btc", None), allow_zero=False)
+        hl_oi_u = _first_num(getattr(mi, "hyperliquid_oi_usd", None), allow_zero=False)
+        if hl_oi_u is None and hl_oi_b is not None and spot_px > 0.0:
+            hl_oi_u = hl_oi_b * spot_px
+        hl_fund = _first_num(getattr(mi, "hyperliquid_funding_8h_pct", None))
+        hl_str = (
+            f"{_fmt_num(hl_oi_b, ',.0f', False, ' BTC') or 'N/A'} ({_fmt_usd_compact(hl_oi_u) or 'N/A'}) · F:{_fmt_num(hl_fund, '+.4f', True, '%') or 'N/A'} [HL DEX]"
+            if (hl_oi_b is not None or hl_fund is not None)
+            else None
+        )
+        liq_ladder_str = _format_modeled_liq_ladder(mag)
+
         panel_3 = [
             _row("BN Open Interest (BTC / USD)", f"{oi_btc:,.0f} BTC ({_fmt_usd_compact(oi_usd) or 'N/A'})" if oi_btc else None, "0,1,4,15,17"),
             _row("Cross-Exch Perp OI & Funding", f"{_fmt_num(agg_oi_b, ',.0f', False, ' BTC') or 'N/A'} ({_fmt_usd_compact(agg_oi_u) or 'N/A'}) · F:{_fmt_num(agg_fund, '+.4f', True, '%') or 'N/A'} [{agg_venues_tag}]" if (agg_oi_b or agg_fund is not None) else None, "Macro,15"),
+            _row("Hyperliquid Perp OI & Funding", hl_str, "Macro,15"),
             _row("OI Δ% (15m/1h/4h/24h) & Quad", f"{_fmt_num(oi_15, '+.2f', True, '%') or 'N/A'}/{_fmt_num(oi_1h, '+.2f', True, '%') or 'N/A'}/{_fmt_num(oi_4h, '+.2f', True, '%') or 'N/A'}/{_fmt_num(oi_24h, '+.2f', True, '%') or 'N/A'} | {quad_display or 'N/A'}" if (oi_deltas_ok or quad_display) else None, "1,4,8,11,12,15,17"),
             _row("Funding 8H% / Ann% / 90D Pct", f"{_fmt_num(fund_8h, '+.4f', True, '%') or 'N/A'} ({_fmt_num(fund_ann, '+.1f', True, '%/yr') or 'N/A'}) · 90D Pct:{_fmt_num(fund_p90, '.1f', True, '%') or 'N/A'}" if (fund_8h is not None or fund_p90 is not None) else None, "0,4,9,11,15,16,19,20"),
             _row("Perp Basis ($ / Ann %)", basis_str, "1,4"),
@@ -614,6 +772,7 @@ class DataHubEngine:
             _row("Vol: DVOL, RV20, GK & BBW%", f"DVOL:{_fmt_num(dvol, '.1f') or 'N/A'} · RV20:{_fmt_num(rv20, '.1f', True, '%') or 'N/A'} · GK:{_fmt_num(gk_ann, '.1f', True, '%') or 'N/A'} · BBW:{_fmt_num(bbw_pct, '.0f', True, '%') or 'N/A'} · Sk20:{_fmt_num(skew20, '+.2f') or 'N/A'}" if vol_any else None, "0,4,6,16,19"),
             _row("Upper / Lower Liq Magnet", f"Up:{_fmt_price(up_mag) or 'N/A'} | Dn:{_fmt_price(dn_mag) or 'N/A'}" if (up_mag or dn_mag) else None, "0,2,13,17"),
             _row("Magnet Ratios & LSCE", f"Imm:{_fmt_num(imm_r, '.2f', True, 'x') or 'N/A'} · Ladder:{_fmt_num(tot_r, '.2f', True, 'x') or 'N/A'} · Pull:{_fmt_num(pull_r, '.2f', True, 'x') or 'N/A'} · LSCE:{lsce_st or 'N/A'}" if (imm_r is not None or pull_r is not None or lsce_st) else None, "13,17"),
+            _row("Modeled Liq Ladder (10x-100x)", liq_ladder_str, "17"),
             _row("Liquidations (1H / 24H) & Flush", f"1H:{liq_1h_s or 'N/A'} | 24H:{liq_24h_s or 'N/A'} · {pf_s or 'N/A'}" if (liq_1h_s or liq_24h_s) else None, "0,8,12,13", liq_status_tag if (liq_1h_s or liq_24h_s) else "UNAVAILABLE"),
         ]
 
@@ -647,12 +806,16 @@ class DataHubEngine:
 
         etf_1d = _first_num(getattr(mi, "etf_daily_net_flow_usd", None))
         etf_3d = _first_num(getattr(mi, "etf_3d_cumulative_flow_usd", None))
+        etf_5d = _first_num(getattr(mi, "etf_5d_cumulative_flow_usd", None))
         etf_status = "UNAVAILABLE"
         etf_str = None
-        if mi is not None and (etf_1d is not None or etf_3d is not None):
-            if getattr(mi, "etf_daily_net_flow_status", "OK") == "OK":
+        if mi is not None and (etf_1d is not None or etf_3d is not None or etf_5d is not None):
+            raw_etf_st = str(getattr(mi, "etf_daily_net_flow_status", "OK") or "").strip()
+            if raw_etf_st == "OK" or raw_etf_st.upper().startswith("CONFIRMED"):
                 etf_status = "OK"
                 etf_str = f"1D:{_fmt_usd_compact(etf_1d, signed=True) or 'N/A'} | 3D:{_fmt_usd_compact(etf_3d, signed=True) or 'N/A'}"
+                if etf_5d is not None:
+                    etf_str += f" | 5D:{_fmt_usd_compact(etf_5d, signed=True) or 'N/A'}"
 
         etf_p_vol = _first_num(getattr(mi, "etf_proxy_vol_1d_usd", None), allow_zero=False)
         etf_p_flow = _first_num(getattr(mi, "etf_proxy_flow_5d_usd", None))
@@ -710,6 +873,8 @@ class DataHubEngine:
             else None
         )
 
+        cal_str, cal_status = _format_macro_calendar_summary(mi)
+
         panel_5 = [
             _row("US SOFR Rate & Vol (NY Fed)", f"{sofr_r:.2f}% (Vol:${_fmt_num(sofr_v, ',.0f') or 'N/A'}B)" if sofr_r is not None else None, "Macro"),
             _row("Fed ON RRP Balance (NY Fed)", f"${rrp_b:.2f}B" if rrp_b is not None else None, "Macro"),
@@ -720,6 +885,7 @@ class DataHubEngine:
             _row("VIX / Brent Crude (BZ=F)", f"VIX:{_fmt_num(vix_v, '.2f', False) or 'N/A'} | Brent:{_fmt_price(brent_v) or 'N/A'}" if (vix_v or brent_v) else None, "3,13"),
             _row("BTC-SPX Corr (20D / 60D)", f"20D:{_fmt_num(corr20, '+.2f') or 'N/A'} | 60D:{_fmt_num(corr60, '+.2f') or 'N/A'}" if (corr20 is not None or corr60 is not None) else None, "3"),
             _row("Fear & Greed / BTC Dom%", fng_str, "3,13"),
+            _row("USD Macro Calendar (High)", cal_str, "Macro", cal_status),
             _row("Manual Context Overrides", f"200D_Veto={getattr(proto, 'enforce_200d_hard_veto_on_tab1', 'N/A')} · Filter={getattr(proto, 'headline_filter_status', 'N/A')}" if proto else None, "2,13"),
         ]
 

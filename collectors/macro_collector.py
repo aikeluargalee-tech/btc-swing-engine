@@ -87,11 +87,16 @@ class MacroIntermarketSnapshot:
     agg_perp_venues_str: Optional[str] = None
     agg_perp_venues_count: Optional[int] = None
     agg_perp_venues_expected: int = 3
+    # Hyperliquid DEX Perp
+    hyperliquid_oi_btc: Optional[float] = None
+    hyperliquid_oi_usd: Optional[float] = None
+    hyperliquid_funding_8h_pct: Optional[float] = None
     # ETF Flows (Farside + Yahoo IBIT/FBTC proxy)
     etf_daily_net_flow_usd: Optional[float] = None
     etf_daily_net_flow_status: str = "unavailable"
     etf_3d_cumulative_flow_usd: Optional[float] = None
     etf_3d_cumulative_flow_status: str = "unavailable"
+    etf_5d_cumulative_flow_usd: Optional[float] = None
     etf_proxy_vol_1d_usd: Optional[float] = None
     etf_proxy_flow_5d_usd: Optional[float] = None
     # US Liquidity & Credit Spreads
@@ -100,6 +105,9 @@ class MacroIntermarketSnapshot:
     us_rrp_balance_b: Optional[float] = None
     credit_hyg_lqd_ratio: Optional[float] = None
     credit_hyg_lqd_5d_chg_pct: Optional[float] = None
+    # Upcoming USD High-Impact Macro Calendar (ForexFactory)
+    macro_calendar_events: List[Dict[str, Any]] = field(default_factory=list)
+    macro_calendar_fetched: bool = False
 
 
 async def _fetch_yahoo_quotes(
@@ -194,8 +202,9 @@ async def _fetch_coingecko_dominance(session: aiohttp.ClientSession) -> Optional
     return None
 
 
-def _fetch_farside_etf_flows_sync() -> Optional[Tuple[str, float, float]]:
+def _fetch_farside_etf_flows_sync() -> Optional[Tuple[str, float, float, float]]:
     """Fetches US Spot Bitcoin ETF flows from Farside Investors (total net flow across all issuers)."""
+    import html as _html
     import re
     import urllib.request
 
@@ -211,18 +220,21 @@ def _fetch_farside_etf_flows_sync() -> Optional[Tuple[str, float, float]]:
     url = "https://farside.co.uk/btc/"
     try:
         req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=5.0) as resp:
+        with urllib.request.urlopen(req, timeout=15.0) as resp:
             if resp.status != 200:
                 return None
-            html = resp.read().decode("utf-8", errors="ignore")
+            raw_html = resp.read().decode("utf-8", errors="ignore")
 
-        rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.DOTALL)
+        date_re = re.compile(r"^\d{1,2}\s+[A-Za-z]{3}\s+\d{4}$")
+        rows = re.findall(r"<tr[^>]*>(.*?)</tr>", raw_html, re.DOTALL)
         parsed_rows = []
-        months = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
         for row_html in rows:
             cells = re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row_html, re.DOTALL)
-            cleaned = [re.sub(r"<[^>]+>", "", c).strip().replace("\xa0", " ") for c in cells]
-            if cleaned and any(mo in cleaned[0] for mo in months):
+            cleaned = [
+                _html.unescape(re.sub(r"<[^>]+>", "", c)).strip().replace("\xa0", " ")
+                for c in cells
+            ]
+            if cleaned and len(cleaned) >= 3 and date_re.match(cleaned[0]):
                 parsed_rows.append(cleaned)
 
         def _parse_val(v: str) -> Optional[float]:
@@ -245,7 +257,13 @@ def _fetch_farside_etf_flows_sync() -> Optional[Tuple[str, float, float]]:
         if valid_totals:
             last_date, daily_net_m = valid_totals[-1]
             cum_3d_m = sum(v for _, v in valid_totals[-3:])
-            return last_date, daily_net_m * 1_000_000.0, cum_3d_m * 1_000_000.0
+            cum_5d_m = sum(v for _, v in valid_totals[-5:])
+            return (
+                last_date,
+                daily_net_m * 1_000_000.0,
+                cum_3d_m * 1_000_000.0,
+                cum_5d_m * 1_000_000.0,
+            )
     except Exception as e:
         logger.debug("Failed Farside ETF flow fetch: %s", e)
     return None
@@ -653,6 +671,99 @@ def _compute_rolling_correlation(
     return round(r, 3) if not np.isnan(r) else None
 
 
+async def _fetch_hyperliquid_perp(session: aiohttp.ClientSession) -> Optional[Dict[str, Any]]:
+    """Fetches Hyperliquid BTC perpetual Open Interest and 8H-normalized funding rate."""
+    url = "https://api.hyperliquid.xyz/info"
+    try:
+        async with session.post(
+            url,
+            json={"type": "metaAndAssetCtxs"},
+            timeout=aiohttp.ClientTimeout(total=6.0),
+        ) as resp:
+            if resp.status != 200:
+                return None
+            data = await resp.json()
+        if not isinstance(data, list) or len(data) < 2:
+            return None
+        universe = (data[0] or {}).get("universe") or []
+        ctxs = data[1] or []
+        idx = next((i for i, u in enumerate(universe) if isinstance(u, dict) and u.get("name") == "BTC"), None)
+        if idx is None or idx >= len(ctxs):
+            return None
+        ctx = ctxs[idx] or {}
+        oi_btc = float(ctx["openInterest"]) if ctx.get("openInterest") is not None else None
+        # Hyperliquid `funding` is 1h decimal fraction -> multiply by 8 * 100 for 8H%
+        fund_8h_pct = float(ctx["funding"]) * 8.0 * 100.0 if ctx.get("funding") is not None else None
+        mark_px = float(ctx.get("markPx") or ctx.get("oraclePx") or 0.0)
+        oi_usd = (oi_btc * mark_px) if (oi_btc is not None and mark_px > 0.0) else None
+        if oi_btc is None and fund_8h_pct is None:
+            return None
+        return {
+            "oi_btc": round(oi_btc, 1) if oi_btc is not None else None,
+            "oi_usd": round(oi_usd, 0) if oi_usd is not None else None,
+            "funding_8h_pct": round(fund_8h_pct, 5) if fund_8h_pct is not None else None,
+        }
+    except Exception as e:
+        logger.debug("Failed Hyperliquid perp fetch: %s", e)
+        return None
+
+
+async def _fetch_usd_macro_calendar(
+    session: aiohttp.ClientSession,
+) -> Tuple[bool, List[Dict[str, Any]]]:
+    """Fetches upcoming USD High-Impact macro events from Forex Factory (-60m to +7d)."""
+    now = datetime.now(timezone.utc)
+    events: List[Dict[str, Any]] = []
+    seen = set()
+    fetched = False
+    urls = (
+        "https://nfs.faireconomy.media/ff_calendar_thisweek.json",
+        "https://nfs.faireconomy.media/ff_calendar_nextweek.json",
+    )
+    for url in urls:
+        try:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=6.0)) as resp:
+                if resp.status != 200:
+                    continue
+                payload = await resp.json(content_type=None)
+            if not isinstance(payload, list):
+                continue
+            fetched = True
+            for ev in payload:
+                if not isinstance(ev, dict):
+                    continue
+                if ev.get("country") != "USD" or ev.get("impact") != "High":
+                    continue
+                raw_date = ev.get("date")
+                if not raw_date:
+                    continue
+                try:
+                    ev_dt = datetime.fromisoformat(str(raw_date)).astimezone(timezone.utc)
+                except Exception:
+                    continue
+                diff_min = (ev_dt - now).total_seconds() / 60.0
+                if -60.0 <= diff_min <= 7 * 24 * 60.0:
+                    title = str(ev.get("title") or "USD High Impact")
+                    key = (title, ev_dt.isoformat())
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    events.append(
+                        {
+                            "title": title,
+                            "time_utc": ev_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                            "ts_ms": int(ev_dt.timestamp() * 1000),
+                            "minutes_away": round(diff_min, 1),
+                            "forecast": str(ev.get("forecast") or ""),
+                            "previous": str(ev.get("previous") or ""),
+                        }
+                    )
+        except Exception as e:
+            logger.debug("Failed ForexFactory calendar fetch (%s): %s", url, e)
+    events.sort(key=lambda x: x["minutes_away"])
+    return fetched, events[:12]
+
+
 async def fetch_macro_and_intermarket_snapshot(
     session: aiohttp.ClientSession, btc_daily_closes: List[float]
 ) -> MacroIntermarketSnapshot:
@@ -660,7 +771,7 @@ async def fetch_macro_and_intermarket_snapshot(
     now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     snap = MacroIntermarketSnapshot(timestamp_utc=now_utc)
 
-    # 1. Dispatch concurrent network tasks (all bounded <=5s timeout)
+    # 1. Dispatch concurrent network tasks (all bounded timeout)
     yahoo_task = _fetch_yahoo_quotes(session)
     fng_task = _fetch_alternative_me_fng(session)
     coingecko_task = _fetch_coingecko_dominance(session)
@@ -673,6 +784,8 @@ async def fetch_macro_and_intermarket_snapshot(
     opt_task = _fetch_deribit_options_summary(session)
     perp_task = _fetch_cross_exchange_perps_and_cb_vol(session)
     nyfed_task = _fetch_nyfed_liquidity(session)
+    hl_task = _fetch_hyperliquid_perp(session)
+    cal_task = _fetch_usd_macro_calendar(session)
 
     (
         yahoo_data,
@@ -687,6 +800,8 @@ async def fetch_macro_and_intermarket_snapshot(
         opt_res,
         perp_res,
         nyfed_res,
+        hl_res,
+        cal_res,
     ) = await asyncio.gather(
         yahoo_task,
         fng_task,
@@ -700,6 +815,8 @@ async def fetch_macro_and_intermarket_snapshot(
         opt_task,
         perp_task,
         nyfed_task,
+        hl_task,
+        cal_task,
         return_exceptions=True,
     )
 
@@ -867,12 +984,30 @@ async def fetch_macro_and_intermarket_snapshot(
         snap.us_10y_breakeven_inflation = round(snap.us_10y_treasury_yield - snap.us_10y_real_yield_tips, 3)
         snap.us_10y_breakeven_source = "Treasury Yield Spread (Nominal - TIPS)"
 
+    # Populate Hyperliquid DEX Perp
+    if isinstance(hl_res, dict) and hl_res:
+        snap.hyperliquid_oi_btc = hl_res.get("oi_btc")
+        snap.hyperliquid_oi_usd = hl_res.get("oi_usd")
+        snap.hyperliquid_funding_8h_pct = hl_res.get("funding_8h_pct")
+
+    # Populate Upcoming USD Macro Calendar
+    if isinstance(cal_res, tuple) and len(cal_res) == 2:
+        cal_ok, cal_events = cal_res
+        snap.macro_calendar_fetched = bool(cal_ok)
+        if isinstance(cal_events, list):
+            snap.macro_calendar_events = cal_events
+
     # Populate ETF Flows (Farside Fallback)
-    if isinstance(farside_res, tuple) and len(farside_res) == 3:
-        last_date, daily_net, cum_3d = farside_res
+    if isinstance(farside_res, tuple) and len(farside_res) >= 3:
+        last_date = farside_res[0]
+        daily_net = farside_res[1]
+        cum_3d = farside_res[2]
+        cum_5d = farside_res[3] if len(farside_res) >= 4 else None
         snap.etf_daily_net_flow_usd = round(daily_net, 2)
         snap.etf_daily_net_flow_status = f"CONFIRMED (Farside {last_date})"
         snap.etf_3d_cumulative_flow_usd = round(cum_3d, 2)
         snap.etf_3d_cumulative_flow_status = f"CONFIRMED (Farside 3D to {last_date})"
+        if cum_5d is not None:
+            snap.etf_5d_cumulative_flow_usd = round(cum_5d, 2)
 
     return snap

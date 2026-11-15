@@ -854,6 +854,11 @@ class TestDataHub(unittest.TestCase):
         self.assertIn("### 7C. MODELED LIQUIDATION LADDER (`10x-100x`) & USD MACRO CALENDAR", report)
         self.assertIn("`10x Shorts`", report)
         self.assertIn("`CPI m/m`", report)
+        self.assertIn("4H ATR(14)% Pctile` & `RelVol(20)", report)
+        self.assertIn("Spot CVD Slopes (7D / 14D)", report)
+        self.assertIn("Hyperliquid Perp OI & Funding", report)
+        self.assertIn("6-Tier Modeled Liq Ladder (7C)", report)
+        self.assertIn("USD Macro Calendar (High)", report)
         for bad in ("verdict", "bullish", "bearish", "recommend"):
             self.assertNotIn(bad, report.lower())
 

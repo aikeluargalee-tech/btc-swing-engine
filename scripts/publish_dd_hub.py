@@ -309,6 +309,8 @@ def render_dashboard_html(
     background: #0c4a6e;
     border-color: var(--cyan);
     color: #f0f9ff;
+    font-size: 14px;
+    padding: 11px 16px;
   }}
   .btn-primary:hover {{
     background: #0369a1;

@@ -1003,6 +1003,113 @@ class TestDataHub(unittest.TestCase):
         self.assertIn(",", sr_4h_multi["sup"])
         self.assertNotEqual(sr_4h_multi["sup"], "None below in lookback")
 
+    def test_web_ui_cards_and_json_parity_preserve_markdown(self) -> None:
+        import re
+        from analytics.btc_magnet_engine import BTCMagnetEngine
+        from scripts.publish_dd_hub import write_dashboard_artifacts
+
+        bars_1d_below = _make_klines(n=220, step_ms=86_400_000, base_px=85_000.0)
+        for idx in range(205, 220):
+            b = bars_1d_below[idx]
+            bars_1d_below[idx] = KlineBar(
+                timestamp_ms=b.timestamp_ms,
+                open=66_000.0,
+                high=66_500.0,
+                low=63_500.0,
+                close=64_150.0,
+                volume=b.volume,
+                taker_buy_volume=b.taker_buy_volume,
+            )
+
+        store = StateStore()
+        store.warmup_complete = True
+        store.binance_spot_price = 65_300.0
+        store.open_interest_btc = 92_000.0
+        store.spot_klines_1d.extend(bars_1d_below)
+        store.spot_klines_4h.extend(self._make_swing_klines(n=80, step_ms=14_400_000, base_px=80_000.0, slope=-200.0))
+        store.spot_klines_1h.extend(_make_klines(n=40, step_ms=3_600_000, base_px=64_800.0))
+
+        BTCMagnetEngine(self.cfg).evaluate(store)
+        store.macro_intermarket = MacroIntermarketSnapshot(
+            macro_calendar_fetched=True,
+            macro_calendar_events=[
+                {
+                    "title": "CPI m/m",
+                    "time_utc": "2026-11-17T13:30:00Z",
+                    "minutes_away": 180.0,
+                    "forecast": "0.3%",
+                    "previous": "0.2%",
+                }
+            ],
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            db_file = tmp_path / "web_ui.sqlite"
+            out_dir = tmp_path / "docs"
+            ev = DataHubEngine(self.cfg, db_path=db_file, write_archive=True).evaluate(store)
+            md_report = build_tab_d_data_only_report(self.cfg, store, db_path=db_file)
+
+            paths = write_dashboard_artifacts(
+                output_dir=out_dir,
+                ev=ev,
+                md_report=md_report,
+                db_path=db_file,
+                repo_url="https://github.com/example/btc-swing-engine",
+                pages_url="https://example.github.io/btc-swing-engine/",
+                utc_str="2026-11-16 00:30:00 UTC",
+                sgt_str="2026-11-16 08:30:00 SGT (UTC+8)",
+                also_write_logs=False,
+                store=store,
+            )
+
+            json_payload = json.loads(paths["json"].read_text(encoding="utf-8"))
+            self.assertEqual(json_payload["stale_breakdown"]["expected_headless_ws_offline"], 1)
+            self.assertEqual(json_payload["stale_breakdown"]["genuine"], 0)
+            self.assertEqual(json_payload["section_0_veto"]["veto_status"], "ACTIVE")
+            self.assertEqual(len(json_payload["section_7a_structure"]), 3)
+            self.assertEqual(len(json_payload["section_7c"]["liquidation_ladder"]), 6)
+            self.assertEqual(len(json_payload["section_7c"]["macro_calendar"]), 1)
+
+            html_txt = paths["html"].read_text(encoding="utf-8")
+            self.assertIn('id="veto" class="veto-banner veto-active"', html_txt)
+            self.assertIn("WS_Off=1", html_txt)
+            self.assertIn('id="snapshot-age"', html_txt)
+            self.assertIn('id="flt-issues"', html_txt)
+            self.assertIn('id="structure-7a"', html_txt)
+            self.assertIn('id="liq-macro-7c"', html_txt)
+            self.assertIn("10x Shorts", html_txt)
+            self.assertIn("CPI m/m", html_txt)
+
+            m_payload = re.search(
+                r'<script type="application/json" id="dd-markdown-payload">(.*?)</script>',
+                html_txt,
+                flags=re.DOTALL,
+            )
+            self.assertIsNotNone(m_payload)
+            decoded_md = json.loads(m_payload.group(1))
+            self.assertEqual(decoded_md, md_report)
+
+            # Empty-but-fetched calendar renders CLEAR / NONE (next 7d) in 7C-2
+            store.macro_intermarket.macro_calendar_events = []
+            ev_clear = DataHubEngine(self.cfg, db_path=db_file, write_archive=False).evaluate(store)
+            md_clear = build_tab_d_data_only_report(self.cfg, store, db_path=db_file)
+            paths_clear = write_dashboard_artifacts(
+                output_dir=out_dir,
+                ev=ev_clear,
+                md_report=md_clear,
+                db_path=db_file,
+                repo_url="https://github.com/example/btc-swing-engine",
+                pages_url="https://example.github.io/btc-swing-engine/",
+                utc_str="2026-11-16 00:35:00 UTC",
+                sgt_str="2026-11-16 08:35:00 SGT (UTC+8)",
+                also_write_logs=False,
+                store=store,
+            )
+            html_clear = paths_clear["html"].read_text(encoding="utf-8")
+            self.assertIn("NONE (next 7d)", html_clear)
+            self.assertIn("CLEAR", html_clear)
+
 
 if __name__ == "__main__":
     unittest.main()

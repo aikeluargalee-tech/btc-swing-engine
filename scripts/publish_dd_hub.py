@@ -35,7 +35,11 @@ from analytics.data_hub_engine import (  # noqa: E402
     DataHubEvaluation,
     DataMetricRow,
 )
-from analytics.data_only_reports import build_tab_d_data_only_report  # noqa: E402
+from analytics.data_only_reports import (  # noqa: E402
+    _summarize_kline_structure,
+    build_tab_d_data_only_report,
+    evaluate_hard_market_veto,
+)
 from analytics.signal_detector import SignalDetector  # noqa: E402
 from collectors.warmup_loader import run_initial_warmup  # noqa: E402
 from config.settings import DEFAULT_CONFIG, EngineConfig  # noqa: E402
@@ -99,12 +103,127 @@ def _serialize_rows(rows: Sequence[DataMetricRow]) -> List[Dict[str, str]]:
     ]
 
 
+def _compute_stale_breakdown(ev: DataHubEvaluation) -> Dict[str, int]:
+    """Splits total stale count into genuine staleness vs expected headless WS offline."""
+    ws_row = next(
+        (r for r in (getattr(ev, "panel_6_macro_onchain", None) or []) if r.label == "WebSocket Feeds & Warmup"),
+        None,
+    )
+    expected_ws_offline = (
+        1
+        if (
+            ws_row is not None
+            and ws_row.status == "STALE"
+            and "Warm:YES" in str(ws_row.value)
+            and "no tick" in str(ws_row.value)
+        )
+        else 0
+    )
+    total_stale = int(ev.stale_count)
+    return {
+        "total": total_stale,
+        "genuine": max(0, total_stale - expected_ws_offline),
+        "expected_headless_ws_offline": expected_ws_offline,
+    }
+
+
+def _build_section_7a_rows(store: Optional[StateStore], spot_px: float) -> List[Dict[str, str]]:
+    """Extracts 500-bar Swing Structure & S/R clusters for 1D / 4H / 1H."""
+    if store is None:
+        return []
+    return [
+        _summarize_kline_structure(list(getattr(store, "spot_klines_1d", []) or []), spot_px, "1D", 86_400_000, lookback=500),
+        _summarize_kline_structure(list(getattr(store, "spot_klines_4h", []) or []), spot_px, "4H", 14_400_000, lookback=500),
+        _summarize_kline_structure(list(getattr(store, "spot_klines_1h", []) or []), spot_px, "1H", 3_600_000, lookback=500),
+    ]
+
+
+def _build_section_7c_data(store: Optional[StateStore]) -> Dict[str, Any]:
+    """Extracts 6-tier modeled liquidation ladder and USD high-impact macro calendar events."""
+    if store is None:
+        return {
+            "liquidation_ladder": [],
+            "macro_calendar_fetched": False,
+            "macro_calendar": [],
+        }
+    mag = getattr(store, "btc_magnet_evaluation", None)
+    tiers_raw = (getattr(mag, "levels_ladder", None) or {}).get("tiers_6") if mag is not None else None
+    ladder: List[Dict[str, Any]] = []
+    if isinstance(tiers_raw, list):
+        for t in tiers_raw:
+            px = t.get("price")
+            dp = t.get("distance_pct")
+            vm = t.get("estimated_vol_m")
+            ladder.append({
+                "tier": str(t.get("tier") or "N/A"),
+                "side": str(t.get("side") or "N/A").upper(),
+                "price": round(float(px), 2) if isinstance(px, (int, float)) else None,
+                "distance_pct": round(float(dp), 2) if isinstance(dp, (int, float)) else None,
+                "estimated_vol_m": round(float(vm), 2) if isinstance(vm, (int, float)) else None,
+            })
+
+    mi = getattr(store, "macro_intermarket", None)
+    cal_raw = (getattr(mi, "macro_calendar_events", None) or []) if mi is not None else []
+    cal_fetched = bool(getattr(mi, "macro_calendar_fetched", False)) if mi is not None else False
+    events: List[Dict[str, Any]] = []
+    if isinstance(cal_raw, list):
+        for cev in cal_raw[:6]:
+            mins = cev.get("minutes_away")
+            if isinstance(mins, (int, float)):
+                cd_s = f"{abs(mins):.0f}m ago" if mins < 0 else (f"in {mins:.0f}m" if mins < 120 else f"in {mins / 60.0:.1f}h")
+            else:
+                cd_s = "N/A"
+            events.append({
+                "title": str(cev.get("title") or "USD Event"),
+                "time_utc": str(cev.get("time_utc") or "N/A"),
+                "minutes_away": round(float(mins), 1) if isinstance(mins, (int, float)) else None,
+                "countdown": cd_s,
+                "forecast": str(cev.get("forecast") or "-"),
+                "previous": str(cev.get("previous") or "-"),
+            })
+    return {
+        "liquidation_ladder": ladder,
+        "macro_calendar_fetched": cal_fetched,
+        "macro_calendar": events,
+    }
+
+
+def _build_section_0_veto(
+    store: Optional[StateStore],
+    spot_px: float,
+    struct_7a: List[Dict[str, str]],
+    utc_str: str,
+    sgt_str: str,
+) -> Dict[str, str]:
+    """Builds the structured Section 0 Hard Downtrend Market Veto object."""
+    if store is None:
+        return {
+            "last_1d_close_str": "UNAVAILABLE",
+            "sma200_1d_str": "UNAVAILABLE",
+            "dist_vs_sma200_str": "UNAVAILABLE",
+            "sma200_pos": "UNAVAILABLE",
+            "struct_4h_str": "UNAVAILABLE",
+            "bos_4h_str": "UNAVAILABLE",
+            "cond_a": "UNAVAILABLE",
+            "cond_b": "UNAVAILABLE",
+            "veto_status": "UNDETERMINED",
+            "portfolio_status": "100% USDT CASH (FAIL-CLOSED — VERIFY DATA)",
+            "new_entry": "PROHIBITED",
+            "timestamp_status": f"{utc_str} | {sgt_str} · Closed-Candle Inputs Only",
+        }
+    s4h = struct_7a[1] if len(struct_7a) > 1 else None
+    veto = dict(evaluate_hard_market_veto(store, spot_px=spot_px, struct_4h=s4h))
+    veto["timestamp_status"] = f"{utc_str} | {sgt_str} · Closed-Candle Inputs Only"
+    return veto
+
+
 def build_dd_json_payload(
     ev: DataHubEvaluation,
     md_report: str,
     recent_archive: List[Dict[str, Any]],
     utc_str: str,
     sgt_str: str,
+    store: Optional[StateStore] = None,
 ) -> Dict[str, Any]:
     """Builds the structured `dd_latest.json` payload for GitHub Pages and downstream bots."""
     panels: Dict[str, Any] = {}
@@ -115,20 +234,30 @@ def build_dd_json_payload(
             "rows": _serialize_rows(rows),
         }
 
+    spot_px = float(ev.spot_price or 0.0)
+    stale_breakdown = _compute_stale_breakdown(ev)
+    struct_7a = _build_section_7a_rows(store, spot_px)
+    veto_0 = _build_section_0_veto(store, spot_px, struct_7a, utc_str, sgt_str)
+    sec_7c = _build_section_7c_data(store)
+
     return {
         "schema_version": "dd_v2",
         "instrument": "BTCUSDT",
         "retrieval_utc": utc_str,
         "retrieval_sgt": sgt_str,
-        "spot_price": float(ev.spot_price),
+        "spot_price": spot_px,
         "total_metrics": int(ev.total_metrics),
         "ok_count": int(ev.ok_count),
         "unavailable_count": int(ev.unavailable_count),
         "stale_count": int(ev.stale_count),
+        "stale_breakdown": stale_breakdown,
         "proxy_or_static_count": int(ev.proxy_or_static_count),
         "archive_snapshots_count": int(ev.archive_snapshots_count),
         "archive_last_bar_utc": ev.archive_last_bar_utc or "",
+        "section_0_veto": veto_0,
         "panels": panels,
+        "section_7a_structure": struct_7a,
+        "section_7c": sec_7c,
         "recent_archive": recent_archive,
         "markdown_report": md_report,
     }
@@ -145,6 +274,140 @@ def _status_badge_class(status: str) -> str:
     return "badge-unavail"
 
 
+def _render_veto_banner_html(veto: Dict[str, Any]) -> str:
+    """Renders the top Section 0 Hard Downtrend Market Veto status card."""
+    st = str(veto.get("veto_status") or "UNDETERMINED").upper()
+    if st == "ACTIVE":
+        cls = "veto-active"
+        badge_cls = "badge-unavail"
+    elif st == "INACTIVE":
+        cls = "veto-inactive"
+        badge_cls = "badge-ok"
+    else:
+        cls = "veto-undetermined"
+        badge_cls = "badge-stale"
+
+    portfolio_s = html.escape(str(veto.get("portfolio_status") or "100% USDT CASH"))
+    entry_s = html.escape(str(veto.get("new_entry") or "PROHIBITED"))
+    cond_a = html.escape(str(veto.get("cond_a") or "UNAVAILABLE"))
+    cond_b = html.escape(str(veto.get("cond_b") or "UNAVAILABLE"))
+    close_1d = html.escape(str(veto.get("last_1d_close_str") or "UNAVAILABLE"))
+    sma_200 = html.escape(str(veto.get("sma200_1d_str") or "UNAVAILABLE"))
+    dist_200 = html.escape(str(veto.get("dist_vs_sma200_str") or "UNAVAILABLE"))
+    struct_4h = html.escape(str(veto.get("struct_4h_str") or "UNAVAILABLE"))
+    bos_4h = html.escape(str(veto.get("bos_4h_str") or "UNAVAILABLE"))
+
+    return (
+        f"<section id=\"veto\" class=\"veto-banner {cls}\">"
+        f"<div class=\"veto-head\">"
+        f"<div class=\"veto-title\">0. HARD DOWNTREND MARKET VETO: "
+        f"<span class=\"badge {badge_cls}\" style=\"font-size:12px;padding:2px 8px;\">{html.escape(st)}</span></div>"
+        f"<div class=\"veto-posture\">"
+        f"<span>Portfolio: <strong>{portfolio_s}</strong></span>"
+        f"<span>New BTC Entry: <strong>{entry_s}</strong></span>"
+        f"</div>"
+        f"</div>"
+        f"<div class=\"veto-grid\">"
+        f"<div class=\"veto-cell\"><span class=\"dim\">Cond A (1D &lt; SMA200):</span> <code>{cond_a}</code> · <code>{close_1d}</code> vs <code>{sma_200}</code> (<code>{dist_200}</code>)</div>"
+        f"<div class=\"veto-cell\"><span class=\"dim\">Cond B (4H Structure/BOS):</span> <code>{cond_b}</code> · <code>{struct_4h}</code> · <code>{bos_4h}</code></div>"
+        f"</div>"
+        f"</section>"
+    )
+
+
+def _render_section_7a_card_html(rows_7a: Sequence[Dict[str, str]]) -> str:
+    """Renders the 7A 500-Bar Market Structure & S/R Zones visual card."""
+    body_rows: List[str] = []
+    for sr in rows_7a:
+        st_txt = str(sr.get("structure") or "")
+        st_cls = "badge-ok" if st_txt.startswith("UPTREND") else ("badge-unavail" if st_txt.startswith("DOWNTREND") else "badge-stale")
+        body_rows.append(
+            f"<tr>"
+            f"<td><code>{html.escape(str(sr.get('tf', '')))} ({html.escape(str(sr.get('bars', '0')))})</code></td>"
+            f"<td><span class=\"badge {st_cls}\">{html.escape(st_txt)}</span></td>"
+            f"<td><code>{html.escape(str(sr.get('pivots', 'N/A')))}</code></td>"
+            f"<td><code>{html.escape(str(sr.get('bos', 'N/A')))}</code></td>"
+            f"<td><code>{html.escape(str(sr.get('res', 'N/A')))}</code></td>"
+            f"<td><code>{html.escape(str(sr.get('sup', 'N/A')))}</code></td>"
+            f"</tr>"
+        )
+    if not body_rows:
+        body_rows.append("<tr><td colspan=\"6\" class=\"dim\">Structure summary unavailable for this payload.</td></tr>")
+
+    return (
+        f"<section id=\"structure-7a\" class=\"section-extra panel-card\">"
+        f"<h2>7A. 500-BAR MARKET STRUCTURE &amp; HISTORICAL S/R ZONES (1D / 4H / 1H)</h2>"
+        f"<div class=\"table-wrap\"><table>"
+        f"<thead><tr><th>TF (Bars)</th><th>Swing Structure</th><th>Last Swing Pivots</th>"
+        f"<th>Latest BOS</th><th>Resistance Zones (Above)</th><th>Support Zones (Below)</th></tr></thead>"
+        f"<tbody>{''.join(body_rows)}</tbody>"
+        f"</table></div></section>"
+    )
+
+
+def _render_section_7c_card_html(sec_7c: Dict[str, Any]) -> str:
+    """Renders the 7C Modeled Liquidation Ladder & USD Macro Calendar visual card."""
+    ladder = sec_7c.get("liquidation_ladder") or []
+    ladder_rows: List[str] = []
+    for tier in ladder:
+        side = str(tier.get("side") or "N/A").upper()
+        s_cls = "badge-unavail" if side == "UPPER" else "badge-ok"
+        px = tier.get("price")
+        dp = tier.get("distance_pct")
+        vm = tier.get("estimated_vol_m")
+        px_s = f"${float(px):,.2f}" if isinstance(px, (int, float)) else "N/A"
+        dp_s = f"{float(dp):+.2f}%" if isinstance(dp, (int, float)) else "N/A"
+        vm_s = f"${float(vm):.1f}M" if isinstance(vm, (int, float)) else "N/A"
+        ladder_rows.append(
+            f"<tr>"
+            f"<td><code>{html.escape(str(tier.get('tier', 'N/A')))}</code></td>"
+            f"<td><span class=\"badge {s_cls}\">{html.escape(side)}</span></td>"
+            f"<td><code>{px_s}</code></td>"
+            f"<td><code>{dp_s}</code></td>"
+            f"<td><code>{vm_s}</code></td>"
+            f"</tr>"
+        )
+    if not ladder_rows:
+        ladder_rows.append("<tr><td colspan=\"5\" class=\"dim\">DATA UNAVAILABLE</td></tr>")
+
+    cal_events = sec_7c.get("macro_calendar") or []
+    cal_fetched = bool(sec_7c.get("macro_calendar_fetched", False))
+    cal_rows: List[str] = []
+    if cal_events:
+        for cev in cal_events:
+            cal_rows.append(
+                f"<tr>"
+                f"<td><code>{html.escape(str(cev.get('title', 'USD Event')))}</code></td>"
+                f"<td><code>{html.escape(str(cev.get('time_utc', 'N/A')))}</code></td>"
+                f"<td><span class=\"badge badge-stale\">{html.escape(str(cev.get('countdown', 'N/A')))}</span></td>"
+                f"<td><code>{html.escape(str(cev.get('forecast', '-')))}</code></td>"
+                f"<td><code>{html.escape(str(cev.get('previous', '-')))}</code></td>"
+                f"</tr>"
+            )
+    elif cal_fetched:
+        cal_rows.append("<tr><td><code>NONE (next 7d)</code></td><td>-</td><td><span class=\"badge badge-ok\">CLEAR</span></td><td>-</td><td>-</td></tr>")
+    else:
+        cal_rows.append("<tr><td colspan=\"5\" class=\"dim\">DATA UNAVAILABLE</td></tr>")
+
+    return (
+        f"<section id=\"liq-macro-7c\" class=\"section-extra\" style=\"padding:0;overflow:hidden;\">"
+        f"<div class=\"split-grid\">"
+        f"<div class=\"split-pane\">"
+        f"<h2 class=\"sub-h2\">7C-1. MODELED LIQUIDATION LADDER (10x-100x)</h2>"
+        f"<div class=\"table-wrap\"><table>"
+        f"<thead><tr><th>Tier</th><th>Side</th><th>Level ($)</th><th>Dist%</th><th>Est Pool ($M)</th></tr></thead>"
+        f"<tbody>{''.join(ladder_rows)}</tbody>"
+        f"</table></div></div>"
+        f"<div class=\"split-pane\">"
+        f"<h2 class=\"sub-h2\">7C-2. USD HIGH-IMPACT MACRO CALENDAR (-60m to +7d)</h2>"
+        f"<div class=\"table-wrap\"><table>"
+        f"<thead><tr><th>Event</th><th>Time (UTC)</th><th>Countdown</th><th>Forecast</th><th>Previous</th></tr></thead>"
+        f"<tbody>{''.join(cal_rows)}</tbody>"
+        f"</table></div></div>"
+        f"</div></section>"
+    )
+
+
 def render_dashboard_html(
     payload: Dict[str, Any],
     repo_url: str,
@@ -152,19 +415,28 @@ def render_dashboard_html(
 ) -> str:
     """Renders a self-contained retro-Bloomberg dark-mode HTML dashboard for GitHub Pages."""
     spot = float(payload.get("spot_price", 0.0) or 0.0)
-    utc_s = html.escape(str(payload.get("retrieval_utc", "")))
+    utc_raw = str(payload.get("retrieval_utc", ""))
+    utc_s = html.escape(utc_raw)
     sgt_s = html.escape(str(payload.get("retrieval_sgt") or payload.get("retrieval_myt") or ""))
     ok_c = int(payload.get("ok_count", 0))
     tot_c = int(payload.get("total_metrics", 0))
     na_c = int(payload.get("unavailable_count", 0))
     st_c = int(payload.get("stale_count", 0))
+    sb = payload.get("stale_breakdown") or {"total": st_c, "genuine": st_c, "expected_headless_ws_offline": 0}
+    gen_c = int(sb.get("genuine", st_c))
+    ws_off_c = int(sb.get("expected_headless_ws_offline", 0))
     px_c = int(payload.get("proxy_or_static_count", 0))
+    issues_c = na_c + st_c + px_c
     arch_c = int(payload.get("archive_snapshots_count", 0))
     arch_last = html.escape(str(payload.get("archive_last_bar_utc") or "N/A"))
     md_report = str(payload.get("markdown_report", ""))
     md_json_safe = json.dumps(md_report).replace("</", "<\\/")
     trigger_url = html.escape(f"{repo_url.rstrip('/')}/actions/workflows/dd_hourly.yml")
     pages_esc = html.escape(pages_url)
+
+    veto_html = _render_veto_banner_html(payload.get("section_0_veto") or {})
+    sec_7a_html = _render_section_7a_card_html(payload.get("section_7a_structure") or [])
+    sec_7c_html = _render_section_7c_card_html(payload.get("section_7c") or {})
 
     panel_cards: List[str] = []
     panels = payload.get("panels", {})
@@ -178,7 +450,7 @@ def render_dashboard_html(
             status = str(r.get("status", "UNAVAILABLE")).upper()
             bcls = _status_badge_class(status)
             rows_html.append(
-                f"<tr>"
+                f"<tr class=\"metric-row\" data-status=\"{html.escape(status)}\">"
                 f"<td class=\"col-metric\">{lbl}<span class=\"tabs-tag\">[{tabs}]</span></td>"
                 f"<td class=\"col-val\"><code>{val}</code></td>"
                 f"<td class=\"col-st\"><span class=\"badge {bcls}\">{html.escape(status)}</span></td>"
@@ -432,6 +704,111 @@ def render_dashboard_html(
     font-family: var(--mono);
     font-size: 12px;
   }}
+  .veto-banner {{
+    margin-bottom: 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    padding: 12px 14px;
+    background: var(--panel);
+  }}
+  .veto-active {{
+    border-color: rgba(244, 63, 94, 0.6);
+    background: linear-gradient(180deg, rgba(244, 63, 94, 0.12), rgba(13, 20, 29, 0.96));
+  }}
+  .veto-inactive {{
+    border-color: rgba(34, 197, 94, 0.5);
+    background: linear-gradient(180deg, rgba(34, 197, 94, 0.10), rgba(13, 20, 29, 0.96));
+  }}
+  .veto-undetermined {{
+    border-color: rgba(245, 158, 11, 0.55);
+    background: linear-gradient(180deg, rgba(245, 158, 11, 0.12), rgba(13, 20, 29, 0.96));
+  }}
+  .veto-head {{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }}
+  .veto-title {{
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--text);
+  }}
+  .veto-posture {{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-size: 12px;
+  }}
+  .veto-grid {{
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    font-size: 12px;
+  }}
+  @media (max-width: 960px) {{
+    .veto-grid {{ grid-template-columns: 1fr; }}
+  }}
+  .veto-cell {{
+    background: rgba(5, 8, 12, 0.55);
+    border: 1px solid rgba(30, 45, 61, 0.75);
+    border-radius: 6px;
+    padding: 6px 10px;
+    word-break: break-word;
+  }}
+  .toolbar {{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 14px;
+  }}
+  .btn-filter {{
+    padding: 5px 10px;
+    font-size: 11px;
+  }}
+  .btn-filter.is-active {{
+    border-color: var(--cyan);
+    background: #0c4a6e;
+    color: #f0f9ff;
+  }}
+  .split-grid {{
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }}
+  @media (max-width: 1080px) {{
+    .split-grid {{ grid-template-columns: 1fr; }}
+  }}
+  .split-pane {{
+    border-right: 1px solid var(--border);
+  }}
+  .split-pane:last-child {{
+    border-right: none;
+  }}
+  @media (max-width: 1080px) {{
+    .split-pane {{
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+    }}
+    .split-pane:last-child {{
+      border-bottom: none;
+    }}
+  }}
+  h2.sub-h2 {{
+    margin: 0;
+    padding: 10px 14px;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    color: var(--amber);
+    background: var(--panel-alt);
+    border-bottom: 1px solid var(--border);
+  }}
+  .age-ok {{ color: var(--green); font-weight: 700; }}
+  .age-warn {{ color: var(--amber); font-weight: 700; }}
+  .age-stale {{ color: var(--red); font-weight: 700; }}
   .dim {{ color: var(--muted); }}
   footer {{
     max-width: 1600px;
@@ -446,12 +823,12 @@ def render_dashboard_html(
 <header class="topbar">
   <div class="top-row">
     <div class="brand">
-      <div class="brand-title">BTC SWING ENGINE // TAB [D: DATA HUB] — {tot_c}-ROW TELEMETRY MATRIX</div>
+      <div class="brand-title">BTC SWING ENGINE // CORTEX DESK LITE v1.0 — TAB [D: {tot_c}-ROW MATRIX]</div>
       <div class="meta-line">
         <span>Spot: <span class="spot-pill">${spot:,.2f}</span></span>
-        <span>UTC: <strong>{utc_s}</strong></span>
+        <span>UTC: <strong>{utc_s}</strong> <span id="snapshot-age"></span></span>
         <span>SGT: <strong>{sgt_s}</strong></span>
-        <span>Coverage: <strong>OK={ok_c}/{tot_c}</strong> · N/A={na_c} · STALE={st_c} · PROXY={px_c}</span>
+        <span>Coverage: <strong>OK={ok_c}/{tot_c}</strong> · N/A={na_c} · STALE={st_c} (Gen={gen_c}, WS_Off={ws_off_c}) · PROXY={px_c}</span>
         <span>SQLite 4H Archive: <strong>{arch_c}</strong> (Last: {arch_last})</span>
       </div>
     </div>
@@ -468,9 +845,22 @@ def render_dashboard_html(
 </header>
 
 <main>
+  {veto_html}
+
+  <div class="toolbar">
+    <button id="flt-all" class="btn btn-filter is-active" type="button">All Metrics ({tot_c})</button>
+    <button id="flt-issues" class="btn btn-filter" type="button">Non-OK Only ({issues_c})</button>
+    <a class="btn btn-filter" href="#structure-7a">7A Structure &amp; S/R</a>
+    <a class="btn btn-filter" href="#liq-macro-7c">7C Liq Ladder &amp; Macro</a>
+    <a class="btn btn-filter" href="#archive-7">SQLite Archive</a>
+  </div>
+
   <div class="grid">
     {''.join(panel_cards)}
   </div>
+
+  {sec_7a_html}
+  {sec_7c_html}
 
   <section class="section-extra">
     <details>
@@ -479,7 +869,7 @@ def render_dashboard_html(
     </details>
   </section>
 
-  <section class="section-extra">
+  <section id="archive-7" class="section-extra">
     <h2 style="margin:0 0 8px;font-size:13px;color:var(--amber);">RECENT 4H SQLITE ARCHIVE SNAPSHOTS</h2>
     <div class="table-wrap">
       <table>
@@ -501,7 +891,7 @@ def render_dashboard_html(
 </main>
 
 <footer>
-  Dashboard URL: <a href="{pages_esc}" style="color:var(--cyan);">{pages_esc}</a> · Zero-Hallucination DATA-ONLY Telemetry (DD v2)
+  Dashboard URL: <a href="{pages_esc}" style="color:var(--cyan);">{pages_esc}</a> · CORTEX BTC DESK LITE v1.0 · Zero-Hallucination DATA-ONLY Telemetry (DD v2)
 </footer>
 
 <script type="application/json" id="dd-markdown-payload">{md_json_safe}</script>
@@ -512,6 +902,45 @@ def render_dashboard_html(
   const payloadEl = document.getElementById("dd-markdown-payload");
   const rawBox = document.getElementById("raw-md");
   const mdText = payloadEl ? JSON.parse(payloadEl.textContent) : (rawBox ? rawBox.value : "");
+
+  const retrievalUtcRaw = {json.dumps(utc_raw)};
+  const ageEl = document.getElementById("snapshot-age");
+  function updateAge() {{
+    if (!ageEl || !retrievalUtcRaw) return;
+    const m = /^(\\d{{4}}-\\d{{2}}-\\d{{2}})\\s+(\\d{{2}}:\\d{{2}}:\\d{{2}})\\s+UTC$/.exec(retrievalUtcRaw.trim());
+    if (!m) return;
+    const ts = Date.parse(m[1] + "T" + m[2] + "Z");
+    if (!isFinite(ts)) return;
+    const mins = Math.max(0, Math.floor((Date.now() - ts) / 60000));
+    let cls = "age-ok";
+    let label = "(" + mins + "m ago)";
+    if (mins > 90) {{
+      cls = "age-stale";
+      label = "(" + mins + "m ago · STALE)";
+    }} else if (mins > 70) {{
+      cls = "age-warn";
+      label = "(" + mins + "m ago · AGING)";
+    }}
+    ageEl.className = cls;
+    ageEl.textContent = label;
+  }}
+  updateAge();
+  setInterval(updateAge, 30000);
+
+  const fltAll = document.getElementById("flt-all");
+  const fltIssues = document.getElementById("flt-issues");
+  const metricRows = Array.from(document.querySelectorAll("tr.metric-row"));
+  function setFilter(mode) {{
+    const onlyIssues = mode === "issues";
+    metricRows.forEach(function (tr) {{
+      const st = (tr.getAttribute("data-status") || "").toUpperCase();
+      tr.style.display = (onlyIssues && st === "OK") ? "none" : "";
+    }});
+    if (fltAll) fltAll.classList.toggle("is-active", !onlyIssues);
+    if (fltIssues) fltIssues.classList.toggle("is-active", onlyIssues);
+  }}
+  if (fltAll) fltAll.addEventListener("click", function () {{ setFilter("all"); }});
+  if (fltIssues) fltIssues.addEventListener("click", function () {{ setFilter("issues"); }});
 
   btn.addEventListener("click", async function () {{
     let copied = false;
@@ -951,6 +1380,7 @@ def write_dashboard_artifacts(
     utc_str: str,
     sgt_str: str,
     also_write_logs: bool = True,
+    store: Optional[StateStore] = None,
 ) -> Dict[str, pathlib.Path]:
     """Writes `btc_data_hub_latest.md`, `dd_latest.json`, and `index.html` into `output_dir`."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -971,7 +1401,7 @@ def write_dashboard_artifacts(
                 pass
 
     recent_archive = query_recent_archive(db_path, limit=30)
-    payload = build_dd_json_payload(ev, md_report, recent_archive, utc_str, sgt_str)
+    payload = build_dd_json_payload(ev, md_report, recent_archive, utc_str, sgt_str, store=store)
     json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     html_path.write_text(render_dashboard_html(payload, repo_url=repo_url, pages_url=pages_url), encoding="utf-8")
     return {"md": md_path, "json": json_path, "html": html_path}
@@ -1052,6 +1482,7 @@ async def run_publisher(
             pages_url=pages_url,
             utc_str=utc_str,
             sgt_str=sgt_str,
+            store=store,
         )
         logger.info(
             "Published Tab [D]: Spot=$%.2f | OK=%d/%d | Archive=%d | Files=%s",

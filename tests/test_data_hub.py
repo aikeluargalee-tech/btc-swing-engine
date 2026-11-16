@@ -961,10 +961,11 @@ class TestDataHub(unittest.TestCase):
         self.assertEqual(v_only_b["veto_status"], "INACTIVE")
         self.assertEqual(v_only_b["new_entry"], "ELIGIBLE FOR FULL ASSESSMENT")
 
-        # Case 3: Missing required data (< 200 1D bars with no SMA200, or missing 4H bars) -> UNDETERMINED + PROHIBITED
+        # Case 3: Missing/incomplete closed 1D series (< 200 closed 1D bars even if macro_evaluation has a cached value) -> UNDETERMINED + PROHIBITED
         store_missing = StateStore()
         store_missing.binance_spot_price = 65_300.0
         store_missing.spot_klines_1d.extend(_make_klines(n=20, step_ms=86_400_000, base_px=65_000.0))
+        store_missing.macro_evaluation = SimpleNamespace(sma_200_1d=72_000.0)
         v_missing = evaluate_hard_market_veto(store_missing, spot_px=65_300.0, now_ms=ref_ms)
         self.assertEqual(v_missing["cond_a"], "UNAVAILABLE")
         self.assertEqual(v_missing["cond_b"], "UNAVAILABLE")
@@ -975,6 +976,32 @@ class TestDataHub(unittest.TestCase):
         rep_missing = build_tab_d_data_only_report(self.cfg, store_missing)
         self.assertIn("- **Veto Status:** `UNDETERMINED`", rep_missing)
         self.assertIn("- **New BTC Entry:** `PROHIBITED`", rep_missing)
+
+        # Case 4: Verify Legacy_200D_Veto_Override, headless WS coverage breakdown, and 4H S/R clustering accuracy
+        from analytics.data_only_reports import _summarize_kline_structure
+
+        store_cov = StateStore()
+        store_cov.binance_spot_price = 65_300.0
+        store_cov.warmup_complete = True
+        store_cov.spot_klines_1d.extend(bars_1d_below)
+        store_cov.spot_klines_4h.extend(bars_4h_up)
+        store_cov.spot_klines_1h.extend(_make_klines(n=40, step_ms=3_600_000, base_px=65_000.0))
+        store_cov.protocol_evaluation = SimpleNamespace(
+            atr_14_1d=2000.0,
+            atr_14_4h=800.0,
+            enforce_200d_hard_veto_on_tab1=False,
+            headline_filter_status="NONE_SIGNIFICANT",
+        )
+        rep_cov = build_tab_d_data_only_report(self.cfg, store_cov)
+        self.assertIn("Legacy_200D_Veto_Override: IGNORED", rep_cov)
+        self.assertIn("Genuine=0, Expected_Headless_WS_Offline=1", rep_cov)
+        for bad in ("verdict", "bullish", "bearish", "recommend", "confirmed", "trade", "wait"):
+            self.assertNotIn(bad, rep_cov.lower())
+
+        # Verify 4H 500-bar clustering surfaces multiple distinct historical support zones when below spot
+        sr_4h_multi = _summarize_kline_structure(bars_4h_up, spot_px=75_500.0, tf_label="4H", interval_ms=14_400_000, now_ms=ref_ms)
+        self.assertIn(",", sr_4h_multi["sup"])
+        self.assertNotEqual(sr_4h_multi["sup"], "None below in lookback")
 
 
 if __name__ == "__main__":

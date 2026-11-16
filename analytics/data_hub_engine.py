@@ -886,7 +886,7 @@ class DataHubEngine:
             _row("BTC-SPX Corr (20D / 60D)", f"20D:{_fmt_num(corr20, '+.2f') or 'N/A'} | 60D:{_fmt_num(corr60, '+.2f') or 'N/A'}" if (corr20 is not None or corr60 is not None) else None, "3"),
             _row("Fear & Greed / BTC Dom%", fng_str, "3,13"),
             _row("USD Macro Calendar (High)", cal_str, "Macro", cal_status),
-            _row("Manual Context Overrides", f"200D_Veto={getattr(proto, 'enforce_200d_hard_veto_on_tab1', 'N/A')} · Filter={getattr(proto, 'headline_filter_status', 'N/A')}" if proto else None, "2,13"),
+            _row("Manual Context Overrides", f"Legacy_200D_Veto_Override: IGNORED (Tab1_Flag={getattr(proto, 'enforce_200d_hard_veto_on_tab1', 'N/A')}) · Filter={getattr(proto, 'headline_filter_status', 'N/A')}" if proto else None, "2,13"),
         ]
 
         # Domain 6: Quant Features, Feed Health & Archive (panel_6_macro_onchain slot)

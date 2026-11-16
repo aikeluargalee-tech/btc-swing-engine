@@ -1201,17 +1201,9 @@ def evaluate_hard_market_veto(
             bar_close_utc = _fmt_ts_utc(int(last_bar.timestamp_ms) + 86_400_000, "%Y-%m-%d %H:%M UTC")
             last_1d_close_str = f"${c_px:,.2f} (1D bar {bar_open_utc} · closed {bar_close_utc})"
 
-    macro_ev = getattr(store, "macro_evaluation", None)
-    tp_ev = getattr(store, "trend_pullback_evaluation", None)
     sma200_val: Optional[float] = None
-    for cand in (
-        getattr(macro_ev, "sma_200_1d", None) if macro_ev is not None else None,
-        getattr(tp_ev, "daily_sma200", None) if tp_ev is not None else None,
-    ):
-        if isinstance(cand, (int, float)) and float(cand) > 0.0:
-            sma200_val = float(cand)
-            break
-    if sma200_val is None and len(closed_1d) >= 200:
+    if len(closed_1d) >= 200:
+        # Derive 1D SMA 200 strictly from the same closed Binance Spot 1D series as last_1d_close
         sma200_val = sum(float(b.close) for b in closed_1d[-200:]) / 200.0
 
     sma200_str = f"${sma200_val:,.2f}" if (sma200_val is not None and sma200_val > 0.0) else "UNAVAILABLE"
@@ -1329,19 +1321,34 @@ def build_tab_d_data_only_report(
         else "N/A"
     )
 
+    ws_row = next((r for r in ev.panel_6_macro_onchain if r.label == "WebSocket Feeds & Warmup"), None)
+    expected_ws_offline = (
+        1
+        if (
+            ws_row is not None
+            and ws_row.status == "STALE"
+            and "Warm:YES" in str(ws_row.value)
+            and "no tick" in str(ws_row.value)
+        )
+        else 0
+    )
+    genuine_stale = max(0, int(ev.stale_count) - expected_ws_offline)
+
     lines: List[str] = [
         "# TAB [D: DATA HUB] | CONSOLIDATED DATA-ONLY TELEMETRY REPORT",
         f"**Retrieval Time (UTC):** `{utc_str}`  |  **Retrieval Time (SGT):** `{sgt_str}`",
         f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}`  |  "
-        f"**Coverage:** `OK={ev.ok_count}/{ev.total_metrics} | UNAVAILABLE={ev.unavailable_count} | STALE={ev.stale_count} | PROXY/STATIC={ev.proxy_or_static_count}`",
+        f"**Coverage:** `OK={ev.ok_count}/{ev.total_metrics} | UNAVAILABLE={ev.unavailable_count} | "
+        f"STALE={ev.stale_count} (Genuine={genuine_stale}, Expected_Headless_WS_Offline={expected_ws_offline}) | "
+        f"PROXY/STATIC={ev.proxy_or_static_count}`",
         f"**24H Range:** `{range_24h_str}`  |  **Returns (24H / 7D / 30D):** `{r24_str} / {r7_str} / {r30_str}`",
         f"**Archive (SQLite):** `{ev.archive_snapshots_count} closed-4H snapshots (Last: {ev.archive_last_bar_utc or 'N/A'})`",
         "",
         "## 0. HARD DOWNTREND MARKET VETO (PRE-ENTRY CAPITAL PRESERVATION GATE)",
         "| Gate Field | Value | Rule / Threshold |",
         "|---|---|---|",
-        f"| Latest Closed 1D Candle Close | `{veto['last_1d_close_str']}` | `Closed 1D bar only (live forming bar excluded)` |",
-        f"| Current 1D SMA 200 | `{veto['sma200_1d_str']}` | `200-day Simple Moving Average` |",
+        f"| Latest Closed 1D Candle Close | `{veto['last_1d_close_str']}` | `Same closed Binance Spot 1D series only (live candle excluded)` |",
+        f"| Current 1D SMA 200 | `{veto['sma200_1d_str']}` | `200-bar SMA of same closed Binance Spot 1D series` |",
         f"| Distance vs 1D SMA 200 | `{veto['dist_vs_sma200_str']}` | `(Closed 1D Close - 1D SMA 200) / 1D SMA 200` |",
         f"| 1D SMA 200 Position | `{veto['sma200_pos']}` | `BELOW if Closed 1D Close < 1D SMA 200 else ABOVE` |",
         f"| Closed 4H Market Structure (`7A`) | `{veto['struct_4h_str']}` | `UPTREND / DOWNTREND / MIXED (500 closed 4H bars)` |",
@@ -1464,9 +1471,9 @@ def build_tab_d_data_only_report(
         "- **Rough Path Lévy (`4H A_SP`)**: Lévy signed area over 6 closed 4H bars (`> 0`: Spot path leads price markup; `< 0`: Spot path lags price / distribution).",
         "- **24H Z-Scores (`z_S / z_F / D`)**: 30-day rolling Z-scores of 24H Spot (`z_S`) and Perp (`z_F`) cumulative delta; `D = z_S - z_F` (`D > 0` = Spot buying divergence vs Perps).",
         "- **Spot CVD Slopes (`7D / 14D`) & 4H Vol Context**: Cumulative spot taker-delta over last `7`/`14` closed `1D` bars; `4H ATR(14)% Pctile` ranks current closed `4H` ATR% against the trailing `120` closed `4H` bars, paired with `RelVol(20)` (`closed 4H volume / 20-bar SMA`).",
-        "- **Volume Profile & Structure**: `30D VA Pos% = (Spot - VAL) / (VAH - VAL) * 100` (Macro 30D Value Area); `ATR(14) 1D/4H/1H`; `L20/H20` = 20-bar (80H) 4H range boundaries; `SLSP` = structural liquidity pool S/R; `7A` scans 500 closed bars (`5x5` pivots) for `HH/HL/LH/LL`, `BOS`, and `1%`-clustered S/R zones.",
+        "- **Volume Profile & Structure**: `30D VA Pos% = (Spot - VAL) / (VAH - VAL) * 100` (Macro 30D Value Area); `ATR(14) 1D/4H/1H`; `L20/H20` = 20-bar (80H) 4H range boundaries; `SLSP` = structural liquidity pool S/R; `7A` scans up to 500 closed bars per TF (`1D ~499d`, `4H ~83d`, `1H ~21d`) using `5x5` pivots for `HH/HL/LH/LL`, `BOS`, and `1%`-clustered S/R zones (deep prior-quarter supports appear on `1D` even if outside the `83d` `4H` window).",
         "- **Derivatives, Modeled Ladder & Quant**: `90D Pct` = 0-100 rolling 90-day percentile rank of 8H funding; `[... X/3 PARTIAL_VENUE]` suppresses OI quadrant tagging when `<3` venues report; `Hyperliquid Perp` reports DEX OI and 8H-normalized funding independently; `Modeled Liq Ladder (7C)` estimates 10x-100x leverage shelves (not private exchange orderbooks); `USD Macro Calendar` tracks high-impact USD releases; `H` = Hurst exponent (`>0.5` trending, `<0.5` mean-reverting); `VCR 72H` = Volatility Compression Ratio; `TSFM Disp%` = horizon dispersion; `LSCE` = liquidation sweep state.",
-        "- **Headless Snapshot Note**: Scheduled/GitHub Actions runs execute a one-shot REST warmup (`Warm:YES`) without a persistent WebSocket loop, so `WebSocket Feeds & Warmup` reporting `STALE` (`no tick`) is expected by design and does not indicate stale REST, orderbook, CVD, or derivatives data.",
+        "- **Headless Snapshot Note**: Scheduled/GitHub Actions runs execute a one-shot REST warmup (`Warm:YES`) without a persistent WebSocket loop, so `WebSocket Feeds & Warmup` reporting `STALE` (`no tick`) is isolated in `Coverage` as `Expected_Headless_WS_Offline=1` and does not indicate stale REST, orderbook, CVD, or derivatives data.",
         "",
         "### DIRECT AI EXECUTION PROTOCOL: CORTEX BTC DESK LITE v1.0",
         "Analyze BTC using the telemetry snapshot above. Operate as **CORTEX BTC DESK LITE v1.0** — a Spot-Only Institutional Capital Preservation & Swing Execution Workstation. Apply strict **zero-hallucination** rules using only metrics explicitly reported above (`0`, `1-6`, `7`, `7A`, `7B`, `7C`).",
@@ -1474,15 +1481,15 @@ def build_tab_d_data_only_report(
         "**Gate 0 — HARD DOWNTREND MARKET VETO (EVALUATE FIRST, BEFORE ALL OTHER SIGNALS):**",
         "- Verify Section `0` (`HARD DOWNTREND MARKET VETO`) BEFORE scoring RSI, MACD, lower-timeframe setups, or liquidation clusters.",
         "- **Rule Conditions (`Condition A AND Condition B`):**",
-        "  - `Condition A`: Latest closed `1D` candle closes strictly below `1D SMA 200`.",
+        "  - `Condition A`: Latest settled closed `1D` candle closes strictly below `1D SMA 200` (both computed from the same completed Binance Spot `1D` candle series; no live forming candle mixing).",
         "  - `Condition B`: Closed `4H` market structure is `DOWNTREND` **OR** `4H Downside BOS Status` is `YES` (`BOS Down`).",
-        "- **Fail-Closed Rule (`UNDETERMINED`):** If either `Condition A` or `Condition B` is `UNAVAILABLE` (missing closed `1D` close, `1D SMA 200`, or insufficient closed `4H` data), DO NOT assume `INACTIVE` — set `Veto Status: UNDETERMINED`, `Portfolio Status: 100% USDT CASH`, and `New BTC Entry: PROHIBITED` until data is verified.",
+        "- **Fail-Closed Rule (`UNDETERMINED`):** If either `Condition A` or `Condition B` is `UNAVAILABLE` (missing closed `1D` close, `< 200` closed `1D` bars for `1D SMA 200`, or insufficient closed `4H` data), DO NOT assume `INACTIVE` — set `Veto Status: UNDETERMINED`, `Portfolio Status: 100% USDT CASH`, and `New BTC Entry: PROHIBITED` until data is verified.",
         "- **Mandatory Enforcement when `ACTIVE` (or `UNDETERMINED`):** Enforce `Portfolio Status: 100% USDT CASH` and `New BTC Entry: PROHIBITED`. No dip-buying and no averaging down. Lower-timeframe `UPTREND` bounces, oversold `RSI`, positive `1H` MACD crossovers, or upside liquidation clusters MUST NOT override this veto. (**Entry-protection only:** this rule MUST NOT automatically trigger selling existing BTC spot holdings; separate BTC-to-USDT exit rules govern open positions.)",
-        "- **Veto Removal Conditions:** Lift `ACTIVE` only when (1) a closed `1D` candle closes above `1D SMA 200` AND (2) closed `4H` structure improves (`UPTREND (HH/HL)` with no active downside BOS), AND (3) subsequent `Step 2` full-market reassessment validates supporting spot-flow demand (`ELIGIBLE FOR FULL ASSESSMENT` permits evaluation, never an automatic buy). Ignore Section `5` `Manual Context Overrides (200D_Veto=...)` for this Desk Lite gate — Section `0` is non-negotiable.",
+        "- **Veto Removal Conditions:** Lift `ACTIVE` only when ALL recovery requirements are independently verified on closed candles (never inferred from a temporary intraday rebound): (1) a settled closed `1D` candle closes above `1D SMA 200` computed from the same completed `1D` series, AND (2) closed `4H` structure independently improves to `UPTREND (HH/HL)` with no active downside BOS, AND (3) subsequent `Step 2` full-market reassessment validates supporting spot-flow demand (`ELIGIBLE FOR FULL ASSESSMENT` permits evaluation, never an automatic buy). Section `5` `Legacy_200D_Veto_Override` is permanently `IGNORED` for Desk Lite.",
         "",
         "**Step 1 — Mandatory Data Hygiene Gate:**",
-        "- Verify `Coverage` and isolate all `UNAVAILABLE`, `STALE`, and `PROXY/STATIC` feeds before scoring.",
-        "- Verify whether `WebSocket Feeds & Warmup` (`STALE`) is a headless REST warmup (`Warm:YES`), distinguishing expected one-shot snapshot behavior from genuine REST staleness.",
+        "- Verify `Coverage` distinguishing: (a) genuine stale market data (`Genuine=...`), (b) expected headless WS inactivity (`Expected_Headless_WS_Offline=...` when `Warm:YES` REST-only run), (c) `[PROXY]` feeds, and (d) `UNAVAILABLE` feeds.",
+        "- Never treat expected headless WebSocket inactivity (`Expected_Headless_WS_Offline=1`) as a genuine REST/derivatives/orderbook market-data failure.",
         "- Flag `[... PARTIAL_VENUE]` on `Cross-Exch Perp OI & Funding` or Section `7` history — never treat partial venue counts (`< 3/3`) as genuine deleveraging.",
         "- Read `90D Pct` strictly as a `0-100` rolling 90-day funding rank, `30D VA Pos%` strictly vs Macro 30D VAH/VAL, `ATR(14) 1D/4H/1H` across matching timeframes, and treat `Modeled Liq Ladder (7C)` as an algorithmic estimate (not private orderbook depth).",
         "- Check `USD Macro Calendar (High)`: treat `NONE (next 7d)` as a clear schedule (`OK`) vs `UNAVAILABLE` as offline.",

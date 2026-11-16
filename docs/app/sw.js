@@ -1,4 +1,4 @@
-const CACHE_NAME = "cortex-btc-pwa-v2";
+const CACHE_NAME = "cortex-btc-pwa-v3";
 const SHELL_ASSETS = [
   "./",
   "./index.html",

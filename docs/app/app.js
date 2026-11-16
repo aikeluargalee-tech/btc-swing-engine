@@ -5,7 +5,11 @@
     { id: "p1", badge: "IBM-P1", title: "IBM 3270 P1 GREEN", desc: "Classic green phosphor CRT", cls: "", metaColor: "#040905" },
     { id: "p3", badge: "IBM-P3", title: "IBM 3270 P3 AMBER", desc: "Warm amber terminal CRT", cls: "theme-p3", metaColor: "#0a0702" },
     { id: "3279", badge: "3279-COL", title: "IBM 3279 COLOR", desc: "Multi-color mainframe CRT", cls: "theme-3279", metaColor: "#05070c" },
-    { id: "modern", badge: "MODERN", title: "MODERN FINTECH", desc: "Clean iOS/Android cards", cls: "theme-modern", metaColor: "#090e18" }
+    { id: "bbg", badge: "BBG-PRO", title: "BLOOMBERG TERMINAL", desc: "Charcoal & high-contrast amber", cls: "theme-bbg", metaColor: "#08090b" },
+    { id: "luxe", badge: "OBSIDIAN", title: "OBSIDIAN GOLD", desc: "Private wealth black & gold", cls: "theme-luxe", metaColor: "#0a0a0e" },
+    { id: "cyber", badge: "CYBER-01", title: "TOKYO CYBERPUNK", desc: "Midnight neon cyan & magenta", cls: "theme-cyber", metaColor: "#0a0516" },
+    { id: "swiss", badge: "SWISS-LT", title: "SWISS PAPER LIGHT", desc: "Daylight high-contrast white", cls: "theme-swiss", metaColor: "#f4f6f9" },
+    { id: "modern", badge: "MODERN", title: "MODERN FINTECH", desc: "Rounded iOS/Android dark UI", cls: "theme-modern", metaColor: "#090e18" }
   ];
 
   const savedLook = (function () {
@@ -48,7 +52,7 @@
   function applyLook(lookId, announce) {
     const cfg = LOOKS.find((l) => l.id === lookId) || LOOKS[0];
     state.look = cfg.id;
-    document.body.classList.remove("theme-p3", "theme-3279", "theme-modern");
+    document.body.classList.remove("theme-p3", "theme-3279", "theme-bbg", "theme-luxe", "theme-cyber", "theme-swiss", "theme-modern");
     if (cfg.cls) document.body.classList.add(cfg.cls);
 
     const lookBtn = document.getElementById("look-toggle-btn");

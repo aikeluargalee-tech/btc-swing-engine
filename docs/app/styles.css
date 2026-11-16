@@ -19,6 +19,8 @@
   --font-mono: "SF Mono", "JetBrains Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
   --radius: 2px;
   --scan-opacity: 0.72;
+  --inset-vignette: inset 0 0 42px rgba(0, 0, 0, 0.9);
+  --overlay-bg: rgba(4, 9, 5, 0.62);
 }
 
 body.theme-p3 {
@@ -57,6 +59,96 @@ body.theme-3279 {
   --glow: 0 0 7px rgba(0, 240, 255, 0.42);
 }
 
+body.theme-bbg {
+  --bg: #000000;
+  --shell: #08090b;
+  --card: #111317;
+  --card-2: #1a1d24;
+  --border: #333842;
+  --border-bright: #ff8c00;
+  --text: #f3f4f6;
+  --muted: #fb923c;
+  --dim: #9ca3af;
+  --accent: #ff8c00;
+  --cyan: #38bdf8;
+  --green: #22c55e;
+  --amber: #ff8c00;
+  --red: #ef4444;
+  --glow: none;
+  --radius: 0px;
+  --scan-opacity: 0;
+  --inset-vignette: none;
+  --overlay-bg: rgba(8, 9, 11, 0.68);
+}
+
+body.theme-luxe {
+  --bg: #050507;
+  --shell: #0a0a0e;
+  --card: #121218;
+  --card-2: #1b1a22;
+  --border: rgba(212, 175, 55, 0.28);
+  --border-bright: #e5c158;
+  --text: #faf7f0;
+  --muted: #c9b57e;
+  --dim: #7c7565;
+  --accent: #e5c158;
+  --cyan: #e5c158;
+  --green: #34d399;
+  --amber: #e5c158;
+  --red: #f87171;
+  --glow: 0 0 12px rgba(229, 193, 88, 0.2);
+  --font-main: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Inter, Roboto, sans-serif;
+  --radius: 14px;
+  --scan-opacity: 0;
+  --inset-vignette: none;
+  --overlay-bg: rgba(10, 10, 14, 0.7);
+}
+
+body.theme-cyber {
+  --bg: #06030d;
+  --shell: #0a0516;
+  --card: #130b26;
+  --card-2: #1d1138;
+  --border: rgba(255, 46, 151, 0.42);
+  --border-bright: #00f5d4;
+  --text: #f8fafc;
+  --muted: #f472b6;
+  --dim: #a78bfa;
+  --accent: #00f5d4;
+  --cyan: #00f5d4;
+  --green: #00f5d4;
+  --amber: #facc15;
+  --red: #ff2e97;
+  --glow: 0 0 10px rgba(0, 245, 212, 0.35);
+  --radius: 6px;
+  --scan-opacity: 0.35;
+  --inset-vignette: inset 0 0 36px rgba(10, 5, 22, 0.85);
+  --overlay-bg: rgba(10, 5, 22, 0.68);
+}
+
+body.theme-swiss {
+  --bg: #e2e8f0;
+  --shell: #f4f6f9;
+  --card: #ffffff;
+  --card-2: #edf2f7;
+  --border: #cbd5e1;
+  --border-bright: #1d4ed8;
+  --text: #0f172a;
+  --muted: #475569;
+  --dim: #64748b;
+  --accent: #1d4ed8;
+  --cyan: #1d4ed8;
+  --green: #15803d;
+  --amber: #b45309;
+  --red: #dc2626;
+  --glow: none;
+  --font-main: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Inter, Roboto, sans-serif;
+  --radius: 12px;
+  --scan-opacity: 0;
+  --inset-vignette: none;
+  --overlay-bg: rgba(244, 246, 249, 0.78);
+}
+
 body.theme-modern {
   --bg: #05080f;
   --shell: #090e18;
@@ -76,6 +168,8 @@ body.theme-modern {
   --font-main: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Inter, Roboto, sans-serif;
   --radius: 16px;
   --scan-opacity: 0;
+  --inset-vignette: none;
+  --overlay-bg: rgba(9, 14, 24, 0.68);
 }
 
 * {
@@ -107,7 +201,7 @@ body {
   position: relative;
   border-left: 1px solid var(--border);
   border-right: 1px solid var(--border);
-  box-shadow: inset 0 0 42px rgba(0, 0, 0, 0.9), 0 24px 80px rgba(0, 0, 0, 0.85);
+  box-shadow: var(--inset-vignette), 0 24px 80px rgba(0, 0, 0, 0.45);
 }
 
 @media (max-width: 500px) {
@@ -183,7 +277,9 @@ body {
   animation: blink 1s steps(2, start) infinite;
 }
 
-body.theme-modern .blink-cursor { display: none; }
+body.theme-modern .blink-cursor,
+body.theme-swiss .blink-cursor,
+body.theme-luxe .blink-cursor { display: none; }
 
 @keyframes blink {
   0%, 49% { opacity: 1; }
@@ -517,6 +613,28 @@ body.theme-modern .btn-primary {
   color: #ffffff;
 }
 
+body.theme-bbg .btn-primary {
+  background: #ff8c00;
+  border-color: #ff8c00;
+  color: #08090b;
+}
+
+body.theme-luxe .btn-primary {
+  background: linear-gradient(135deg, #e5c158, #b88a2e);
+  border-color: #e5c158;
+  color: #09090d;
+}
+
+body.theme-swiss .btn-primary {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #ffffff;
+}
+
+body.theme-swiss .card {
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+}
+
 /* Levels & Liquidation Ladder */
 .tf-cards {
   display: flex;
@@ -727,7 +845,7 @@ body.theme-modern .btn-primary {
   justify-content: center;
   text-align: center;
   padding: 18px;
-  background: rgba(4, 9, 5, 0.55);
+  background: var(--overlay-bg);
   z-index: 5;
 }
 

@@ -1176,6 +1176,109 @@ def _query_tab_d_trajectory_rows(db_path: pathlib.Path, limit: int = 6) -> List[
     return out
 
 
+def evaluate_hard_market_veto(
+    store: StateStore,
+    spot_px: float = 0.0,
+    struct_4h: Optional[Dict[str, str]] = None,
+    now_ms: Optional[int] = None,
+) -> Dict[str, str]:
+    """Evaluates the deterministic Desk Lite Hard Downtrend Market Veto gate from closed 1D/4H bars."""
+    bars_1d = list(getattr(store, "spot_klines_1d", []) or [])
+    bars_4h = list(getattr(store, "spot_klines_4h", []) or [])
+    closed_1d = _closed_kline_bars(bars_1d, 86_400_000, now_ms=now_ms)
+
+    if struct_4h is None:
+        struct_4h = _summarize_kline_structure(bars_4h, spot_px, "4H", 14_400_000, lookback=500, now_ms=now_ms)
+
+    last_1d_close: Optional[float] = None
+    last_1d_close_str = "UNAVAILABLE"
+    if closed_1d:
+        last_bar = closed_1d[-1]
+        c_px = float(last_bar.close)
+        if c_px > 0.0:
+            last_1d_close = c_px
+            bar_open_utc = _fmt_ts_utc(int(last_bar.timestamp_ms), "%Y-%m-%d")
+            bar_close_utc = _fmt_ts_utc(int(last_bar.timestamp_ms) + 86_400_000, "%Y-%m-%d %H:%M UTC")
+            last_1d_close_str = f"${c_px:,.2f} (1D bar {bar_open_utc} · closed {bar_close_utc})"
+
+    macro_ev = getattr(store, "macro_evaluation", None)
+    tp_ev = getattr(store, "trend_pullback_evaluation", None)
+    sma200_val: Optional[float] = None
+    for cand in (
+        getattr(macro_ev, "sma_200_1d", None) if macro_ev is not None else None,
+        getattr(tp_ev, "daily_sma200", None) if tp_ev is not None else None,
+    ):
+        if isinstance(cand, (int, float)) and float(cand) > 0.0:
+            sma200_val = float(cand)
+            break
+    if sma200_val is None and len(closed_1d) >= 200:
+        sma200_val = sum(float(b.close) for b in closed_1d[-200:]) / 200.0
+
+    sma200_str = f"${sma200_val:,.2f}" if (sma200_val is not None and sma200_val > 0.0) else "UNAVAILABLE"
+
+    if last_1d_close is not None and sma200_val is not None and sma200_val > 0.0:
+        diff_usd = last_1d_close - sma200_val
+        diff_pct = (diff_usd / sma200_val) * 100.0
+        sign_str = "-" if diff_usd < 0 else "+"
+        dist_str = f"{diff_pct:+.2f}% ({sign_str}${abs(diff_usd):,.2f})"
+        below_sma200 = last_1d_close < sma200_val
+        sma200_pos = "BELOW" if below_sma200 else "ABOVE"
+        cond_a = "YES" if below_sma200 else "NO"
+    else:
+        dist_str = "UNAVAILABLE"
+        sma200_pos = "UNAVAILABLE"
+        cond_a = "UNAVAILABLE"
+
+    raw_struct_4h = str(struct_4h.get("structure") or "INSUFFICIENT_DATA")
+    raw_bos_4h = str(struct_4h.get("bos") or "N/A")
+    if raw_struct_4h == "INSUFFICIENT_DATA":
+        struct_4h_cat = "UNAVAILABLE"
+        bos_4h_str = "UNAVAILABLE"
+        cond_b = "UNAVAILABLE"
+    else:
+        if raw_struct_4h.startswith("UPTREND"):
+            struct_4h_cat = "UPTREND (HH/HL)"
+        elif raw_struct_4h.startswith("DOWNTREND"):
+            struct_4h_cat = "DOWNTREND (LH/LL)"
+        else:
+            struct_4h_cat = f"MIXED ({raw_struct_4h})" if not raw_struct_4h.startswith("MIXED") else raw_struct_4h
+
+        bos_down = raw_bos_4h.startswith("BOS Down")
+        bos_4h_str = (
+            f"YES ({raw_bos_4h})"
+            if bos_down
+            else (f"NO ({raw_bos_4h})" if raw_bos_4h not in ("N/A", "None in window") else "NO (No Downside BOS in window)")
+        )
+        cond_b = "YES" if (struct_4h_cat.startswith("DOWNTREND") or bos_down) else "NO"
+
+    if cond_a == "UNAVAILABLE" or cond_b == "UNAVAILABLE":
+        veto_status = "UNDETERMINED"
+        portfolio_status = "100% USDT CASH (FAIL-CLOSED — VERIFY DATA)"
+        new_entry = "PROHIBITED"
+    elif cond_a == "YES" and cond_b == "YES":
+        veto_status = "ACTIVE"
+        portfolio_status = "100% USDT CASH"
+        new_entry = "PROHIBITED"
+    else:
+        veto_status = "INACTIVE"
+        portfolio_status = "NORMAL ASSESSMENT REQUIRED"
+        new_entry = "ELIGIBLE FOR FULL ASSESSMENT"
+
+    return {
+        "last_1d_close_str": last_1d_close_str,
+        "sma200_1d_str": sma200_str,
+        "dist_vs_sma200_str": dist_str,
+        "sma200_pos": sma200_pos,
+        "struct_4h_str": struct_4h_cat,
+        "bos_4h_str": bos_4h_str,
+        "cond_a": cond_a,
+        "cond_b": cond_b,
+        "veto_status": veto_status,
+        "portfolio_status": portfolio_status,
+        "new_entry": new_entry,
+    }
+
+
 def build_tab_d_data_only_report(
     config: Optional[EngineConfig],
     store: StateStore,
@@ -1192,6 +1295,13 @@ def build_tab_d_data_only_report(
     bars_1h = list(getattr(store, "spot_klines_1h", []) or [])
     bars_4h = list(getattr(store, "spot_klines_4h", []) or [])
     bars_1d = list(getattr(store, "spot_klines_1d", []) or [])
+
+    struct_rows = [
+        _summarize_kline_structure(bars_1d, spot_px, "1D", 86_400_000, lookback=500),
+        _summarize_kline_structure(bars_4h, spot_px, "4H", 14_400_000, lookback=500),
+        _summarize_kline_structure(bars_1h, spot_px, "1H", 3_600_000, lookback=500),
+    ]
+    veto = evaluate_hard_market_veto(store, spot_px=spot_px, struct_4h=struct_rows[1])
 
     if len(bars_1h) >= 24 and spot_px > 0.0:
         w24 = bars_1h[-24:]
@@ -1227,6 +1337,24 @@ def build_tab_d_data_only_report(
         f"**24H Range:** `{range_24h_str}`  |  **Returns (24H / 7D / 30D):** `{r24_str} / {r7_str} / {r30_str}`",
         f"**Archive (SQLite):** `{ev.archive_snapshots_count} closed-4H snapshots (Last: {ev.archive_last_bar_utc or 'N/A'})`",
         "",
+        "## 0. HARD DOWNTREND MARKET VETO (PRE-ENTRY CAPITAL PRESERVATION GATE)",
+        "| Gate Field | Value | Rule / Threshold |",
+        "|---|---|---|",
+        f"| Latest Closed 1D Candle Close | `{veto['last_1d_close_str']}` | `Closed 1D bar only (live forming bar excluded)` |",
+        f"| Current 1D SMA 200 | `{veto['sma200_1d_str']}` | `200-day Simple Moving Average` |",
+        f"| Distance vs 1D SMA 200 | `{veto['dist_vs_sma200_str']}` | `(Closed 1D Close - 1D SMA 200) / 1D SMA 200` |",
+        f"| 1D SMA 200 Position | `{veto['sma200_pos']}` | `BELOW if Closed 1D Close < 1D SMA 200 else ABOVE` |",
+        f"| Closed 4H Market Structure (`7A`) | `{veto['struct_4h_str']}` | `UPTREND / DOWNTREND / MIXED (500 closed 4H bars)` |",
+        f"| 4H Downside BOS Status (`7A`) | `{veto['bos_4h_str']}` | `YES if latest closed 4H BOS is BOS Down else NO` |",
+        f"| Timestamp & Candle Closed Status | `{utc_str} | {sgt_str} · Closed-Candle Inputs Only` | `Strict closed-bar verification gate` |",
+        "",
+        "**HARD DOWNTREND MARKET VETO STATUS:**",
+        f"- **Veto Status:** `{veto['veto_status']}`",
+        f"- **Condition A (Closed 1D Close < 1D SMA 200):** `{veto['cond_a']}`",
+        f"- **Condition B (4H Downside Structure / BOS Down):** `{veto['cond_b']}`",
+        f"- **Portfolio Status:** `{veto['portfolio_status']}`",
+        f"- **New BTC Entry:** `{veto['new_entry']}`",
+        "",
     ]
     sections = (
         ("1. PRICE, TREND & MARKET STRUCTURE", ev.panel_1_feeds),
@@ -1257,11 +1385,6 @@ def build_tab_d_data_only_report(
     else:
         lines.append("| `N/A` | `N/A` | `N/A` | `N/A` | `N/A` | `N/A` |")
 
-    struct_rows = [
-        _summarize_kline_structure(bars_1d, spot_px, "1D", 86_400_000, lookback=500),
-        _summarize_kline_structure(bars_4h, spot_px, "4H", 14_400_000, lookback=500),
-        _summarize_kline_structure(bars_1h, spot_px, "1H", 3_600_000, lookback=500),
-    ]
     lines.extend([
         "",
         "### 7A. 500-BAR MARKET STRUCTURE & HISTORICAL S/R ZONES (`1D / 4H / 1H`)",
@@ -1346,9 +1469,18 @@ def build_tab_d_data_only_report(
         "- **Headless Snapshot Note**: Scheduled/GitHub Actions runs execute a one-shot REST warmup (`Warm:YES`) without a persistent WebSocket loop, so `WebSocket Feeds & Warmup` reporting `STALE` (`no tick`) is expected by design and does not indicate stale REST, orderbook, CVD, or derivatives data.",
         "",
         "### DIRECT AI EXECUTION PROTOCOL: CORTEX BTC DESK LITE v1.0",
-        "Analyze BTC using the telemetry snapshot above. Operate as **CORTEX BTC DESK LITE v1.0** — a Spot-Only Institutional Capital Preservation & Swing Execution Workstation. Apply strict **zero-hallucination** rules using only metrics explicitly reported above (`7`, `7A`, `7B`, `7C`, and Sections `1-6`).",
+        "Analyze BTC using the telemetry snapshot above. Operate as **CORTEX BTC DESK LITE v1.0** — a Spot-Only Institutional Capital Preservation & Swing Execution Workstation. Apply strict **zero-hallucination** rules using only metrics explicitly reported above (`0`, `1-6`, `7`, `7A`, `7B`, `7C`).",
         "",
-        "**Step 1 — Mandatory Data Hygiene Gate (Run First):**",
+        "**Gate 0 — HARD DOWNTREND MARKET VETO (EVALUATE FIRST, BEFORE ALL OTHER SIGNALS):**",
+        "- Verify Section `0` (`HARD DOWNTREND MARKET VETO`) BEFORE scoring RSI, MACD, lower-timeframe setups, or liquidation clusters.",
+        "- **Rule Conditions (`Condition A AND Condition B`):**",
+        "  - `Condition A`: Latest closed `1D` candle closes strictly below `1D SMA 200`.",
+        "  - `Condition B`: Closed `4H` market structure is `DOWNTREND` **OR** `4H Downside BOS Status` is `YES` (`BOS Down`).",
+        "- **Fail-Closed Rule (`UNDETERMINED`):** If either `Condition A` or `Condition B` is `UNAVAILABLE` (missing closed `1D` close, `1D SMA 200`, or insufficient closed `4H` data), DO NOT assume `INACTIVE` — set `Veto Status: UNDETERMINED`, `Portfolio Status: 100% USDT CASH`, and `New BTC Entry: PROHIBITED` until data is verified.",
+        "- **Mandatory Enforcement when `ACTIVE` (or `UNDETERMINED`):** Enforce `Portfolio Status: 100% USDT CASH` and `New BTC Entry: PROHIBITED`. No dip-buying and no averaging down. Lower-timeframe `UPTREND` bounces, oversold `RSI`, positive `1H` MACD crossovers, or upside liquidation clusters MUST NOT override this veto. (**Entry-protection only:** this rule MUST NOT automatically trigger selling existing BTC spot holdings; separate BTC-to-USDT exit rules govern open positions.)",
+        "- **Veto Removal Conditions:** Lift `ACTIVE` only when (1) a closed `1D` candle closes above `1D SMA 200` AND (2) closed `4H` structure improves (`UPTREND (HH/HL)` with no active downside BOS), AND (3) subsequent `Step 2` full-market reassessment validates supporting spot-flow demand (`ELIGIBLE FOR FULL ASSESSMENT` permits evaluation, never an automatic buy). Ignore Section `5` `Manual Context Overrides (200D_Veto=...)` for this Desk Lite gate — Section `0` is non-negotiable.",
+        "",
+        "**Step 1 — Mandatory Data Hygiene Gate:**",
         "- Verify `Coverage` and isolate all `UNAVAILABLE`, `STALE`, and `PROXY/STATIC` feeds before scoring.",
         "- Verify whether `WebSocket Feeds & Warmup` (`STALE`) is a headless REST warmup (`Warm:YES`), distinguishing expected one-shot snapshot behavior from genuine REST staleness.",
         "- Flag `[... PARTIAL_VENUE]` on `Cross-Exch Perp OI & Funding` or Section `7` history — never treat partial venue counts (`< 3/3`) as genuine deleveraging.",
@@ -1361,15 +1493,16 @@ def build_tab_d_data_only_report(
         "2. **Spot Flow & Liquidity Inspector:** Evaluate `Spot/Perp CVD` across `15m/1h/4h/24h`, multi-day `Spot CVD Slopes (7D / 14D)`, `z_S / z_F / D`, `Coinbase Premium`, `L2 Depth`, `OBI`, `Spr`, `30D VA Pos%`, `SLSP`, and `7A` S/R clusters -> classify true spot accumulation vs distribution or passive absorption.",
         "3. **Derivatives & Squeeze Risk Profiler:** Evaluate `BN OI`, `Cross-Exch OI` (only when `3/3` venues valid), `Hyperliquid Perp OI & Funding` (`[HL DEX]` vs CEX positioning), `OI Δ%` & Quad, `Funding 8H% / Ann% / 90D Pct`, `DVOL`, `25d RR Skew`, and `6-Tier Modeled Liq Ladder (7C)` (`10x-100x` upper/lower distance & `$M` asymmetry) -> classify leverage fragility and squeeze asymmetry.",
         "4. **Macro, On-Chain & ETF Gatekeeper:** Synthesize `MVRV`, `SOPR`, Farside `US Spot ETF Flow (1D / 3D / 5D)` (use `IBIT+FBTC` `[PROXY]` only as secondary context), `Stablecoin Supply`, `DXY`, `US10Y`, `VIX`, `SPX`, `Net Liquidity`, and `USD Macro Calendar (High)` (`7C` event proximity within `24h` or `±30m` high-impact windows) -> assign macro backdrop (`Tailwind`, `Neutral`, or `Headwind`).",
-        "5. **Spot-Only Risk & Decision Arbiter:** Enforce hard capital-preservation gates: if `1D` closes below `1D SMA 200` and `4H` shows active downtrend / broken structure, or trend conviction fails multi-gate alignment, enforce `100% USDT CASH — NO ENTRY`. Never force an entry in chop (`ADX < 20` or `TRANSITIONAL`), and account for imminent (`< 24h`) high-impact USD macro event risk when staging entries. For any qualified spot setup, cap maximum portfolio risk at `0.75%` per position.",
+        "5. **Spot-Only Risk & Decision Arbiter:** Respect `Gate 0` (`HARD DOWNTREND MARKET VETO`) first: if `ACTIVE` or `UNDETERMINED`, hold `100% USDT CASH` with `New BTC Entry: PROHIBITED` (entry-protection only; do not auto-sell existing BTC holdings). Only when `Veto Status` is `INACTIVE` may you evaluate spot longs; still never force an entry in chop (`ADX < 20` or `TRANSITIONAL`) or inside `< 24h` high-impact USD macro event risk, and cap maximum portfolio risk at `0.75%` per qualified spot position.",
         "",
         "**Step 3 — Mandatory Output Contract:**",
+        "- **0. HARD DOWNTREND MARKET VETO** (`Veto Status: ACTIVE / INACTIVE / UNDETERMINED`, `Condition A (1D below SMA 200): YES / NO / UNAVAILABLE`, `Condition B (4H downside structure): YES / NO / UNAVAILABLE`, `Portfolio Status: 100% USDT CASH / NORMAL ASSESSMENT REQUIRED`, `New BTC Entry: PROHIBITED / ELIGIBLE FOR FULL ASSESSMENT`).",
         "- **1. EXECUTIVE SUMMARY & DESK POSTURE** (Spot Price, Regime State, Posture: `ACTIVE SPOT LONG` or `100% USDT CASH — NO ENTRY`, Confidence `/100`).",
         "- **2. DATA HYGIENE AUDIT** (Exact `OK/UNAVAILABLE/STALE/PROXY` tally, headless WS clarification, any `PARTIAL_VENUE` anomalies, degraded-signal list).",
         "- **3. MULTI-TIMEFRAME REGIME & FLOW SYNTHESIS** (Price/EMA/ADX + `4H ATR% Pctile / RelVol` structure vs intraday & `7D/14D` Spot CVD, Coinbase Premium, and 4H SQLite Section `7` + `7A/7B` trajectory).",
         "- **4. DERIVATIVES, LIQUIDITY & MACRO CONTEXT** (CEX `3/3` + `Hyperliquid DEX` OI/funding, funding `90D Pct`, options skew, `6-tier Liq Ladder (7C)`, Farside `1D/3D/5D` ETF flows, `USD Macro Calendar (7C)` event window, and macro backdrop).",
         "- **5. CRITICAL LEVELS MAP** (Immediate & Major Support, Immediate & Major Resistance, `7C` modeled liquidation shelves, and Hard Invalidation Levels tied to `7A/7B` & `SLSP`).",
-        "- **6. SPOT EXECUTION PLAN (OR NO-ENTRY GATE)** (Exact Entry Zone, Stop Loss, Take Profit Targets, Position Size at `<= 0.75%` portfolio risk, event-window timing constraints, and explicit Multi-Gate Validation Triggers required to shift posture).",
+        "- **6. SPOT EXECUTION PLAN (OR NO-ENTRY GATE)** (Exact Entry Zone or `NO ENTRY — VETO ACTIVE/UNDETERMINED`, Stop Loss, Take Profit Targets, Position Size at `<= 0.75%` portfolio risk, event-window timing constraints, and explicit Multi-Gate Validation Triggers required to shift posture).",
         "",
     ])
 

@@ -16,7 +16,11 @@ from unittest.mock import patch
 from rich.console import Console
 
 from analytics.data_hub_engine import UNAVAILABLE, DataHubEngine
-from analytics.data_only_reports import build_tab_d_data_only_report, copy_tab_data_only_report_to_clipboard
+from analytics.data_only_reports import (
+    build_tab_d_data_only_report,
+    copy_tab_data_only_report_to_clipboard,
+    evaluate_hard_market_veto,
+)
 from collectors.macro_collector import MacroIntermarketSnapshot
 from config.settings import EngineConfig
 from core.models import (
@@ -860,9 +864,117 @@ class TestDataHub(unittest.TestCase):
         self.assertIn("6-Tier Modeled Liq Ladder (7C)", report)
         self.assertIn("USD Macro Calendar (High)", report)
         self.assertIn("**Retrieval Time (SGT):**", report)
+        self.assertIn("## 0. HARD DOWNTREND MARKET VETO (PRE-ENTRY CAPITAL PRESERVATION GATE)", report)
+        self.assertIn("**Gate 0 — HARD DOWNTREND MARKET VETO (EVALUATE FIRST, BEFORE ALL OTHER SIGNALS):**", report)
         self.assertNotIn("MYT", report)
-        for bad in ("verdict", "bullish", "bearish", "recommend"):
+        for bad in ("verdict", "bullish", "bearish", "recommend", "confirmed", "trade", "wait"):
             self.assertNotIn(bad, report.lower())
+
+    @staticmethod
+    def _make_swing_klines(n: int, step_ms: int, base_px: float, slope: float, wave_amp: float = 1200.0) -> list:
+        import math
+
+        now_ms = int(datetime(2026, 11, 14, 8, 0, tzinfo=timezone.utc).timestamp() * 1000)
+        out = []
+        for i in range(n):
+            px = base_px + (slope * i) + wave_amp * math.sin((2.0 * math.pi * i) / 14.0)
+            out.append(
+                KlineBar(
+                    timestamp_ms=now_ms - (n - 1 - i) * step_ms,
+                    open=px - 20.0,
+                    high=px + 150.0,
+                    low=px - 150.0,
+                    close=px,
+                    volume=1200.0,
+                    taker_buy_volume=600.0,
+                )
+            )
+        return out
+
+    def test_hard_downtrend_market_veto_active_inactive_and_undetermined(self) -> None:
+        ref_ms = int(datetime(2026, 11, 15, 12, 0, tzinfo=timezone.utc).timestamp() * 1000)
+
+        # Case 1: Both Condition A (1D < SMA200) and Condition B (4H DOWNTREND / BOS Down) TRUE -> ACTIVE
+        bars_1d_below = _make_klines(n=220, step_ms=86_400_000, base_px=85_000.0)
+        # Drop the final closed 1D bars sharply below the 200D average
+        for idx in range(205, 220):
+            b = bars_1d_below[idx]
+            bars_1d_below[idx] = KlineBar(
+                timestamp_ms=b.timestamp_ms,
+                open=66_000.0,
+                high=66_500.0,
+                low=63_500.0,
+                close=64_150.0,
+                volume=b.volume,
+                taker_buy_volume=b.taker_buy_volume,
+            )
+        bars_4h_down = self._make_swing_klines(n=80, step_ms=14_400_000, base_px=80_000.0, slope=-200.0)
+        bars_4h_up = self._make_swing_klines(n=80, step_ms=14_400_000, base_px=60_000.0, slope=+200.0)
+
+        store_active = StateStore()
+        store_active.binance_spot_price = 65_300.0
+        store_active.spot_klines_1d.extend(bars_1d_below)
+        store_active.spot_klines_4h.extend(bars_4h_down)
+        store_active.spot_klines_1h.extend(_make_klines(n=40, step_ms=3_600_000, base_px=64_800.0))
+
+        v_active = evaluate_hard_market_veto(store_active, spot_px=65_300.0, now_ms=ref_ms)
+        self.assertEqual(v_active["cond_a"], "YES")
+        self.assertEqual(v_active["sma200_pos"], "BELOW")
+        self.assertEqual(v_active["cond_b"], "YES")
+        self.assertEqual(v_active["struct_4h_str"], "DOWNTREND (LH/LL)")
+        self.assertTrue(v_active["bos_4h_str"].startswith("YES"))
+        self.assertEqual(v_active["veto_status"], "ACTIVE")
+        self.assertEqual(v_active["portfolio_status"], "100% USDT CASH")
+        self.assertEqual(v_active["new_entry"], "PROHIBITED")
+
+        rep_active = build_tab_d_data_only_report(self.cfg, store_active)
+        self.assertIn("- **Veto Status:** `ACTIVE`", rep_active)
+        self.assertIn("- **Portfolio Status:** `100% USDT CASH`", rep_active)
+        self.assertIn("- **New BTC Entry:** `PROHIBITED`", rep_active)
+        for bad in ("verdict", "bullish", "bearish", "recommend", "confirmed", "trade", "wait"):
+            self.assertNotIn(bad, rep_active.lower())
+
+        # Case 2a: Only Condition A TRUE (1D < SMA200, but 4H UPTREND + no downside BOS) -> INACTIVE
+        store_only_a = StateStore()
+        store_only_a.binance_spot_price = 65_300.0
+        store_only_a.spot_klines_1d.extend(bars_1d_below)
+        store_only_a.spot_klines_4h.extend(bars_4h_up)
+        v_only_a = evaluate_hard_market_veto(store_only_a, spot_px=65_300.0, now_ms=ref_ms)
+        self.assertEqual(v_only_a["cond_a"], "YES")
+        self.assertEqual(v_only_a["cond_b"], "NO")
+        self.assertEqual(v_only_a["struct_4h_str"], "UPTREND (HH/HL)")
+        self.assertTrue(v_only_a["bos_4h_str"].startswith("NO"))
+        self.assertEqual(v_only_a["veto_status"], "INACTIVE")
+        self.assertEqual(v_only_a["portfolio_status"], "NORMAL ASSESSMENT REQUIRED")
+        self.assertEqual(v_only_a["new_entry"], "ELIGIBLE FOR FULL ASSESSMENT")
+
+        # Case 2b: Only Condition B TRUE (1D > SMA200, 4H DOWNTREND) -> INACTIVE
+        bars_1d_above = _make_klines(n=220, step_ms=86_400_000, base_px=60_000.0)
+        store_only_b = StateStore()
+        store_only_b.binance_spot_price = 78_000.0
+        store_only_b.spot_klines_1d.extend(bars_1d_above)
+        store_only_b.spot_klines_4h.extend(bars_4h_down)
+        v_only_b = evaluate_hard_market_veto(store_only_b, spot_px=78_000.0, now_ms=ref_ms)
+        self.assertEqual(v_only_b["cond_a"], "NO")
+        self.assertEqual(v_only_b["sma200_pos"], "ABOVE")
+        self.assertEqual(v_only_b["cond_b"], "YES")
+        self.assertEqual(v_only_b["veto_status"], "INACTIVE")
+        self.assertEqual(v_only_b["new_entry"], "ELIGIBLE FOR FULL ASSESSMENT")
+
+        # Case 3: Missing required data (< 200 1D bars with no SMA200, or missing 4H bars) -> UNDETERMINED + PROHIBITED
+        store_missing = StateStore()
+        store_missing.binance_spot_price = 65_300.0
+        store_missing.spot_klines_1d.extend(_make_klines(n=20, step_ms=86_400_000, base_px=65_000.0))
+        v_missing = evaluate_hard_market_veto(store_missing, spot_px=65_300.0, now_ms=ref_ms)
+        self.assertEqual(v_missing["cond_a"], "UNAVAILABLE")
+        self.assertEqual(v_missing["cond_b"], "UNAVAILABLE")
+        self.assertEqual(v_missing["veto_status"], "UNDETERMINED")
+        self.assertIn("FAIL-CLOSED", v_missing["portfolio_status"])
+        self.assertEqual(v_missing["new_entry"], "PROHIBITED")
+
+        rep_missing = build_tab_d_data_only_report(self.cfg, store_missing)
+        self.assertIn("- **Veto Status:** `UNDETERMINED`", rep_missing)
+        self.assertIn("- **New BTC Entry:** `PROHIBITED`", rep_missing)
 
 
 if __name__ == "__main__":

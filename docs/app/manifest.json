@@ -1,0 +1,19 @@
+{
+  "name": "CORTEX BTC DESK — Mobile",
+  "short_name": "CORTEX BTC",
+  "description": "Spot-only institutional BTC intelligence, Hard Downtrend Veto monitor, S/R map, and liquidation ladder.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#070b12",
+  "theme_color": "#070b12",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

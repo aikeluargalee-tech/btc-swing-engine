@@ -1,4 +1,4 @@
-const CACHE_NAME = "cortex-btc-pwa-v1";
+const CACHE_NAME = "cortex-btc-pwa-v2";
 const SHELL_ASSETS = [
   "./",
   "./index.html",
@@ -28,7 +28,6 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
 
-  // Network-first for live dd_latest.json telemetry so fresh snapshots show immediately
   if (url.pathname.endsWith("dd_latest.json")) {
     event.respondWith(
       fetch(event.request)
@@ -42,7 +41,6 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Network-first with cache fallback for app shell
   event.respondWith(
     fetch(event.request)
       .then((res) => {

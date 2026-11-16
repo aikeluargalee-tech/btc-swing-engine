@@ -1,12 +1,12 @@
 {
-  "name": "CORTEX BTC DESK — Mobile",
-  "short_name": "CORTEX BTC",
-  "description": "Spot-only institutional BTC intelligence, Hard Downtrend Veto monitor, S/R map, and liquidation ladder.",
+  "name": "IBM 3270 // CORTEX BTC DESK",
+  "short_name": "CORTEX 3270",
+  "description": "IBM 3270 Mainframe BTC Spot Intelligence, Gate 0 Veto Monitor, S/R Map, and Liquidation Ladder.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#070b12",
-  "theme_color": "#070b12",
+  "background_color": "#040905",
+  "theme_color": "#040905",
   "orientation": "portrait",
   "icons": [
     {

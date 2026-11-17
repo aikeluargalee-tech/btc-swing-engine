@@ -1182,7 +1182,7 @@ def evaluate_hard_market_veto(
     struct_4h: Optional[Dict[str, str]] = None,
     now_ms: Optional[int] = None,
 ) -> Dict[str, str]:
-    """Evaluates the deterministic Desk Lite Hard Downtrend Market Veto gate from closed 1D/4H bars."""
+    """Evaluates the deterministic Gate 0 Bidirectional Regime Router from closed 1D/4H bars."""
     bars_1d = list(getattr(store, "spot_klines_1d", []) or [])
     bars_4h = list(getattr(store, "spot_klines_4h", []) or [])
     closed_1d = _closed_kline_bars(bars_1d, 86_400_000, now_ms=now_ms)
@@ -1223,6 +1223,7 @@ def evaluate_hard_market_veto(
 
     raw_struct_4h = str(struct_4h.get("structure") or "INSUFFICIENT_DATA")
     raw_bos_4h = str(struct_4h.get("bos") or "N/A")
+    bos_down = False
     if raw_struct_4h == "INSUFFICIENT_DATA":
         struct_4h_cat = "UNAVAILABLE"
         bos_4h_str = "UNAVAILABLE"
@@ -1243,17 +1244,56 @@ def evaluate_hard_market_veto(
         )
         cond_b = "YES" if (struct_4h_cat.startswith("DOWNTREND") or bos_down) else "NO"
 
+    mi = getattr(store, "macro_intermarket", None)
+    cal_fetched = bool(getattr(mi, "macro_calendar_fetched", False)) if mi is not None else False
+    cal_events = (getattr(mi, "macro_calendar_events", None) or []) if mi is not None else []
+    near_events = [
+        ev_c for ev_c in cal_events
+        if isinstance(ev_c, dict)
+        and isinstance(ev_c.get("minutes_away"), (int, float))
+        and -60.0 <= float(ev_c["minutes_away"]) <= 1440.0
+    ]
+    if near_events:
+        first_ev = near_events[0]
+        m_away = float(first_ev["minutes_away"])
+        cd_s = f"{abs(m_away):.0f}m ago" if m_away < 0 else (f"in {m_away:.0f}m" if m_away < 120 else f"in {m_away / 60.0:.1f}h")
+        macro_caution = f"CAUTION (<24h: {first_ev.get('title', 'USD Event')} {cd_s})"
+    elif cal_fetched:
+        macro_caution = "CLEAR (>24h / NONE)"
+    else:
+        macro_caution = "UNAVAILABLE"
+
     if cond_a == "UNAVAILABLE" or cond_b == "UNAVAILABLE":
+        active_route = "UNDETERMINED"
+        primary_rail = "HOLD_BOTH_RAILS (FAIL-CLOSED — VERIFY DATA)"
+        btc_posture = "HOLD BTC (FAIL-CLOSED — VERIFY DATA)"
+        usdt_posture = "HOLD USDT (FAIL-CLOSED — VERIFY DATA)"
         veto_status = "UNDETERMINED"
-        portfolio_status = "100% USDT CASH (FAIL-CLOSED — VERIFY DATA)"
+        portfolio_status = "HOLD CURRENT INVENTORY (FAIL-CLOSED — VERIFY DATA)"
         new_entry = "PROHIBITED"
     elif cond_a == "YES" and cond_b == "YES":
+        active_route = "MACRO_DOWNTREND_DISTRIBUTION"
+        primary_rail = "RAIL A — BTC -> USDT CONVERSION (DEFENSIVE / SELL RALLIES)"
+        btc_posture = "ACTIVE (RAIL A) — CONVERT INTO OVERHEAD RESISTANCE"
+        usdt_posture = "RESTRICTED (RAIL B) — HOLD PENDING VALIDATED SWEEP & RECLAIM"
         veto_status = "ACTIVE"
-        portfolio_status = "100% USDT CASH"
-        new_entry = "PROHIBITED"
-    else:
+        portfolio_status = "RAIL A PRIMARY (BTC -> USDT) / RAIL B RESTRICTED"
+        new_entry = "RESTRICTED TO VALIDATED SWEEP RECLAIM"
+    elif cond_a == "NO" and struct_4h_cat.startswith("UPTREND") and not bos_down:
+        active_route = "MACRO_UPTREND_MARKUP"
+        primary_rail = "RAIL B — USDT -> BTC ACCUMULATION (BUY PULLBACKS)"
+        btc_posture = "HOLD (RAIL A SELECTIVE TRIM AT MAJOR RESISTANCE / UPPER 7C)"
+        usdt_posture = "ACTIVE (RAIL B) — ACCUMULATE 4H HIGHER-LOW PULLBACKS"
         veto_status = "INACTIVE"
-        portfolio_status = "NORMAL ASSESSMENT REQUIRED"
+        portfolio_status = "RAIL B PRIMARY (USDT -> BTC) / RAIL A TRIM EXTREMES"
+        new_entry = "ELIGIBLE FOR FULL ASSESSMENT"
+    else:
+        active_route = "TRANSITIONAL_RANGE"
+        primary_rail = "TWO_WAY_RANGE_HARVEST (BOUNDARY SWINGS)"
+        btc_posture = "TWO-WAY HARVEST — CONVERT AT 7A RESISTANCE & UPPER 7C"
+        usdt_posture = "TWO-WAY HARVEST — DEPLOY AT 7A SUPPORT & LOWER 7C SWEEPS"
+        veto_status = "INACTIVE"
+        portfolio_status = "TWO_WAY_RANGE_HARVEST (BOTH RAILS ACTIVE AT BOUNDARIES)"
         new_entry = "ELIGIBLE FOR FULL ASSESSMENT"
 
     return {
@@ -1265,6 +1305,11 @@ def evaluate_hard_market_veto(
         "bos_4h_str": bos_4h_str,
         "cond_a": cond_a,
         "cond_b": cond_b,
+        "macro_caution": macro_caution,
+        "active_route": active_route,
+        "primary_rail": primary_rail,
+        "btc_sleeve_posture": btc_posture,
+        "usdt_sleeve_posture": usdt_posture,
         "veto_status": veto_status,
         "portfolio_status": portfolio_status,
         "new_entry": new_entry,
@@ -1344,8 +1389,8 @@ def build_tab_d_data_only_report(
         f"**24H Range:** `{range_24h_str}`  |  **Returns (24H / 7D / 30D):** `{r24_str} / {r7_str} / {r30_str}`",
         f"**Archive (SQLite):** `{ev.archive_snapshots_count} closed-4H snapshots (Last: {ev.archive_last_bar_utc or 'N/A'})`",
         "",
-        "## 0. HARD DOWNTREND MARKET VETO (PRE-ENTRY CAPITAL PRESERVATION GATE)",
-        "| Gate Field | Value | Rule / Threshold |",
+        "## 0. BIDIRECTIONAL REGIME ROUTER (GATE 0 — DUAL-INVENTORY SPOT WORKSTATION)",
+        "| Router Field | Value | Rule / Threshold |",
         "|---|---|---|",
         f"| Latest Closed 1D Candle Close | `{veto['last_1d_close_str']}` | `Same closed Binance Spot 1D series only (live candle excluded)` |",
         f"| Current 1D SMA 200 | `{veto['sma200_1d_str']}` | `200-bar SMA of same closed Binance Spot 1D series` |",
@@ -1353,14 +1398,15 @@ def build_tab_d_data_only_report(
         f"| 1D SMA 200 Position | `{veto['sma200_pos']}` | `BELOW if Closed 1D Close < 1D SMA 200 else ABOVE` |",
         f"| Closed 4H Market Structure (`7A`) | `{veto['struct_4h_str']}` | `UPTREND / DOWNTREND / MIXED (500 closed 4H bars)` |",
         f"| 4H Downside BOS Status (`7A`) | `{veto['bos_4h_str']}` | `YES if latest closed 4H BOS is BOS Down else NO` |",
+        f"| Upcoming Macro Event Caution (`7C`) | `{veto['macro_caution']}` | `CAUTION (<24h USD high-impact event) else CLEAR` |",
         f"| Timestamp & Candle Closed Status | `{utc_str} | {sgt_str} · Closed-Candle Inputs Only` | `Strict closed-bar verification gate` |",
         "",
-        "**HARD DOWNTREND MARKET VETO STATUS:**",
-        f"- **Veto Status:** `{veto['veto_status']}`",
-        f"- **Condition A (Closed 1D Close < 1D SMA 200):** `{veto['cond_a']}`",
-        f"- **Condition B (4H Downside Structure / BOS Down):** `{veto['cond_b']}`",
-        f"- **Portfolio Status:** `{veto['portfolio_status']}`",
-        f"- **New BTC Entry:** `{veto['new_entry']}`",
+        "**BIDIRECTIONAL REGIME ROUTER STATUS:**",
+        f"- **Active Route:** `{veto['active_route']}`",
+        f"- **Primary Active Rail:** `{veto['primary_rail']}`",
+        f"- **Active BTC Inventory (`Rail A: BTC -> USDT`):** `{veto['btc_sleeve_posture']}`",
+        f"- **Active USDT Inventory (`Rail B: USDT -> BTC`):** `{veto['usdt_sleeve_posture']}`",
+        f"- **Condition A (`1D Close < 1D SMA 200`):** `{veto['cond_a']}`  |  **Condition B (`4H Downside Structure / BOS`):** `{veto['cond_b']}`",
         "",
     ]
     sections = (
@@ -1467,7 +1513,7 @@ def build_tab_d_data_only_report(
     lines.append("")
 
     lines.extend([
-        "## 8. METRIC FORMULA LEGEND & CORTEX DESK LITE PROTOCOL",
+        "## 8. METRIC FORMULA LEGEND & CORTEX DIBSE BIDIRECTIONAL PROTOCOL",
         "- **Rough Path Lévy (`4H A_SP`)**: Lévy signed area over 6 closed 4H bars (`> 0`: Spot path leads price markup; `< 0`: Spot path lags price / distribution).",
         "- **24H Z-Scores (`z_S / z_F / D`)**: 30-day rolling Z-scores of 24H Spot (`z_S`) and Perp (`z_F`) cumulative delta; `D = z_S - z_F` (`D > 0` = Spot buying divergence vs Perps).",
         "- **Spot CVD Slopes (`7D / 14D`) & 4H Vol Context**: Cumulative spot taker-delta over last `7`/`14` closed `1D` bars; `4H ATR(14)% Pctile` ranks current closed `4H` ATR% against the trailing `120` closed `4H` bars, paired with `RelVol(20)` (`closed 4H volume / 20-bar SMA`).",
@@ -1475,17 +1521,22 @@ def build_tab_d_data_only_report(
         "- **Derivatives, Modeled Ladder & Quant**: `90D Pct` = 0-100 rolling 90-day percentile rank of 8H funding; `[... X/3 PARTIAL_VENUE]` suppresses OI quadrant tagging when `<3` venues report; `Hyperliquid Perp` reports DEX OI and 8H-normalized funding independently; `Modeled Liq Ladder (7C)` estimates 10x-100x leverage shelves (not private exchange orderbooks); `USD Macro Calendar` tracks high-impact USD releases; `H` = Hurst exponent (`>0.5` trending, `<0.5` mean-reverting); `VCR 72H` = Volatility Compression Ratio; `TSFM Disp%` = horizon dispersion; `LSCE` = liquidation sweep state.",
         "- **Headless Snapshot Note**: Scheduled/GitHub Actions runs execute a one-shot REST warmup (`Warm:YES`) without a persistent WebSocket loop, so `WebSocket Feeds & Warmup` reporting `STALE` (`no tick`) is isolated in `Coverage` as `Expected_Headless_WS_Offline=1` and does not indicate stale REST, orderbook, CVD, or derivatives data.",
         "",
-        "### DIRECT AI EXECUTION PROTOCOL: CORTEX BTC DESK LITE v1.0",
-        "Analyze BTC using the telemetry snapshot above. Operate as **CORTEX BTC DESK LITE v1.0** — a Spot-Only Institutional Capital Preservation & Swing Execution Workstation. Apply strict **zero-hallucination** rules using only metrics explicitly reported above (`0`, `1-6`, `7`, `7A`, `7B`, `7C`).",
+        "### DIRECT AI EXECUTION PROTOCOL: CORTEX DIBSE BIDIRECTIONAL DESK v1.0",
+        "Analyze BTC using the telemetry snapshot above. Operate as **CORTEX DIBSE BIDIRECTIONAL DESK v1.0** — a Spot-Only Dual-Inventory (Active BTC Inventory & Active USDT Inventory, zero leverage, user-agnostic allocation) Bidirectional Swing Workstation. Apply strict **zero-hallucination** rules using only metrics explicitly reported above (`0`, `1-6`, `7`, `7A`, `7B`, `7C`).",
         "",
-        "**Gate 0 — HARD DOWNTREND MARKET VETO (EVALUATE FIRST, BEFORE ALL OTHER SIGNALS):**",
-        "- Verify Section `0` (`HARD DOWNTREND MARKET VETO`) BEFORE scoring RSI, MACD, lower-timeframe setups, or liquidation clusters.",
-        "- **Rule Conditions (`Condition A AND Condition B`):**",
-        "  - `Condition A`: Latest settled closed `1D` candle closes strictly below `1D SMA 200` (both computed from the same completed Binance Spot `1D` candle series; no live forming candle mixing).",
-        "  - `Condition B`: Closed `4H` market structure is `DOWNTREND` **OR** `4H Downside BOS Status` is `YES` (`BOS Down`).",
-        "- **Fail-Closed Rule (`UNDETERMINED`):** If either `Condition A` or `Condition B` is `UNAVAILABLE` (missing closed `1D` close, `< 200` closed `1D` bars for `1D SMA 200`, or insufficient closed `4H` data), DO NOT assume `INACTIVE` — set `Veto Status: UNDETERMINED`, `Portfolio Status: 100% USDT CASH`, and `New BTC Entry: PROHIBITED` until data is verified.",
-        "- **Mandatory Enforcement when `ACTIVE` (or `UNDETERMINED`):** Enforce `Portfolio Status: 100% USDT CASH` and `New BTC Entry: PROHIBITED`. No dip-buying and no averaging down. Lower-timeframe `UPTREND` bounces, oversold `RSI`, positive `1H` MACD crossovers, or upside liquidation clusters MUST NOT override this veto. (**Entry-protection only:** this rule MUST NOT automatically trigger selling existing BTC spot holdings; separate BTC-to-USDT exit rules govern open positions.)",
-        "- **Veto Removal Conditions:** Lift `ACTIVE` only when ALL recovery requirements are independently verified on closed candles (never inferred from a temporary intraday rebound): (1) a settled closed `1D` candle closes above `1D SMA 200` computed from the same completed `1D` series, AND (2) closed `4H` structure independently improves to `UPTREND (HH/HL)` with no active downside BOS, AND (3) subsequent `Step 2` full-market reassessment validates supporting spot-flow demand (`ELIGIBLE FOR FULL ASSESSMENT` permits evaluation, never an automatic buy). Section `5` `Legacy_200D_Veto_Override` is permanently `IGNORED` for Desk Lite.",
+        "**Gate 0 — BIDIRECTIONAL REGIME ROUTER (EVALUATE FIRST, BEFORE ALL OTHER SIGNALS):**",
+        "- Verify Section `0` (`1D Close vs 1D SMA 200`, `4H Structure / BOS`, and `Upcoming Macro Event Caution (7C)`) BEFORE scoring lower-timeframe setups.",
+        "- **Regime Routing Logic (closed Binance Spot candles only):**",
+        "  - **MACRO_DOWNTREND_DISTRIBUTION (`1D Close < 1D SMA 200` AND (`4H DOWNTREND` OR `4H BOS Down = YES`)):**",
+        "    - **Primary Active Rail:** `RAIL A — BTC -> USDT CONVERSION` (sell/trim active BTC inventory into overhead resistance or failing rebounds with defined buy-back invalidation and lower rebuy targets).",
+        "    - **Secondary Rail:** `RAIL B — USDT -> BTC ACCUMULATION` is **RESTRICTED** to validated capitulation sweeps (`3-Gate Reversal`: sweep of major `1D/4H` support or `7C` long liquidation tier + closed-candle reclaim + positive `Spot CVD` / `4H A_SP > 0` absorption) — zero blind falling-knife buying.",
+        "  - **MACRO_UPTREND_MARKUP (`1D Close > 1D SMA 200` AND `4H UPTREND (HH/HL)` AND `4H BOS Down = NO`):**",
+        "    - **Primary Active Rail:** `RAIL B — USDT -> BTC ACCUMULATION` (deploy USDT on validated `4H HL` pullbacks with `<= 0.75%` max portfolio risk).",
+        "    - **Secondary Rail:** `RAIL A — BTC -> USDT TRIM` activates selectively only at major `1D/4H` resistance or upper `7C` short liquidation shelves when `RSI(14) > 70` and `z_S` / `4H A_SP` show distribution divergence.",
+        "  - **TRANSITIONAL_RANGE (Mixed `1D` vs `4H`):**",
+        "    - **Active Rail:** `TWO_WAY_RANGE_HARVEST` — Convert `BTC -> USDT` at `7A/SLSP` resistance, `30D VAH`, or upper `7C` short clusters; deploy `USDT -> BTC` at `7A/SLSP` support, `30D VAL`, or lower `7C` long sweeps.",
+        "  - **FAIL-CLOSED (`UNDETERMINED`):** If `1D Close`, `1D SMA 200`, or `4H Structure` is `UNAVAILABLE`, hold both rails (`HOLD BTC / HOLD USDT — NO EXECUTION`) until data is verified.",
+        "- Section `5` `Legacy_200D_Veto_Override` is permanently `IGNORED` for Desk v1.0.",
         "",
         "**Step 1 — Mandatory Data Hygiene Gate:**",
         "- Verify `Coverage` distinguishing: (a) genuine stale market data (`Genuine=...`), (b) expected headless WS inactivity (`Expected_Headless_WS_Offline=...` when `Warm:YES` REST-only run), (c) `[PROXY]` feeds, and (d) `UNAVAILABLE` feeds.",
@@ -1495,21 +1546,23 @@ def build_tab_d_data_only_report(
         "- Check `USD Macro Calendar (High)`: treat `NONE (next 7d)` as a clear schedule (`OK`) vs `UNAVAILABLE` as offline.",
         "- Do not cite missing metrics or external prices outside this telemetry snapshot.",
         "",
-        "**Step 2 — 5-Function Deterministic Synthesis:**",
+        "**Step 2 — 5-Function Bidirectional Synthesis:**",
         "1. **Multi-Timeframe Regime Classifier:** Integrate Section `1`, `7A` (`1D/4H/1H` swing structure & BOS), `7B` closed OHLCV price action, `1D/4H` ADX, `RSI(14)`, `4H ATR(14)% Pctile` & `RelVol(20)` (volatility regime & volume participation), EMA/SMA stack, and Hurst `H` -> classify as `UPTREND`, `DOWNTREND`, `RANGE-BOUND`, or `TRANSITIONAL`.",
-        "2. **Spot Flow & Liquidity Inspector:** Evaluate `Spot/Perp CVD` across `15m/1h/4h/24h`, multi-day `Spot CVD Slopes (7D / 14D)`, `z_S / z_F / D`, `Coinbase Premium`, `L2 Depth`, `OBI`, `Spr`, `30D VA Pos%`, `SLSP`, and `7A` S/R clusters -> classify true spot accumulation vs distribution or passive absorption.",
-        "3. **Derivatives & Squeeze Risk Profiler:** Evaluate `BN OI`, `Cross-Exch OI` (only when `3/3` venues valid), `Hyperliquid Perp OI & Funding` (`[HL DEX]` vs CEX positioning), `OI Δ%` & Quad, `Funding 8H% / Ann% / 90D Pct`, `DVOL`, `25d RR Skew`, and `6-Tier Modeled Liq Ladder (7C)` (`10x-100x` upper/lower distance & `$M` asymmetry) -> classify leverage fragility and squeeze asymmetry.",
-        "4. **Macro, On-Chain & ETF Gatekeeper:** Synthesize `MVRV`, `SOPR`, Farside `US Spot ETF Flow (1D / 3D / 5D)` (use `IBIT+FBTC` `[PROXY]` only as secondary context), `Stablecoin Supply`, `DXY`, `US10Y`, `VIX`, `SPX`, `Net Liquidity`, and `USD Macro Calendar (High)` (`7C` event proximity within `24h` or `±30m` high-impact windows) -> assign macro backdrop (`Tailwind`, `Neutral`, or `Headwind`).",
-        "5. **Spot-Only Risk & Decision Arbiter:** Respect `Gate 0` (`HARD DOWNTREND MARKET VETO`) first: if `ACTIVE` or `UNDETERMINED`, hold `100% USDT CASH` with `New BTC Entry: PROHIBITED` (entry-protection only; do not auto-sell existing BTC holdings). Only when `Veto Status` is `INACTIVE` may you evaluate spot longs; still never force an entry in chop (`ADX < 20` or `TRANSITIONAL`) or inside `< 24h` high-impact USD macro event risk, and cap maximum portfolio risk at `0.75%` per qualified spot position.",
+        "2. **Spot Flow & Rough Path Inspector:** Evaluate `Spot/Perp CVD` across `15m/1h/4h/24h`, multi-day `Spot CVD Slopes (7D / 14D)`, `z_S / z_F / D`, `Rough Path Lévy (4H A_SP)` (`> 0` spot leads markup; `< 0` spot leads distribution), `Coinbase Premium`, `L2 Depth`, `OBI`, `Spr`, `30D VA Pos%`, `SLSP`, and `7A` S/R clusters -> classify true spot accumulation/absorption vs distribution/short-covering bounce.",
+        "3. **Derivatives & Squeeze Asymmetry Profiler:** Evaluate `BN OI`, `Cross-Exch OI` (only when `3/3` venues valid), `Hyperliquid Perp OI & Funding` (`[HL DEX]` vs CEX positioning), `OI Δ%` & Quad, `Funding 8H% / Ann% / 90D Pct`, `DVOL`, `25d RR Skew`, and `6-Tier Modeled Liq Ladder (7C)` (`10x-100x` upper/lower distance & `$M` asymmetry) -> identify whether `UPPER` shorts or `LOWER` longs form the primary liquidity magnet.",
+        "4. **Macro, On-Chain & ETF Gatekeeper:** Synthesize `MVRV`, `SOPR`, `Exchange Netflow 24H`, Farside `US Spot ETF Flow (1D / 3D / 5D)` (use `IBIT+FBTC` `[PROXY]` only as secondary context), `Stablecoin Supply / Net Issuance`, `DXY`, `US10Y`, `VIX`, `SPX`, `Net Liquidity`, and `USD Macro Calendar (High)` (`7C` event proximity within `24h` or `±30m` high-impact windows) -> assign macro backdrop (`Tailwind`, `Neutral`, or `Headwind`).",
+        "5. **Dual-Inventory Risk & Execution Arbiter:**",
+        "   - **Rail A (`BTC -> USDT` Conversion Rules):** Activate when price stalls or reverses at `4H/1D/SLSP` resistance or upper `7C` short liquidation shelves while `1D < SMA 200` or `4H A_SP < 0` / `7D Spot CVD < 0` (or euphoria extremes in `MACRO_UPTREND_MARKUP`). Output exact **Overhead Conversion Zone**, **Suggested % of Active BTC Inventory to Convert**, **Upper Buy-Back Invalidation Stop** (where converted BTC is repurchased if breakout invalidates downside thesis), and **Lower USDT Rebuy Targets** to compound BTC quantity.",
+        "   - **Rail B (`USDT -> BTC` Accumulation Rules):** Activate on validated `4H HL` pullbacks in uptrends, OR validated `1H/4H` sweep-and-reclaim reversals below `7A/SLSP` support or `7C` long liquidation shelves with positive `Spot CVD`, `z_S > 0`, and `4H A_SP > 0`. Enforce `<= 0.75%` max portfolio risk per qualified position and guard against unhedged entries inside `< 24h` USD high-impact macro windows.",
         "",
-        "**Step 3 — Mandatory Output Contract:**",
-        "- **0. HARD DOWNTREND MARKET VETO** (`Veto Status: ACTIVE / INACTIVE / UNDETERMINED`, `Condition A (1D below SMA 200): YES / NO / UNAVAILABLE`, `Condition B (4H downside structure): YES / NO / UNAVAILABLE`, `Portfolio Status: 100% USDT CASH / NORMAL ASSESSMENT REQUIRED`, `New BTC Entry: PROHIBITED / ELIGIBLE FOR FULL ASSESSMENT`).",
-        "- **1. EXECUTIVE SUMMARY & DESK POSTURE** (Spot Price, Regime State, Posture: `ACTIVE SPOT LONG` or `100% USDT CASH — NO ENTRY`, Confidence `/100`).",
+        "**Step 3 — Mandatory Bidirectional Output Contract:**",
+        "- **0. BIDIRECTIONAL REGIME ROUTER (`GATE 0`)** (`Active Route`, `Condition A (1D vs SMA 200)`, `Condition B (4H Structure/BOS)`, `Macro <24h Window`, **`BTC Inventory Action (Rail A: BTC -> USDT): SELL (CONVERT TO USDT) / HOLD BTC`**, **`USDT Inventory Action (Rail B: USDT -> BTC): BUY (DEPLOY TO BTC) / HOLD USDT`**).",
+        "- **1. EXECUTIVE SUMMARY & DUAL-INVENTORY POSTURE** (`Spot Price`, `Regime State`, explicit **`BTC Inventory Action`** & **`USDT Inventory Action`**, `Confidence /100`).",
         "- **2. DATA HYGIENE AUDIT** (Exact `OK/UNAVAILABLE/STALE/PROXY` tally, headless WS clarification, any `PARTIAL_VENUE` anomalies, degraded-signal list).",
-        "- **3. MULTI-TIMEFRAME REGIME & FLOW SYNTHESIS** (Price/EMA/ADX + `4H ATR% Pctile / RelVol` structure vs intraday & `7D/14D` Spot CVD, Coinbase Premium, and 4H SQLite Section `7` + `7A/7B` trajectory).",
-        "- **4. DERIVATIVES, LIQUIDITY & MACRO CONTEXT** (CEX `3/3` + `Hyperliquid DEX` OI/funding, funding `90D Pct`, options skew, `6-tier Liq Ladder (7C)`, Farside `1D/3D/5D` ETF flows, `USD Macro Calendar (7C)` event window, and macro backdrop).",
-        "- **5. CRITICAL LEVELS MAP** (Immediate & Major Support, Immediate & Major Resistance, `7C` modeled liquidation shelves, and Hard Invalidation Levels tied to `7A/7B` & `SLSP`).",
-        "- **6. SPOT EXECUTION PLAN (OR NO-ENTRY GATE)** (Exact Entry Zone or `NO ENTRY — VETO ACTIVE/UNDETERMINED`, Stop Loss, Take Profit Targets, Position Size at `<= 0.75%` portfolio risk, event-window timing constraints, and explicit Multi-Gate Validation Triggers required to shift posture).",
+        "- **3. MULTI-TIMEFRAME REGIME & ROUGH PATH FLOW SYNTHESIS** (Price/EMA/ADX + `4H ATR% Pctile / RelVol` vs `4H A_SP` Lévy area, intraday & `7D/14D` Spot CVD, Coinbase Premium, and `4H` SQLite Section `7` + `7A/7B` trajectory).",
+        "- **4. DERIVATIVES, LIQUIDATION MAGNETS & MACRO BACKDROP** (CEX `3/3` + `Hyperliquid DEX` OI/funding, funding `90D Pct`, options skew, `6-tier Liq Ladder (7C)` upper vs lower squeeze magnets, Farside `1D/3D/5D` ETF flows, `USD Macro Calendar (7C)` event window, and macro backdrop).",
+        "- **5. BIDIRECTIONAL LEVELS MAP** (`Rail A` Supply/Conversion Zones, `Rail B` Demand/Rebuy Zones, `7C` modeled liquidation shelves, and Structural Buy-Back / Stop Invalidation Levels tied to `7A/7B` & `SLSP`).",
+        "- **6. DUAL-INVENTORY EXECUTION PLAN (`RAIL A` & `RAIL B`)** (**Rail A (`BTC -> USDT`):** Exact Conversion Trigger Zone, Suggested % of Active BTC Inventory, Upper Buy-Back Invalidation Stop, Lower Target Rebuy Zone; **Rail B (`USDT -> BTC`):** Exact Entry Trigger / Confirmation Gate, Stop Loss at `<= 0.75%` portfolio risk, Take Profit Targets, and Macro Event Timing Constraint).",
         "",
     ])
 

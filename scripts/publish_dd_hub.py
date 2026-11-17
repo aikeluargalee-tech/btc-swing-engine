@@ -195,7 +195,7 @@ def _build_section_0_veto(
     utc_str: str,
     sgt_str: str,
 ) -> Dict[str, str]:
-    """Builds the structured Section 0 Hard Downtrend Market Veto object."""
+    """Builds the structured Section 0 Bidirectional Regime Router (Gate 0) object."""
     if store is None:
         return {
             "last_1d_close_str": "UNAVAILABLE",
@@ -206,8 +206,13 @@ def _build_section_0_veto(
             "bos_4h_str": "UNAVAILABLE",
             "cond_a": "UNAVAILABLE",
             "cond_b": "UNAVAILABLE",
+            "macro_caution": "UNAVAILABLE",
+            "active_route": "UNDETERMINED",
+            "primary_rail": "HOLD_BOTH_RAILS (FAIL-CLOSED — VERIFY DATA)",
+            "btc_sleeve_posture": "HOLD BTC (FAIL-CLOSED — VERIFY DATA)",
+            "usdt_sleeve_posture": "HOLD USDT (FAIL-CLOSED — VERIFY DATA)",
             "veto_status": "UNDETERMINED",
-            "portfolio_status": "100% USDT CASH (FAIL-CLOSED — VERIFY DATA)",
+            "portfolio_status": "HOLD CURRENT INVENTORY (FAIL-CLOSED — VERIFY DATA)",
             "new_entry": "PROHIBITED",
             "timestamp_status": f"{utc_str} | {sgt_str} · Closed-Candle Inputs Only",
         }
@@ -215,6 +220,112 @@ def _build_section_0_veto(
     veto = dict(evaluate_hard_market_veto(store, spot_px=spot_px, struct_4h=s4h))
     veto["timestamp_status"] = f"{utc_str} | {sgt_str} · Closed-Candle Inputs Only"
     return veto
+
+
+def _build_bidirectional_rails(
+    store: Optional[StateStore],
+    router: Dict[str, str],
+    spot_px: float,
+    struct_7a: Sequence[Dict[str, str]],
+    sec_7c: Dict[str, Any],
+) -> Dict[str, Dict[str, str]]:
+    """Builds deterministic Rail A (BTC->USDT) and Rail B (USDT->BTC) reference card payloads."""
+    route = str(router.get("active_route") or "UNDETERMINED").upper()
+    macro_caution = str(router.get("macro_caution") or "UNAVAILABLE")
+    btc_posture = str(router.get("btc_sleeve_posture") or "HOLD BTC")
+    usdt_posture = str(router.get("usdt_sleeve_posture") or "HOLD USDT")
+
+    if store is None:
+        return {
+            "rail_a": {
+                "name": "RAIL A · BTC → USDT (SELL / CONVERT)",
+                "posture": btc_posture,
+                "supply_zone": "UNAVAILABLE",
+                "invalidation_buyback": "UNAVAILABLE",
+                "rebuy_target": "UNAVAILABLE",
+            },
+            "rail_b": {
+                "name": "RAIL B · USDT → BTC (BUY / ACCUMULATE)",
+                "posture": usdt_posture,
+                "demand_zone": "UNAVAILABLE",
+                "flow_gate": "UNAVAILABLE",
+                "risk_and_macro": f"<= 0.75% max portfolio risk · Macro: {macro_caution}",
+            },
+        }
+
+    slsp = getattr(store, "slsp_evaluation", None)
+    nres = getattr(getattr(slsp, "nearest_resistance", None), "center_price", None)
+    nsup = getattr(getattr(slsp, "nearest_support", None), "center_price", None)
+    s_1d = struct_7a[0] if len(struct_7a) > 0 else {}
+    s_4h = struct_7a[1] if len(struct_7a) > 1 else {}
+
+    ladder = sec_7c.get("liquidation_ladder") or []
+    up_tiers = [t for t in ladder if str(t.get("side", "")).upper() == "UPPER" and isinstance(t.get("price"), (int, float))]
+    dn_tiers = [t for t in ladder if str(t.get("side", "")).upper() == "LOWER" and isinstance(t.get("price"), (int, float))]
+
+    sup_parts: List[str] = []
+    res_parts: List[str] = []
+    if isinstance(nres, (int, float)) and float(nres) > 0.0:
+        res_parts.append(f"SLSP Res ${float(nres):,.2f}")
+    if s_1d.get("res") and "None" not in str(s_1d.get("res")):
+        res_parts.append(f"1D: {s_1d['res']}")
+    if up_tiers:
+        near_up = min(up_tiers, key=lambda x: float(x["price"]))
+        far_up = max(up_tiers, key=lambda x: float(x["price"]))
+        res_parts.append(f"7C Shorts: ${float(near_up['price']):,.0f}–${float(far_up['price']):,.0f}")
+
+    if isinstance(nsup, (int, float)) and float(nsup) > 0.0:
+        sup_parts.append(f"SLSP Sup ${float(nsup):,.2f}")
+    if s_1d.get("sup") and "None" not in str(s_1d.get("sup")):
+        sup_parts.append(f"1D: {s_1d['sup']}")
+    if s_4h.get("sup") and "None" not in str(s_4h.get("sup")):
+        sup_parts.append(f"4H: {s_4h['sup']}")
+    if dn_tiers:
+        near_dn = max(dn_tiers, key=lambda x: float(x["price"]))
+        far_dn = min(dn_tiers, key=lambda x: float(x["price"]))
+        sup_parts.append(f"7C Longs: ${float(far_dn['price']):,.0f}–${float(near_dn['price']):,.0f}")
+
+    pivots_4h = str(s_4h.get("pivots") or "N/A")
+    res_4h = str(s_4h.get("res") or "N/A")
+    if route == "MACRO_DOWNTREND_DISTRIBUTION":
+        inval_s = f"Closed 4H reclaim above {res_4h if 'None' not in res_4h else pivots_4h}"
+    elif route == "MACRO_UPTREND_MARKUP":
+        inval_s = "Selective euphoria trim only (re-enter on 4H HL hold)"
+    else:
+        inval_s = f"Closed 4H breakout above boundary ({res_4h})"
+
+    fg = getattr(store, "four_gate_evaluation", None)
+    asp = getattr(fg, "loop_a_g1_val", None)
+    d_spr = getattr(fg, "loop_a_g2_val", None)
+    flow_bits: List[str] = []
+    if isinstance(asp, (int, float)):
+        flow_bits.append(f"4H A_SP:{float(asp):+.3f}")
+    if isinstance(d_spr, (int, float)):
+        flow_bits.append(f"D(z_S-z_F):{float(d_spr):+.2f}")
+    flow_prefix = (" · ".join(flow_bits) + " · ") if flow_bits else ""
+
+    if route == "MACRO_UPTREND_MARKUP":
+        gate_req = f"{flow_prefix}Buy 4H Higher-Low pullback + Spot CVD / A_SP > 0"
+    else:
+        gate_req = f"{flow_prefix}Require closed sweep reclaim + Spot CVD / A_SP > 0"
+
+    tp_ref = f"Targets: {', '.join(res_parts[:2])}" if res_parts else "Targets: 7A Overhead Resistance"
+    return {
+        "rail_a": {
+            "name": "RAIL A · BTC → USDT (SELL / CONVERT)",
+            "posture": btc_posture,
+            "supply_zone": " · ".join(res_parts) if res_parts else "7A Resistance / Upper 7C Shorts",
+            "invalidation_buyback": inval_s,
+            "rebuy_target": " · ".join(sup_parts[:2]) if sup_parts else "Lower 7C Long Pools / 7A Support",
+        },
+        "rail_b": {
+            "name": "RAIL B · USDT → BTC (BUY / ACCUMULATE)",
+            "posture": usdt_posture,
+            "demand_zone": " · ".join(sup_parts) if sup_parts else "7A Support / Lower 7C Longs",
+            "flow_gate": gate_req,
+            "risk_and_macro": f"<= 0.75% max portfolio risk · {tp_ref} · Macro: {macro_caution}",
+        },
+    }
 
 
 def build_dd_json_payload(
@@ -239,6 +350,7 @@ def build_dd_json_payload(
     struct_7a = _build_section_7a_rows(store, spot_px)
     veto_0 = _build_section_0_veto(store, spot_px, struct_7a, utc_str, sgt_str)
     sec_7c = _build_section_7c_data(store)
+    rails_0 = _build_bidirectional_rails(store, veto_0, spot_px, struct_7a, sec_7c)
 
     return {
         "schema_version": "dd_v2",
@@ -255,6 +367,7 @@ def build_dd_json_payload(
         "archive_snapshots_count": int(ev.archive_snapshots_count),
         "archive_last_bar_utc": ev.archive_last_bar_utc or "",
         "section_0_veto": veto_0,
+        "bidirectional_rails": rails_0,
         "panels": panels,
         "section_7a_structure": struct_7a,
         "section_7c": sec_7c,
@@ -274,21 +387,30 @@ def _status_badge_class(status: str) -> str:
     return "badge-unavail"
 
 
-def _render_veto_banner_html(veto: Dict[str, Any]) -> str:
-    """Renders the top Section 0 Hard Downtrend Market Veto status card."""
+def _render_veto_banner_html(veto: Dict[str, Any], rails: Optional[Dict[str, Any]] = None) -> str:
+    """Renders the top Section 0 Bidirectional Regime Router and side-by-side Rail A / Rail B cards."""
+    route = str(veto.get("active_route") or "").upper()
     st = str(veto.get("veto_status") or "UNDETERMINED").upper()
-    if st == "ACTIVE":
+    if not route:
+        route = "MACRO_DOWNTREND_DISTRIBUTION" if st == "ACTIVE" else ("UNDETERMINED" if st == "UNDETERMINED" else "TRANSITIONAL_RANGE")
+
+    if route == "MACRO_DOWNTREND_DISTRIBUTION":
         cls = "veto-active"
         badge_cls = "badge-unavail"
-    elif st == "INACTIVE":
+    elif route == "MACRO_UPTREND_MARKUP":
         cls = "veto-inactive"
         badge_cls = "badge-ok"
+    elif route == "TRANSITIONAL_RANGE":
+        cls = "veto-range"
+        badge_cls = "badge-proxy"
     else:
         cls = "veto-undetermined"
         badge_cls = "badge-stale"
 
-    portfolio_s = html.escape(str(veto.get("portfolio_status") or "100% USDT CASH"))
-    entry_s = html.escape(str(veto.get("new_entry") or "PROHIBITED"))
+    macro_s = str(veto.get("macro_caution") or "UNAVAILABLE")
+    macro_cls = "badge-stale" if macro_s.startswith("CAUTION") else ("badge-ok" if macro_s.startswith("CLEAR") else "badge-unavail")
+    btc_p = html.escape(str(veto.get("btc_sleeve_posture") or veto.get("portfolio_status") or "HOLD BTC"))
+    usdt_p = html.escape(str(veto.get("usdt_sleeve_posture") or veto.get("new_entry") or "HOLD USDT"))
     cond_a = html.escape(str(veto.get("cond_a") or "UNAVAILABLE"))
     cond_b = html.escape(str(veto.get("cond_b") or "UNAVAILABLE"))
     close_1d = html.escape(str(veto.get("last_1d_close_str") or "UNAVAILABLE"))
@@ -297,19 +419,40 @@ def _render_veto_banner_html(veto: Dict[str, Any]) -> str:
     struct_4h = html.escape(str(veto.get("struct_4h_str") or "UNAVAILABLE"))
     bos_4h = html.escape(str(veto.get("bos_4h_str") or "UNAVAILABLE"))
 
+    rails_d = rails or {}
+    ra = rails_d.get("rail_a") or {}
+    rb = rails_d.get("rail_b") or {}
+
     return (
         f"<section id=\"veto\" class=\"veto-banner {cls}\">"
         f"<div class=\"veto-head\">"
-        f"<div class=\"veto-title\">0. HARD DOWNTREND MARKET VETO: "
-        f"<span class=\"badge {badge_cls}\" style=\"font-size:12px;padding:2px 8px;\">{html.escape(st)}</span></div>"
+        f"<div class=\"veto-title\">0. BIDIRECTIONAL REGIME ROUTER (DIBSE GATE 0): "
+        f"<span class=\"badge {badge_cls}\" style=\"font-size:12px;padding:2px 8px;\">{html.escape(route)}</span> "
+        f"<span class=\"badge {macro_cls}\" style=\"font-size:11px;padding:2px 7px;\">MACRO: {html.escape(macro_s)}</span></div>"
         f"<div class=\"veto-posture\">"
-        f"<span>Portfolio: <strong>{portfolio_s}</strong></span>"
-        f"<span>New BTC Entry: <strong>{entry_s}</strong></span>"
+        f"<span>BTC Inventory (Rail A): <strong>{btc_p}</strong></span>"
+        f"<span>USDT Inventory (Rail B): <strong>{usdt_p}</strong></span>"
         f"</div>"
         f"</div>"
         f"<div class=\"veto-grid\">"
         f"<div class=\"veto-cell\"><span class=\"dim\">Cond A (1D &lt; SMA200):</span> <code>{cond_a}</code> · <code>{close_1d}</code> vs <code>{sma_200}</code> (<code>{dist_200}</code>)</div>"
         f"<div class=\"veto-cell\"><span class=\"dim\">Cond B (4H Structure/BOS):</span> <code>{cond_b}</code> · <code>{struct_4h}</code> · <code>{bos_4h}</code></div>"
+        f"</div>"
+        f"<div id=\"rails-0\" class=\"rails-grid\">"
+        f"<div class=\"rail-card rail-a\">"
+        f"<div class=\"rail-title\">RAIL A · BTC &rarr; USDT (CONVERT / TRIM)</div>"
+        f"<div class=\"rail-row\"><span class=\"dim\">Posture:</span> <code>{html.escape(str(ra.get('posture', btc_p)))}</code></div>"
+        f"<div class=\"rail-row\"><span class=\"dim\">Supply / Sell Zone:</span> <code>{html.escape(str(ra.get('supply_zone', 'N/A')))}</code></div>"
+        f"<div class=\"rail-row\"><span class=\"dim\">Buy-Back Invalidation:</span> <code>{html.escape(str(ra.get('invalidation_buyback', 'N/A')))}</code></div>"
+        f"<div class=\"rail-row\"><span class=\"dim\">Lower Rebuy Zone:</span> <code>{html.escape(str(ra.get('rebuy_target', 'N/A')))}</code></div>"
+        f"</div>"
+        f"<div class=\"rail-card rail-b\">"
+        f"<div class=\"rail-title\">RAIL B · USDT &rarr; BTC (ACCUMULATE)</div>"
+        f"<div class=\"rail-row\"><span class=\"dim\">Posture:</span> <code>{html.escape(str(rb.get('posture', usdt_p)))}</code></div>"
+        f"<div class=\"rail-row\"><span class=\"dim\">Demand / Rebuy Zone:</span> <code>{html.escape(str(rb.get('demand_zone', 'N/A')))}</code></div>"
+        f"<div class=\"rail-row\"><span class=\"dim\">Confirmation Gate:</span> <code>{html.escape(str(rb.get('flow_gate', 'N/A')))}</code></div>"
+        f"<div class=\"rail-row\"><span class=\"dim\">Risk &amp; Targets:</span> <code>{html.escape(str(rb.get('risk_and_macro', 'N/A')))}</code></div>"
+        f"</div>"
         f"</div>"
         f"</section>"
     )
@@ -434,7 +577,10 @@ def render_dashboard_html(
     trigger_url = html.escape(f"{repo_url.rstrip('/')}/actions/workflows/dd_hourly.yml")
     pages_esc = html.escape(pages_url)
 
-    veto_html = _render_veto_banner_html(payload.get("section_0_veto") or {})
+    veto_html = _render_veto_banner_html(
+        payload.get("section_0_veto") or {},
+        payload.get("bidirectional_rails") or None,
+    )
     sec_7a_html = _render_section_7a_card_html(payload.get("section_7a_structure") or [])
     sec_7c_html = _render_section_7c_card_html(payload.get("section_7c") or {})
 
@@ -723,6 +869,40 @@ def render_dashboard_html(
     border-color: rgba(245, 158, 11, 0.55);
     background: linear-gradient(180deg, rgba(245, 158, 11, 0.12), rgba(13, 20, 29, 0.96));
   }}
+  .veto-range {{
+    border-color: rgba(56, 189, 248, 0.55);
+    background: linear-gradient(180deg, rgba(56, 189, 248, 0.11), rgba(13, 20, 29, 0.96));
+  }}
+  .rails-grid {{
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+  }}
+  @media (max-width: 960px) {{
+    .rails-grid {{ grid-template-columns: 1fr; }}
+  }}
+  .rail-card {{
+    background: rgba(5, 8, 12, 0.65);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 11px;
+    font-size: 12px;
+  }}
+  .rail-card.rail-a {{ border-left: 3px solid var(--red); }}
+  .rail-card.rail-b {{ border-left: 3px solid var(--green); }}
+  .rail-title {{
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+    color: var(--cyan);
+  }}
+  .rail-row {{
+    margin-bottom: 4px;
+    word-break: break-word;
+  }}
+  .rail-row:last-child {{ margin-bottom: 0; }}
   .veto-head {{
     display: flex;
     flex-wrap: wrap;
@@ -823,7 +1003,7 @@ def render_dashboard_html(
 <header class="topbar">
   <div class="top-row">
     <div class="brand">
-      <div class="brand-title">BTC SWING ENGINE // CORTEX DESK LITE v1.0 — TAB [D: {tot_c}-ROW MATRIX]</div>
+      <div class="brand-title">BTC SWING ENGINE // CORTEX DIBSE BIDIRECTIONAL DESK v1.0 — TAB [D: {tot_c}-ROW MATRIX]</div>
       <div class="meta-line">
         <span>Spot: <span class="spot-pill">${spot:,.2f}</span></span>
         <span>UTC: <strong>{utc_s}</strong> <span id="snapshot-age"></span></span>
@@ -850,6 +1030,7 @@ def render_dashboard_html(
   <div class="toolbar">
     <button id="flt-all" class="btn btn-filter is-active" type="button">All Metrics ({tot_c})</button>
     <button id="flt-issues" class="btn btn-filter" type="button">Non-OK Only ({issues_c})</button>
+    <a class="btn btn-filter" href="#rails-0">0A/0B Rails</a>
     <a class="btn btn-filter" href="#structure-7a">7A Structure &amp; S/R</a>
     <a class="btn btn-filter" href="#liq-macro-7c">7C Liq Ladder &amp; Macro</a>
     <a class="btn btn-filter" href="#archive-7">SQLite Archive</a>
@@ -891,7 +1072,7 @@ def render_dashboard_html(
 </main>
 
 <footer>
-  Dashboard URL: <a href="{pages_esc}" style="color:var(--cyan);">{pages_esc}</a> · CORTEX BTC DESK LITE v1.0 · Zero-Hallucination DATA-ONLY Telemetry (DD v2)
+  Dashboard URL: <a href="{pages_esc}" style="color:var(--cyan);">{pages_esc}</a> · CORTEX DIBSE BIDIRECTIONAL DESK v1.0 · Zero-Hallucination DATA-ONLY Telemetry (DD v2)
 </footer>
 
 <script type="application/json" id="dd-markdown-payload">{md_json_safe}</script>

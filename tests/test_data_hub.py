@@ -314,9 +314,10 @@ class TestDataHub(unittest.TestCase):
             self.assertIn("## 5. MACRO, CREDIT & US LIQUIDITY", report)
             self.assertIn("## 7. RECENT CLOSED-4H SNAPSHOT TRAJECTORY (SQLITE ARCHIVE)", report)
             self.assertIn("| Funding 8H% / 90D Pct |", report)
-            self.assertIn("## 8. METRIC FORMULA LEGEND & CORTEX DESK LITE PROTOCOL", report)
-            self.assertIn("DIRECT AI EXECUTION PROTOCOL: CORTEX BTC DESK LITE v1.0", report)
-            self.assertIn("100% USDT CASH — NO ENTRY", report)
+            self.assertIn("## 8. METRIC FORMULA LEGEND & CORTEX DIBSE BIDIRECTIONAL PROTOCOL", report)
+            self.assertIn("DIRECT AI EXECUTION PROTOCOL: CORTEX DIBSE BIDIRECTIONAL DESK v1.0", report)
+            self.assertIn("SELL (CONVERT TO USDT) / HOLD BTC", report)
+            self.assertIn("BUY (DEPLOY TO BTC) / HOLD USDT", report)
             self.assertIn("`2026-11-14 08:00:00 UTC` | `$73,650.00`", report)
             self.assertNotIn("OIPositioningQuadrant.", report)
             self.assertIn("NEUTRAL_CHURN`", report)
@@ -864,8 +865,9 @@ class TestDataHub(unittest.TestCase):
         self.assertIn("6-Tier Modeled Liq Ladder (7C)", report)
         self.assertIn("USD Macro Calendar (High)", report)
         self.assertIn("**Retrieval Time (SGT):**", report)
-        self.assertIn("## 0. HARD DOWNTREND MARKET VETO (PRE-ENTRY CAPITAL PRESERVATION GATE)", report)
-        self.assertIn("**Gate 0 — HARD DOWNTREND MARKET VETO (EVALUATE FIRST, BEFORE ALL OTHER SIGNALS):**", report)
+        self.assertIn("## 0. BIDIRECTIONAL REGIME ROUTER (GATE 0 — DUAL-INVENTORY SPOT WORKSTATION)", report)
+        self.assertIn("**Gate 0 — BIDIRECTIONAL REGIME ROUTER (EVALUATE FIRST, BEFORE ALL OTHER SIGNALS):**", report)
+        self.assertIn("DIRECT AI EXECUTION PROTOCOL: CORTEX DIBSE BIDIRECTIONAL DESK v1.0", report)
         self.assertNotIn("MYT", report)
         for bad in ("verdict", "bullish", "bearish", "recommend", "confirmed", "trade", "wait"):
             self.assertNotIn(bad, report.lower())
@@ -923,18 +925,19 @@ class TestDataHub(unittest.TestCase):
         self.assertEqual(v_active["cond_b"], "YES")
         self.assertEqual(v_active["struct_4h_str"], "DOWNTREND (LH/LL)")
         self.assertTrue(v_active["bos_4h_str"].startswith("YES"))
+        self.assertEqual(v_active["active_route"], "MACRO_DOWNTREND_DISTRIBUTION")
         self.assertEqual(v_active["veto_status"], "ACTIVE")
-        self.assertEqual(v_active["portfolio_status"], "100% USDT CASH")
-        self.assertEqual(v_active["new_entry"], "PROHIBITED")
+        self.assertIn("RAIL A", v_active["btc_sleeve_posture"])
+        self.assertIn("RAIL B", v_active["usdt_sleeve_posture"])
 
         rep_active = build_tab_d_data_only_report(self.cfg, store_active)
-        self.assertIn("- **Veto Status:** `ACTIVE`", rep_active)
-        self.assertIn("- **Portfolio Status:** `100% USDT CASH`", rep_active)
-        self.assertIn("- **New BTC Entry:** `PROHIBITED`", rep_active)
+        self.assertIn("- **Active Route:** `MACRO_DOWNTREND_DISTRIBUTION`", rep_active)
+        self.assertIn("Active BTC Inventory (`Rail A: BTC -> USDT`)", rep_active)
+        self.assertIn("Active USDT Inventory (`Rail B: USDT -> BTC`)", rep_active)
         for bad in ("verdict", "bullish", "bearish", "recommend", "confirmed", "trade", "wait"):
             self.assertNotIn(bad, rep_active.lower())
 
-        # Case 2a: Only Condition A TRUE (1D < SMA200, but 4H UPTREND + no downside BOS) -> INACTIVE
+        # Case 2a: Mixed (1D < SMA200, but 4H UPTREND + no downside BOS) -> TRANSITIONAL_RANGE
         store_only_a = StateStore()
         store_only_a.binance_spot_price = 65_300.0
         store_only_a.spot_klines_1d.extend(bars_1d_below)
@@ -944,11 +947,10 @@ class TestDataHub(unittest.TestCase):
         self.assertEqual(v_only_a["cond_b"], "NO")
         self.assertEqual(v_only_a["struct_4h_str"], "UPTREND (HH/HL)")
         self.assertTrue(v_only_a["bos_4h_str"].startswith("NO"))
+        self.assertEqual(v_only_a["active_route"], "TRANSITIONAL_RANGE")
         self.assertEqual(v_only_a["veto_status"], "INACTIVE")
-        self.assertEqual(v_only_a["portfolio_status"], "NORMAL ASSESSMENT REQUIRED")
-        self.assertEqual(v_only_a["new_entry"], "ELIGIBLE FOR FULL ASSESSMENT")
 
-        # Case 2b: Only Condition B TRUE (1D > SMA200, 4H DOWNTREND) -> INACTIVE
+        # Case 2b: Mixed (1D > SMA200, 4H DOWNTREND) -> TRANSITIONAL_RANGE
         bars_1d_above = _make_klines(n=220, step_ms=86_400_000, base_px=60_000.0)
         store_only_b = StateStore()
         store_only_b.binance_spot_price = 78_000.0
@@ -958,10 +960,22 @@ class TestDataHub(unittest.TestCase):
         self.assertEqual(v_only_b["cond_a"], "NO")
         self.assertEqual(v_only_b["sma200_pos"], "ABOVE")
         self.assertEqual(v_only_b["cond_b"], "YES")
+        self.assertEqual(v_only_b["active_route"], "TRANSITIONAL_RANGE")
         self.assertEqual(v_only_b["veto_status"], "INACTIVE")
-        self.assertEqual(v_only_b["new_entry"], "ELIGIBLE FOR FULL ASSESSMENT")
 
-        # Case 3: Missing/incomplete closed 1D series (< 200 closed 1D bars even if macro_evaluation has a cached value) -> UNDETERMINED + PROHIBITED
+        # Case 2c: Full Uptrend Alignment (1D > SMA200 and 4H UPTREND + no downside BOS) -> MACRO_UPTREND_MARKUP
+        store_bull = StateStore()
+        store_bull.binance_spot_price = 78_000.0
+        store_bull.spot_klines_1d.extend(bars_1d_above)
+        store_bull.spot_klines_4h.extend(bars_4h_up)
+        v_bull = evaluate_hard_market_veto(store_bull, spot_px=78_000.0, now_ms=ref_ms)
+        self.assertEqual(v_bull["cond_a"], "NO")
+        self.assertEqual(v_bull["cond_b"], "NO")
+        self.assertEqual(v_bull["active_route"], "MACRO_UPTREND_MARKUP")
+        self.assertIn("RAIL B", v_bull["primary_rail"])
+        self.assertIn("RAIL B", v_bull["usdt_sleeve_posture"])
+
+        # Case 3: Missing/incomplete closed 1D series (< 200 closed 1D bars even if macro_evaluation has a cached value) -> UNDETERMINED
         store_missing = StateStore()
         store_missing.binance_spot_price = 65_300.0
         store_missing.spot_klines_1d.extend(_make_klines(n=20, step_ms=86_400_000, base_px=65_000.0))
@@ -969,13 +983,14 @@ class TestDataHub(unittest.TestCase):
         v_missing = evaluate_hard_market_veto(store_missing, spot_px=65_300.0, now_ms=ref_ms)
         self.assertEqual(v_missing["cond_a"], "UNAVAILABLE")
         self.assertEqual(v_missing["cond_b"], "UNAVAILABLE")
+        self.assertEqual(v_missing["active_route"], "UNDETERMINED")
         self.assertEqual(v_missing["veto_status"], "UNDETERMINED")
         self.assertIn("FAIL-CLOSED", v_missing["portfolio_status"])
         self.assertEqual(v_missing["new_entry"], "PROHIBITED")
 
         rep_missing = build_tab_d_data_only_report(self.cfg, store_missing)
-        self.assertIn("- **Veto Status:** `UNDETERMINED`", rep_missing)
-        self.assertIn("- **New BTC Entry:** `PROHIBITED`", rep_missing)
+        self.assertIn("- **Active Route:** `UNDETERMINED`", rep_missing)
+        self.assertIn("FAIL-CLOSED", rep_missing)
 
         # Case 4: Verify Legacy_200D_Veto_Override, headless WS coverage breakdown, and 4H S/R clustering accuracy
         from analytics.data_only_reports import _summarize_kline_structure
@@ -1066,13 +1081,19 @@ class TestDataHub(unittest.TestCase):
             json_payload = json.loads(paths["json"].read_text(encoding="utf-8"))
             self.assertEqual(json_payload["stale_breakdown"]["expected_headless_ws_offline"], 1)
             self.assertEqual(json_payload["stale_breakdown"]["genuine"], 0)
-            self.assertEqual(json_payload["section_0_veto"]["veto_status"], "ACTIVE")
+            self.assertEqual(json_payload["section_0_veto"]["active_route"], "MACRO_DOWNTREND_DISTRIBUTION")
+            self.assertIn("CAUTION (<24h: CPI m/m", json_payload["section_0_veto"]["macro_caution"])
+            self.assertIn("RAIL A", json_payload["bidirectional_rails"]["rail_a"]["name"])
+            self.assertIn("RAIL B", json_payload["bidirectional_rails"]["rail_b"]["name"])
             self.assertEqual(len(json_payload["section_7a_structure"]), 3)
             self.assertEqual(len(json_payload["section_7c"]["liquidation_ladder"]), 6)
             self.assertEqual(len(json_payload["section_7c"]["macro_calendar"]), 1)
 
             html_txt = paths["html"].read_text(encoding="utf-8")
             self.assertIn('id="veto" class="veto-banner veto-active"', html_txt)
+            self.assertIn('id="rails-0" class="rails-grid"', html_txt)
+            self.assertIn("RAIL A", html_txt)
+            self.assertIn("RAIL B", html_txt)
             self.assertIn("WS_Off=1", html_txt)
             self.assertIn('id="snapshot-age"', html_txt)
             self.assertIn('id="flt-issues"', html_txt)
@@ -1090,7 +1111,7 @@ class TestDataHub(unittest.TestCase):
             decoded_md = json.loads(m_payload.group(1))
             self.assertEqual(decoded_md, md_report)
 
-            # Empty-but-fetched calendar renders CLEAR / NONE (next 7d) in 7C-2
+            # Empty-but-fetched calendar renders CLEAR / NONE (next 7d) in 7C-2 & CLEAR in Section 0
             store.macro_intermarket.macro_calendar_events = []
             ev_clear = DataHubEngine(self.cfg, db_path=db_file, write_archive=False).evaluate(store)
             md_clear = build_tab_d_data_only_report(self.cfg, store, db_path=db_file)
@@ -1106,6 +1127,8 @@ class TestDataHub(unittest.TestCase):
                 also_write_logs=False,
                 store=store,
             )
+            json_clear = json.loads(paths_clear["json"].read_text(encoding="utf-8"))
+            self.assertEqual(json_clear["section_0_veto"]["macro_caution"], "CLEAR (>24h / NONE)")
             html_clear = paths_clear["html"].read_text(encoding="utf-8")
             self.assertIn("NONE (next 7d)", html_clear)
             self.assertIn("CLEAR", html_clear)

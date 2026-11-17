@@ -1015,6 +1015,7 @@ def render_dashboard_html(
     <div>
       <div class="actions">
         <button id="copy-dd-btn" class="btn btn-primary" type="button">[ &#x1F4CB; COPY FULL DD REPORT FOR AI ]</button>
+        <button id="fresh-reload-btn" class="btn btn-trigger" type="button" style="display:none;"></button>
         <a class="btn" href="btc_data_hub_latest.md" download="btc_data_hub_latest.md">[ &#x2B07; DOWNLOAD .MD ]</a>
         <a class="btn" href="dd_latest.json" target="_blank" rel="noopener">[ {{ }} JSON ]</a>
         <a class="btn btn-trigger" href="{trigger_url}" target="_blank" rel="noopener">[ &#x26A1; TRIGGER ON-DEMAND RUN ]</a>
@@ -1079,18 +1080,25 @@ def render_dashboard_html(
 <script>
 (function () {{
   const btn = document.getElementById("copy-dd-btn");
+  const reloadBtn = document.getElementById("fresh-reload-btn");
   const statusEl = document.getElementById("copy-status");
   const payloadEl = document.getElementById("dd-markdown-payload");
   const rawBox = document.getElementById("raw-md");
-  const mdText = payloadEl ? JSON.parse(payloadEl.textContent) : (rawBox ? rawBox.value : "");
+  const pageUtcRaw = {json.dumps(utc_raw)};
+  const pageSgtRaw = {json.dumps(str(payload.get("retrieval_sgt") or payload.get("retrieval_myt") or ""))};
+  let activeMdText = payloadEl ? JSON.parse(payloadEl.textContent) : (rawBox ? rawBox.value : "");
+  let activeUtcRaw = pageUtcRaw;
+  let activeSgtRaw = pageSgtRaw;
 
-  const retrievalUtcRaw = {json.dumps(utc_raw)};
   const ageEl = document.getElementById("snapshot-age");
+  function parseUtcMs(raw) {{
+    const m = /^(\\d{{4}}-\\d{{2}}-\\d{{2}})\\s+(\\d{{2}}:\\d{{2}}:\\d{{2}})\\s+UTC$/.exec(String(raw || "").trim());
+    if (!m) return NaN;
+    return Date.parse(m[1] + "T" + m[2] + "Z");
+  }}
   function updateAge() {{
-    if (!ageEl || !retrievalUtcRaw) return;
-    const m = /^(\\d{{4}}-\\d{{2}}-\\d{{2}})\\s+(\\d{{2}}:\\d{{2}}:\\d{{2}})\\s+UTC$/.exec(retrievalUtcRaw.trim());
-    if (!m) return;
-    const ts = Date.parse(m[1] + "T" + m[2] + "Z");
+    if (!ageEl || !activeUtcRaw) return;
+    const ts = parseUtcMs(activeUtcRaw);
     if (!isFinite(ts)) return;
     const mins = Math.max(0, Math.floor((Date.now() - ts) / 60000));
     let cls = "age-ok";
@@ -1108,6 +1116,53 @@ def render_dashboard_html(
   updateAge();
   setInterval(updateAge, 30000);
 
+  async function checkLatestSnapshot() {{
+    if (!window.fetch || !String(location.protocol || "").startsWith("http")) return false;
+    const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(function () {{ ctrl.abort(); }}, 2500) : null;
+    try {{
+      const res = await fetch("dd_latest.json?t=" + Date.now(), {{
+        cache: "no-store",
+        signal: ctrl ? ctrl.signal : undefined
+      }});
+      if (!res.ok) return false;
+      const latest = await res.json();
+      if (!latest || !latest.markdown_report || !latest.retrieval_utc) return false;
+      const latestMs = parseUtcMs(latest.retrieval_utc);
+      const curMs = parseUtcMs(activeUtcRaw);
+      if ((isFinite(latestMs) && isFinite(curMs) && latestMs > curMs) || (!isFinite(curMs) && latest.retrieval_utc !== activeUtcRaw)) {{
+        activeMdText = String(latest.markdown_report);
+        activeUtcRaw = String(latest.retrieval_utc);
+        activeSgtRaw = String(latest.retrieval_sgt || latest.retrieval_utc);
+        if (rawBox) rawBox.value = activeMdText;
+        updateAge();
+        if (reloadBtn && activeUtcRaw !== pageUtcRaw) {{
+          reloadBtn.style.display = "inline-flex";
+          reloadBtn.textContent = "[ \u21bb NEWER SNAPSHOT: " + activeSgtRaw + " — RELOAD ]";
+        }}
+        return true;
+      }}
+    }} catch (e) {{
+      // Offline or aborted: keep embedded payload silently
+    }} finally {{
+      if (timer) clearTimeout(timer);
+    }}
+    return false;
+  }}
+
+  if (reloadBtn) {{
+    reloadBtn.addEventListener("click", function () {{
+      const u = new URL(window.location.href);
+      u.searchParams.set("t", String(Date.now()));
+      window.location.replace(u.toString());
+    }});
+  }}
+  checkLatestSnapshot();
+  setInterval(checkLatestSnapshot, 60000);
+  document.addEventListener("visibilitychange", function () {{
+    if (!document.hidden) checkLatestSnapshot();
+  }});
+
   const fltAll = document.getElementById("flt-all");
   const fltIssues = document.getElementById("flt-issues");
   const metricRows = Array.from(document.querySelectorAll("tr.metric-row"));
@@ -1124,10 +1179,12 @@ def render_dashboard_html(
   if (fltIssues) fltIssues.addEventListener("click", function () {{ setFilter("issues"); }});
 
   btn.addEventListener("click", async function () {{
+    statusEl.textContent = "Checking latest cloud snapshot…";
+    await checkLatestSnapshot();
     let copied = false;
     if (navigator.clipboard && navigator.clipboard.writeText) {{
       try {{
-        await navigator.clipboard.writeText(mdText);
+        await navigator.clipboard.writeText(activeMdText);
         copied = true;
       }} catch (e) {{
         copied = false;
@@ -1136,6 +1193,7 @@ def render_dashboard_html(
     if (!copied && rawBox) {{
       const details = rawBox.closest("details");
       if (details) details.open = true;
+      rawBox.value = activeMdText;
       rawBox.focus();
       rawBox.select();
       try {{
@@ -1144,10 +1202,14 @@ def render_dashboard_html(
         copied = false;
       }}
     }}
+    const tsTag = activeSgtRaw || activeUtcRaw || "CURRENT";
+    const syncedNote = (activeUtcRaw && pageUtcRaw && activeUtcRaw !== pageUtcRaw)
+      ? " [AUTO-SYNCED NEWER CLOUD SNAPSHOT]"
+      : "";
     statusEl.textContent = copied
-      ? "✓ COPIED " + mdText.length.toLocaleString() + " CHARS ({tot_c}-ROW DD REPORT) TO CLIPBOARD"
+      ? "\u2713 COPIED [" + tsTag + "] (" + activeMdText.length.toLocaleString() + " CHARS)" + syncedNote
       : "Select & copy from the Raw Markdown box below.";
-    setTimeout(function () {{ statusEl.textContent = ""; }}, 4500);
+    setTimeout(function () {{ statusEl.textContent = ""; }}, 6000);
   }});
 }})();
 </script>

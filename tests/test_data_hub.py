@@ -1101,6 +1101,9 @@ class TestDataHub(unittest.TestCase):
             self.assertIn('id="liq-macro-7c"', html_txt)
             self.assertIn("10x Shorts", html_txt)
             self.assertIn("CPI m/m", html_txt)
+            self.assertIn('id="fresh-reload-btn"', html_txt)
+            self.assertIn("checkLatestSnapshot", html_txt)
+            self.assertIn("dd_latest.json?t=", html_txt)
 
             m_payload = re.search(
                 r'<script type="application/json" id="dd-markdown-payload">(.*?)</script>',

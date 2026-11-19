@@ -1876,7 +1876,11 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             f"* **Sensor Mission**: First-Shock Early Warning Alarm & Anti-Knife-Catch Interlock",
             f"* **Disruption Status**: `{slsp.tell_tale_status}` | Long Veto Active: **`{slsp.tell_tale_veto}`**",
             f"* **15-Minute Candle Microstructure**: RelVol: `{slsp.tell_tale_relvol_15m:.1f}x` vs 20-period baseline (Threshold: >=5.0x)",
-            f"* **5-Minute Candle Microstructure**: RelVol: `{slsp.tell_tale_relvol_5m:.1f}x` vs 20-period baseline (Threshold: >=5.0x)",
+            (
+                f"* **5-Minute Candle Microstructure**: RelVol: `{slsp.tell_tale_relvol_5m:.1f}x` vs 20-period baseline (Threshold: >=5.0x)"
+                if slsp.tell_tale_relvol_5m > 0
+                else "* **5-Minute Candle Microstructure**: RelVol: `DATA UNAVAILABLE`"
+            ),
             f"* **Anti-Knife-Catch Guard Interlock**: **`{'🚨 HARD VETO: LOCKOUT ALL LONGS' if slsp.tell_tale_veto else '✓ CLEAR TO TRADE (Order Flow Stable)'}`**",
             "",
             "### 13E. Panel [5] Executive Alignment & Beginner Action Playbook",

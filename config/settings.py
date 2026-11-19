@@ -15,6 +15,10 @@ from typing import List
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Single source of truth for the disaster-stop risk-budget ceiling.
+# Was duplicated as 4.8 (engine) and 4.5 (report label) and silently disagreed.
+RISK_BUDGET_MAX_PCT: float = 4.5
+
 
 
 
@@ -298,6 +302,9 @@ class EngineConfig:
     # --- Tab [13: P] Structure + Level Swing Protocol (SLSP v1.0) & 4-in-1 Integration ---
     slsp_risk_pct: float = 0.75                     # Default risk per trade: 0.75% equity
     slsp_max_risk_pct: float = 1.00                 # Maximum risk per trade: 1.00%
+    slsp_max_position_btc: float = float(
+        os.environ.get("SLSP_MAX_POSITION_BTC", "0.20")
+    )                                               # Hard per-tranche BTC cap (0.0 disables cap)
     slsp_min_rr: float = 1.50                       # Minimum reward-to-risk ratio: 1.50
     slsp_min_level_strength: int = 3                # Minimum level score (1-5): 3 stars
     slsp_max_daily_loss_pct: float = 2.0            # Max daily loss circuit breaker: 2.0%

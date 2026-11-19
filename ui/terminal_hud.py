@@ -48,6 +48,7 @@ from rich.text import Text
 
 from analytics.ai_packet_exporter import copy_ai_packet_to_clipboard_and_disk
 from analytics.signal_detector import SignalDetector
+from analytics.waterfall import evaluate_waterfall
 from config.settings import EngineConfig
 from core.models import ExecutionGateState, MarketRegime
 from core.state_store import StateStore
@@ -3718,48 +3719,44 @@ def _build_tab_waterfall_hud(store: StateStore, header_panel: Panel) -> Group:
     # -------------------------------------------------------------------------
     # 2. MASTER WATERFALL SYNTHESIS & BINDING CONSTRAINT
     # -------------------------------------------------------------------------
-    # Pillar roll-up. The GREEN branch previously fired on the 15m footprint alone
-    # (all_gates_pass), which is pillar 5 of 5, and labelled it "ALL 5 PILLARS ALIGNED".
-    p1_ok = bool(above_200 and not ntz_active)
-    p2_ok = bool(at_edge and not is_mid_chop)
-    p3_ok = bool((not is_stealth_dist) and (cpi_usd >= -5.0))
-    p4_ok = bool(not is_crowded_long)
-    p5_ok = bool(all_gates_pass or (wick_abs and delta_flip))
-    pillars_aligned = bool(p1_ok and p2_ok and p3_ok and p4_ok and p5_ok)
+    # Pillars and the resolved state come from analytics.waterfall - one authority
+    # shared with the exported Tab [W] report. Do not recompute a pillar here.
+    wf = evaluate_waterfall(store)
+    wf_in = wf.inputs
 
-    if ntz_active:
+    if wf.state == "RED_SYSTEMIC":
         master_status = "[bold white on red] RED: 100% CASH LOCK (SYSTEMIC HAZARD VETO) [/bold white on red]"
-        binding_constraint = f"[bold red]PILLAR 1 VETO:[/bold red] Systemic Non-Trade Zone active ({ntz_text}). All spot entries locked."
+        binding_constraint = f"[bold red]PILLAR 1 VETO:[/bold red] Systemic Non-Trade Zone active ({wf_in['ntz_text']}). All spot entries locked."
         plain_english = "Major macro news event or systemic cascade in progress. Market is highly hazardous; stay 100% in cash."
         border_color = "red"
-    elif is_stealth_dist:
+    elif wf.state == "RED_STEALTH":
         master_status = "[bold white on red] RED: 100% CASH (STEALTH DISTRIBUTION VETO) [/bold white on red]"
-        binding_constraint = f"[bold red]PILLAR 3 VETO:[/bold red] Spot CVD dumping ({spot_cvd_4h:+,.1f} BTC) while Perp pumps (Div Z = {div_z:.2f}σ)."
+        binding_constraint = f"[bold red]PILLAR 3 VETO:[/bold red] Spot CVD dumping ({wf_in['spot_cvd_4h_btc']:+,.1f} BTC) while Perp pumps (Div Z = {wf_in['flow_divergence_z']:.2f}σ)."
         plain_english = "Whales are quietly selling real BTC into a retail-driven futures bounce. Do NOT buy; stay 100% in cash."
         border_color = "red"
-    elif is_crowded_long:
+    elif wf.state == "RED_CROWDED":
         master_status = "[bold white on red] RED: 100% CASH (LEVERAGED LONG TRAP VETO) [/bold white on red]"
-        binding_constraint = f"[bold red]PILLAR 4 VETO:[/bold red] Futures OI expanding with funding > 0.012% into resistance."
+        binding_constraint = f"[bold red]PILLAR 4 VETO:[/bold red] Futures OI expanding ({wf_in['oi_change_4h_pct']:+.1f}%) with funding > 0.012% into resistance."
         plain_english = "Too many gamblers borrowing money to buy near resistance. High risk of a long liquidation flush; stay in cash."
         border_color = "red"
-    elif cpi_usd < -50.0 and not at_edge:
+    elif wf.state == "RED_US_SELLING":
         master_status = "[bold white on red] RED: 100% CASH (HEAVY US SPOT SELLING) [/bold white on red]"
-        binding_constraint = f"[bold red]PILLAR 3 VETO:[/bold red] Coinbase Premium at deep discount (${cpi_usd:+,.2f}). US institutions selling."
+        binding_constraint = f"[bold red]PILLAR 3 VETO:[/bold red] Coinbase Premium at deep discount (${wf_in['coinbase_premium_usd']:+,.2f}). US institutions selling."
         plain_english = "US institutions on Coinbase are actively dumping coins onto offshore exchanges. Stand aside in cash."
         border_color = "red"
-    elif pillars_aligned and rrr_pass:
+    elif wf.state == "GREEN":
         master_status = "[bold black on bright_green] GREEN: ALL 5 PILLARS ALIGNED — EXECUTE SPOT SWING LONG [/bold black on bright_green]"
         binding_constraint = "[bold green]NO BINDING CONSTRAINTS:[/bold green] Macro permission, structural map, flow truth, and footprint trigger verified."
         plain_english = "Institutions confirmed: Big players absorbed sellers at key support and turned buyers. Safe to buy Spot BTC."
         border_color = "bright_green"
-    elif at_edge or (wick_abs and not delta_flip):
+    elif wf.state == "BLUE":
         master_status = "[bold black on bright_cyan] BLUE: SETUP ARMED — PRE-POSITION LIMIT BIDS AT SUPPORT SHELF [/bold black on bright_cyan]"
-        binding_constraint = f"[bold cyan]PILLAR 5 AWAITING TRIGGER:[/bold cyan] At key structural edge (${c_val:,.0f}); waiting for 15m Delta Flip."
+        binding_constraint = f"[bold cyan]PILLAR 5 AWAITING TRIGGER:[/bold cyan] At key structural edge (${wf_in['c_val']:,.0f}); waiting for 15m Delta Flip."
         plain_english = "Price is sitting at strong institutional support. Waiting for buyers to show up on the 15m chart before entering."
         border_color = "cyan"
     else:
         master_status = "[bold black on yellow] AMBER: PATIENT OBSERVATION — MID-RANGE CHOP [/bold black on yellow]"
-        binding_constraint = f"[bold yellow]PILLAR 2 CONSTRAINT:[/bold yellow] Price in mid-range chop; awaiting sweep of 30D cVAL (${c_val:,.0f}) or HVN Floor (${hvn_floor:,.0f})."
+        binding_constraint = f"[bold yellow]PILLAR 2 CONSTRAINT:[/bold yellow] Price in mid-range chop; awaiting sweep of 30D cVAL (${wf_in['c_val']:,.0f}) or HVN Floor (${wf_in['hvn_floor']:,.0f})."
         plain_english = "Price is stuck in the middle of nowhere (choppy range). No edge here; wait patiently for price to drop to support."
         border_color = "yellow"
 

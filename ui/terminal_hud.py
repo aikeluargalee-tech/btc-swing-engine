@@ -3549,10 +3549,12 @@ def _build_tab_waterfall_hud(store: StateStore, header_panel: Panel) -> Group:
 
     # --- PILLAR 1: MACRO PERMISSION (Data Point 1: 1D 200 SMA & NTZ 8A-8F) ---
     sma200_px = float(getattr(macro_ev, "sma_200_1d", 0.0) or getattr(f_ev, "sma_200_1d", 0.0) or 0.0)
-    above_200 = bool(getattr(macro_ev, "above_200d_sma", True) if macro_ev else getattr(f_ev, "above_200d_sma", True))
+    # Fail CLOSED: absent macro telemetry must never read as "above the 200D".
+    # These defaulted to True, so a missing feed printed PASS and authorised 1.00% risk.
+    above_200 = bool(getattr(macro_ev, "above_200d_sma", False) if macro_ev else getattr(f_ev, "above_200d_sma", False))
     sma200_slope_usd = float(getattr(macro_ev, "sma_200_slope_5d_usd", 0.0) if macro_ev else 0.0)
     sma200_slope_pct = float(getattr(macro_ev, "sma_200_slope_5d_pct", 0.0) if macro_ev else 0.0)
-    slope_pos = bool(getattr(macro_ev, "slope_200d_positive", True) if macro_ev else True)
+    slope_pos = bool(getattr(macro_ev, "slope_200d_positive", False) if macro_ev else False)
 
     ntz_active = bool(
         getattr(f_ev, "ntz_veto_active", False)
@@ -3588,8 +3590,16 @@ def _build_tab_waterfall_hud(store: StateStore, header_panel: Panel) -> Group:
     dist_val_pct = ((current_price - c_val) / c_val * 100.0) if c_val > 0 else 0.0
     dist_poc_pct = ((c_poc - current_price) / current_price * 100.0) if current_price > 0 else 0.0
 
-    at_edge = (abs(dist_val_pct) <= 1.5) or (current_price <= c_val)
-    if not is_mid_chop or at_edge:
+    # Unknown cVAL used to make dist_val_pct 0.0, which satisfied abs(x) <= 1.5 and reported
+    # "at the institutional shelf" with a $0 support level. Unknown is now simply not at the edge.
+    if c_val > 0 and current_price > 0:
+        at_edge = (abs(dist_val_pct) <= 1.5) or (current_price <= c_val)
+    else:
+        at_edge = False
+
+    # Label says "Value Area Edge AND Not Mid-Range"; the code used OR, so Pillar 2 passed
+    # whenever price was anywhere but mid-chop, edge or no edge.
+    if at_edge and not is_mid_chop:
         dp2_badge = "[bold black on green] ✓ PASS [/bold black on green]"
         dp2_summary = f"[green]At Institutional Shelf (cVAL ${c_val:,.0f} / HVN ${hvn_floor:,.0f})[/green]"
     else:
@@ -3708,6 +3718,15 @@ def _build_tab_waterfall_hud(store: StateStore, header_panel: Panel) -> Group:
     # -------------------------------------------------------------------------
     # 2. MASTER WATERFALL SYNTHESIS & BINDING CONSTRAINT
     # -------------------------------------------------------------------------
+    # Pillar roll-up. The GREEN branch previously fired on the 15m footprint alone
+    # (all_gates_pass), which is pillar 5 of 5, and labelled it "ALL 5 PILLARS ALIGNED".
+    p1_ok = bool(above_200 and not ntz_active)
+    p2_ok = bool(at_edge and not is_mid_chop)
+    p3_ok = bool((not is_stealth_dist) and (cpi_usd >= -5.0))
+    p4_ok = bool(not is_crowded_long)
+    p5_ok = bool(all_gates_pass or (wick_abs and delta_flip))
+    pillars_aligned = bool(p1_ok and p2_ok and p3_ok and p4_ok and p5_ok)
+
     if ntz_active:
         master_status = "[bold white on red] RED: 100% CASH LOCK (SYSTEMIC HAZARD VETO) [/bold white on red]"
         binding_constraint = f"[bold red]PILLAR 1 VETO:[/bold red] Systemic Non-Trade Zone active ({ntz_text}). All spot entries locked."
@@ -3728,7 +3747,7 @@ def _build_tab_waterfall_hud(store: StateStore, header_panel: Panel) -> Group:
         binding_constraint = f"[bold red]PILLAR 3 VETO:[/bold red] Coinbase Premium at deep discount (${cpi_usd:+,.2f}). US institutions selling."
         plain_english = "US institutions on Coinbase are actively dumping coins onto offshore exchanges. Stand aside in cash."
         border_color = "red"
-    elif all_gates_pass or (wick_abs and delta_flip and rrr_pass):
+    elif pillars_aligned and rrr_pass:
         master_status = "[bold black on bright_green] GREEN: ALL 5 PILLARS ALIGNED — EXECUTE SPOT SWING LONG [/bold black on bright_green]"
         binding_constraint = "[bold green]NO BINDING CONSTRAINTS:[/bold green] Macro permission, structural map, flow truth, and footprint trigger verified."
         plain_english = "Institutions confirmed: Big players absorbed sellers at key support and turned buyers. Safe to buy Spot BTC."

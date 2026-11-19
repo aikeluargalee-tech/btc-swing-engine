@@ -284,10 +284,14 @@ class FourGateEngine:
         perp_raw: List[Any],
         funding_raw: List[Any],
         dvol_current: float,
-        equity_usd: float = 100000.0,
+        equity_usd: Optional[float] = None,
     ) -> FourGateEvaluation:
         """Runs the deterministic 4-Gate calculation and 90-day event study."""
         now_utc = datetime.now(timezone.utc)
+        if equity_usd is None:
+            # Was a hardcoded 100k default: every sleeve size was computed against
+            # an account the operator may not actually hold.
+            equity_usd = float(getattr(self.config, "portfolio_equity_usd", 100_000.0) or 100_000.0)
         live_spot_px = float(spot_raw[-1][4]) if spot_raw and len(spot_raw[-1]) >= 5 else 0.0
 
         # Audit Fix 1: Lock Signal Evaluation strictly to CLOSED 4H Bars (klines[:-1])
@@ -423,12 +427,13 @@ class FourGateEngine:
         # Refinement 1: Anchor L_20 and H_20 strictly prior to the 3-bar (12H) window
         l_20 = float(np.min(lows[-123:-3])) if len(lows) >= 123 else (float(np.min(lows[:-3])) if len(lows) > 3 else float(np.min(lows)))
         h_20 = float(np.max(highs[-123:-3])) if len(highs) >= 123 else (float(np.max(highs[:-3])) if len(highs) > 3 else float(np.max(highs)))
+        # NB: window spans the last 3 bars incl. the current one (tautology guards removed).
         window_low = float(np.min(lows[-3:]))
         window_high = float(np.max(highs[-3:]))
 
         # Gate 3 — Loop A: State A (12H Sweep & Hold Reclaim of VAL or L20)
-        sweep_L20 = bool((window_low < l_20) and (closes[-1] > l_20) and (lows[-1] >= window_low))
-        sweep_VAL = bool((window_low < val_30) and (closes[-1] > val_30) and (lows[-1] >= window_low))
+        sweep_L20 = bool((window_low < l_20) and (closes[-1] > l_20))
+        sweep_VAL = bool((window_low < val_30) and (closes[-1] > val_30))
         state_a = sweep_L20 or sweep_VAL
 
         # Gate 3 — Loop A: State B (POC Node Hold)
@@ -445,8 +450,8 @@ class FourGateEngine:
             gate_3_details = f"No Trigger: POC=${poc_30:,.0f} | VAL=${val_30:,.0f} | L20=${l_20:,.0f}"
 
         # Gate 3 — Loop B: Resistance Sweep & Rejection of VAH or H20
-        sweep_H20 = bool((window_high > h_20) and (closes[-1] < h_20) and (highs[-1] <= window_high))
-        sweep_VAH = bool((window_high > vah_30) and (closes[-1] < vah_30) and (highs[-1] <= window_high))
+        sweep_H20 = bool((window_high > h_20) and (closes[-1] < h_20))
+        sweep_VAH = bool((window_high > vah_30) and (closes[-1] < vah_30))
         state_a_b = sweep_H20 or sweep_VAH
         state_b_b = bool((closes[-1] < vah_30) and (abs(float(np.max(highs[-2:])) - vah_30) / vah_30 <= 0.005) and (closes[-2] < vah_30))
         gate_3_b_pass = state_a_b or state_b_b
@@ -795,6 +800,7 @@ class FourGateEngine:
 
             l_20 = float(np.min(lows[max(0, k - 122) : max(0, k - 2)]))
             h_20 = float(np.max(highs[max(0, k - 122) : max(0, k - 2)]))
+            # NB: window spans [k-2, k] incl. the current bar (tautology guards removed).
             window_low = float(np.min(lows[k - 2 : k + 1]))
             window_high = float(np.max(highs[k - 2 : k + 1]))
 
@@ -816,8 +822,8 @@ class FourGateEngine:
             # ---------------------------------------------------------
             if k >= last_trigger_bar_a + 30:
                 if A_SP > 0.0 and dS_win[-1] > 0 and d_flow >= 1.0:
-                    sweep_L20 = (window_low < l_20) and (closes[k] > l_20) and (lows[k] >= window_low)
-                    sweep_VAL = (window_low < val_30) and (closes[k] > val_30) and (lows[k] >= window_low)
+                    sweep_L20 = (window_low < l_20) and (closes[k] > l_20)
+                    sweep_VAL = (window_low < val_30) and (closes[k] > val_30)
                     state_a_a = sweep_L20 or sweep_VAL
                     state_b_a = (closes[k] > poc_30) and (abs(float(np.min(lows[k - 1 : k + 1])) - poc_30) / poc_30 <= 0.005) and (closes[k - 1] > poc_30)
 
@@ -850,8 +856,8 @@ class FourGateEngine:
             # ---------------------------------------------------------
             if k >= last_trigger_bar_b + 30:
                 if A_SP < 0.0 and dS_win[-1] < 0 and d_flow <= -1.0:
-                    sweep_H20 = (window_high > h_20) and (closes[k] < h_20) and (highs[k] <= window_high)
-                    sweep_VAH = (window_high > vah_30) and (closes[k] < vah_30) and (highs[k] <= window_high)
+                    sweep_H20 = (window_high > h_20) and (closes[k] < h_20)
+                    sweep_VAH = (window_high > vah_30) and (closes[k] < vah_30)
                     state_a_b = sweep_H20 or sweep_VAH
                     state_b_b = (closes[k] < vah_30) and (abs(float(np.max(highs[k - 1 : k + 1])) - vah_30) / vah_30 <= 0.005) and (closes[k - 1] < vah_30)
 
@@ -1093,6 +1099,18 @@ def copy_four_gate_to_clipboard(store: Any) -> Tuple[bool, str, int]:
     if not ev:
         return False, "DIBSE evaluation not yet available.", 0
 
+    # An execution ticket is an instruction only when every gate is met. Printing one
+    # beside a STANDBY verdict is how a "do nothing" report gets read as a buy order.
+    if ev.loop_a_score >= 4:
+        ticket_line = (
+            f"- Execution Ticket: Deploy ${ev.usdt_sleeve_usd:,.2f} USDT -> Buy Spot BTC at ${ev.loop_a_entry_price:,.2f}"
+        )
+    else:
+        ticket_line = (
+            f"- Execution Ticket: NONE - {ev.loop_a_score}/4 gates met, no order. "
+            f"Reference price if all 4 ever align: ${ev.loop_a_entry_price:,.2f}"
+        )
+
     lines = [
         "# BTC DIBSE QUANTITATIVE PROTOCOL TELEMETRY PACKET (TAB 19 / [Q])",
         f"**Protocol**: DUAL-INVENTORY BIDIRECTIONAL SWING ENGINE (DIBSE) | SPOT-ONLY",
@@ -1110,7 +1128,7 @@ def copy_four_gate_to_clipboard(store: Any) -> Tuple[bool, str, int]:
         f"  - POC_30: ${ev.gate_3_poc:,.1f} | VAL_30: ${ev.gate_3_val:,.1f} | VAH_30: ${ev.gate_3_vah:,.1f} | L20: ${ev.gate_3_l20:,.1f}",
         f"- Gate 4 [90D Funding Anti-Crowding]: {'PASS' if ev.loop_a_g4_positioning else 'FAIL'} | Rate: {ev.loop_a_g4_funding_rate * 100:+.4f}% | Percentile: {ev.loop_a_g4_funding_p90:.1f}%",
         f"  - Active Rule: {ev.loop_a_g4_details}",
-        f"- Execution Ticket: Deploy ${ev.usdt_sleeve_usd:,.2f} USDT → Buy Spot BTC at ${ev.loop_a_entry_price:,.2f}",
+        ticket_line,
         f"- Profit Target: ${ev.loop_a_target_price:,.2f} (+{ev.loop_a_target_pct * 100:.2f}%) | Projected Gain: +${ev.loop_a_expected_profit_usd:,.2f} USDT Cash",
         f"- Risk Mandate: {ev.loop_a_stop_rule}",
         "",

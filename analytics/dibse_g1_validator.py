@@ -297,14 +297,14 @@ def save_archive_npz(archive: ArchiveData, cache_path: Path = DEFAULT_CACHE_PATH
         spot_full_closes=archive.spot_full_closes,
         fund_times=archive.fund_times,
         fund_rates=archive.fund_rates,
-        meta_json=np.array([json.dumps(archive.meta)], dtype=object),
+        meta_json=np.array([json.dumps(archive.meta)]),  # unicode dtype: no pickle needed
     )
     tmp_path.replace(cache_path)
 
 
 def load_archive_npz(cache_path: Path = DEFAULT_CACHE_PATH) -> ArchiveData:
     """Load cached ArchiveData from .npz."""
-    with np.load(cache_path, allow_pickle=True) as z:
+    with np.load(cache_path, allow_pickle=False) as z:
         meta = json.loads(str(z["meta_json"][0]))
         return ArchiveData(
             open_times=z["open_times"],
@@ -485,6 +485,8 @@ def extract_causal_signals(archive: ArchiveData) -> CausalSignalTable:
         anchor_end = k - 2
         l_20 = float(np.min(lows[anchor_start:anchor_end]))
         h_20 = float(np.max(highs[anchor_start:anchor_end]))
+        # NB: window_low/high span bars [k-2, k] inclusive, so they already contain bar k.
+        # Any "lows[k] >= window_low" style guard is therefore a tautology and was removed.
         window_low = float(np.min(lows[k - 2 : k + 1]))
         window_high = float(np.max(highs[k - 2 : k + 1]))
 
@@ -496,15 +498,15 @@ def extract_causal_signals(archive: ArchiveData) -> CausalSignalTable:
         high_2bar = float(max(highs[k - 1], hk))
 
         # Loop A Gate 3
-        sweep_L20 = (window_low < l_20) and (ck > l_20) and (lk >= window_low)
-        sweep_VAL = (window_low < val_30) and (ck > val_30) and (lk >= window_low)
+        sweep_L20 = (window_low < l_20) and (ck > l_20)
+        sweep_VAL = (window_low < val_30) and (ck > val_30)
         state_a_a = sweep_L20 or sweep_VAL
         state_b_a = (ck > poc_30) and (abs(low_2bar - poc_30) / poc_30 <= 0.005) and (ck_prev > poc_30)
         a_g3[k] = state_a_a or state_b_a
 
         # Loop B Gate 3
-        sweep_H20 = (window_high > h_20) and (ck < h_20) and (hk <= window_high)
-        sweep_VAH = (window_high > vah_30) and (ck < vah_30) and (hk <= window_high)
+        sweep_H20 = (window_high > h_20) and (ck < h_20)
+        sweep_VAH = (window_high > vah_30) and (ck < vah_30)
         state_a_b = sweep_H20 or sweep_VAH
         state_b_b = (ck < vah_30) and (abs(high_2bar - vah_30) / vah_30 <= 0.005) and (ck_prev < vah_30)
         b_g3[k] = state_a_b or state_b_b

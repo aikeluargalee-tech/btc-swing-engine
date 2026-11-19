@@ -135,6 +135,7 @@ class EMAStrategyEngine:
         d_ema_50 = 0.0
         d_ema_200 = 0.0
         d_ema_200_slope = 0.0
+        d_ema_200_slope_5d_pct = 0.0
         daily_adx = 0.0
 
         if len(daily_closes) >= 50:
@@ -146,12 +147,20 @@ class EMAStrategyEngine:
             if len(daily_closes) >= 200:
                 ema200_series = compute_ema_series(daily_closes, 200)
                 d_ema_200 = ema200_series[-1]
-                if len(ema200_series) >= 5:
-                    d_ema_200_slope = (ema200_series[-1] - ema200_series[-5]) / 5.0
+                if len(ema200_series) >= 6:
+                    prev_200 = ema200_series[-6]
+                    d_ema_200_slope = (ema200_series[-1] - prev_200) / 5.0
+                    d_ema_200_slope_5d_pct = ((ema200_series[-1] - prev_200) / prev_200) * 100.0 if prev_200 > 0 else 0.0
+                elif len(ema200_series) >= 2:
+                    prev_200 = ema200_series[0]
+                    span = float(len(ema200_series) - 1)
+                    d_ema_200_slope = (ema200_series[-1] - prev_200) / span
+                    d_ema_200_slope_5d_pct = ((ema200_series[-1] - prev_200) / prev_200) * 100.0 if prev_200 > 0 else 0.0
             else:
                 # Approximate 200 EMA if slightly fewer bars available
                 d_ema_200 = float(np.mean(daily_closes[-len(daily_closes):]))
                 d_ema_200_slope = 0.0
+                d_ema_200_slope_5d_pct = 0.0
 
             daily_adx = compute_adx(daily_highs, daily_lows, daily_closes, period=14)
 
@@ -284,6 +293,7 @@ class EMAStrategyEngine:
             daily_ema_50=round(d_ema_50, 2),
             daily_ema_200=round(d_ema_200, 2),
             daily_ema_200_slope=round(d_ema_200_slope, 2),
+            daily_ema_200_slope_5d_pct=round(d_ema_200_slope_5d_pct, 3),
             daily_adx=round(daily_adx, 1),
             ema_4h_9=round(ema_4h_9, 2),
             ema_4h_20=round(ema_4h_20, 2),

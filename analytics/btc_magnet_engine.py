@@ -7,7 +7,7 @@ import urllib.request
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from config.settings import EngineConfig
+from config.settings import EngineConfig, RISK_BUDGET_MAX_PCT
 from core.models import BTCMagnetEvaluation, BTCMagnetLevel, BTCMagnetRuleCheck
 from analytics.reconciliation_engine import ReconciliationEngine
 from core.state_store import StateStore
@@ -265,7 +265,7 @@ class BTCMagnetEngine:
         deep_shelf = min(ma_200d, swing_low_4h * 0.985, lower_magnet.price * 0.99)
         disaster_stop = round(deep_shelf * 0.993, 2)
         disaster_dist_pct = round(abs(spot_price - disaster_stop) / spot_price * 100.0, 2)
-        risk_budget_pass = bool(disaster_dist_pct <= 4.8)
+        risk_budget_pass = bool(disaster_dist_pct <= RISK_BUDGET_MAX_PCT)
 
         # Simple 3-way regime label for backward compatibility
         range_spread_pct = ((high_24h - low_24h) / low_24h) * 100.0 if low_24h > 0 else 3.5
@@ -1220,7 +1220,7 @@ class BTCMagnetEngine:
                 f"- **Recommended Spot Sizing:** `{regime_res.get('sizing_factor', 0.0):.2f}x` ({regime_res.get('action', '')})",
                 f"- **Capital Rotation:** `{regime_res.get('rotation', 'Remain USDT')}`",
                 f"- **Disaster Hard Stop:** `${disaster_stop:,.2f}` (`{disaster_dist_pct:.2f}%` from spot, safely below 200D SMA & 25x shelf)",
-                f"- **Risk Budget Compliance (<= 4.5%):** `{'PASS' if disaster_dist_pct <= 4.8 else 'FAIL'}`",
+                f"- **Risk Budget Compliance (<= {RISK_BUDGET_MAX_PCT}%):** `{'PASS' if disaster_dist_pct <= RISK_BUDGET_MAX_PCT else 'FAIL'}`",
             ])
 
         lines.extend([

@@ -36,6 +36,7 @@ from core.models import (
 )
 from analytics.btc_magnet_engine import BTCMagnetEngine
 from core.state_store import StateStore
+from .ema_strategy_engine import compute_ema_series
 from .liquidation_reader import read_latest_liquidation_report
 from .slsp_trade_manager import SLSPTradeManager
 from .volume_profile import compute_atr
@@ -51,6 +52,7 @@ class SLSPEngine:
         self.read_only = read_only
 
         self.risk_pct = getattr(self.config, "slsp_risk_pct", 0.75)
+        self.max_position_btc = float(getattr(self.config, "slsp_max_position_btc", 0.20) or 0.0)
         self.min_rr = getattr(self.config, "slsp_min_rr", 1.50)
         self.min_level_strength = getattr(self.config, "slsp_min_level_strength", 3)
         self.max_daily_loss_pct = getattr(self.config, "slsp_max_daily_loss_pct", 2.0)
@@ -60,7 +62,7 @@ class SLSPEngine:
         state_path = getattr(self.config, "slsp_state_path", None)
         self.trade_manager = SLSPTradeManager(
             state_path=state_path,
-            account_equity=100_000.0,
+            account_equity=float(getattr(self.config, "spot_swing_account_equity_usd", 100_000.0) or 100_000.0),
             risk_pct=self.risk_pct,
             max_daily_loss_pct=self.max_daily_loss_pct,
             max_weekly_loss_pct=self.max_weekly_loss_pct,
@@ -115,6 +117,19 @@ class SLSPEngine:
         last_low_intact = current_price >= last_sl
 
         if is_higher_high and is_higher_low and last_low_intact:
+            if len(bars_1d) >= 50:
+                closes = [b.close for b in bars_1d]
+                ema20_now = compute_ema_series(closes, 20)[-1]
+                ema50_now = compute_ema_series(closes, 50)[-1]
+                ema200_now = compute_ema_series(closes, 200)[-1] if len(closes) >= 200 else 0.0
+                if (current_price < ema20_now < ema50_now) or (
+                    ema200_now > 0.0 and current_price < ema50_now < ema200_now
+                ):
+                    reason = (
+                        f"Macro Bear Trend (Spot ${current_price:,.0f} below 1D EMA20 ${ema20_now:,.0f} "
+                        f"& EMA50 ${ema50_now:,.0f}; local bounce overridden)"
+                    )
+                    return "DOWNTREND", reason, last_sh, last_sl
             reason = f"Higher Highs (${last_sh:,.0f} > ${prev_sh:,.0f}) & Higher Lows (${last_sl:,.0f} > ${prev_sl:,.0f}); Swing Low Intact"
             return "UPTREND", reason, last_sh, last_sl
 
@@ -445,7 +460,40 @@ class SLSPEngine:
         # 2. Component 2: Industrial 3-EMA Telemetry
         ema_snap = store.ema_strategy
         ema_3_reg = ema_snap.daily_regime if ema_snap else "NEUTRAL"
-        ema_3_slope = ema_snap.daily_ema_200_slope if ema_snap else 0.0
+        if ema_snap is not None:
+            # A 0.0 here means "never computed" (fewer than 200 daily bars), not "flat".
+            # The old else-branch returned dollars/day as if it were a percent, which is
+            # how a ~-0.8% slope once printed as -96.4%.
+            pct_field = getattr(ema_snap, "daily_ema_200_slope_5d_pct", None)
+            if pct_field:
+                ema_3_slope = float(pct_field)
+            elif ema_snap.daily_ema_200 > 0 and getattr(ema_snap, "daily_ema_200_slope", 0.0):
+                # daily_ema_200_slope is dollars/day; convert to a 5-day percent.
+                ema_3_slope = (float(ema_snap.daily_ema_200_slope) * 5.0 / ema_snap.daily_ema_200) * 100.0
+            elif len(spot_1d) >= 200:
+                ema200_series = compute_ema_series([b.close for b in spot_1d], 200)
+                prev_200 = ema200_series[-6]
+                ema_3_slope = ((ema200_series[-1] - prev_200) / prev_200) * 100.0 if prev_200 > 0 else 0.0
+            else:
+                ema_3_slope = 0.0
+        elif len(spot_1d) >= 200:
+            ema200_series = compute_ema_series([b.close for b in spot_1d], 200)
+            prev_200 = ema200_series[-6] if len(ema200_series) >= 6 else ema200_series[0]
+            ema_3_slope = ((ema200_series[-1] - prev_200) / prev_200) * 100.0 if prev_200 > 0 else 0.0
+        else:
+            ema_3_slope = 0.0
+
+        if ema_snap is not None and regime == "UPTREND":
+            snap_bear = ema_3_reg in ("STRONG_BEAR", "WEAK_BEAR") or (
+                0.0 < ema_snap.daily_ema_20 < ema_snap.daily_ema_50 and current_price < ema_snap.daily_ema_20
+            )
+            if snap_bear:
+                regime = "DOWNTREND"
+                reg_reason = (
+                    f"Macro Bear Trend ({ema_3_reg}: Spot ${current_price:,.0f} < "
+                    f"1D EMA20 ${ema_snap.daily_ema_20:,.0f} < EMA50 ${ema_snap.daily_ema_50:,.0f})"
+                )
+
         ema_3_vz = ema_snap.pullback_zone_active if ema_snap else False
         ema_3_adx = ema_snap.daily_adx if ema_snap else 0.0
         ema_3_pos_met = ema_snap.positioning_confirmations_met if ema_snap else 0
@@ -560,25 +608,45 @@ class SLSPEngine:
             decision_log.append(f"[FAIL-CLOSED LOCKOUT (100% USDT)]: {macro_lock_reason}")
         elif macro_reg_id in ("CASCADE_FORCED_DELEVERAGING", "LEVERAGED_FRAGILE_UPSIDE", "DISTRIBUTION_BEAR_CONTINUATION") or getattr(mag_eval, "is_conflicted", False):
             macro_hard_lock = True
+            macro_sizing = 0.0
+            macro_rotation = "Remain USDT"
             macro_lock_reason = f"Macro Regime ({macro_reg_name}) commands 100% Cash. No knife-catching allowed."
             trade_state = "STAND_ASIDE"
             decision_log.append(f"[ALERT] MACRO HARD-LOCK (100% CASH): {macro_lock_reason}")
         elif lsce_stat == "SWEEP_IN_PROGRESS":
             macro_hard_lock = True
+            macro_sizing = 0.0
+            macro_rotation = "Remain USDT"
             macro_lock_reason = f"Active liquidation sweep in progress at {lsce_cluster}. Wait for absorption."
             trade_state = "STAND_ASIDE"
             decision_log.append(f"[ALERT] MACRO VETO: {macro_lock_reason}")
+        elif regime == "DOWNTREND" or ema_3_reg in ("STRONG_BEAR", "WEAK_BEAR"):
+            macro_hard_lock = True
+            macro_sizing = 0.0
+            macro_rotation = "Remain USDT"
+            macro_lock_reason = f"Daily Market Bias is DOWNTREND ({reg_reason}) — Spot long sizing locked to 0.00x (100% USDT)."
+            trade_state = "STAND_ASIDE"
+            decision_log.append(f"[ALERT] MACRO HARD-LOCK (100% CASH): {macro_lock_reason}")
         elif lsce_stat == "SWEEP_AND_RECLAIM_CONFIRMED":
             confluence_score = min(100, confluence_score + 20)
             decision_log.append("LSCE Confirmed: Lower liquidity shelf swept and reclaimed with positive spot absorption (+20 pts)!")
 
+        if macro_hard_lock:
+            macro_sizing = 0.0
+
         # 8. Construct Candidate Trade Setup
         active_setup: Optional[SLSPTradeSetup] = None
         if nearest_supp:
-            # Stop loss: below support zone center or swing low, clamped with ATR buffer
+            # Unify Structural Stop across setup arithmetic, R-multiples, and reported stops
             atr_4h = max(compute_atr(bars_4h[-30:], period=14), 100.0)
-            stop_candidate = min(nearest_supp.price_min - (0.10 * atr_4h), current_price - (0.50 * atr_4h))
+            shelf_stop = min(nearest_supp.price_min - (0.10 * atr_4h), current_price - (0.50 * atr_4h))
+            stop_candidate = min(shelf_stop, s_stop) if (0.0 < s_stop < current_price) else shelf_stop
             stop_loss = round(stop_candidate, 2)
+            s_stop = stop_loss
+            s_dist = round(((current_price - s_stop) / current_price) * 100.0, 2) if current_price > 0 else 0.0
+            if d_stop <= 0.0 or d_stop >= s_stop:
+                d_stop = round(s_stop * 0.985, 2)
+                d_dist = round(((current_price - d_stop) / current_price) * 100.0, 2) if current_price > 0 else 0.0
             risk_per_coin = current_price - stop_loss
 
             if risk_per_coin > 0:
@@ -615,8 +683,12 @@ class SLSPEngine:
                     and nearest_supp.strength >= self.min_level_strength
                 )
 
-                effective_size_btc = round(size_btc * macro_sizing, 4)
-                effective_notional_usd = round(notional_usd * macro_sizing, 2)
+                raw_effective_btc = size_btc * macro_sizing
+                if self.max_position_btc > 0.0 and raw_effective_btc > self.max_position_btc:
+                    effective_size_btc = round(self.max_position_btc, 4)
+                else:
+                    effective_size_btc = round(raw_effective_btc, 4)
+                effective_notional_usd = round(effective_size_btc * current_price, 2)
                 effective_is_valid = is_valid and not macro_hard_lock and (macro_sizing > 0.0)
 
                 active_setup = SLSPTradeSetup(

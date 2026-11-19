@@ -3633,6 +3633,10 @@ class EMAStrategySnapshot:
 
 
 
+    daily_ema_200_slope_5d_pct: Optional[float] = None
+
+
+
     daily_adx: float = 0.0
 
 

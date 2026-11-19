@@ -21,7 +21,7 @@ import subprocess
 import time
 from typing import Callable, Dict, List, Optional, Tuple
 
-from config.settings import DEFAULT_CONFIG, EngineConfig
+from config.settings import DEFAULT_CONFIG, EngineConfig, RISK_BUDGET_MAX_PCT
 from core.state_store import StateStore
 
 SGT_TZ = timezone(timedelta(hours=8))
@@ -71,6 +71,20 @@ def _spot_price(store: StateStore) -> float:
 # ==============================================================================
 # 1. TAB [P: STRUCTURE] DATA-ONLY REPORT
 # ==============================================================================
+def _demand_zone_label(liq_rep: object) -> str:
+    """Renders the detector's ACTUAL demand-zone bounds.
+
+    The report previously hardcoded "$75,000 - $78,000" while printing distances
+    computed against a $63,000-$63,900 zone, so the label and the numbers described
+    two different things (and the percentages read as impossible).
+    """
+    lo = float(getattr(liq_rep, "demand_zone_lower", 0.0) or 0.0)
+    hi = float(getattr(liq_rep, "demand_zone_upper", 0.0) or 0.0)
+    if lo > 0 and hi > 0:
+        return f"${min(lo, hi):,.0f} - ${max(lo, hi):,.0f}"
+    return "UNAVAILABLE"
+
+
 def build_tab_p_data_only_report(config: Optional[EngineConfig], store: StateStore) -> str:
     cfg = config or DEFAULT_CONFIG
     ts_utc, ts_sgt = _timestamps_utc_sgt()
@@ -105,7 +119,7 @@ def build_tab_p_data_only_report(config: Optional[EngineConfig], store: StateSto
         "## 2. DAILY SWING STRUCTURE & LIQUIDATION-BACKED KEY SHELVES (SLSP v1.0)",
         f"- **Daily Market Bias:** `{slsp.regime}`",
         f"- **Confluence Score:** `{slsp.confluence_score}/100`",
-        f"- **Trade State:** `{slsp.trade_state}`",
+        f"- **Position State:** `{slsp.trade_state}`",
     ])
     supp = slsp.nearest_support
     res = slsp.nearest_resistance
@@ -119,7 +133,7 @@ def build_tab_p_data_only_report(config: Optional[EngineConfig], store: StateSto
             f"- **Support Strength / Touches:** `{supp.strength}/5` | Touches: `{supp.touch_count}`",
             f"- **Support Is Round Number:** `{bool(supp.is_round_number)}` | **Support Is HVN:** `{bool(supp.is_hvn)}`",
             f"- **Support Liquidation Cluster Tag:** `{supp.liquidation_cluster_tag if supp.liquidation_cluster_tag else 'None'}`",
-            f"- **Support Liquidation Volume USD:** `${supp.liquidation_volume_usd:,.2f}`",
+            f"- **Support Modeled OI-Ladder Pool USD:** `${supp.liquidation_volume_usd:,.2f}`",
         ])
     else:
         lines.append("- **Nearest Support Shelf Center:** `0.00` (No shelf within 10% scan window)")
@@ -133,7 +147,7 @@ def build_tab_p_data_only_report(config: Optional[EngineConfig], store: StateSto
             f"- **Resistance Center Minus Spot (`Resistance - Spot`):** `${r_diff_usd:+,.2f}` (`{r_diff_pct:+.2f}%`)",
             f"- **Resistance Strength / Touches:** `{res.strength}/5` | Touches: `{res.touch_count}`",
             f"- **Resistance Liquidation Cluster Tag:** `{res.liquidation_cluster_tag if res.liquidation_cluster_tag else 'None'}`",
-            f"- **Resistance Liquidation Volume USD:** `${res.liquidation_volume_usd:,.2f}`",
+            f"- **Resistance Modeled OI-Ladder Pool USD:** `${res.liquidation_volume_usd:,.2f}`",
         ])
     else:
         lines.append("- **Nearest Resistance Shelf Center:** `0.00` (No shelf within 10% scan window)")
@@ -144,8 +158,8 @@ def build_tab_p_data_only_report(config: Optional[EngineConfig], store: StateSto
         f"- **Dominant Gravitational Pull:** `{slsp.dominant_pull_dir}`",
         f"- **Immediate Tier (100x) Imbalance Ratio:** `{slsp.immediate_ratio:.2f}x`",
         f"- **Total Ladder (10x-100x) Imbalance Ratio:** `{slsp.total_ladder_ratio:.2f}x`",
-        f"- **Upper Liquidation Magnet Cluster:** `${slsp.upper_magnet_price:,.2f}` (`{slsp.upper_magnet_dist_pct:+.2f}%` from Spot) | Volume: `${slsp.upper_magnet_vol_usd / 1e6:.2f}M`",
-        f"- **Lower Liquidation Magnet Cluster:** `${slsp.lower_magnet_price:,.2f}` (`{slsp.lower_magnet_dist_pct:+.2f}%` from Spot) | Volume: `${slsp.lower_magnet_vol_usd / 1e6:.2f}M`",
+        f"- **Upper Liquidation Magnet Cluster:** `${slsp.upper_magnet_price:,.2f}` (`{slsp.upper_magnet_dist_pct:+.2f}%` from Spot) | Modeled OI-Ladder Pool: `${slsp.upper_magnet_vol_usd / 1e6:.2f}M`",
+        f"- **Lower Liquidation Magnet Cluster:** `${slsp.lower_magnet_price:,.2f}` (`{slsp.lower_magnet_dist_pct:+.2f}%` from Spot) | Modeled OI-Ladder Pool: `${slsp.lower_magnet_vol_usd / 1e6:.2f}M`",
         f"- **LSCE Sweep State:** `[{slsp.lsce_status}]`",
         f"- **LSCE Cluster Tested:** `{slsp.lsce_cluster_tested}`",
         f"- **LSCE Action Verdict:** `{slsp.lsce_action_verdict}`",
@@ -153,7 +167,11 @@ def build_tab_p_data_only_report(config: Optional[EngineConfig], store: StateSto
 
     setup = slsp.active_setup
     ref_entry = round(float(setup.entry_price), 2) if (setup and setup.entry_price > 0) else spot_px
-    ref_stop = round(float(setup.stop_loss), 2) if (setup and setup.stop_loss > 0) else round(spot_px * 0.98, 2)
+    ref_stop = (
+        round(float(slsp.structural_stop_price), 2)
+        if slsp.structural_stop_price > 0
+        else (round(float(setup.stop_loss), 2) if (setup and setup.stop_loss > 0) else round(spot_px * 0.98, 2))
+    )
     stop_dist = round(ref_entry - ref_stop, 2)
     ref_1_5r = round(ref_entry + 1.5 * stop_dist, 2) if stop_dist > 0 else 0.0
     ref_2_5r = round(ref_entry + 2.5 * stop_dist, 2) if stop_dist > 0 else 0.0
@@ -161,20 +179,22 @@ def build_tab_p_data_only_report(config: Optional[EngineConfig], store: StateSto
     clearance_ok = bool(not setup.obstacle_detected) if setup else False
     sized_btc = round(float(setup.position_size_btc), 4) if setup else 0.0
     notional_usd = round(float(setup.notional_value_usd), 2) if setup else 0.0
+    max_tranche_btc = float(getattr(cfg, "slsp_max_position_btc", 0.0) or 0.0)
+    cap_note = f", Cap {max_tranche_btc:.2f} BTC" if max_tranche_btc > 0 else ""
 
     lines.extend([
         "",
         f"## 4. REFERENCE LEVELS & DUAL INVIOLABLE STOPS (Reference calculation if entered at ${ref_entry:,.2f})",
         f"- **Reference Entry Price:** `${ref_entry:,.2f}`",
-        f"- **Structural Stop Loss (1H Close):** `${slsp.structural_stop_price:,.2f}` (`{slsp.structural_stop_dist_pct:.2f}%` from Spot)",
+        f"- **Structural Stop Loss (4H swing low or shelf floor - ATR):** `${slsp.structural_stop_price:,.2f}` (`{slsp.structural_stop_dist_pct:.2f}%` from Spot)",
         f"- **Disaster Hard Stop (Below 200 SMA & 25x Shelf):** `${slsp.disaster_stop_price:,.2f}` (`{slsp.disaster_stop_dist_pct:.2f}%` from Spot)",
-        f"- **Risk Budget Compliance Pass (<= 4.5%):** `{bool(slsp.disaster_stop_dist_pct <= 4.5)}`",
+        f"- **Risk Budget Compliance Pass (<= {RISK_BUDGET_MAX_PCT}%):** `{bool(slsp.disaster_stop_dist_pct <= RISK_BUDGET_MAX_PCT)}`",
         f"- **Stop Distance (`Reference Entry - Structural Stop`):** `${stop_dist:,.2f}`",
         f"- **1.5R Reference Level (`Entry + 1.5 * Stop Distance`):** `${ref_1_5r:,.2f}`",
         f"- **2.5R Reference Level (`Entry + 2.5 * Stop Distance`):** `${ref_2_5r:,.2f}`",
         f"- **Distance to Overhead Resistance in R (`Obstacle R`):** `{obs_r:.2f}R`",
         f"- **Clearance >= 1.50R (`Obstacle R >= 1.50`):** `{clearance_ok}`",
-        f"- **Sized Position (Macro Sized {slsp.macro_sizing_factor:.2f}x):** `{sized_btc:.4f} BTC` (`${notional_usd:,.2f}` notional)",
+        f"- **Sized Position (Macro Sized {slsp.macro_sizing_factor:.2f}x{cap_note}):** `{sized_btc:.4f} BTC` (`${notional_usd:,.2f}` notional)",
         "",
         "## 5. DAILY & 4H 3-EMA METRICS",
         f"- **1D EMA20 / EMA50 / EMA200:** `${ (ema_snap.daily_ema_20 if ema_snap else 0.0):,.2f}` / `${ (ema_snap.daily_ema_50 if ema_snap else 0.0):,.2f}` / `${ (ema_snap.daily_ema_200 if ema_snap else 0.0):,.2f}`",
@@ -188,31 +208,71 @@ def build_tab_p_data_only_report(config: Optional[EngineConfig], store: StateSto
         "",
         "## 6. LIQUIDATION FLUSH & VOLUME CLIMAX SENSORS",
         f"- **1H OI Delta (%):** `{slsp.liq_flush_oi_delta:+.2f}%`",
-        f"- **15m Relative Volume (`RelVol vs 20-bar SMA`):** `{slsp.tell_tale_relvol_15m:.2f}x` | **15m RelVol >= 5.0x:** `{bool(slsp.tell_tale_relvol_15m >= 5.0)}`",
-        f"- **5m Relative Volume (`RelVol vs 20-bar SMA`):** `{slsp.tell_tale_relvol_5m:.2f}x` | **5m RelVol >= 5.0x:** `{bool(slsp.tell_tale_relvol_5m >= 5.0)}`",
+        (
+            f"- **15m Relative Volume (`RelVol vs 20-bar SMA`):** `{slsp.tell_tale_relvol_15m:.2f}x` | **15m RelVol >= 5.0x:** `{bool(slsp.tell_tale_relvol_15m >= 5.0)}`"
+            if slsp.tell_tale_relvol_15m > 0
+            else "- **15m Relative Volume (`RelVol vs 20-bar SMA`):** `DATA UNAVAILABLE`"
+        ),
+        (
+            f"- **5m Relative Volume (`RelVol vs 20-bar SMA`):** `{slsp.tell_tale_relvol_5m:.2f}x` | **5m RelVol >= 5.0x:** `{bool(slsp.tell_tale_relvol_5m >= 5.0)}`"
+            if slsp.tell_tale_relvol_5m > 0
+            else "- **5m Relative Volume (`RelVol vs 20-bar SMA`):** `DATA UNAVAILABLE`"
+        ),
         f"- **Volume Climax Interlock Active:** `{bool(slsp.tell_tale_veto)}`",
     ])
-    if liq_rep is not None:
+    liq_avail = bool(liq_rep is not None and getattr(liq_rep, "is_available", False))
+    liq_stale = bool(liq_rep is not None and getattr(liq_rep, "is_stale", False))
+    if liq_avail:
         w15 = liq_rep.windows.get("15m")
         w1h = liq_rep.windows.get("1h")
         w4h = liq_rep.windows.get("4h")
         w24h = liq_rep.windows.get("24h")
+        stale_tag = " [STALE / CACHED]" if liq_stale else ""
+        upd_ts = getattr(liq_rep, "timestamp_utc", "") or "live"
+        feed_status_str = (
+            f"STALE (Local Companion Cached — Updated {upd_ts})"
+            if liq_stale
+            else f"ONLINE (Local Companion Binance USD-M forceOrder WS; <=1 evt/s sample — Updated {upd_ts})"
+        )
         lines.extend([
-            f"- **Liquidated USD (`15m / 1h / 4h / 24h`):** `${(w15.total_usd if w15 else 0.0):,.0f}` / `${(w1h.total_usd if w1h else 0.0):,.0f}` / `${(w4h.total_usd if w4h else 0.0):,.0f}` / `${(w24h.total_usd if w24h else 0.0):,.0f}`",
-            f"- **24H Liquidation Multiple:** `{liq_rep.liquidation_multiple_24h:.2f}x`",
-            f"- **Reference Zone (`$75,000 - $78,000`) Distance to Lower / Upper:** `{liq_rep.demand_zone_dist_lower_pct:+.2f}%` / `{liq_rep.demand_zone_dist_upper_pct:+.2f}%`",
+            f"- **Companion Liquidation Feed Status:** `{feed_status_str}`",
+            f"- **Liquidated USD (`15m / 1h / 4h / 24h`):** `${(w15.total_usd if w15 else 0.0):,.0f}` / `${(w1h.total_usd if w1h else 0.0):,.0f}` / `${(w4h.total_usd if w4h else 0.0):,.0f}` / `${(w24h.total_usd if w24h else 0.0):,.0f}{stale_tag}`",
+            f"- **24H Liquidation Multiple:** `{liq_rep.liquidation_multiple_24h:.2f}x{stale_tag}`",
+            f"- **Reference Zone (`{_demand_zone_label(liq_rep)}`) Distance to Lower / Upper:** `{liq_rep.demand_zone_dist_lower_pct:+.2f}%` / `{liq_rep.demand_zone_dist_upper_pct:+.2f}%`",
+        ])
+    else:
+        lines.extend([
+            "- **Companion Liquidation Feed Status:** `DATA UNAVAILABLE`",
+            "- **Liquidated USD (`15m / 1h / 4h / 24h`):** `DATA UNAVAILABLE`",
         ])
 
     recon_eval = getattr(store, "reconciliation_evaluation", None)
     if recon_eval is not None:
+        gate_str = (
+            "PASS (Feeds Aligned — No Veto)"
+            if recon_eval.execution_authorization == "AUTHORIZED"
+            else "VETO / LOCKOUT (Data Mismatch)"
+        )
+        gate_status = str(recon_eval.trading_status).replace("EXECUTION AUTHORIZED", "FEEDS_ALIGNED_NO_LOCKOUT")
+        effective_alloc = (
+            0.0
+            if slsp.macro_hard_lock_cash
+            else min(float(recon_eval.capital_allocation), float(slsp.macro_sizing_factor))
+        )
+        effective_target = (
+            "100% USDT (Macro Hard-Lock Active)"
+            if slsp.macro_hard_lock_cash
+            else recon_eval.target_allocation
+        )
+        effective_rotation = slsp.macro_rotation if slsp.macro_hard_lock_cash else recon_eval.portfolio_rotation
         lines.extend([
             "",
             "## 7. UPSTREAM DATA INTEGRITY RECONCILIATION GATE",
             f"- **Reconciliation Verdict:** `{recon_eval.verdict}`",
-            f"- **Execution Authorization:** `{recon_eval.execution_authorization}`",
-            f"- **Trading Status:** `{recon_eval.trading_status}`",
-            f"- **Prescribed Capital Allocation:** `{recon_eval.capital_allocation:.2f}x` (`{recon_eval.target_allocation}`)",
-            f"- **Portfolio Rotation Directive:** `{recon_eval.portfolio_rotation}`",
+            f"- **Cross-Feed Data Integrity Gate:** `{gate_str}`",
+            f"- **Reconciliation Gate Status:** `{gate_status}`",
+            f"- **Prescribed Capital Allocation:** `{effective_alloc:.2f}x` (`{effective_target}`)",
+            f"- **Portfolio Rotation Directive:** `{effective_rotation}`",
             f"- **Module A (Ladder Math):** `{'PASS' if recon_eval.ladder_check_passed else 'FAIL'}` | **Module D (LSCE Proof):** `{'PASS' if recon_eval.lsce_check_passed else 'FAIL'}`",
         ])
         if recon_eval.fail_reasons:
@@ -419,12 +479,18 @@ def build_tab_m_data_only_report(config: Optional[EngineConfig], store: StateSto
         store.reconciliation_evaluation = recon_eval
 
     if recon_eval is not None:
+        gate_str = (
+            "PASS (Feeds Aligned — No Veto)"
+            if recon_eval.execution_authorization == "AUTHORIZED"
+            else "VETO / LOCKOUT (Data Mismatch)"
+        )
+        gate_status = str(recon_eval.trading_status).replace("EXECUTION AUTHORIZED", "FEEDS_ALIGNED_NO_LOCKOUT")
         lines.extend([
             "",
             "## 7. B1 vs B2 DATA INTEGRITY RECONCILIATION AUDIT",
             f"- **Reconciliation Verdict:** `{recon_eval.verdict}`",
-            f"- **Execution Authorization:** `{recon_eval.execution_authorization}`",
-            f"- **Prescribed Capital Sizing:** `{recon_eval.capital_allocation:.2f}x` ({recon_eval.trading_status})",
+            f"- **Cross-Feed Data Integrity Gate:** `{gate_str}`",
+            f"- **Prescribed Capital Sizing:** `{recon_eval.capital_allocation:.2f}x` ({gate_status})",
             f"- **Portfolio Rotation Directive:** `{recon_eval.portfolio_rotation}`",
             f"- **Target Capital Allocation:** `{recon_eval.target_allocation}`",
             "- **Mandatory Module Verification:**",

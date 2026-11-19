@@ -519,14 +519,14 @@ class ReconciliationEngine:
             result.capital_allocation = b2.sizing_factor
             result.target_allocation = b2.action
             result.portfolio_rotation = b2.rotation
-            result.trading_status = "EXECUTION AUTHORIZED (WITH WARNINGS)"
+            result.trading_status = "FEEDS_ALIGNED_WITH_WARNINGS (NO LOCKOUT)"
         else:
             result.verdict = "PASS"
             result.execution_authorization = "AUTHORIZED"
             result.capital_allocation = b2.sizing_factor
             result.target_allocation = b2.action
             result.portfolio_rotation = b2.rotation
-            result.trading_status = "EXECUTION AUTHORIZED"
+            result.trading_status = "FEEDS_ALIGNED_NO_LOCKOUT"
 
         return result
 

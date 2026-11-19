@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from typing import List
+from unittest.mock import patch
 
 from config.settings import EngineConfig
 from core.models import (
@@ -641,6 +642,174 @@ class TestSLSPEngine(unittest.TestCase):
             self.assertNotEqual(eval_p.nearest_resistance.liquidation_cluster_tag, "Lower Long Pool ($410.0M • -1.5%)")
             if eval_p.nearest_resistance.liquidation_cluster_tag:
                 self.assertIn("Upper Short", eval_p.nearest_resistance.liquidation_cluster_tag)
+
+    def test_tab_p_deepseek_audit_fixes(self) -> None:
+        """Verifies all 5 Tab [P] fixes: true % slope, bear-trend bias override, unavailable 5m/liq, and gate wording."""
+        from analytics.data_only_reports import build_tab_p_data_only_report
+        from analytics.ema_strategy_engine import EMAStrategyEngine
+        from core.models import DerivativesSnapshot, FlowSnapshot, LiquidationDetectorReport, LiquidationWindow
+
+        # Construct 210 descending daily bars (-16% below EMAs) ending with a small 2-bar local bounce
+        bars_1d: List[KlineBar] = []
+        base_ts = 1700000000000
+        for i in range(204):
+            px = 84000.0 - (i * 100.0)
+            bars_1d.append(make_kline(base_ts + i * 86400000, px + 50, px + 150, px - 150, px))
+        # Append 2-bar local bounce pivots below EMAs that previously fooled detect_daily_regime into UPTREND
+        bounce_closes = [62500.0, 63400.0, 62800.0, 63900.0, 63100.0, 63644.0]
+        for j, c in enumerate(bounce_closes):
+            bars_1d.append(make_kline(base_ts + (204 + j) * 86400000, c - 100, c + 250, c - 250, c))
+
+        bars_4h = [
+            make_kline(base_ts + i * 14400000, 63400, 63800, 63200, 63644)
+            for i in range(60)
+        ]
+
+        spot_px = 63644.0
+        self.store.binance_spot_price = spot_px
+        self.store.spot_klines_1d.extend(bars_1d)
+        self.store.spot_klines_4h.extend(bars_4h)
+
+        ema_snap = EMAStrategyEngine(self.config).evaluate(
+            store=self.store,
+            spot_1d=bars_1d,
+            bars_4h=bars_4h,
+            current_price=spot_px,
+            flow=FlowSnapshot(),
+            deriv=DerivativesSnapshot(),
+            atr_4h=700.0,
+        )
+        self.store.ema_strategy = ema_snap
+        self.assertIsNotNone(ema_snap.daily_ema_200_slope_5d_pct)
+        self.assertLess(abs(ema_snap.daily_ema_200_slope_5d_pct), 5.0)
+        self.assertLess(ema_snap.daily_ema_200_slope, -5.0)  # raw $/day is large negative
+
+        # 1 & 2: Bias must NOT report UPTREND below EMAs; 5D slope must be true % (~-0.7%), not $/day
+        eval_p = self.engine.evaluate(self.store, bars_1d, bars_4h, current_price=spot_px)
+        self.assertEqual(eval_p.regime, "DOWNTREND")
+        self.assertLess(abs(eval_p.ema_3_slope_200), 5.0)
+        self.assertAlmostEqual(eval_p.ema_3_slope_200, ema_snap.daily_ema_200_slope_5d_pct, places=2)
+
+        # Attach unavailable liquidation report + reconciliation gate and build Tab [P] markdown
+        # Also test unified structural stop + DOWNTREND 0.00x hard-lock using exact Hermes numbers
+        from core.models import BTCMagnetEvaluation, BTCMagnetLevel
+        self.store.btc_magnet_evaluation = BTCMagnetEvaluation(
+            timestamp_utc="2026-11-19 15:24:41 UTC",
+            spot_price=spot_px,
+            regime_id="RANGE_LIQUIDATION_MAGNET",
+            regime_name="Range / Liquidation Magnet",
+            majority_score="3/4",
+            sizing_factor=0.50,
+            rotation="Remain USDT",
+            upper_magnet=BTCMagnetLevel(price=65192.25, dist_pct=2.43, usd_volume=240e6),
+            lower_magnet=BTCMagnetLevel(price=62287.0, dist_pct=-2.13, usd_volume=350e6),
+            pull_direction="LOWER",
+            immediate_ratio=1.79,
+            total_ladder_ratio=1.75,
+            lsce_status="UNTESTED",
+            structural_stop_price=61938.84,
+            structural_stop_dist_pct=2.68,
+            disaster_stop_price=60704.0,
+            disaster_stop_dist_pct=4.62,
+        )
+        self.store.liquidation_report = LiquidationDetectorReport(
+            is_available=False,
+            windows={"15m": LiquidationWindow(total_usd=763_077.0)},
+        )
+        self.store.reconciliation_evaluation = SimpleNamespace(
+            verdict="PASS",
+            execution_authorization="AUTHORIZED",
+            trading_status="FEEDS_ALIGNED_NO_LOCKOUT",
+            capital_allocation=0.50,
+            target_allocation="Range / Liquidation Magnet: Stand Aside or Selective (0.50x)",
+            portfolio_rotation="Remain USDT",
+            ladder_check_passed=True,
+            lsce_check_passed=True,
+            fail_reasons=[],
+            warnings=[],
+        )
+
+        with patch(
+            "analytics.slsp_engine.read_latest_liquidation_report",
+            return_value=self.store.liquidation_report,
+        ):
+            eval_p = self.engine.evaluate(self.store, bars_1d, bars_4h, current_price=spot_px)
+            report = build_tab_p_data_only_report(self.config, self.store)
+
+        self.assertIn("- **Daily Market Bias:** `DOWNTREND`", report)
+        # During DOWNTREND, macro sizing must lock to 0.00x and position size to 0.0000 BTC
+        self.assertTrue(eval_p.macro_hard_lock_cash)
+        self.assertEqual(eval_p.macro_sizing_factor, 0.0)
+        self.assertIn("- **Macro Sizing Factor:** `0.00x`", report)
+        if eval_p.active_setup:
+            self.assertEqual(eval_p.structural_stop_price, eval_p.active_setup.stop_loss)
+            self.assertEqual(eval_p.structural_stop_price, 61938.84)
+            expected_dist = round(spot_px - 61938.84, 2)
+            self.assertIn(f"- **Stop Distance (`Reference Entry - Structural Stop`):** `${expected_dist:,.2f}`", report)
+            self.assertIn("- **Sized Position (Macro Sized 0.00x, Cap 0.20 BTC):** `0.0000 BTC` (`$0.00` notional)", report)
+
+        self.assertNotIn("5m Relative Volume (`RelVol vs 20-bar SMA`):** `0.00x`", report)
+        self.assertIn("- **5m Relative Volume (`RelVol vs 20-bar SMA`):** `DATA UNAVAILABLE`", report)
+        self.assertIn("- **Companion Liquidation Feed Status:** `DATA UNAVAILABLE`", report)
+        self.assertIn("- **Liquidated USD (`15m / 1h / 4h / 24h`):** `DATA UNAVAILABLE`", report)
+        self.assertIn("Modeled OI-Ladder Pool", report)
+        self.assertNotIn("Execution Authorization", report)
+        self.assertNotIn("EXECUTION AUTHORIZED", report)
+        self.assertNotIn("AUTHORIZED", report)
+        self.assertIn("Cross-Feed Data Integrity Gate", report)
+        self.assertIn("- **Reconciliation Gate Status:** `FEEDS_ALIGNED_NO_LOCKOUT`", report)
+        # Section 7 must inherit SLSP's 0.00x macro hard-lock rather than leaking Tab M's 0.50x
+        self.assertIn("- **Prescribed Capital Allocation:** `0.00x` (`100% USDT (Macro Hard-Lock Active)`)", report)
+
+    def test_tranche_position_cap_enforced_on_large_equity(self) -> None:
+        """Verifies slsp_max_position_btc caps model sizing at one tranche (0.20 BTC) on $229k equity."""
+        from core.models import BTCMagnetEvaluation, BTCMagnetLevel
+        cfg = EngineConfig(
+            spot_swing_account_equity_usd=229_290.0,
+            slsp_risk_pct=0.75,
+            slsp_max_position_btc=0.20,
+            slsp_state_path=self.state_path,
+        )
+        eng = SLSPEngine(cfg, read_only=True)
+        store = StateStore()
+        base_ts = 1700000000000
+        # 20 range bars near $63,000 -> regime = RANGE (no downtrend hard-lock)
+        bars_1d = [
+            make_kline(base_ts + i * 86400000, 63000, 64500, 62500, 63200)
+            for i in range(20)
+        ]
+        bars_4h = [
+            make_kline(base_ts + i * 14400000, 63000, 63600, 62800, 63200)
+            for i in range(30)
+        ]
+        spot_px = 63200.0
+        store.binance_spot_price = spot_px
+        store.spot_klines_1d.extend(bars_1d)
+        store.btc_magnet_evaluation = BTCMagnetEvaluation(
+            timestamp_utc="2026-11-19 16:00:00 UTC",
+            spot_price=spot_px,
+            regime_id="RANGE_LIQUIDATION_MAGNET",
+            regime_name="Range / Liquidation Magnet",
+            majority_score="3/4",
+            sizing_factor=1.0,
+            rotation="Selective Long",
+            upper_magnet=BTCMagnetLevel(price=68000.0, dist_pct=7.6, usd_volume=240e6),
+            lower_magnet=BTCMagnetLevel(price=62000.0, dist_pct=-1.9, usd_volume=350e6),
+            pull_direction="UPPER",
+            immediate_ratio=1.5,
+            total_ladder_ratio=1.5,
+            lsce_status="UNTESTED",
+            structural_stop_price=62000.0,
+            structural_stop_dist_pct=1.90,
+            disaster_stop_price=60700.0,
+            disaster_stop_dist_pct=3.96,
+        )
+
+        ev = eng.evaluate(store, bars_1d, bars_4h, current_price=spot_px)
+        self.assertIsNotNone(ev.active_setup)
+        # Uncapped 0.75% of $229,290 ($1,719.68) / $1,200 stop = 1.4331 BTC -> must be capped at 0.2000 BTC
+        self.assertEqual(ev.active_setup.position_size_btc, 0.2000)
+        self.assertEqual(ev.active_setup.notional_value_usd, round(0.2000 * spot_px, 2))
 
 
 if __name__ == "__main__":

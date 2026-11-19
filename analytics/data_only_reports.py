@@ -22,6 +22,20 @@ import time
 from typing import Callable, Dict, List, Optional, Tuple
 
 from config.settings import DEFAULT_CONFIG, EngineConfig, RISK_BUDGET_MAX_PCT
+from analytics.waterfall import (
+    evaluate_waterfall,
+    EDGE_TOLERANCE_PCT,
+    RRR_MIN,
+    STEALTH_SPOT_MAX_BTC,
+    STEALTH_PERP_MIN_BTC,
+    STEALTH_DIV_Z_MAX,
+    CPI_PASS_MIN_USD,
+    CPI_CAUTION_USD,
+    CPI_VETO_USD,
+    FUNDING_PASS_MAX_PCT,
+    FUNDING_CROWDED_MIN_PCT,
+    OI_CROWDED_MIN_PCT,
+)
 from core.state_store import StateStore
 
 SGT_TZ = timezone(timedelta(hours=8))
@@ -719,40 +733,55 @@ def build_tab_f_data_only_report(config: Optional[EngineConfig], store: StateSto
 # 8. TAB [W: WATERFALL] DATA-ONLY REPORT
 # ==============================================================================
 def build_tab_w_data_only_report(config: Optional[EngineConfig], store: StateStore) -> str:
+    """Tab [W] serialisation of analytics.waterfall.evaluate_waterfall.
+
+    Same five pillars, same thresholds, same resolved state as the HUD. This used to
+    compute a *second* set of five conditions from entirely different fields
+    (confluence score, location score, funding, spot delta, footprint), so the export
+    described a model the screen never displayed and could not be checked against it.
+    """
     ts_utc, ts_sgt = _timestamps_utc_sgt()
-    spot_px = _spot_price(store)
-    sig = getattr(store, "latest_signal", None)
-    mp = getattr(store, "macro_profile", None)
-    deriv = getattr(store, "derivatives_snapshot", None)
-    flow = getattr(store, "flow_snapshot", None)
-    f_ev = getattr(store, "footprint_evaluation", None)
+    wf = evaluate_waterfall(store)
+    i = wf.inputs
 
-    c_val = round(float(mp.c_val), 2) if mp else 0.0
-    c_poc = round(float(mp.c_poc), 2) if mp else 0.0
-    c_vah = round(float(mp.c_vah), 2) if mp else 0.0
+    def mk(flag: bool) -> str:
+        return "PASS" if flag else "FAIL"
 
-    conf_score = float(getattr(sig, "confluence_score", 0.0) or 0.0) if sig else 0.0
-    loc_score = float(getattr(sig, "location_score", 0.0) or 0.0) if sig else 0.0
-    p1_pass = bool(conf_score >= 50.0)
-    p2_pass = bool(sig and not getattr(sig, "is_mid_range_chop", False) and loc_score >= 12.0)
-    p3_pass = bool(deriv and getattr(deriv, "funding_rate_pct", 0.0) <= 0.01)
-    p4_pass = bool(flow and getattr(flow, "w_4h", None) and flow.w_4h.spot_delta_btc > 0)
-    p5_pass = bool(f_ev and getattr(f_ev, "all_gates_pass", False))
-    true_count = sum(1 for x in (p1_pass, p2_pass, p3_pass, p4_pass, p5_pass) if x)
+    pillar_true = sum(1 for x in (wf.p1_macro, wf.p2_structure, wf.p3_flow,
+                                  wf.p4_leverage, wf.p5_trigger) if x)
 
     lines = [
         "# TAB [W: WATERFALL] | DATA-ONLY METRICS REPORT",
         f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (SGT):** `{ts_sgt}`",
-        f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}`",
+        f"**Spot Price (BTCUSDT):** `${i['price']:,.2f}`",
+        "**Pillar Source:** `analytics.waterfall.evaluate_waterfall` (identical to the HUD)",
         "",
-        "## 1. 5-PILLAR CONDITION BOOLEANS & RAW INPUTS",
-        f"- **Pillar 1 (`Confluence Score >= 50.0`):** `{p1_pass}` (Confluence Score: `{conf_score:.2f}`)",
-        f"- **Pillar 2 (`Value Area Edge & Not Mid-Range`):** `{p2_pass}` (`30D cVAL ${c_val:,.2f}` | `30D cPOC ${c_poc:,.2f}` | `30D cVAH ${c_vah:,.2f}` | `VA Position`: `{float(getattr(sig, 'va_position_pct', 0.0) if sig else 0.0):.1f}%` | `Mid-Range`: `{bool(getattr(sig, 'is_mid_range_chop', False)) if sig else False}`)",
-        f"- **Pillar 3 (`8H Funding <= 0.0100%`):** `{p3_pass}` (`8H Funding`: `{float(getattr(deriv, 'funding_rate_pct', 0.0) if deriv else 0.0):+.4f}%` | `4H OI Change`: `{float(getattr(deriv, 'oi_change_4h_pct', 0.0) if deriv else 0.0):+.2f}%`)",
-        f"- **Pillar 4 (`4H Spot Delta > 0 BTC`):** `{p4_pass}` (`4H Spot Delta`: `{ (flow.w_4h.spot_delta_btc if (flow and getattr(flow, 'w_4h', None)) else 0.0):+.2f} BTC` | `4H Perp Delta`: `{ (flow.w_4h.perp_delta_btc if (flow and getattr(flow, 'w_4h', None)) else 0.0):+.2f} BTC`)",
-        f"- **Pillar 5 (`15m Footprint 4-Gate Pass`):** `{p5_pass}` (`15m Active Delta`: `{float(getattr(f_ev, 'active_bar_delta', 0.0) if f_ev else 0.0):+.2f} BTC`)",
-        f"- **Total Pillars True:** `{true_count} / 5`",
+        "## 1. FIVE PILLAR CONDITIONS",
+        f"- **Pillar 1 - Macro Permission:** `{mk(wf.p1_macro)}` (above 200D SMA: `{i['above_200d_sma']}` | 200D SMA: `${i['sma200_px']:,.2f}` | 5D slope: `{i['sma200_slope_5d_pct']:+.3f}%` | NTZ hazard: `{i['ntz_active']}`)",
+        f"- **Pillar 2 - Structure & Asymmetry:** `{mk(wf.p2_structure)}` (30D cVAL: `${i['c_val']:,.2f}` | cPOC: `${i['c_poc']:,.2f}` | cVAH: `${i['c_vah']:,.2f}` | spot - cVAL: `{i['dist_val_pct']:+.2f}%` | at edge: `{i['at_edge']}` | mid-range chop: `{i['is_mid_range_chop']}` | R:R to magnet: `{i['rrr_to_magnet']:.2f}R` | R:R gate: `{i['rrr_pass']}`)",
+        f"- **Pillar 3 - Cross-Venue Flow:** `{mk(wf.p3_flow)}` (4H spot CVD: `{i['spot_cvd_4h_btc']:+,.1f} BTC` | 4H perp CVD: `{i['perp_cvd_4h_btc']:+,.1f} BTC` | divergence z: `{i['flow_divergence_z']:+.2f}` | stealth distribution: `{i['is_stealth_distribution']}` | spot accumulation: `{i['is_spot_accumulation']}` | Coinbase premium: `${i['coinbase_premium_usd']:+,.2f}`)",
+        f"- **Pillar 4 - Leverage Fuel:** `{mk(wf.p4_leverage)}` (OI: `{i['open_interest_btc']:,.0f} BTC` | 4H dOI: `{i['oi_change_4h_pct']:+.2f}%` | funding: `{i['funding_rate_pct']:+.4f}%` | crowded long: `{i['is_crowded_long']}` | squeeze fuel: `{i['is_squeeze_fuel']}`)",
+        f"- **Pillar 5 - Sniper Trigger:** `{mk(wf.p5_trigger)}` (footprint 4-gate: `{i['footprint_all_gates_pass']}` | wick absorption: `{i['footprint_wick_absorption']}` | delta flip: `{i['footprint_delta_flip']}` | 15m delta: `{i['footprint_active_delta_btc']:+,.1f} BTC`)",
+        f"- **Pillars True:** `{pillar_true} / 5`",
+        "",
+        "## 2. RESOLVED WATERFALL STATE",
+        f"- **Waterfall State:** `{wf.state}`",
+        f"- **Binding Pillar:** `{wf.binding_pillar}`",
+        f"- **All Pillars Aligned:** `{wf.pillars_aligned}`",
+        f"- **State Vocabulary:** `RED_SYSTEMIC` | `RED_STEALTH` | `RED_CROWDED` | `RED_US_SELLING` | `GREEN` | `BLUE` | `AMBER`",
+        "",
+        "## 3. THRESHOLDS IN FORCE",
+        f"- **Pillar 2 edge tolerance:** `+/-{EDGE_TOLERANCE_PCT}%` of cVAL; requires edge AND not mid-range",
+        f"- **Pillar 2 asymmetry floor:** `{RRR_MIN:.2f}R`",
+        f"- **Pillar 3 stealth:** spot `< {STEALTH_SPOT_MAX_BTC:.0f}` BTC and perp `> {STEALTH_PERP_MIN_BTC:.0f}` BTC and z `< {STEALTH_DIV_Z_MAX:.1f}`",
+        f"- **Pillar 3 Coinbase premium:** pass `>= ${CPI_PASS_MIN_USD:,.2f}` | caution `< -${abs(CPI_CAUTION_USD):,.2f}` | veto `< -${abs(CPI_VETO_USD):,.2f}`",
+        f"- **Pillar 4 funding:** neutral `<= {FUNDING_PASS_MAX_PCT:.4f}%` | crowded veto `> {FUNDING_CROWDED_MIN_PCT:.4f}%` | crowded OI `> {OI_CROWDED_MIN_PCT:.1f}%`",
+        "",
+        "## 4. RAW INPUT SNAPSHOT (for independent recomputation)",
     ]
+    for key in sorted(i):
+        lines.append(f"- `{key}`: `{i[key]}`")
+
     return sanitize_data_only_text("\n".join(lines))
 
 

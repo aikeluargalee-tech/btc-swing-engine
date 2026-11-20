@@ -2083,6 +2083,22 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             for w in recon_eval.warnings:
                 lines.append(f"* **[WARNING]**: `{w}`")
 
+    # --- SECTION 20: TAB [X / 20] 4H FUTURES + INVENTORY PROTOCOL v4.0 ---
+    try:
+        from analytics.data_only_reports import build_tab_x_data_only_report
+        tab_x_section = build_tab_x_data_only_report(config, store).strip()
+        if tab_x_section:
+            lines.extend([
+                "",
+                "---",
+                "",
+                "## SECTION 20: TAB [X / 20] 4H FUTURES + INVENTORY PROTOCOL v4.0 (ANALYTICAL / PAPER ONLY)",
+                "",
+                tab_x_section,
+            ])
+    except Exception:
+        pass
+
     return "\n".join(lines) + "\n"
 
 

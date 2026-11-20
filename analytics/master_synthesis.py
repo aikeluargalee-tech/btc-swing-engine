@@ -59,7 +59,7 @@ class MasterSynthesisEvaluator:
         sig: SignalEvaluation,
         pev: ProtocolV13Evaluation,
         mev: MacroRadarEvaluation,
-        rmev: RegimeMatrixEvaluation,
+        rmev: RegimeMatrixEvaluation | None,
         flow: FlowSnapshot,
         deriv: DerivativesSnapshot,
     ) -> MasterSynthesisEvaluation:
@@ -69,10 +69,39 @@ class MasterSynthesisEvaluator:
         tp = sig.trade_plan
         target_support = tp.reference_entry if tp else (sig.support_hvn or sig.c_val)
 
-        active_cfg: RegimeConfigItem = next(
-            (c for c in rmev.configs if c.is_active),
-            rmev.configs[0],
+        # Without Tab [4], the master desk cannot establish a regime or evaluate its gates.
+        if rmev is None:
+            unavailable = TabVerdictRow(
+                tab_num=4,
+                tab_name="[4] Regime Matrix",
+                traffic_light="YELLOW",
+                score_or_status="UNAVAILABLE",
+                primary_driver="Missing input: regime_matrix_evaluation",
+                tab_conclusion="Master synthesis held in unavailable state",
+            )
+            unavailable_ev = MasterSynthesisEvaluation(
+                timestamp_utc=now_str,
+                current_price=round(price, 2),
+                tab_rows=[unavailable],
+                tabs_yellow_count=1,
+                master_alignment_score=0.0,
+                alignment_status="UNAVAILABLE",
+                supreme_veto_active=True,
+                supreme_veto_reason="Missing input: regime_matrix_evaluation",
+                master_traffic_light="YELLOW",
+                master_headline="YELLOW LIGHT — MASTER SYNTHESIS UNAVAILABLE (Tab [4] regime evaluation missing)",
+                master_what_is_happening="UNAVAILABLE — missing input: regime_matrix_evaluation; no regime configuration nominated.",
+                master_why_resolution="Master synthesis did not evaluate because Tab [4] regime telemetry is missing.",
+            )
+            store.master_synthesis_evaluation = unavailable_ev
+            return unavailable_ev
+
+        active_cfg: RegimeConfigItem | None = next(
+            (c for c in rmev.configs if c.is_active and c.code == rmev.active_config_code),
+            None,
         )
+        config_code = active_cfg.code if active_cfg else "NO_MATCH"
+        config_category = active_cfg.category if active_cfg else None
 
         # Check true capital-preservation vetoes (excluding pure entry-geometry R:R notes)
         true_tab1_vetoes = [
@@ -108,9 +137,9 @@ class MasterSynthesisEvaluator:
             p_conc = f"{slsp.trade_state} | Sup ${supp_px:,.0f} ({obs_r:.1f}R)"
         else:
             p_light = "YELLOW"
-            p_status = "SLSP + 3-EMA"
-            p_driver = f"cVAL ${sig.c_val:,.0f} | cVAH ${sig.c_vah:,.0f}"
-            p_conc = f"WATCH SUPPORT ${target_support:,.0f}"
+            p_status = "UNAVAILABLE"
+            p_driver = "Missing input: slsp_evaluation"
+            p_conc = "UNAVAILABLE — structure desk did not evaluate"
 
         row_p = TabVerdictRow(
             tab_num=13,
@@ -141,10 +170,10 @@ class MasterSynthesisEvaluator:
             g_driver = f"4H S:{s_4h:+,.0f} P:{p_4h:+,.0f} BTC | CPI:{cpi_pct:+.3f}%"
             g_conc = f"4H Spot {s_4h:+,.0f} BTC | VWAP {vwap_sd:+.2f}SD"
         else:
-            g_light = "BLUE" if flow.w_4h.spot_delta_btc > 0 else "YELLOW"
-            g_status = f"4H Spot Z:{flow.w_4h.spot_zscore:+.2f}"
-            g_driver = f"4H S:{flow.w_4h.spot_delta_btc:+,.0f} P:{flow.w_4h.perp_delta_btc:+,.0f} BTC"
-            g_conc = f"Spot CVD {flow.w_4h.spot_delta_btc:+,.0f} BTC (Abs {flow.w_1h.absorption_index:.2f})"
+            g_light = "YELLOW"
+            g_status = "UNAVAILABLE"
+            g_driver = "Missing input: grok_quant_evaluation"
+            g_conc = "UNAVAILABLE — Grok flow desk did not evaluate"
 
         row_g = TabVerdictRow(
             tab_num=15,
@@ -177,9 +206,9 @@ class MasterSynthesisEvaluator:
             r_conc = f"{m_pass}/{m_tot} SSRN Gates | VolTarget {vt_wt:.0f}%"
         else:
             r_light = "YELLOW"
-            r_status = "SSRN 5-MODEL"
-            r_driver = "OFI • Jump Risk • Volatility"
-            r_conc = "NEUTRAL ALPHA BASELINE"
+            r_status = "UNAVAILABLE"
+            r_driver = "Missing input: ssrn_alpha_evaluation"
+            r_conc = "UNAVAILABLE — SSRN desk did not evaluate"
 
         row_r = TabVerdictRow(
             tab_num=16,
@@ -210,14 +239,16 @@ class MasterSynthesisEvaluator:
             m_driver = f"Up:${up_mag:,.0f} (+{up_dist_pct:.1f}%) | Low:${dn_mag:,.0f} (-{dn_dist_pct:.1f}%)"
             m_conc = f"Up ${up_mag:,.0f} (+{up_dist_pct:.1f}%) | Low ${dn_mag:,.0f} (-{dn_dist_pct:.1f}%)"
         else:
+            # Keep cross-desk calculations available from Tab [2], while the Tab [M]
+            # row itself remains explicitly unavailable without its own evaluation.
             up_mag = float(pev.short_liq_magnet_usd)
             dn_mag = float(pev.long_liq_magnet_usd)
             up_dist_pct = ((up_mag - price) / price * 100.0) if price > 0 and up_mag > 0 else 0.0
             dn_dist_pct = ((price - dn_mag) / price * 100.0) if price > 0 and dn_mag > 0 else 0.0
-            m_light = "BLUE" if abs(up_dist_pct) <= abs(dn_dist_pct) else "YELLOW"
-            m_status = f"↑+{up_dist_pct:.1f}% • ↓-{dn_dist_pct:.1f}%"
-            m_driver = f"S-Liq:${up_mag:,.0f} | L-Liq:${dn_mag:,.0f}"
-            m_conc = f"Up ${up_mag:,.0f} (+{up_dist_pct:.1f}%) | Low ${dn_mag:,.0f} (-{dn_dist_pct:.1f}%)"
+            m_light = "YELLOW"
+            m_status = "UNAVAILABLE"
+            m_driver = "Missing input: btc_magnet_evaluation.upper_magnet/lower_magnet"
+            m_conc = "UNAVAILABLE — magnet desk did not evaluate"
 
         row_m = TabVerdictRow(
             tab_num=17,
@@ -247,9 +278,9 @@ class MasterSynthesisEvaluator:
             a_conc = f"{tpb.strategy_verdict} ({tpb.decision_state[:22]})"
         else:
             a_light = "YELLOW"
-            a_status = "1D/4H PULLBACK"
-            a_driver = f"1D 200SMA ${mev.sma_200_1d:,.0f}"
-            a_conc = "WARMING UP 1D/4H BARS"
+            a_status = "UNAVAILABLE"
+            a_driver = "Missing input: trend_pullback_evaluation"
+            a_conc = "UNAVAILABLE — strategy desk did not evaluate"
 
         row_a = TabVerdictRow(
             tab_num=18,
@@ -280,10 +311,10 @@ class MasterSynthesisEvaluator:
             f_driver = f"Delta {fp_delta:+.1f} BTC | State: {fp_sig[:18]}"
             f_conc = f"{fp_sig[:24]} (Δ {fp_delta:+.1f} BTC)"
         else:
-            f_light = "BLUE" if flow.w_15m.spot_delta_btc > 0 else "YELLOW"
-            f_status = f"15m Δ:{flow.w_15m.spot_delta_btc:+.1f} BTC"
-            f_driver = f"15m Spot {flow.w_15m.spot_delta_btc:+.1f} BTC"
-            f_conc = f"15m Spot Δ {flow.w_15m.spot_delta_btc:+.1f} BTC"
+            f_light = "YELLOW"
+            f_status = "UNAVAILABLE"
+            f_driver = "Missing input: footprint_evaluation"
+            f_conc = "UNAVAILABLE — footprint desk did not evaluate"
 
         row_f = TabVerdictRow(
             tab_num=11,
@@ -304,17 +335,17 @@ class MasterSynthesisEvaluator:
         w_passes = sum([p1_pass, p2_pass, p3_pass, p4_pass, p5_pass])
         if not p4_pass or len(true_tab1_vetoes) > 0:
             w_light = "RED"
-            w_conc = f"VETO LOCKED ({w_passes}/5 Pillars) • {active_cfg.code}"
+            w_conc = f"VETO LOCKED ({w_passes}/5 Pillars) • {config_code}"
         elif w_passes == 5:
             w_light = "GREEN"
-            w_conc = f"ALL 5/5 PILLARS PASS • {active_cfg.code}"
+            w_conc = f"ALL 5/5 PILLARS PASS • {config_code}"
         elif w_passes >= 3:
             w_light = "BLUE"
-            w_conc = f"{w_passes}/5 Pillars Pass • {active_cfg.code} ({sig. confluence_score:.0f}/100)"
+            w_conc = f"{w_passes}/5 Pillars Pass • {config_code} ({sig. confluence_score:.0f}/100)"
         else:
             w_light = "YELLOW"
             w_conc = f"{w_passes}/5 Pillars Pass • Bid ${target_support:,.0f}"
-        w_status = f"{w_passes}/5 Gates • {active_cfg.code}"
+        w_status = f"{w_passes}/5 Gates • {config_code}"
         w_driver = f"Conf {sig.confluence_score:.0f}/100 | VA {sig.va_position_pct:.0f}% | NTZ:{pev.non_trade_zone_status}"
 
         row_w = TabVerdictRow(
@@ -336,9 +367,9 @@ class MasterSynthesisEvaluator:
             sw_conc = f"{sw_ev.verdict} (R:R {rrr_val:.2f}R)"
         else:
             sw_light = "YELLOW"
-            sw_status = f"NTZ:{pev.non_trade_zone_status} • Sell:{active_sells}/4"
-            sw_driver = f"1D:{pev.daily_bias} | S:${pev.short_liq_magnet_usd:,.0f} L:${pev.long_liq_magnet_usd:,.0f}"
-            sw_conc = f"BUY:{pev.buy_allowed} ({pev.entry_status})"
+            sw_status = "UNAVAILABLE"
+            sw_driver = "Missing input: ready spot_swing_evaluation (data_ready and macro required)"
+            sw_conc = "UNAVAILABLE — spot swing desk did not evaluate"
 
         row_0 = TabVerdictRow(
             tab_num=0,
@@ -349,7 +380,7 @@ class MasterSynthesisEvaluator:
             tab_conclusion=sw_conc,
         )
 
-        regime_mult = _CONFIG_MULTIPLIER_MAP.get(active_cfg.code, 0.50)
+        regime_mult = _CONFIG_MULTIPLIER_MAP.get(config_code, 0.0) if active_cfg else 0.0
         tab_rows = [row_p, row_g, row_r, row_m, row_a, row_f, row_w, row_0]
         lights = [r.traffic_light for r in tab_rows]
         g_cnt = lights.count("GREEN")
@@ -371,7 +402,7 @@ class MasterSynthesisEvaluator:
         if pev.non_trade_zone_status == "YES":
             supreme_veto = True
             supreme_veto_reasons.append("Desk [W/2] Non-Trade Zone (8A–8F)")
-        if active_cfg.category == "DEFENSIVE_CASH":
+        if config_category == "DEFENSIVE_CASH":
             supreme_veto = True
             supreme_veto_reasons.append(f"Desk [W/4] {active_cfg.code} ({active_cfg.short_title})")
         for vr in true_tab1_vetoes:
@@ -661,7 +692,7 @@ class MasterSynthesisEvaluator:
 
         # Track B: If Already Holding Spot BTC
         tab1_stop = tp.stop_loss if tp else pev.downside_ref_1d_atr
-        tab4_stop = active_cfg.computed_stop_usd
+        tab4_stop = active_cfg.computed_stop_usd if active_cfg else 0.0
         valid_stops = [s for s in (tab1_stop, tab4_stop) if 0 < s < price * 0.998]
         reconciled_stop = round(min(valid_stops), 2) if valid_stops else round(price * 0.985, 2)
         if pev.long_liq_magnet_usd > 0 and reconciled_stop >= (pev.long_liq_magnet_usd - 75.0) and price < sig.c_val:
@@ -706,10 +737,10 @@ class MasterSynthesisEvaluator:
         if pev.any_sell_confirmed:
             holder_action = "EXIT / REDUCE IMMEDIATELY (SELL TRIGGER ACTIVE)"
             holder_note = f"Confirmed Sell Trigger ({active_sells}/4). Protect spot capital now."
-        elif active_cfg.category == "DEFENSIVE_CASH":
+        elif config_category == "DEFENSIVE_CASH":
             holder_action = f"DEFENSIVE REDUCE / TIGHTEN STOP ({active_cfg.code.upper()})"
             holder_note = f"Trail hard stop tightly at ${reconciled_stop:,.0f} under {active_cfg.code}."
-        elif "TAKE PARTIAL PROFIT" in pev.liq_magnet_verdict or active_cfg.code in ("Config D", "Config E"):
+        elif "TAKE PARTIAL PROFIT" in pev.liq_magnet_verdict or (active_cfg is not None and active_cfg.code in ("Config D", "Config E")):
             holder_action = f"HOLD CORE + SCALE 30–50% AT ${holder_tp1_usd:,.0f}"
             holder_note = f"Harvest 30–50% at ${holder_tp1_usd:,.0f}; keep hard stop at ${reconciled_stop:,.0f}."
         else:
@@ -726,21 +757,26 @@ class MasterSynthesisEvaluator:
             master_headline = (
                 f"RED LIGHT — SUPREME CAPITAL PRESERVATION VETO ACTIVE ({supreme_veto_reason_str.upper()[:65]})"
             )
+        elif active_cfg is None:
+            master_light = "YELLOW"
+            master_headline = "YELLOW LIGHT — NO-MATCH REGIME (SETUP STATE ONLY; OPERATOR DECIDES)"
         elif (
             sig.gate_state == ExecutionGateState.GATE3_RECLAIM_TRIGGERED
             and pev.buy_allowed == "YES"
-            and active_cfg.category in ("BULL_LONG", "ACCUMULATE")
+            and config_category in ("BULL_LONG", "ACCUMULATE")
         ):
             master_light = "GREEN"
             master_headline = (
-                f"GREEN LIGHT — MULTI-TAB BUY CONFLUENCE CONFIRMED "
-                f"(EXECUTE {cash_final_btc:.4f} BTC / ${cash_final_usd:,.0f} SPOT SWING LONG)"
+                f"GREEN LIGHT — SETUP STATE ONLY: MULTI-TAB BUY CONFLUENCE "
+                f"({cash_final_btc:.4f} BTC / ${cash_final_usd:,.0f} SPOT SWING LONG). "
+                "NOT an instruction or permission to place an order; operator decides."
             )
         elif (g_cnt + b_cnt) >= 2 and r_cnt == 0 and not sig.is_mid_range_chop:
             master_light = "BLUE"
             master_headline = (
-                f"BLUE LIGHT — CONSTRUCTIVE MULTI-TAB ACCUMULATION ZONE "
-                f"(STAGE {cash_edge_btc:.4f} BTC BID AT ${ref_entry:,.0f} SUPPORT)"
+                f"BLUE LIGHT — SETUP STATE ONLY: CONSTRUCTIVE MULTI-TAB ACCUMULATION ZONE "
+                f"({cash_edge_btc:.4f} BTC reference size at ${ref_entry:,.0f} support). "
+                "NOT an instruction or permission to place an order; operator decides."
             )
         else:
             master_light = "YELLOW"
@@ -752,11 +788,13 @@ class MasterSynthesisEvaluator:
         master_what = (
             f"Scoreboard: {g_cnt} Green • {b_cnt} Blue • {y_cnt} Yellow • {r_cnt} Red "
             f"(Master Alignment: {master_alignment_score:.1f}% — {alignment_status}). "
-            f"BTC (${price:,.0f}) is in {active_cfg.code} ({active_cfg.short_title}, {active_cfg.match_pct:.0f}% match) "
-            f"with 4H Spot CVD {flow.w_4h.spot_delta_btc:+,.1f} BTC."
+            + (f"BTC (${price:,.0f}) is in {active_cfg.code} ({active_cfg.short_title}, {active_cfg.match_pct:.0f}% match) "
+               if active_cfg else f"BTC (${price:,.0f}) regime: NO-MATCH — no active configuration qualifies. ")
+            + f"with 4H Spot CVD {flow.w_4h.spot_delta_btc:+,.1f} BTC."
         )
         master_why = conflict_points[0]
         master_cmd = (
+            "SETUP STATE ONLY — NOT an instruction or permission to place an order; operator decides. "
             f"[IF IN CASH]: {cash_permission} -> Zone ${tp.entry_zone_low if tp else ref_entry:,.0f}–${tp.entry_zone_high if tp else ref_entry:,.0f} "
             f"({cash_edge_btc:.4f} BTC / ${cash_edge_usd:,.0f}).  "
             f"[IF HOLDING SPOT]: {holder_action} | Stop ${reconciled_stop:,.0f} | TP1 ${holder_tp1_usd:,.0f} • TP2 ${holder_tp2_usd:,.0f}."

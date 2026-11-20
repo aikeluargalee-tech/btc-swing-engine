@@ -466,8 +466,25 @@ class MasterSynthesisEvaluator:
                 input_states[row.tab_name] = "REFUSED"
         input_states["[Veto Gate]"] = "REFUSED" if supreme_veto else "LIVE"
 
+        # Object presence is not a setup. A Trend-Pullback evaluation exists whenever that desk
+        # has run at all, so "(tpb is not None)" reported the trigger OBSERVED on a desk whose own
+        # verdict was "NO TRADE (DEFENSIVE / BEARISH REGIME)" - the same fail-open shape as the
+        # rest of the audit: the existence of an answer treated as a positive answer.
+        tpb_affirmative = bool(
+            tpb is not None
+            and {getattr(tpb, "trade_decision", "NO TRADE"),
+                 getattr(tpb, "strategy_verdict", "NO TRADE")}
+            & {"ENTRY READY", "WAIT FOR RETEST", "CONFIRMED"}
+        )
+        # `sig.trade_plan` is BUILT ON EVERY EVALUATION and is never None (signal_detector
+        # builds it unconditionally and no path passes None), so truthiness of the plan asserted
+        # "a setup exists" on every single run - the trigger read OBSERVED while all four desks
+        # said REFUSED. A live setup is an active sweep/retest FSM, not the presence of a plan.
+        _ACTIVE_FSM_STATES = {"SEEKING_REJECTION", "PENDING_RETEST", "TRIGGERED"}
+        tp_affirmative = getattr(sig, "fsm_state", None) in _ACTIVE_FSM_STATES
         setup_observed = bool(
-            tp or (tpb is not None) or (sw_ev is not None and sw_ev.verdict == "NEW LONG SETUP")
+            tp_affirmative or tpb_affirmative
+            or (sw_ev is not None and getattr(sw_ev, "verdict", "") == "NEW LONG SETUP")
         )
         input_states[SETUP_TRIGGER_KEY] = "OBSERVED" if setup_observed else "NONE"
         decision_verdict = tab_z_precedence(input_states)

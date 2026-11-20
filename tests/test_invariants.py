@@ -132,5 +132,28 @@ class TestNothingMayAuthoriseATrade(unittest.TestCase):
                          "an artefact claims execution authority:\n  " + "\n  ".join(offenders))
 
 
+class TestNoSetupFromObjectPresence(unittest.TestCase):
+    """An answer existing is not a yes. The Tab Z setup trigger must come from an affirmative
+    state, never from the mere presence of an evaluation or plan object.
+
+    The defect this locks down: `sig.trade_plan` is built on every evaluation and is never None,
+    so `bool(tp)` asserted "a setup exists" on every run - the trigger read OBSERVED while all
+    four desks said REFUSED. Same shape as Tab L's 75.0 floor and Tab 4's always-active config.
+    """
+
+    def test_setup_trigger_does_not_use_plan_truthiness(self):
+        src = (ROOT / "analytics" / "master_synthesis.py").read_text(encoding="utf-8")
+        # Scan executable lines only: the comments explain this defect and name the old
+        # expressions, so a whole-file search would flag the explanation instead of the code.
+        code = "\n".join(l for l in src.splitlines() if not l.lstrip().startswith("#"))
+        self.assertNotIn("(tpb is not None)", code,
+                         "a Trend-Pullback evaluation exists whenever that desk has run; "
+                         "testing it for None reports OBSERVED on a desk whose verdict is NO TRADE")
+        self.assertNotIn("tp or tpb_affirmative", code,
+                         "trade_plan is never None, so `tp or` is a constant True")
+        self.assertIn("_ACTIVE_FSM_STATES", code,
+                      "the setup trigger must be derived from an active sweep/retest FSM state")
+
+
 if __name__ == "__main__":
     unittest.main()

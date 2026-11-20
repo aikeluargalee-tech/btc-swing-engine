@@ -332,7 +332,10 @@ def test_format_reconciliation_report():
     rep = format_reconciliation_report(audit)
 
     assert "# [R: RECONCILIATION] | B1 vs B2 DATA INTEGRITY AUDIT" in rep
-    assert "DENIED" in rep
+    # The gate is rendered as a LOCK state, not as permission. The internal flag still
+    # says AUTHORIZED/DENIED, but no artefact may present that as authority to trade.
+    assert "LOCKED (data mismatch" in rep
+    assert "AUTHORIZED" not in rep
     assert "LOCKOUT DIRECTIVE" in rep
     assert "Module A" in rep
     # Ensure plain ASCII

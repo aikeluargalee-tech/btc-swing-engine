@@ -550,13 +550,29 @@ class ReconciliationEngine:
         return 0.0
 
 
+def format_data_integrity_lock(value: str) -> str:
+    """Renders the internal authorization flag as a LOCK state.
+
+    The underlying field records whether the B1/B2 data-integrity gate found a lockout. It
+    is a veto gate: a cleared gate removes an objection, it does not grant permission. It
+    must therefore never be rendered as the word AUTHORIZED in any artefact an operator or
+    reviewer reads.
+    """
+    v = str(value).strip().upper()
+    if v == "AUTHORIZED":
+        return "NO LOCKOUT (data-integrity gate cleared - grants nothing)"
+    if v == "DENIED":
+        return "LOCKED (data mismatch - new entries vetoed)"
+    return v or "UNAVAILABLE"
+
+
 def format_reconciliation_report(audit: ReconciliationAuditResult) -> str:
     """Renders standardized DATA-ONLY report markdown for Section [R: RECONCILIATION]."""
     auth_color = "PASS" if audit.execution_authorization == "AUTHORIZED" else "DENIED"
     lines = [
         "# [R: RECONCILIATION] | B1 vs B2 DATA INTEGRITY AUDIT",
         f"**Audit Timestamp (UTC):** `{audit.timestamp_utc}`",
-        f"**Reconciliation Verdict:** `{audit.verdict}`  |  **Execution Authorization:** `{audit.execution_authorization}`",
+        f"**Reconciliation Verdict:** `{audit.verdict}`  |  **Data-Integrity Lock (veto-only; grants nothing):** `{format_data_integrity_lock(audit.execution_authorization)}`",
         f"**Prescribed Capital Sizing:** `{audit.capital_allocation:.2f}x`  |  **Target Allocation:** `{audit.target_allocation}`",
         f"**Portfolio Rotation Directive:** `{audit.portfolio_rotation}`  |  **Trading Status:** `{audit.trading_status}`",
         "",

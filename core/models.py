@@ -1433,6 +1433,7 @@ class RegimeMatrixEvaluation:
     # Provenance: "OK" only when a real closed 1D feed produced the daily metrics.
     # Appended last so existing positional construction is unaffected.
     data_status: str = "OK"
+    active_match_floor_pct: float = 55.0
 
 
 

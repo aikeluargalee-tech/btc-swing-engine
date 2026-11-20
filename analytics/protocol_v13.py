@@ -27,6 +27,7 @@ from core.models import (
     ProtocolV13Evaluation,
 )
 from core.state_store import StateStore
+from core.context_loader import load_claims_file
 from .volume_profile import compute_atr, synthesize_4h_bars
 
 
@@ -73,6 +74,15 @@ def synthesize_1d_bars_from_1h(bars_1h: Sequence[KlineBar]) -> List[KlineBar]:
     return out
 
 
+_PROTOCOL_CONTEXT_CLAIMS: Dict[str, set] = {
+    "liq_cascade_72h_over_300m": {"TRIGGERED", "YES", "ACTIVE", "CONFIRMED_CLEAR", "UNVERIFIED"},
+    "liq_cascade_reclaimed_within_24h": {"FAILED", "CONFIRMED", "CONFIRMED_CLEAR", "UNVERIFIED"},
+    "s2_risk_level": {"LOW", "MED", "MEDIUM", "HIGH", "CRITICAL", "UNVERIFIED"},
+    "etf_net_outflow_weakness": {"CONFIRMED", "NOT_CONFIRMED", "UNVERIFIED"},
+    "catalyst_technical_breakdown": {"CONFIRMED", "NOT_CONFIRMED", "UNVERIFIED"},
+}
+
+
 class ProtocolV13Evaluator:
     """Evaluates Protocol v1.3 Market Structure, CoinGlass 6-Panel Audit, and Non-Trade Zones."""
 
@@ -82,72 +92,46 @@ class ProtocolV13Evaluator:
         self._last_context_load_ts: float = 0.0
 
     def _load_protocol_context(self) -> Dict[str, Any]:
-        """Hot-reloads `config/protocol_context.json` every 10 seconds."""
+        """Hot-reloads `config/protocol_context.json` every 10 seconds.
+
+        Validation is delegated to core.context_loader so this tab obeys the same rules as
+        every other file-backed context: an absent, unreadable, corrupt, stale or
+        unrecognised file yields UNAVAILABLE for the affected claims and never falls back to
+        the permissive answer. The previous inline reader defaulted to CONFIRMED_CLEAR / LOW
+        and swallowed read errors, so a missing file read as "nothing is wrong".
+        """
         now = time.time()
         if self._cached_context and (now - self._last_context_load_ts) < 10.0:
             return self._cached_context
 
         self._last_context_load_ts = now
-        defaults: Dict[str, Any] = {
-            "last_reviewed_utc": "UNAVAILABLE",
-            "liq_cascade_72h_over_300m": "UNAVAILABLE",
-            "liq_cascade_reclaimed_within_24h": "UNAVAILABLE",
-            "fomc_cpi_window_override": "AUTO",
-            "s2_risk_level": "UNAVAILABLE",
-            "etf_net_outflow_weakness": "UNAVAILABLE",
-            "catalyst_technical_breakdown": "UNAVAILABLE",
-            "enforce_200d_hard_veto_on_tab1": False,
+        ctx = load_claims_file(
+            getattr(self.config, "protocol_context_path", None),
+            enumerated=_PROTOCOL_CONTEXT_CLAIMS,
+            max_age_hours=getattr(self.config, "protocol_context_max_age_hours", {}) or {},
+            timestamp_key="last_reviewed_utc",
+        )
+
+        src: Dict[str, Any] = dict(ctx.raw or {})
+        values: Dict[str, Any] = {
+            "last_reviewed_utc": src.get("last_reviewed_utc", "UNAVAILABLE"),
+            "fomc_cpi_window_override": src.get("fomc_cpi_window_override", "AUTO"),
+            "enforce_200d_hard_veto_on_tab1": bool(src.get("enforce_200d_hard_veto_on_tab1", False)),
             "cycle_ath_override_usd": self.config.default_cycle_ath_usd,
+            "context_age_hours": ctx.age_hours,
+            "context_error": "" if ctx.ok else ctx.reason(),
+            "context_status": ctx.status,
         }
-        context_error = ""
         try:
-            if self.config.protocol_context_path.exists():
-                with open(self.config.protocol_context_path, "r", encoding="utf-8") as f:
-                    loaded = json.load(f)
-                    if isinstance(loaded, dict):
-                        defaults.update(loaded)
-                    else:
-                        context_error = "context root is not an object"
-            else:
-                context_error = "context file is missing"
-        except Exception as exc:
-            context_error = f"context unreadable or corrupt ({type(exc).__name__})"
-
-        reviewed = defaults.get("last_reviewed_utc")
-        try:
-            reviewed_dt = datetime.fromisoformat(str(reviewed).replace("Z", "+00:00"))
-            age_hours = (datetime.now(timezone.utc) - reviewed_dt.astimezone(timezone.utc)).total_seconds() / 3600
-            if age_hours < 0:
-                raise ValueError("review timestamp is in the future")
-            defaults["context_age_hours"] = age_hours
-            stale = []
-            for key, max_hours in self.config.protocol_context_max_age_hours.items():
-                if age_hours > max_hours:
-                    defaults[key] = "UNAVAILABLE"
-                    stale.append(f"{key} age {age_hours:.1f}h exceeds {max_hours:g}h")
-            if stale:
-                context_error = "; ".join(stale)
+            override = float(src.get("cycle_ath_override_usd"))
+            if override > 0:
+                values["cycle_ath_override_usd"] = override
         except (TypeError, ValueError):
-            defaults["context_age_hours"] = None
-            context_error = "review timestamp missing or invalid"
+            pass
+        values.update(ctx.values)          # validated claims, UNAVAILABLE where invalid
 
-        allowed = {
-            "liq_cascade_72h_over_300m": {"TRIGGERED", "YES", "ACTIVE", "CONFIRMED_CLEAR", "UNVERIFIED"},
-            "liq_cascade_reclaimed_within_24h": {"FAILED", "CONFIRMED", "CONFIRMED_CLEAR", "UNVERIFIED"},
-            "s2_risk_level": {"LOW", "MED", "MEDIUM", "HIGH", "CRITICAL", "UNVERIFIED"},
-            "etf_net_outflow_weakness": {"CONFIRMED", "NOT_CONFIRMED", "UNVERIFIED"},
-            "catalyst_technical_breakdown": {"CONFIRMED", "NOT_CONFIRMED", "UNVERIFIED"},
-        }
-        for key, values in allowed.items():
-            value = str(defaults.get(key, "UNAVAILABLE")).upper()
-            if value not in values:
-                defaults[key] = "UNAVAILABLE"
-            else:
-                defaults[key] = value
-        defaults["context_error"] = context_error or ""
-
-        self._cached_context = defaults
-        return defaults
+        self._cached_context = values
+        return values
 
     @staticmethod
     def _classify_cvd_direction(bars: Sequence[KlineBar], lookback: int = 3) -> Tuple[float, str]:

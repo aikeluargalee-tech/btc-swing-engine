@@ -16,6 +16,7 @@ from core.models import (
     MarketRegime,
     OIPositioningQuadrant,
     SignalEvaluation,
+    Tab1Verdict,
     TradePlan,
     VolumeProfileResult,
 )
@@ -23,6 +24,36 @@ from core.state_store import StateStore
 from .cvd_engine import compute_derivatives_snapshot, compute_flow_snapshot
 
 logger = logging.getLogger(__name__)
+
+
+def build_tab1_verdict(
+    gate_state, regime, hard_veto, confluence_score, threshold, is_mid_range_chop=False
+):
+    """Create the single evaluation-layer traffic-light conclusion for Tab 1."""
+    conditions = [
+        f"gate_state={gate_state.value}",
+        f"regime={regime.value}",
+        f"hard_veto_triggered={bool(hard_veto)}",
+        f"confluence_score={confluence_score:.1f} (required threshold {threshold:.1f})",
+        f"is_mid_range_chop={bool(is_mid_range_chop)}",
+    ]
+    if regime == MarketRegime.MARKDOWN or gate_state == ExecutionGateState.CASH_MARKDOWN or hard_veto:
+        return Tab1Verdict("RED", "A market markdown or active hard veto blocks the setup.", conditions)
+    if gate_state == ExecutionGateState.GATE3_RECLAIM_TRIGGERED and confluence_score >= threshold:
+        return Tab1Verdict(
+            "GREEN",
+            "Reclaim trigger is present and confluence meets the configured threshold; operator review remains required.",
+            conditions,
+        )
+    if gate_state == ExecutionGateState.GATE2_MICROSTRUCTURE_ARMED:
+        return Tab1Verdict(
+            "BLUE", "Microstructure is armed, but the reclaim trigger is not confirmed.", conditions
+        )
+    if gate_state in (ExecutionGateState.GATE4_PENDING_RETEST, ExecutionGateState.GATE1_ZONE_ALERT) or is_mid_range_chop:
+        return Tab1Verdict("YELLOW", "A watch condition is active; confirmation or a better location is pending.", conditions)
+    return Tab1Verdict("YELLOW", "No confirmed Tab 1 setup is present.", conditions)
+
+
 from .ema_strategy_engine import EMAStrategyEngine
 from .gartley_engine import GartleyEngine
 from .macro_radar import MacroRadarEvaluator
@@ -981,6 +1012,10 @@ class SignalDetector:
             fsm_direction=active_fsm.direction.value if active_fsm else None,
             fsm_status_summary=fsm_summary,
             ema_strategy=ema_snap,
+            tab1_verdict=build_tab1_verdict(
+                gate_state, regime, hard_veto, total_score,
+                self.config.signal_confluence_threshold, is_mid_range_chop,
+            ),
         )
 
         store.latest_signal = evaluation

@@ -4,7 +4,7 @@ Evaluates all 10 institutional microstructure configurations (Config A through C
 in real time against live VWAP (Daily/Weekly), 20D/50D EMA, Spot Volume vs 20D MA,
 Spot/Perp CVD ratios & Z-scores, Open Interest dynamics, Funding Rates, ATR compression,
 and 24-72h base width, outputting:
-- 0-100% live diagnostic match score for each Configuration (A through J)
+- heuristic diagnostic score (not a percentage) for each Configuration (A through J)
 - Active #1 Configuration & #2 Runner-Up
 - Live checklist of IF YOU OBSERVE (EXACT METRIC FACTS) -> THEN IT MEANS -> ACTIONABLE PROTOCOL
 - Exact USD stop-loss levels anchored to live 1H/4H/24H candle structure.
@@ -42,7 +42,7 @@ def _compute_vwap(bars: Sequence[KlineBar]) -> float:
 
 
 class RegimeMatrixEvaluator:
-    """Scores Configurations A through J and selects the active diagnostic & execution protocol."""
+    """Scores Configurations A-J and nominates only a qualifying diagnostic; this is veto-only."""
 
     def __init__(self, config: EngineConfig) -> None:
         self.config = config
@@ -174,7 +174,7 @@ class RegimeMatrixEvaluator:
                     _chk(a_c3, f"Spot CVD positive / Ratio >= 1.25 (Current: {spot_buy_sell_ratio_4h:.2f})"),
                     _chk(a_c4, f"Institutional / US Spot proxy positive (CPI: {deriv.coinbase_premium_pct:+.3f}%)"),
                     _chk(a_c5, f"OI moderate -1% to +4% 24h (Current: {oi_24h:+.2f}%)"),
-                    _chk(a_c6, f"Funding controlled +0.002% to +0.010% (Current: {funding:+.4f}%)"),
+                    _chk(a_c6, f"Funding controlled +0.002% to +0.012% (Current: {funding:+.4f}%)"),
                 ],
             )
         )
@@ -214,11 +214,11 @@ class RegimeMatrixEvaluator:
                 stop_rule=f"Stop: Trail tight stop on 67% at 4H swing low (${swing_low_4h:,.0f})",
                 computed_stop_usd=round(swing_low_4h, 2),
                 observed_checklist=[
-                    _chk(b_c1, f"Price rising rapid / vertical (>2.5x ATR) (4H: {price_chg_4h:+.2f}%)"),
+                    _chk(b_c1, f"4H rise >1.2% or price >1.5x ATR above Daily VWAP (4H: {price_chg_4h:+.2f}%)"),
                     _chk(b_c2, f"Spot CVD flat or declining (1H Spot: {flow.w_1h.spot_delta_btc:+,.1f} BTC)"),
                     _chk(b_c3, f"Perp CVD aggressively upward (1H Perp Z: {flow.w_1h.perp_zscore:+.2f})"),
                     _chk(b_c4, f"OI surging (24h dOI: {oi_24h:+.2f}% / 4h dOI: {oi_4h:+.2f}%)"),
-                    _chk(b_c5, f"Funding elevated >= +0.025% (Current: {funding:+.4f}%)"),
+                    _chk(b_c5, f"Funding elevated >= +0.020% (Current: {funding:+.4f}%)"),
                     _chk(b_c6, f"Futures basis > 14% annualized (Current: {annualized_basis_pct:.1f}%)"),
                 ],
             )
@@ -346,8 +346,8 @@ class RegimeMatrixEvaluator:
                 stop_rule=f"Stop: Below Phase 3 capitulation wick (${low_24h * 0.992:,.0f})",
                 computed_stop_usd=round(low_24h * 0.992, 2),
                 observed_checklist=[
-                    _chk(e_c1, f"Price drops > 4%–8% rapidly (1H: {price_chg_1h:+.2f}%, 4H: {price_chg_4h:+.2f}%)"),
-                    _chk(e_c2, f"OI crashing <= -5% 1h / <= -10% 4h (Current: {oi_1h:+.2f}% / {oi_4h:+.2f}%)"),
+                    _chk(e_c1, f"Price <= -3.5% 1H or <= -5.0% 4H (Current: {price_chg_1h:+.2f}% / {price_chg_4h:+.2f}%)"),
+                    _chk(e_c2, f"OI <= -3.5% 1H or <= -6.0% 4H (Current: {oi_1h:+.2f}% / {oi_4h:+.2f}%)"),
                     _chk(e_c3, f"Funding plunges negative (Current: {funding:+.4f}%)"),
                     _chk(e_c4, f"Basis in backwardation (Perp Basis: {deriv.perp_basis_usd:+.2f} USD)"),
                 ],
@@ -387,7 +387,7 @@ class RegimeMatrixEvaluator:
                 stop_rule=f"Stop: Base consolidation floor -0.5% (${base_lo * 0.995:,.0f})",
                 computed_stop_usd=round(base_lo * 0.995, 2),
                 observed_checklist=[
-                    _chk(f_c1, f"ATR compresses > 40% from peak (Current: {atr_compression_pct:.1f}% compression)"),
+                    _chk(f_c1, f"ATR compression >= 30.0% from peak (Current: {atr_compression_pct:.1f}% compression)"),
                     _chk(f_c2, f"Tight base range < 2.5%–3.2% width (Current: {base_width_72h_pct:.2f}%)"),
                     _chk(f_c3, f"OI flat -1.5% to +2.0% baseline (Current: {oi_24h:+.2f}%)"),
                     _chk(f_c4, f"Funding reset near neutral (Current: {funding:+.4f}%)"),
@@ -468,7 +468,7 @@ class RegimeMatrixEvaluator:
                 observed_checklist=[
                     _chk(h_c1, "Marginal new high or double top near cVAH with upper wicks"),
                     _chk(h_c2, "Bearish Spot CVD divergence (Price higher, Spot CVD negative)"),
-                    _chk(h_c3, f"Funding elevated > +0.020% (Current: {funding:+.4f}%)"),
+                    _chk(h_c3, f"Funding elevated >= +0.020% (Current: {funding:+.4f}%)"),
                     _chk(h_c4, f"Daily VWAP (${daily_vwap:,.0f}) rejected on 4H close"),
                 ],
             )
@@ -564,16 +564,32 @@ class RegimeMatrixEvaluator:
             )
         )
 
-        # Rank and mark #1 Active Config & #2 Runner-Up
+        # Scores are heuristic points, not a fraction of conditions satisfied. A
+        # compound defining setup plus the configured floor is required to nominate.
+        defining_conditions = {
+            "Config A": a_c1 and a_c2 and a_c3,
+            "Config B": b_c1 and (b_c3 or b_c4) and (b_c5 or b_c6),
+            "Config C": c_c2 and c_c3 and c_c6,
+            "Config D": d_c2 and d_c3 and d_c4,
+            "Config E": e_c1 and e_c2 and (e_c3 or e_c4),
+            "Config F": f_c1 and f_c2 and f_c5,
+            "Config G": g_c1 and g_c3 and g_c4,
+            "Config H": h_c1 and h_c2 and (h_c3 or h_c4),
+            "Config I": i_c1 and i_c2 and i_c3,
+            "Config J": j_c1 and j_c2 and j_c4,
+        }
         ranked = sorted(configs, key=lambda c: c.match_pct, reverse=True)
-        active_code = ranked[0].code
-        runner_up_code = ranked[1].code if len(ranked) > 1 else active_code
+        floor = max(0.0, min(100.0, float(getattr(self.config, "regime_matrix_min_active_match_pct", 55.0))))
+        candidate = next((item for item in ranked if defining_conditions[item.code] and item.match_pct >= floor), None)
+        active_code = candidate.code if candidate is not None else "NO_MATCH"
+        runner_up_code = next((item.code for item in ranked if item.code != active_code), "NO_MATCH")
         for item in configs:
             if item.code == active_code:
                 item.is_active = True
 
         ev = RegimeMatrixEvaluation(
             data_status=data_status,
+            active_match_floor_pct=floor,
             timestamp_utc=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             current_price=round(current_price, 2),
             daily_vwap=round(daily_vwap, 2),

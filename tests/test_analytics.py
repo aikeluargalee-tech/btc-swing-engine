@@ -484,7 +484,10 @@ class TestBTCAnalyticsEngine(unittest.TestCase):
         self.assertIn("SECTION 2: COMPOSITE VOLUME PROFILE & MULTI-HORIZON ORDER FLOW", ai_packet)
         self.assertIn("SECTION 3: PROTOCOL v1.3, COINGLASS 6-PANEL (BTC) & LIQUIDATION MAGNETS", ai_packet)
         self.assertIn("SECTION 4: MACRO QUANT, POWER-LAW & CYCLE RADAR", ai_packet)
-        self.assertIn("SECTION 5: QUANTITATIVE MICROSTRUCTURE MATRIX A–J SCORES", ai_packet)
+        # Heading renamed deliberately: the scores are a heuristic sum with partial credit,
+        # not percentages. Section NUMBER is unchanged; the packet's own audit prompt
+        # already referred to it as "Regime Matrix A-J", so this also removes a mismatch.
+        self.assertIn("SECTION 5: REGIME MATRIX A–J HEURISTIC SCORES", ai_packet)
         self.assertIn("SECTION 6: PYTHON ENGINE BENCHMARK VERDICT", ai_packet)
         self.assertIn("6A. Panel 1 — 9-Desk Executive Verdict Rollup Matrix", ai_packet)
         self.assertIn("6B. Panel 2 — 4-Layer Institutional Decision Funnel", ai_packet)

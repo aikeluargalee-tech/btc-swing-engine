@@ -916,11 +916,15 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
 
             "",
 
-            "## SECTION 5: QUANTITATIVE MICROSTRUCTURE MATRIX A–J SCORES (TAB [4] RAW SCORES)",
+            "## SECTION 5: REGIME MATRIX A–J HEURISTIC SCORES (TAB [4]; SCORES ARE NOT PERCENTAGES)",
 
             "",
 
-            "| Config | Regime Title | Match % | Live Observed Telemetry | Protocol Mandate & Stop |",
+            f"**Nomination:** `{rmev.active_config_code}`. A compound defining condition and at least `{rmev.active_match_floor_pct:.1f}` heuristic points are required. `NO_MATCH` means no configuration was nominated; the highest score is diagnostic only.",
+
+            f"**Top heuristic candidate:** `{rmev.runner_up_config_code}`.",
+
+            "| Config | Regime Title | Heuristic Score (points) | Live Observed Telemetry | Protocol Reference & Stop |",
 
             "| :--- | :--- | :--- | :--- | :--- |",
 
@@ -932,7 +936,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
 
             lines.append(
 
-                f"| **`{cfg.code}` {act_mark}** | {cfg.short_title} ({cfg.diagnosis_subtitle}) | **`{cfg.match_pct:.0f}%`** | `{cfg.key_live_facts}` | `{cfg.action_headline}` • `{cfg.sizing_rule}` • `{cfg.stop_rule}` |"
+                f"| **`{cfg.code}` {act_mark}** | {cfg.short_title} ({cfg.diagnosis_subtitle}) | **`{cfg.match_pct:.1f}`** | `{cfg.key_live_facts}` | `{cfg.action_headline}` • `{cfg.sizing_rule}` • `{cfg.stop_rule}` |"
 
             )
 

@@ -29,6 +29,8 @@ class EngineConfig:
 
     """Configuration parameters for data ingestion, volume profile math, and signal detection."""
 
+    regime_matrix_min_active_match_pct: float = 55.0
+
 
 
     # --- Symbols ---

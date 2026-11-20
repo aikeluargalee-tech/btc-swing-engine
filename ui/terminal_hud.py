@@ -1163,14 +1163,14 @@ def _build_tab4_regime_matrix_hud(store: StateStore, header_panel: Panel) -> Gro
             Panel("Warming up Configurations A-J telemetry...", title="Regime Matrix A-J", box=box.ROUNDED),
         )
 
-    active_cfg = next((c for c in rmev.configs if c.code == rmev.active_config_code), rmev.configs[0])
-    runner_cfg = next((c for c in rmev.configs if c.code == rmev.runner_up_config_code), rmev.configs[0])
+    active_cfg = next((c for c in rmev.configs if c.code == rmev.active_config_code), None)
+    runner_cfg = next((c for c in rmev.configs if c.code == rmev.runner_up_config_code), None)
 
     # --- Introduction Card: Beginner Context & Methodology ---
     intro_lines = [
         "[bold cyan]▶ PURPOSE & SCOPE:[/bold cyan] Microstructure regime radar categorizing live market physics into 10 deterministic Configurations (A through J).",
         "[bold cyan]▶ CORE MODELS & FEEDS:[/bold cyan] Daily/Weekly VWAP • 4-Tier Volatility (Ultra-Low to High Vol) • Order Book Depth Imbalance • CVD Slope.",
-        "[bold cyan]▶ EXECUTION MANDATE:[/bold cyan] [bold yellow]Regime Dictates Strategy[/bold yellow]: Trending regimes authorize breakout continuation; Chop/Mean-Reversion regimes require strict range fading.",
+        f"[bold cyan]▶ NOMINATION RULE:[/bold cyan] Compound defining condition and heuristic score >= {rmev.active_match_floor_pct:.1f} points required; a passing score alone does not nominate.",
     ]
     intro_panel = Panel(
         "\n".join(intro_lines),
@@ -1230,25 +1230,27 @@ def _build_tab4_regime_matrix_hud(store: StateStore, header_panel: Panel) -> Gro
     p2_table.add_column("Diagnostic Field", style="white", no_wrap=True)
     p2_table.add_column("Active Regime Output", justify="right", no_wrap=True)
 
-    cat_badge = (
-        f"[bold black on green] {active_cfg.code}: {active_cfg.short_title.upper()} ({active_cfg.match_pct:.0f}% MATCH) [/bold black on green]"
+    cat_badge = "[bold white on red] NO-MATCH — no configuration meets defining conditions and score floor [/bold white on red]" if active_cfg is None else (
+        f"[bold black on green] {active_cfg.code}: {active_cfg.short_title.upper()} ({active_cfg.match_pct:.1f} POINTS) [/bold black on green]"
         if active_cfg.category in ("BULL_LONG", "ACCUMULATE")
         else (
-            f"[bold black on yellow] {active_cfg.code}: {active_cfg.short_title.upper()} ({active_cfg.match_pct:.0f}% MATCH) [/bold black on yellow]"
+            f"[bold black on yellow] {active_cfg.code}: {active_cfg.short_title.upper()} ({active_cfg.match_pct:.1f} POINTS) [/bold black on yellow]"
             if active_cfg.category == "HARVEST_WAIT"
-            else f"[bold white on red] {active_cfg.code}: {active_cfg.short_title.upper()} ({active_cfg.match_pct:.0f}% MATCH) [/bold white on red]"
+            else f"[bold white on red] {active_cfg.code}: {active_cfg.short_title.upper()} ({active_cfg.match_pct:.1f} POINTS) [/bold white on red]"
         )
     )
     p2_table.add_row("Primary Active Configuration", cat_badge)
-    p2_table.add_row("Market Diagnosis (THEN IT MEANS)", f"[bold cyan]{active_cfg.diagnosis_subtitle}[/bold cyan]")
-    p2_table.add_row("Actionable Protocol Mandate", f"[bold yellow]{active_cfg.action_headline}[/bold yellow]")
-    p2_table.add_row("Position Sizing Protocol", active_cfg.sizing_rule)
-    p2_table.add_row("Execution / Harvest Rule", active_cfg.entry_or_harvest_rule)
-    p2_table.add_row("Dynamic Stop / Invalidation", f"[bold red]{active_cfg.stop_rule}[/bold red]")
-    p2_table.add_row(
-        "Secondary Runner-Up Config",
-        f"[dim]{runner_cfg.code}: {runner_cfg.short_title} ({runner_cfg.match_pct:.0f}% Match) -> {runner_cfg.action_headline}[/dim]",
-    )
+    if active_cfg is None:
+        p2_table.add_row("Nomination Status", "NO-MATCH; heuristic scores are diagnostic only")
+        p2_table.add_row("Top Heuristic Candidate", f"{runner_cfg.code}: {runner_cfg.short_title} ({runner_cfg.match_pct:.1f} points)" if runner_cfg else "UNAVAILABLE")
+        p2_table.add_row("Score Floor", f"{rmev.active_match_floor_pct:.1f} points plus defining condition")
+    else:
+        p2_table.add_row("Market Diagnosis (THEN IT MEANS)", f"[bold cyan]{active_cfg.diagnosis_subtitle}[/bold cyan]")
+        p2_table.add_row("Protocol Reference (veto-only)", f"[bold yellow]{active_cfg.action_headline}[/bold yellow]")
+        p2_table.add_row("Position Sizing Protocol", active_cfg.sizing_rule)
+        p2_table.add_row("Execution / Harvest Rule", active_cfg.entry_or_harvest_rule)
+        p2_table.add_row("Dynamic Stop / Invalidation", f"[bold red]{active_cfg.stop_rule}[/bold red]")
+        p2_table.add_row("Top Heuristic Candidate", f"[dim]{runner_cfg.code}: {runner_cfg.short_title} ({runner_cfg.match_pct:.1f} points)[/dim]" if runner_cfg else "UNAVAILABLE")
 
     top_row = Table.grid(expand=True, padding=(0, 1))
     top_row.add_column(ratio=1)
@@ -1270,18 +1272,18 @@ def _build_tab4_regime_matrix_hud(store: StateStore, header_panel: Panel) -> Gro
     p3_table = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold green", pad_edge=False)
     p3_table.add_column("Config", style="bold white", min_width=10, no_wrap=True)
     p3_table.add_column("Market Diagnosis (THEN IT MEANS)", style="white", ratio=2, no_wrap=True)
-    p3_table.add_column("Live Match", justify="right", min_width=14, no_wrap=True)
+    p3_table.add_column("Heuristic Score (points)", justify="right", min_width=20, no_wrap=True)
     p3_table.add_column("Live Observed Telemetry Facts", justify="left", ratio=3, no_wrap=True)
-    p3_table.add_column("Actionable Protocol (Sizing & Stops)", justify="right", ratio=3, no_wrap=True)
+    p3_table.add_column("Protocol Reference (Sizing & Stops)", justify="right", ratio=3, no_wrap=True)
 
     for cfg in rmev.configs:
         if cfg.is_active:
             c_name = f"[bold black on green] {cfg.code} [/bold black on green]"
-            m_str = f"[bold green]{cfg.match_pct:.0f}% [ACTIVE][/bold green]"
+            m_str = f"[bold green]{cfg.match_pct:.1f} [NOMINATED][/bold green]"
             diag_str = f"[bold white]{cfg.short_title} — {cfg.diagnosis_subtitle}[/bold white]"
         else:
             c_name = cfg.code
-            m_str = f"[dim]{cfg.match_pct:.0f}%[/dim]" if cfg.match_pct < 50 else f"[yellow]{cfg.match_pct:.0f}%[/yellow]"
+            m_str = f"[dim]{cfg.match_pct:.1f}[/dim]" if cfg.match_pct < rmev.active_match_floor_pct else f"[yellow]{cfg.match_pct:.1f}[/yellow]"
             diag_str = f"{cfg.short_title} ({cfg.diagnosis_subtitle})"
 
         act_col = (
@@ -1309,13 +1311,15 @@ def _build_tab4_regime_matrix_hud(store: StateStore, header_panel: Panel) -> Gro
     p4_grid.add_column(ratio=6, no_wrap=True)
 
     left_lines = [
-        f"[bold cyan]IF YOU OBSERVE — {active_cfg.code} ({active_cfg.short_title}) Live Fact Checklist:[/bold cyan]"
+        f"[bold cyan]IF YOU OBSERVE — {active_cfg.code} ({active_cfg.short_title}) Live Fact Checklist:[/bold cyan]" if active_cfg else "[bold yellow]NO-MATCH: no nominated configuration; review telemetry and heuristic rankings only.[/bold yellow]"
     ]
-    for item in active_cfg.observed_checklist[:5]:
+    for item in active_cfg.observed_checklist[:5] if active_cfg else []:
         left_lines.append(f"  {item}")
     left_lines.append(
-        f"  [bold yellow]Mandate:[/bold yellow] {active_cfg.action_headline} | {active_cfg.sizing_rule} | [bold red]{active_cfg.stop_rule}[/bold red]"
-    )
+        f"  [bold yellow]Protocol reference (veto-only):[/bold yellow] {active_cfg.action_headline} | {active_cfg.sizing_rule} | [bold red]{active_cfg.stop_rule}[/bold red]"
+    ) if active_cfg else None
+    if left_lines[-1] is None:
+        left_lines.pop()
 
     utc_hour = datetime.now(timezone.utc).hour
     session_windows = [
@@ -1347,24 +1351,27 @@ def _build_tab4_regime_matrix_hud(store: StateStore, header_panel: Panel) -> Gro
     )
 
     # --- Panel 5: Executive Bottom Line (Config A-J Plain-English Quick Glance) ---
-    if active_cfg.category == "BULL_LONG":
-        headline = f"[bold black on green] GREEN LIGHT — {active_cfg.code.upper()}: {active_cfg.short_title.upper()} ({active_cfg.action_headline.upper()}) [/bold black on green]"
+    if active_cfg is None:
+        headline = "[bold white on red] NO-MATCH — NO CONFIGURATION NOMINATED [/bold white on red]"
+        border_style = "red"
+    elif active_cfg.category == "BULL_LONG":
+        headline = f"[bold black on green] DIAGNOSTIC — {active_cfg.code.upper()}: {active_cfg.short_title.upper()} [/bold black on green]"
         border_style = "green"
     elif active_cfg.category == "ACCUMULATE":
-        headline = f"[bold black on cyan] BLUE LIGHT — {active_cfg.code.upper()}: {active_cfg.short_title.upper()} ({active_cfg.action_headline.upper()}) [/bold black on cyan]"
+        headline = f"[bold black on cyan] DIAGNOSTIC — {active_cfg.code.upper()}: {active_cfg.short_title.upper()} [/bold black on cyan]"
         border_style = "cyan"
     elif active_cfg.category == "HARVEST_WAIT":
-        headline = f"[bold black on yellow] YELLOW LIGHT — {active_cfg.code.upper()}: {active_cfg.short_title.upper()} ({active_cfg.action_headline.upper()}) [/bold black on yellow]"
+        headline = f"[bold black on yellow] DIAGNOSTIC — {active_cfg.code.upper()}: {active_cfg.short_title.upper()} [/bold black on yellow]"
         border_style = "yellow"
     else:
-        headline = f"[bold white on red] RED LIGHT — {active_cfg.code.upper()}: {active_cfg.short_title.upper()} ({active_cfg.action_headline.upper()}) [/bold white on red]"
+        headline = f"[bold white on red] DIAGNOSTIC — {active_cfg.code.upper()}: {active_cfg.short_title.upper()} [/bold white on red]"
         border_style = "red"
 
     p5_lines = [
         headline,
-        f"  [bold white]What's Happening :[/bold white] Live telemetry matches {active_cfg.code} ({active_cfg.short_title} — {active_cfg.diagnosis_subtitle}) at {active_cfg.match_pct:.0f}% confidence ({active_cfg.key_live_facts}).",
-        f"  [bold white]Why / Runner-Up  :[/bold white] Secondary match is {runner_cfg.code} ({runner_cfg.short_title} at {runner_cfg.match_pct:.0f}%). Daily VWAP is ${rmev.daily_vwap:,.0f} and Weekly VWAP is ${rmev.weekly_vwap:,.0f}.",
-        f"  [bold white]Your Next Move   :[/bold white] [bold]{active_cfg.action_headline}[/bold] -> {active_cfg.sizing_rule} | {active_cfg.entry_or_harvest_rule} | {active_cfg.stop_rule}.",
+        f"  [bold white]What's Happening :[/bold white] NO-MATCH. Top heuristic candidate: {runner_cfg.code} ({runner_cfg.short_title}, {runner_cfg.match_pct:.1f} points); floor {rmev.active_match_floor_pct:.1f} plus defining conditions not met." if active_cfg is None and runner_cfg else ("  [bold white]What's Happening :[/bold white] NO-MATCH; no configuration telemetry available." if active_cfg is None else f"  [bold white]What's Happening :[/bold white] {active_cfg.code} ({active_cfg.short_title} — {active_cfg.diagnosis_subtitle}), heuristic score {active_cfg.match_pct:.1f} points ({active_cfg.key_live_facts})."),
+        f"  [bold white]Why / Top Candidate :[/bold white] {runner_cfg.code} ({runner_cfg.short_title}, {runner_cfg.match_pct:.1f} points). Daily VWAP is ${rmev.daily_vwap:,.0f} and Weekly VWAP is ${rmev.weekly_vwap:,.0f}." if runner_cfg else "  [bold white]Why / Top Candidate :[/bold white] UNAVAILABLE.",
+        f"  [bold white]Protocol Reference :[/bold white] {active_cfg.action_headline} | {active_cfg.sizing_rule} | {active_cfg.entry_or_harvest_rule} | {active_cfg.stop_rule}." if active_cfg else "  [bold white]Protocol Reference :[/bold white] No protocol nominated.",
     ]
     bottom_panel = Panel(
         "\n".join(p5_lines),

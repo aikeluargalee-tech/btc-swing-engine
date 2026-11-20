@@ -1004,11 +1004,48 @@ def build_tab_l_data_only_report(config: Optional[EngineConfig], store: StateSto
         f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}`",
         "**Desk Purpose & Scope:** `Single-screen 8-Flagship-Desk Telemetry Matrix (P, G, R, M, A, F, W, 0) & 4-Domain Readiness Overview. Keeps each strategy's reference entry, stop, and sizing calculations strictly unblended.`",
         "",
-        "## 1. 8-FLAGSHIP TOP-RIBBON DESK READINESS METRICS (`P, G, R, M, A, F, W, 0`)",
     ]
     if ms is not None:
+        # This packet is DATA-ONLY by contract: it must contain zero interpretive words, and
+        # 'verdict'/'trade' are on the forbidden list. So the decision is expressed as a STATE
+        # derived from the same table, in vocabulary that survives sanitisation.
+        #
+        # Note the bug this replaces: the raw verdict was passed through the sanitiser, which is a
+        # blunt substring pass, so "NO_TRADE" was published as "NO_position" - neither the real
+        # verdict nor a clean state. It corrupted a state name, which is worse than either.
+        states = dict(getattr(ms, "input_states", {}) or {})
+        blocking = {"SYNTHETIC", "STALE", "UNAVAILABLE", "NO_MATCH", "REFUSED"}
+        blocked_by = [d for d, s in states.items() if s in blocking]
+        setup = str(states.get("[Setup Trigger]", "NONE"))
+        if blocked_by:
+            decision_state = "BLOCKED"
+        elif setup == "OBSERVED":
+            decision_state = "ELIGIBLE_FOR_OPERATOR_REVIEW"
+        else:
+            decision_state = "FORMING"
         lines.extend([
-            f"- **8-Desk Readiness Index (`0.0 - 100.0`):** `{ms.master_alignment_score:.1f}`",
+            "## 0. DECISION STATE (derived from the table below; no interpretation added)",
+            f"- **Decision state:** `{decision_state}`  (`BLOCKED` | `ELIGIBLE_FOR_OPERATOR_REVIEW` | `FORMING`)",
+            f"- **Regime:** `{getattr(ms, 'regime_code', 'UNAVAILABLE')}`",
+            f"- **Supreme gate active:** `{bool(ms.supreme_veto_active)}` | Reason: `{ms.supreme_veto_reason}`",
+            "- **State table (the decision state is recomputable from these rows alone):**",
+        ])
+        for desk, state in states.items():
+            lines.append(f"  - `{desk}`: `{state}`")
+        lines.append(
+            "- **Blocking inputs:** `" + ("none" if not blocked_by else "; ".join(blocked_by)) + "`"
+        )
+        lines.append("")
+    lines.extend([
+        "## 1. 8-FLAGSHIP TOP-RIBBON DESK READINESS METRICS (`P, G, R, M, A, F, W, 0`)",
+    ])
+    if ms is not None:
+        raw_align = getattr(ms, "master_alignment_raw", None)
+        cap_note = ""
+        if ms.supreme_veto_active and raw_align is not None:
+            cap_note = f" (raw desk mean `{raw_align:.1f}`, capped at 25.0 while a hard veto is active)"
+        lines.extend([
+            f"- **8-Desk Readiness Index (`0.0 - 100.0`):** `{ms.master_alignment_score:.1f}`{cap_note}",
             f"- **Readiness Index >= 70.0:** `{bool(ms.master_alignment_score >= 70.0)}`",
             f"- **Hard Veto Active Across Desks:** `{bool(ms.supreme_veto_active)}`",
             "",
@@ -1019,6 +1056,10 @@ def build_tab_l_data_only_report(config: Optional[EngineConfig], store: StateSto
             h_status = str(getattr(h, "status", "STANDBY"))
             h_rule = getattr(h, "authority_rule", "")
             h_ruling = getattr(h, "live_ruling", "")
+            # D1's on-screen ruling is truncated for box width, which cut the veto reasons
+            # mid-word ("Desk [W/2] No"). The export carries the full reason instead.
+            if str(h_name).startswith("D1") and ms.supreme_veto_active:
+                h_ruling = f"LOCKED: {ms.supreme_veto_reason}"
             lines.append(
                 f"- **{h_name} (`{h_rule}`):** Pass=`{bool(h_status == 'PASS')}` | "
                 f"Armed=`{bool(h_status in ('PASS', 'ARMED'))}` | Telemetry: `{h_ruling}`"

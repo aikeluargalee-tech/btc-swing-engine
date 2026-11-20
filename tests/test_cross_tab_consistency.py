@@ -25,6 +25,7 @@ from pathlib import Path
 from rich.console import Console
 
 from analytics.ai_packet_exporter import build_ai_telemetry_packet
+from analytics.data_only_reports import build_tab_l_data_only_report
 from analytics.signal_detector import SignalDetector
 from analytics.master_synthesis import (
     SETUP_TRIGGER_KEY,
@@ -168,6 +169,69 @@ class TestPacketAgreement(unittest.TestCase):
         upper = self.packet.upper()
         self.assertNotIn("AUTHORIZED", upper)
         self.assertNotIn("EXECUTION AUTHORIZATION", upper)
+
+
+class TestTabZExportCarriesTheDecision(unittest.TestCase):
+    """The exported Z packet is what the operator hands to a reviewer, so it must state the
+    decision and the reasons - in vocabulary that survives the data-only sanitiser.
+
+    The defect this locks down: the raw verdict went through sanitize_data_only_text(), a blunt
+    substring pass, so "NO_TRADE" was published as "NO_position". It corrupted a state name,
+    which is worse than either the verdict or a clean state.
+    """
+
+    BLOCKING = {"SYNTHETIC", "STALE", "UNAVAILABLE", "NO_MATCH", "REFUSED"}
+    FORBIDDEN = ("verdict", "trade", "wait", "bullish", "bearish",
+                 "confirmed", "rejected", "recommend")
+
+    @classmethod
+    def setUpClass(cls):
+        cls.cfg = _config()
+        cls.store = _flat_store()
+        SignalDetector(cls.cfg).evaluate(cls.store)
+        cls.ms = cls.store.master_synthesis_evaluation
+        cls.report = build_tab_l_data_only_report(cls.cfg, cls.store)
+        cls.states = dict(getattr(cls.ms, "input_states", {}) or {})
+
+    def _expected_state(self) -> str:
+        if any(s in self.BLOCKING for s in self.states.values()):
+            return "BLOCKED"
+        if self.states.get("[Setup Trigger]") == "OBSERVED":
+            return "ELIGIBLE_FOR_OPERATOR_REVIEW"
+        return "FORMING"
+
+    def test_export_states_the_decision_and_agrees_with_the_engine(self):
+        self.assertIn("## 0. DECISION STATE", self.report, "the export states no decision")
+        expected = self._expected_state()
+        self.assertIn(f"`{expected}`", self.report,
+                      f"the exported decision state is not {expected}")
+        self.assertEqual(expected == "BLOCKED", self.ms.decision_verdict == "NO_TRADE",
+                         "exported decision state disagrees with the engine's verdict")
+
+    def test_export_lists_every_desk_state(self):
+        self.assertTrue(self.states, "no state table to export")
+        for desk, state in self.states.items():
+            self.assertIn(f"`{desk}`: `{state}`", self.report,
+                          f"{desk} is missing from the exported state table")
+
+    def test_export_keeps_the_data_only_contract(self):
+        lower = self.report.lower()
+        for word in self.FORBIDDEN:
+            self.assertNotIn(word, lower,
+                             f"forbidden interpretive word '{word}' in the data-only export")
+
+    def test_unavailable_desk_cannot_create_a_setup_trigger(self):
+        """A desk reporting UNAVAILABLE cannot be the source of an observed setup: its verdict
+        field is stale by definition. Without this, Tab [0] read OBSERVED while its own row
+        said UNAVAILABLE, because the trigger was taken from the same object."""
+        for desk, state in self.states.items():
+            if state == "UNAVAILABLE" and desk.endswith("Spot Swing"):
+                self.assertNotEqual(self.states.get("[Setup Trigger]"), "OBSERVED",
+                                    f"{desk} is UNAVAILABLE yet the setup trigger is OBSERVED")
+
+    def test_export_does_not_corrupt_state_names(self):
+        self.assertNotIn("NO_position", self.report,
+                         "the sanitiser mangled a state name instead of stating it")
 
 
 class TestNoImperativesInRenderedOutput(unittest.TestCase):

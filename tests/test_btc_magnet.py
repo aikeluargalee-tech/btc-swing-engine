@@ -209,6 +209,142 @@ class TestBTCMagnetEngine(unittest.TestCase):
         self.assertGreaterEqual(res.sizing_factor, 0.0)
         self.assertLessEqual(res.sizing_factor, 1.0)
 
+    def test_missing_spot_fails_closed_without_fabrication(self) -> None:
+        """Empty store must fail closed with spot=0.0 and UNAVAILABLE provenance (never 76000.0)."""
+        empty_store = StateStore()
+        res = BTCMagnetEngine(self.config).evaluate(empty_store)
+
+        self.assertFalse(res.spot_available)
+        self.assertEqual(res.spot_price, 0.0)
+        self.assertEqual(res.verdict, "WAIT")
+        self.assertEqual(res.sizing_factor, 0.0)
+        self.assertFalse(res.risk_budget_pass)
+        self.assertEqual(res.liqmap_source, "UNAVAILABLE")
+        self.assertEqual(res.market_regime, "UNAVAILABLE")
+        self.assertEqual(res.input_provenance.get("spot_price"), "UNAVAILABLE")
+        self.assertIn("NO ENTRY DIRECTIVE", res.entry_instruction)
+
+    def test_single_signal_and_dead_feeds_cannot_speak(self) -> None:
+        """Spot + single live liqmap signal (with missing range/OI/funding/flow) must WAIT and not score 4/4."""
+        partial_store = StateStore()
+        partial_store.binance_spot_price = 80_000.0
+        eng = BTCMagnetEngine(self.config)
+        eng._last_fetch_ts = 1e12
+        eng._cached_liq_data = {
+            "levels": {
+                "above": [{"price": 82_400.0, "dist_pct": 3.0, "usd": 220_000_000}],
+                "below": [{"price": 78_400.0, "dist_pct": -2.0, "usd": 360_000_000}],
+            }
+        }
+        res = eng.evaluate(partial_store)
+
+        self.assertTrue(res.spot_available)
+        self.assertFalse(res.range_24h_available)
+        self.assertFalse(res.oi_available)
+        self.assertFalse(res.funding_available)
+        self.assertFalse(res.flow_available)
+        self.assertEqual(res.market_regime, "UNAVAILABLE")
+        self.assertEqual(res.regime_id, "TRANSITION_MIXED")
+        self.assertEqual(res.verdict, "WAIT")
+        self.assertEqual(res.sizing_factor, 0.0)
+        self.assertEqual(res.input_provenance.get("range_24h"), "UNAVAILABLE")
+        self.assertEqual(res.input_provenance.get("ema_20d"), "UNAVAILABLE")
+        self.assertEqual(res.input_provenance.get("ma_200d"), "UNAVAILABLE")
+
+    def test_stored_evaluation_single_source_and_explicit_recompute(self) -> None:
+        """HUD, Tab M report, and AI packet must not silently evaluate when store.btc_magnet_evaluation is None."""
+        import io
+        from unittest.mock import patch
+        from rich.console import Console
+        from analytics.data_only_reports import build_tab_m_data_only_report
+        from analytics.btc_magnet_engine import get_or_recompute_btc_magnet
+
+        fresh_store = StateStore()
+        fresh_store.binance_spot_price = 76_000.0
+
+        with patch("analytics.btc_magnet_engine.BTCMagnetEngine.evaluate") as mock_eval:
+            renderable = build_dashboard_renderable(self.config, fresh_store, tab_override=17)
+            report = build_tab_m_data_only_report(self.config, fresh_store)
+            packet = build_ai_telemetry_packet(self.config, fresh_store)
+            mock_eval.assert_not_called()
+
+        self.assertIsNone(fresh_store.btc_magnet_evaluation)
+        buf = io.StringIO()
+        Console(file=buf, width=140, force_terminal=False).print(renderable)
+        hud_text = buf.getvalue()
+        self.assertIn("BTC MAGNET", hud_text)
+        self.assertIn("DATA UNAVAILABLE", hud_text)
+        self.assertIn("DATA UNAVAILABLE", report)
+        self.assertIn("## SECTION 17: TAB [M] BTC MAGNET", packet)
+        self.assertIn("DATA UNAVAILABLE", packet)
+
+        # Explicit recompute path populates store and marks EXPLICIT_RECOMPUTE
+        ev, did_recompute = get_or_recompute_btc_magnet(self.config, fresh_store, recompute=True)
+        self.assertTrue(did_recompute)
+        self.assertIsNotNone(ev)
+        self.assertEqual(ev.evaluation_origin, "EXPLICIT_RECOMPUTE")
+        self.assertIs(fresh_store.btc_magnet_evaluation, ev)
+
+    def test_failed_live_liqmap_logs_and_fails_closed(self) -> None:
+        """When live liqmap fetch fails, engine records error, labels MODELLED_FALLBACK, and refuses SPEAK."""
+        import urllib.error
+        from unittest.mock import patch
+
+        eng = BTCMagnetEngine(self.config)
+        eng._cached_liq_data = None
+        eng._last_fetch_ts = 0.0
+
+        with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("offline")):
+            with self.assertLogs("analytics.btc_magnet_engine", level="WARNING") as cm:
+                res = eng.evaluate(self.store)
+
+        self.assertTrue(any("Failed to fetch live liqmap" in msg for msg in cm.output))
+        self.assertEqual(res.liqmap_source, "MODELLED_FALLBACK")
+        self.assertIn("URLError", res.liqmap_error)
+        self.assertEqual(res.upper_magnet.source, "MODELLED_FALLBACK")
+        self.assertEqual(res.lower_magnet.source, "MODELLED_FALLBACK")
+        self.assertFalse(res.rule_checks[0].passed)
+        self.assertEqual(res.verdict, "WAIT")
+        self.assertEqual(res.sizing_factor, 0.0)
+        self.assertIn("NO ENTRY DIRECTIVE", res.entry_instruction)
+
+    def test_hud_labels_and_wait_gating_across_outputs(self) -> None:
+        """Verify Structural Stop label accuracy, RISK_BUDGET_MAX_PCT, and no entry directive next to WAIT."""
+        import io
+        from rich.console import Console
+        from analytics.data_only_reports import build_tab_m_data_only_report
+        from config.settings import RISK_BUDGET_MAX_PCT
+
+        # Force WAIT via sharp 24h move
+        self.store.high_24h = 82_000.0
+        self.store.low_24h = 74_000.0
+        self.store.price_change_24h_pct = 8.5
+        res = self.engine.evaluate(self.store)
+
+        self.assertEqual(res.verdict, "WAIT")
+        self.assertEqual(res.sizing_factor, 0.0)
+        self.assertIn("NO ENTRY DIRECTIVE", res.entry_instruction)
+        self.assertNotIn("Authorized entry", res.lsce_action_verdict)
+        self.assertIn("NO ENTRY DIRECTIVE", res.magnet_summary_markdown)
+
+        renderable = build_dashboard_renderable(self.config, self.store, tab_override=17)
+        buf = io.StringIO()
+        Console(file=buf, width=160, force_terminal=False).print(renderable)
+        hud_text = buf.getvalue()
+        self.assertNotIn("Structural Stop (1H Close)", hud_text)
+        self.assertIn("Structural Stop (24H Low -0.2%)", hud_text)
+        self.assertIn(f"{RISK_BUDGET_MAX_PCT}%", hud_text)
+        self.assertIn("NO ENTRY DIRECTIVE", hud_text)
+
+        report = build_tab_m_data_only_report(self.config, self.store)
+        self.assertIn("CACHED_LIQMAP", report)
+        self.assertIn(f"<= {RISK_BUDGET_MAX_PCT}%", report)
+        self.assertIn("NO ENTRY DIRECTIVE", report)
+
+        packet = build_ai_telemetry_packet(self.config, self.store)
+        self.assertIn("CACHED_LIQMAP", packet)
+        self.assertIn("NO ENTRY DIRECTIVE", packet)
+
 
 if __name__ == "__main__":
     unittest.main()

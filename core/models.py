@@ -4947,6 +4947,7 @@ class BTCMagnetLevel:
     price: float = 0.0
     dist_pct: float = 0.0
     usd_volume: float = 0.0
+    source: str = "UNAVAILABLE"  # MEASURED_LIQMAP | CACHED_LIQMAP | ESTIMATED_SWING_POOL | MODELLED_FALLBACK | UNAVAILABLE
 
 
 @dataclass
@@ -5036,6 +5037,27 @@ class BTCMagnetEvaluation:
     reconciliation_fail_reasons: List[str] = field(default_factory=list)
     reconciliation_warnings: List[str] = field(default_factory=list)
     reconciliation_table: List[Dict[str, str]] = field(default_factory=list)
+
+    # Provenance & Data Availability Metadata
+    evaluation_origin: str = "STORED"  # ENGINE_EVALUATE | EXPLICIT_RECOMPUTE | STORED
+    liqmap_source: str = "UNAVAILABLE"  # LIVE_EDGEORNOT | CACHED_LIQMAP | PARTIAL_LIQMAP_WITH_MODELLED | ESTIMATED_SWING_POOL | MODELLED_FALLBACK | UNAVAILABLE
+    liqmap_error: str = ""
+    spot_available: bool = False
+    range_24h_available: bool = False
+    price_change_24h_available: bool = False
+    oi_available: bool = False
+    funding_available: bool = False
+    flow_available: bool = False
+    perp_flow_available: bool = False
+    vwap_available: bool = False
+    ema_20d_available: bool = False
+    ema_50d_available: bool = False
+    ma_200d_available: bool = False
+    atr_available: bool = False
+    ls_ratio_available: bool = False
+    depth_ratio_available: bool = False
+    basis_available: bool = False
+    input_provenance: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass

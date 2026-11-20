@@ -210,9 +210,9 @@ def _build_header_panel(store: StateStore, active_tab: int) -> Group:
         else "[dim white][0: SPOT SWING][/dim white]"
     )
     tL = (
-        "[bold white on magenta] [L: MASTER] [/bold white on magenta]"
+        "[bold white on magenta] [Z: DECISION] [/bold white on magenta]"
         if active_tab == 10
-        else "[dim white][L: MASTER][/dim white]"
+        else "[dim white][Z: DECISION][/dim white]"
     )
     tC = "[bold white on dark_red] [C: AI PACKET] [/bold white on dark_red]"
     tH = (
@@ -1852,7 +1852,7 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
     ]
     return Group(
         header_panel,
-        Panel(f"{getattr(msev, 'decision_verdict', 'NO_TRADE')} — {msev.master_headline}", title="1. VERDICT"),
+        Panel(str(msev.master_headline), title="1. VERDICT"),
         Panel("\n".join(f"• {item}" for item in drivers), title="2. WHY"),
         Panel("\n".join(f"• {item}" for item in catalysts), title="3. WHAT CHANGES IT"),
         Panel("\n".join(f"• {item}" for item in refused), title="4. WHAT IS REFUSED"),
@@ -1866,7 +1866,7 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
     ]
     intro_panel = Panel(
         "\n".join(intro_lines),
-        title="[bold cyan]TAB [L: MASTER] · 8-FLAGSHIP DESK COMMAND MATRIX & INDEPENDENT STRATEGY LEDGER[/bold cyan]",
+        title="[bold cyan]TAB [Z: DECISION SURFACE] · ONE VERDICT · 8 FLAGSHIP DESKS AS EVIDENCE[/bold cyan]",
         box=box.ROUNDED,
         border_style="cyan",
         padding=(0, 1),
@@ -6550,7 +6550,7 @@ def build_dashboard_renderable(
             active_tab = 17
         elif str(tab_override).lower() in ("a", "k", "strategy", "trend_pullback", "btc_strategy", "18"):
             active_tab = 18
-        elif str(tab_override).lower() in ("l", "master", "10"):
+        elif str(tab_override).lower() in ("z", "decision", "surface", "tabz", "l", "master", "10"):
             active_tab = 10
         elif str(tab_override).lower() in ("w", "waterfall", "wf", "12"):
             active_tab = 12
@@ -6652,7 +6652,7 @@ def print_dry_run_report(
             7: "TAB [7: GARTLEY 222 & CONFLUENCE RADAR]",
             8: "TAB [8: PATTERN INVALIDATION & SFP TRAP RADAR]",
             9: "TAB [9: TERMINAL EXHAUSTION RADAR]",
-            10: "TAB [L: MASTER SYNTHESIS & SUPREME COMMAND CENTER]",
+            10: "TAB [Z: DECISION SURFACE — VERDICT / WHY / WHAT CHANGES IT / REFUSALS]",
             13: "TAB [P: PRICE ACTION & STRUCTURE PROTOCOL (SLSP v1.0 + 3-EMA + SENSORS)]",
             14: "TAB [B: CLASSIC CHART PATTERN RADAR & CANDLESTICK GEOMETRY]",
             15: "TAB [G: GROK DUAL-HORIZON FLOW & VWAP SD MATRIX]",

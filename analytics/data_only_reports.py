@@ -789,6 +789,8 @@ def build_tab_w_data_only_report(config: Optional[EngineConfig], store: StateSto
 # 9. TAB [0: SPOT SWING] DATA-ONLY REPORT
 # ==============================================================================
 def build_tab_0_data_only_report(config: Optional[EngineConfig], store: StateStore) -> str:
+    from analytics.spot_swing_engine import compute_safety_guard
+
     ts_utc, ts_sgt = _timestamps_utc_sgt()
     spot_px = _spot_price(store)
     sw = getattr(store, "spot_swing_evaluation", None)
@@ -801,27 +803,94 @@ def build_tab_0_data_only_report(config: Optional[EngineConfig], store: StateSto
         "## 1. SPOT SWING SCREENER METRICS & GATE BOOLEANS",
     ]
     if sw is not None:
-        ref_entry = round(float(getattr(sw, "entry_price", 0.0) or spot_px), 2)
-        ref_stop = round(float(getattr(sw, "stop_loss_price", 0.0) or (spot_px * 0.975)), 2)
-        stop_dist = round(ref_entry - ref_stop, 2)
+        sg = compute_safety_guard(store)
         lines.extend([
-            f"- **Composite Confluence Score (`0 - 100`):** `{getattr(sw, 'confluence_score', 0.0):.1f}`",
-            f"- **Gate 1 (`Macro Filter`):** `{bool(getattr(sw, 'gate1_macro_pass', False))}`",
-            f"- **Gate 2 (`Structure / Location`):** `{bool(getattr(sw, 'gate2_location_pass', False))}`",
-            f"- **Gate 3 (`Derivatives / Funding`):** `{bool(getattr(sw, 'gate3_derivatives_pass', False))}`",
-            f"- **Gate 4 (`Spot Order Flow`):** `{bool(getattr(sw, 'gate4_flow_pass', False))}`",
-            f"- **All Screener Gates True:** `{bool(getattr(sw, 'all_gates_pass', False))}`",
-            "",
-            f"## 2. REFERENCE LEVELS (Reference calculation if entered at ${ref_entry:,.2f}. Not an order.)",
-            f"- **Reference Entry Price:** `${ref_entry:,.2f}`",
-            f"- **Reference Stop Level:** `${ref_stop:,.2f}`",
-            f"- **Stop Distance (`Reference Entry - Stop Level`):** `${stop_dist:,.2f}`",
-            f"- **Reference Level 1 (`TP1`):** `${float(getattr(sw, 'tp1_price', 0.0) or 0.0):,.2f}`",
-            f"- **Reference Level 2 (`TP2`):** `${float(getattr(sw, 'tp2_price', 0.0) or 0.0):,.2f}`",
-            f"- **Reference Level 3 (`3R`):** `${float(getattr(sw, 'tp3_price', 0.0) or 0.0):,.2f}`",
+            f"- **Screener State:** `{sw.verdict}` (`Light: {sw.traffic_light}` | `data_ready={bool(sw.data_ready)}`)",
+            f"- **Configured Equity:** `${sw.equity_usd:,.2f}` | **Risk Budget (%):** `{sw.risk_pct:.2f}%`",
+            f"- **Safety Guard (Companion Feeds):** `{sg['status']}` (`{sg['detail']}`)",
         ])
+        if sw.data_notes:
+            lines.append(f"- **Data Notes:** `{'; '.join(sw.data_notes)}`")
+
+        m = sw.macro
+        if m is not None:
+            thr_pct = getattr(m, "bbw_max_percentile", 0.30) * 100.0
+            lines.extend([
+                "",
+                "### 1A. 1D Macro Regime Gate",
+                f"- **1D Close / EMA50 / EMA200:** `${m.close:,.2f}` / `${m.ema50:,.2f}` / `${m.ema200:,.2f}`",
+                f"- **Gate 1 (`Trend Baseline: Close > EMA50 > EMA200`):** `{bool(m.trend_pass)}`",
+                f"- **BBW({getattr(m, 'bbw_period', 20)}) / {getattr(m, 'bbw_rank_window', 180)}D Rank:** `{m.bbw * 100:.2f}%` / `{m.bbw_percentile * 100:.1f}%` (Threshold `<= {thr_pct:.0f}%`, Lookback `{m.squeeze_lookback_bars}D`)",
+                f"- **Gate 2 (`Volatility Squeeze`):** `{bool(m.compression_pass)}`",
+                f"- **Macro Gate Approved (`Trend AND Squeeze`):** `{bool(m.macro_approved)}`",
+            ])
+        else:
+            lines.append("- **1D Macro Regime Gate:** `UNAVAILABLE`")
+
+        s = sw.setup
+        if s is not None and s.anchors_ready and s.pwl > 0:
+            lines.extend([
+                "",
+                "### 1B. 4H Weekly Anchors & Structural Liquidity Setup",
+                f"- **Previous Mon–Sun Week PWH / PWL:** `${s.pwh:,.2f}` / `${s.pwl:,.2f}`",
+                f"- **4H Sweep (`low < PWL` in last {getattr(s, 'sweep_window_bars', 12)} bars):** `{bool(s.sweep_detected)}` (Lowest Wick: `{f'${s.sweep_low:,.2f}' if s.sweep_detected else 'NONE'}`)",
+                f"- **4H Reclaim (`close > PWL`):** `{bool(s.reclaim_confirmed)}` (Closed 4H: `${s.close:,.2f}`)",
+                f"- **4H Volume (`vol > SMA({getattr(s, 'vol_sma_period', 3)})` incl. current bar):** `{bool(s.volume_confirmed)}` (`{s.volume:,.1f}` vs `{s.vol_sma3:,.1f}`)",
+                f"- **Signal Active (`Sweep AND Reclaim AND Vol`):** `{bool(s.signal_active)}` (`is_fresh={bool(s.is_fresh)}`)",
+            ])
+        else:
+            lines.append("- **4H Weekly Anchors & Setup:** `UNAVAILABLE (syncing previous-week bars)`")
+
+        mg = sw.magnet
+        if mg is not None:
+            eff_target = mg.target_magnet if getattr(mg, "target_magnet", 0.0) > 0 else mg.short_liq_magnet
+            lines.extend([
+                "",
+                "### 1C. Daily Liquidation Magnet Protocol & RRR Gate",
+                f"- **Regime Classification:** `{mg.regime}` (`{mg.regime_detail}`)",
+                f"- **30–45D Range / Pivot / 50D SMA:** `${mg.range_low_30d:,.2f}` – `${mg.range_high_30d:,.2f}` (`{mg.range_pos_pct:.1f}%`) | Pivot `${mg.range_pivot:,.2f}` | 50D SMA `${mg.sma50_1d:,.2f}`",
+                f"- **Short-Liq Magnet (Upper):** `${mg.short_liq_magnet:,.2f}` (`{mg.short_liq_distance_pct:+.2f}%` | `{mg.short_liq_size_label}` | `{mg.short_liq_source}`)",
+                f"- **Long-Liq Magnet (Lower):** `${mg.long_liq_magnet:,.2f}` (`{-mg.long_liq_distance_pct:+.2f}%` | `{mg.long_liq_size_label}` | `{mg.long_liq_source}`)",
+                f"- **OI Trend:** `{mg.oi_trend}`",
+                f"- **8H Funding:** `{mg.funding_status}`",
+                f"- **Spot CVD Assessment:** `{mg.spot_cvd_assessment}` (`spot_cvd_confirming={bool(mg.spot_cvd_confirming)}`)",
+                f"- **Headline Filter:** `{mg.headline_filter}`",
+                f"- **24H Cumulative Liquidations:** `{mg.cum_liq_24h_summary}`",
+                f"- **RRR Check (`Target ${eff_target:,.2f}` vs `Stop ${mg.hard_stop_price:,.2f}`):** `{mg.rrr_to_magnet:.2f}R` (`min_required={mg.min_required_rrr:.1f}R`, `rrr_pass={bool(mg.rrr_pass)}`)",
+                f"- **Max Entry for {mg.min_required_rrr:g}R:** `${mg.max_entry_for_3r:,.2f}` | **Protocol State:** `{mg.verdict}` (`Confidence: {mg.confidence}`)",
+            ])
+
+        lines.append("")
+        t = sw.trade
+        rk = sw.risk
+        macro_ok = bool(m is not None and m.macro_approved)
+        rrr_ok = bool(mg is None or mg.rrr_pass)
+        mag_actionable = bool(mg is None or mg.verdict not in ("Do Nothing", "Reduce or Exit"))
+        if t is not None:
+            lines.extend([
+                f"## 2. ACTIVE POSITION LEVELS (Open `{t.status}` at ${t.entry:,.2f})",
+                f"- **Entry Price:** `${t.entry:,.2f}` | **Size:** `{t.qty_btc:.6f} BTC` (`${t.qty_btc * t.entry:,.2f}`)",
+                f"- **Current Stop / Initial Stop:** `${t.current_stop:,.2f}` / `${t.initial_stop:,.2f}`",
+                f"- **Level 1 (`+2.0R`):** `${t.tp1:,.2f}` (`tp1_hit={bool(t.tp1_hit)}`)",
+                f"- **Level 2 (`PWH`):** `${t.tp2:,.2f}`",
+            ])
+        elif rk is not None and macro_ok and rrr_ok and mag_actionable:
+            lines.extend([
+                f"## 2. REFERENCE LEVELS (Reference calculation if entered at ${rk.entry:,.2f}. Not an order.)",
+                f"- **Reference Entry Price:** `${rk.entry:,.2f}`",
+                f"- **Reference Stop Level:** `${rk.stop:,.2f}` (`ATR14=${rk.atr14:,.2f}`, Distance `${rk.stop_distance:,.2f}` / `{rk.stop_distance_pct:.2f}%`)",
+                f"- **Reference Spot Size (100% Equity Cap):** `{rk.qty_btc:.6f} BTC` (`${rk.notional_usd:,.2f}` = `{rk.equity_alloc_pct:.1f}%` of `${rk.equity_usd:,.2f}`, `spot_capped={bool(rk.spot_capped)}`)",
+                f"- **Reference Level 1 (`+2.0R`):** `${rk.tp1:,.2f}`",
+                f"- **Reference Level 2 (`PWH`):** `${rk.tp2_pwh:,.2f}`",
+                f"- **Reference Level 3 (`{f'{mg.min_required_rrr:g}R' if mg else '3R'}`):** `${rk.tp_3r:,.2f}`",
+            ])
+        else:
+            lines.extend([
+                "## 2. REFERENCE LEVELS",
+                "- **Active Reference Sizing:** `NONE (100% Cash / Gate Closed or RRR Below Minimum)`",
+            ])
     else:
-        lines.append("- **Spot Swing Screener Evaluation Available:** `False`")
+        lines.append("- **Spot Swing Screener Evaluation Available:** `False` (`UNAVAILABLE`)")
 
     return sanitize_data_only_text("\n".join(lines))
 

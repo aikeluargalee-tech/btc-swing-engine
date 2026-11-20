@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import tempfile
 import time
@@ -175,6 +176,8 @@ def compute_macro_gate(
     compression_pass = bool((recent <= max_percentile).any())
 
     last_close = float(close.iloc[-1])
+    if not np.isfinite(last_close) or last_close <= 0:
+        return None
     trend_pass = bool(last_close > ema_f.iloc[-1] and ema_f.iloc[-1] > ema_s.iloc[-1])
     return SpotSwingMacroGate(
         bar_ts_ms=int(df_1d_closed["ts"].iloc[-1]),
@@ -187,6 +190,9 @@ def compute_macro_gate(
         compression_pass=compression_pass,
         squeeze_lookback_bars=lookback,
         macro_approved=bool(trend_pass and compression_pass),
+        bbw_max_percentile=float(max_percentile),
+        bbw_period=int(bbw_period),
+        bbw_rank_window=int(rank_window),
     )
 
 
@@ -223,10 +229,46 @@ def detect_setup(
     window_bars: int = 12,
     vol_sma_period: int = 3,
     last_traded_sweep_ts_ms: int = 0,
+    anchors_ready: bool = True,
 ) -> SpotSwingSetup:
-    """Sweep (low < PWL in last 12 bars) + Reclaim (last close > PWL) + Volume (> SMA3)."""
+    """Sweep (low < PWL in last 12 bars) + Reclaim (last close > PWL) + Volume (> SMA3).
+
+    Structural guard: if `anchors_ready` is False or `pwl`/`pwh` are non-positive/invalid (e.g. from an
+    unready `compute_weekly_anchors` call), returns an inactive setup with `anchors_ready=False`.
+
+    Volume benchmark: `rolling(vol_sma_period).mean()` intentionally includes the current bar (matching
+    `ta.sma(volume, 3)`); for `period=3`, `V_t > (V_{t-2} + V_{t-1} + V_t) / 3` is algebraically equivalent
+    to `V_t > (V_{t-2} + V_{t-1}) / 2`.
+    """
+    if df_4h_closed.empty:
+        return SpotSwingSetup(
+            week_start_ms=week_start_ms,
+            anchors_ready=False,
+            sweep_window_bars=int(window_bars),
+            vol_sma_period=int(vol_sma_period),
+        )
+
     last = df_4h_closed.iloc[-1]
-    window = df_4h_closed.iloc[-window_bars:]
+    valid_anchors = bool(
+        anchors_ready
+        and np.isfinite(pwl)
+        and pwl > 0.0
+        and np.isfinite(pwh)
+        and pwh >= pwl
+    )
+    if not valid_anchors:
+        return SpotSwingSetup(
+            bar_ts_ms=int(last["ts"]),
+            close=float(last["close"]),
+            volume=float(last["volume"]),
+            week_start_ms=week_start_ms,
+            anchors_ready=False,
+            sweep_window_bars=int(window_bars),
+            vol_sma_period=int(vol_sma_period),
+        )
+
+    window_n = max(1, int(window_bars))
+    window = df_4h_closed.iloc[-window_n:]
     swept = window[window["low"] < pwl]
     sweep_detected = not swept.empty
 
@@ -237,6 +279,8 @@ def detect_setup(
         sweep_low = float(swept.loc[idx, "low"])
         sweep_bar_ts = int(swept.loc[idx, "ts"])
 
+    # Intentional: rolling(vol_sma_period).mean() includes the current bar (TradingView ta.sma(volume, 3));
+    # for vol_sma_period=3, volume > SMA3 is algebraically identical to volume > mean of the prior 2 bars.
     vol_sma = float(df_4h_closed["volume"].rolling(vol_sma_period).mean().iloc[-1])
     reclaim = bool(last["close"] > pwl)
     volume_ok = bool(np.isfinite(vol_sma) and last["volume"] > vol_sma)
@@ -258,6 +302,8 @@ def detect_setup(
         signal_active=raw_signal,
         is_fresh=bool(raw_signal and sweep_bar_ts > last_traded_sweep_ts_ms),
         anchors_ready=True,
+        sweep_window_bars=window_n,
+        vol_sma_period=int(vol_sma_period),
     )
 
 
@@ -331,34 +377,150 @@ def compute_risk(
 # MODULE F: DAILY LIQUIDATION MAGNET PROTOCOL (STEPS 1-4 + RRR 1:3)
 # ============================================================================
 
+_NUMERIC_OVERRIDE_KEYS = (
+    "short_liq_magnet_override_usd",
+    "short_liq_magnet_price",
+    "long_liq_magnet_override_usd",
+    "long_liq_magnet_price",
+    "short_liq_size_override_usd",
+    "short_liq_magnet_size_usd",
+    "long_liq_size_override_usd",
+    "long_liq_magnet_size_usd",
+)
+_STRING_OVERRIDE_KEYS = ("headline_filter", "headline_classification")
+
+
+def _parse_positive_float(val: Any) -> Optional[float]:
+    """Parses a finite non-negative float, rejecting bools, NaN/Inf, and negative numbers."""
+    if isinstance(val, bool):
+        return None
+    try:
+        num = float(val)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(num) or num < 0.0:
+        return None
+    return num
+
+
 def _load_magnet_overrides(config: Optional[EngineConfig]) -> Dict[str, Any]:
-    """Reads optional Coinglass magnet overrides and headline status from protocol_context.json."""
+    """Reads and validates Coinglass magnet overrides and headline status from protocol_context.json."""
     out: Dict[str, Any] = {
         "short_liq_magnet_override_usd": 0.0,
         "long_liq_magnet_override_usd": 0.0,
         "short_liq_size_override_usd": 0.0,
         "long_liq_size_override_usd": 0.0,
         "headline_classification": "NONE_SIGNIFICANT",
+        "_context_warning": "",
     }
-    try:
-        if config is not None and config.protocol_context_path.exists():
+    warnings: List[str] = []
+    if config is not None and config.protocol_context_path.exists():
+        try:
             with open(config.protocol_context_path, "r", encoding="utf-8") as fh:
                 raw = json.load(fh)
-                if isinstance(raw, dict):
-                    out.update(raw)
-    except Exception:
-        pass
-    if os.getenv("SHORT_LIQ_MAGNET_USD"):
-        try:
-            out["short_liq_magnet_override_usd"] = float(os.environ["SHORT_LIQ_MAGNET_USD"])
-        except ValueError:
-            pass
-    if os.getenv("LONG_LIQ_MAGNET_USD"):
-        try:
-            out["long_liq_magnet_override_usd"] = float(os.environ["LONG_LIQ_MAGNET_USD"])
-        except ValueError:
-            pass
+        except Exception as exc:
+            msg = f"protocol_context.json unreadable ({type(exc).__name__}); magnet overrides ignored"
+            logger.warning(msg)
+            warnings.append(msg)
+            raw = None
+        if raw is not None and not isinstance(raw, dict):
+            msg = f"protocol_context.json root must be JSON object, got {type(raw).__name__}; magnet overrides ignored"
+            logger.warning(msg)
+            warnings.append(msg)
+        elif isinstance(raw, dict):
+            for key in _NUMERIC_OVERRIDE_KEYS:
+                if key not in raw or raw[key] is None:
+                    continue
+                parsed = _parse_positive_float(raw[key])
+                if parsed is None:
+                    msg = f"Invalid numeric override '{key}' in protocol_context.json; ignored"
+                    logger.warning(msg)
+                    warnings.append(msg)
+                else:
+                    out[key] = parsed
+            for key in _STRING_OVERRIDE_KEYS:
+                if key not in raw or raw[key] is None:
+                    continue
+                val = raw[key]
+                if not isinstance(val, str) or not val.strip():
+                    msg = f"Invalid string override '{key}' in protocol_context.json; ignored"
+                    logger.warning(msg)
+                    warnings.append(msg)
+                else:
+                    out[key] = val.strip()
+
+    for env_key, target_key in (
+        ("SHORT_LIQ_MAGNET_USD", "short_liq_magnet_override_usd"),
+        ("LONG_LIQ_MAGNET_USD", "long_liq_magnet_override_usd"),
+    ):
+        env_raw = os.getenv(env_key)
+        if env_raw:
+            parsed = _parse_positive_float(env_raw)
+            if parsed is None or parsed <= 0.0:
+                msg = f"Invalid env {env_key}={env_raw!r}; ignored"
+                logger.warning(msg)
+                warnings.append(msg)
+            else:
+                out[target_key] = parsed
+
+    if warnings:
+        out["_context_warning"] = "; ".join(warnings)
     return out
+
+
+def compute_safety_guard(store: Optional[StateStore]) -> Dict[str, Any]:
+    """Shared companion safety-guard evaluator (fails CLOSED when companion feeds are absent)."""
+    liq_rep = store.trap_evaluation.liquidation_report if (store is not None and store.trap_evaluation is not None) else None
+    tt_ev = store.exhaustion_evaluation.tell_tale if (store is not None and store.exhaustion_evaluation is not None) else None
+
+    veto_active = False
+    if liq_rep is not None and liq_rep.is_available:
+        if "EXTREME" in liq_rep.magnitude_tier and not (
+            liq_rep.post_flush_price_structure and liq_rep.post_flush_price_structure.stabilisation_confirmed
+        ):
+            liq_status = "FLUSH IN PROGRESS (PAUSE)"
+            liq_known_clear = False
+            veto_active = True
+        elif liq_rep.post_flush_price_structure and (
+            liq_rep.post_flush_price_structure.stabilisation_confirmed or liq_rep.post_flush_price_structure.higher_low_formed
+        ):
+            liq_status = "STABILIZED"
+            liq_known_clear = True
+        else:
+            liq_status = "NORMAL / QUIET"
+            liq_known_clear = True
+    else:
+        liq_status = "UNAVAILABLE"
+        liq_known_clear = False
+
+    if tt_ev is not None:
+        if tt_ev.is_selling_climax:
+            tt_status = "CLIMAX DUMP"
+            tt_known_clear = False
+            veto_active = True
+        else:
+            tt_status = "CLEAR"
+            tt_known_clear = True
+    else:
+        tt_status = "UNAVAILABLE"
+        tt_known_clear = False
+
+    all_available = bool(liq_known_clear and tt_known_clear)
+    if veto_active:
+        status = "PAUSED (VETO)"
+    elif all_available:
+        status = "CLEAR (NO VETO)"
+    else:
+        status = "UNAVAILABLE"
+
+    return {
+        "status": status,
+        "detail": f"Liq: {liq_status} • Climax: {tt_status}",
+        "liq_status": liq_status,
+        "tt_status": tt_status,
+        "veto_active": veto_active,
+        "all_available": all_available,
+    }
 
 
 def compute_magnet_protocol(
@@ -461,18 +623,31 @@ def compute_magnet_protocol(
     deriv = store.derivatives_snapshot if store is not None else None
     flow = store.flow_snapshot if store is not None else None
 
-    oi_btc = float(deriv.open_interest_btc if deriv is not None else (store.open_interest_btc if store is not None else 0.0))
-    oi_usd = float(deriv.open_interest_usd if deriv is not None else (store.open_interest_usd if store is not None else 0.0))
+    deriv_populated = bool(
+        deriv is not None
+        and (
+            deriv.open_interest_btc > 0.0
+            or deriv.open_interest_usd > 0.0
+            or deriv.funding_rate_pct != 0.0
+            or deriv.oi_change_4h_pct != 0.0
+        )
+    )
+    oi_btc = float((deriv.open_interest_btc if deriv is not None and deriv.open_interest_btc > 0.0 else (store.open_interest_btc if store is not None else 0.0)))
+    oi_usd = float((deriv.open_interest_usd if deriv is not None and deriv.open_interest_usd > 0.0 else (store.open_interest_usd if store is not None else 0.0)))
     if oi_usd <= 0.0 and oi_btc > 0.0:
         oi_usd = oi_btc * price
-    oi_24h = float(store.get_oi_change_pct(86400)) if store is not None else 0.0
-    oi_4h = float(deriv.oi_change_4h_pct if deriv is not None else (store.get_oi_change_pct(14400) if store is not None else 0.0))
-    fund_8h = float(deriv.funding_rate_pct if deriv is not None else (store.funding_rate_pct if store is not None else 0.0))
+    has_oi_history = bool(store is not None and len(store.oi_history) >= 2 and store.open_interest_btc > 0.0)
+    oi_available = bool(oi_btc > 0.0 and (deriv_populated or has_oi_history))
+    funding_available = bool(deriv_populated or (store is not None and (store.open_interest_btc > 0.0 or store.funding_rate_pct != 0.0)))
+
+    oi_24h = float(store.get_oi_change_pct(86400)) if has_oi_history else 0.0
+    oi_4h = float(deriv.oi_change_4h_pct if (deriv is not None and deriv.oi_change_4h_pct != 0.0) else (store.get_oi_change_pct(14400) if has_oi_history else 0.0))
+    fund_8h = float(deriv.funding_rate_pct if (deriv is not None and deriv.funding_rate_pct != 0.0) else (store.funding_rate_pct if store is not None else 0.0))
 
     if manual_short_sz > 0.0:
         short_liq_size_label = f"${manual_short_sz / 1e6:,.0f}M (Coinglass)"
     elif oi_usd > 0.0:
-        est_s = oi_usd * (0.045 if fund_8h < 0 else 0.032)
+        est_s = oi_usd * (0.045 if (funding_available and fund_8h < 0) else 0.032)
         short_liq_size_label = f"~${est_s / 1e6:,.0f}M est. pool"
     else:
         short_liq_size_label = "Est. Swing Pool"
@@ -480,7 +655,7 @@ def compute_magnet_protocol(
     if manual_long_sz > 0.0:
         long_liq_size_label = f"${manual_long_sz / 1e6:,.0f}M (Coinglass)"
     elif oi_usd > 0.0:
-        est_l = oi_usd * (0.045 if fund_8h > 0.005 else 0.035)
+        est_l = oi_usd * (0.045 if (funding_available and fund_8h > 0.005) else 0.035)
         long_liq_size_label = f"~${est_l / 1e6:,.0f}M est. pool"
     else:
         long_liq_size_label = "Est. Swing Pool"
@@ -493,22 +668,28 @@ def compute_magnet_protocol(
             f"(Long: ${w24.long_usd / 1e6:.2f}M • Short: ${w24.short_usd / 1e6:.2f}M • {liq_rep.liquidation_multiple_24h:.2f}x Med)"
         )
     else:
-        cum_liq_24h_summary = "Data unavailable (companion detector standby)"
+        cum_liq_24h_summary = "UNAVAILABLE (companion detector standby)"
 
     prev_1d_close = float(closes_1d.iloc[-2]) if len(closes_1d) >= 2 else last_close_1d
     price_chg_24h = ((price - prev_1d_close) / max(prev_1d_close, 1.0)) * 100.0
-    if oi_24h >= 1.0 or oi_4h >= 0.35:
-        oi_dir = "Rising"
-        oi_interp = "New shorts entering (squeeze fuel)" if price_chg_24h <= -0.20 else "New longs entering (trap risk)"
-    elif oi_24h <= -1.0 or oi_4h <= -0.35:
-        oi_dir = "Falling"
-        oi_interp = "Covering / de-leveraging"
+    if not oi_available:
+        oi_interp = "UNAVAILABLE"
+        oi_trend_str = "UNAVAILABLE (no OI telemetry)"
     else:
-        oi_dir = "Flat"
-        oi_interp = "Balanced positioning"
-    oi_trend_str = f"{oi_dir} (24H {oi_24h:+.2f}% • 4H {oi_4h:+.2f}% • {oi_interp})"
+        if oi_24h >= 1.0 or oi_4h >= 0.35:
+            oi_dir = "Rising"
+            oi_interp = "New shorts entering (squeeze fuel)" if price_chg_24h <= -0.20 else "New longs entering (trap risk)"
+        elif oi_24h <= -1.0 or oi_4h <= -0.35:
+            oi_dir = "Falling"
+            oi_interp = "Covering / de-leveraging"
+        else:
+            oi_dir = "Flat"
+            oi_interp = "Balanced positioning"
+        oi_trend_str = f"{oi_dir} (24H {oi_24h:+.2f}% • 4H {oi_4h:+.2f}% • {oi_interp})"
 
-    if fund_8h < -0.0005:
+    if not funding_available:
+        funding_status = "UNAVAILABLE (no funding telemetry)"
+    elif fund_8h < -0.0005:
         funding_status = f"Negative ({fund_8h:+.4f}% / 8h — Shorts paying, squeeze primed)"
     elif fund_8h <= 0.0060:
         funding_status = f"Neutral ({fund_8h:+.4f}% / 8h — Uncrowded)"
@@ -517,9 +698,16 @@ def compute_magnet_protocol(
     else:
         funding_status = f"Strongly Positive ({fund_8h:+.4f}% / 8h — Crowded longs, trap risk)"
 
-    if flow is not None and (flow.w_24h.spot_delta_btc != 0.0 or flow.w_4h.spot_delta_btc != 0.0):
+    flow_available = False
+    if flow is not None and (
+        flow.w_24h.spot_delta_btc != 0.0
+        or flow.w_4h.spot_delta_btc != 0.0
+        or flow.w_24h.perp_delta_btc != 0.0
+        or flow.w_4h.perp_delta_btc != 0.0
+    ):
         s_24h, p_24h = float(flow.w_24h.spot_delta_btc), float(flow.w_24h.perp_delta_btc)
         s_4h, p_4h = float(flow.w_4h.spot_delta_btc), float(flow.w_4h.perp_delta_btc)
+        flow_available = True
     elif store is not None and store.spot_klines_1h:
         s1h = list(store.spot_klines_1h)
         p1h = list(store.perp_klines_1h)
@@ -527,16 +715,17 @@ def compute_magnet_protocol(
         p_24h = float(sum(b.delta for b in p1h[-24:])) if p1h else 0.0
         s_4h = float(sum(b.delta for b in s1h[-4:]))
         p_4h = float(sum(b.delta for b in p1h[-4:])) if p1h else 0.0
+        # Synthetic/unmeasured 1H bars default taker_buy_volume == 0.5 * volume -> delta == 0.0 everywhere.
+        flow_available = any(b.taker_buy_volume > 0 and abs(b.delta) > 1e-9 for b in s1h[-24:])
     else:
         s_24h = p_24h = s_4h = p_4h = 0.0
 
-    last_4h_bullish = bool(float(df_4h_closed["close"].iloc[-1]) > float(df_4h_closed["open"].iloc[-1]))
-    if s_4h > 15.0 and (s_24h >= 0.0 or s_4h >= 0.5 * max(p_4h, 1.0)):
+    if not flow_available:
+        spot_cvd_confirming = False
+        spot_cvd_assessment = "UNAVAILABLE (no Spot CVD telemetry)"
+    elif s_4h > 15.0 and (s_24h >= 0.0 or s_4h >= 0.5 * max(p_4h, 1.0)):
         spot_cvd_confirming = True
         spot_cvd_assessment = f"Confirming (4H Spot {s_4h:+,.0f} BTC • 24H {s_24h:+,.0f} BTC)"
-    elif s_4h == 0.0 and s_24h == 0.0 and setup.reclaim_confirmed and setup.volume_confirmed and last_4h_bullish:
-        spot_cvd_confirming = True
-        spot_cvd_assessment = f"Confirming (4H Reclaim Vol {setup.volume:,.0f} > SMA3 {setup.vol_sma3:,.0f})"
     elif s_4h <= 0.0 and p_4h > 20.0:
         spot_cvd_confirming = False
         spot_cvd_assessment = f"Not confirming — Futures-driven (4H Spot {s_4h:+,.0f} vs Perp {p_4h:+,.0f} BTC)"
@@ -597,7 +786,9 @@ def compute_magnet_protocol(
             else price
         )
     )
-    if setup.sweep_detected and setup.sweep_low > 0 and setup.sweep_low < entry_ref:
+    if trade is not None and trade.initial_stop > 0.0 and trade.initial_stop < entry_ref:
+        hard_stop_price = trade.initial_stop
+    elif setup.sweep_detected and setup.sweep_low > 0 and setup.sweep_low < entry_ref:
         hard_stop_price = setup.sweep_low - 0.5 * atr_4h
     elif setup.anchors_ready and setup.pwl > 0 and setup.pwl < entry_ref:
         hard_stop_price = setup.pwl - 0.5 * atr_4h
@@ -619,9 +810,9 @@ def compute_magnet_protocol(
     tp_3r_price = entry_ref + min_rrr * risk_distance_usd
     max_entry_for_3r = (target_magnet + min_rrr * hard_stop_price) / (1.0 + min_rrr)
 
-    budget = equity_usd * (risk_pct / 100.0)
+    budget = max(0.0, equity_usd) * (max(0.0, risk_pct) / 100.0)
     qty_uncapped = budget / risk_distance_usd
-    qty_max_spot = equity_usd / max(entry_ref, 1.0)
+    qty_max_spot = max(0.0, equity_usd) / max(entry_ref, 1.0)
     rec_qty = min(qty_uncapped, qty_max_spot)
     rec_notional = rec_qty * entry_ref
     rec_risk = rec_qty * risk_distance_usd
@@ -631,6 +822,8 @@ def compute_magnet_protocol(
     recent_4h_high = float(df_4h_closed["high"].iloc[-6:].max())
     swept_upper_cluster = recent_4h_high >= short_liq_magnet * 0.992 or recent_4h_high >= range_high_30d * 0.995
     rejected_below_pivot = price < range_pivot or price < sma50_1d
+    oi_resilient = oi_available and (oi_24h >= -1.0 if has_oi_history else oi_4h >= -1.0)
+    max_bbw_pct_label = macro.bbw_max_percentile * 100.0
 
     if swept_upper_cluster and rejected_below_pivot and not spot_cvd_confirming:
         verdict = "Reduce or Exit"
@@ -644,7 +837,7 @@ def compute_magnet_protocol(
             f"• Short-squeeze fuel exhausted at upper cluster; price rejected below Range Pivot (${range_pivot:,.0f}) / 50DMA (${sma50_1d:,.0f}).\n"
             f"• Prepare for rotation lower toward ${long_liq_magnet:,.0f} long-liquidation pool."
         )
-    elif last_close_1d > short_liq_magnet and spot_cvd_confirming and oi_24h >= -1.0:
+    elif last_close_1d > short_liq_magnet and spot_cvd_confirming and oi_resilient and macro.trend_pass:
         verdict = "Rare Add Consideration"
         confidence = "High" if rrr_pass else "Medium"
         primary_reason = (
@@ -653,14 +846,20 @@ def compute_magnet_protocol(
         invalidation_text = f"Daily close back below ${short_liq_magnet:,.0f} or 50-day MA (${sma50_1d:,.0f})."
         actionable_note = (
             f"Rare confirmed breakout above ${short_liq_magnet:,.0f} with confirming Spot CVD. Action playbook:\n"
-            f"• Consider adds on retest of ${short_liq_magnet:,.0f} ONLY if R:R >= 1:3 holds (Stop ${hard_stop_price:,.0f}, 3R Target ${tp_3r_price:,.0f}).\n"
+            f"• Consider adds on retest of ${short_liq_magnet:,.0f} ONLY if R:R >= 1:{min_rrr:g} holds (Stop ${hard_stop_price:,.0f}, {min_rrr:g}R Target ${tp_3r_price:,.0f}).\n"
             f"• Invalidation: Daily close falling back below ${short_liq_magnet:,.0f} or 50-day MA (${sma50_1d:,.0f}) voids breakout."
         )
-    elif (short_liq_distance_pct <= 3.5 or range_pos_pct >= 72.0) and fund_8h <= 0.008 and not spot_cvd_confirming:
+    elif (
+        (0.0 < short_liq_distance_pct <= 3.5 or range_pos_pct >= 72.0)
+        and funding_available
+        and fund_8h <= 0.008
+        and flow_available
+        and not spot_cvd_confirming
+    ):
         verdict = "Partial Profit into Magnet"
         confidence = "High"
         primary_reason = (
-            f"Short-liq magnet sits {short_liq_distance_pct:.2f}% above (${short_liq_magnet:,.0f}) with negative/neutral funding ({fund_8h:+.4f}%) and unconfirmed Spot CVD."
+            f"Short-liq magnet sits {short_liq_distance_pct:+.2f}% from price (${short_liq_magnet:,.0f}) with negative/neutral funding ({fund_8h:+.4f}%) and unconfirmed Spot CVD."
         )
         invalidation_text = f"Daily close below Range Pivot (${range_pivot:,.0f}) or 50-day MA (${sma50_1d:,.0f})."
         actionable_note = (
@@ -671,23 +870,39 @@ def compute_magnet_protocol(
     elif (
         trade is not None
         or (setup.signal_active and macro.macro_approved)
-        or (long_liq_distance_pct <= 3.0 and spot_cvd_confirming and macro.trend_pass)
+        or (0.0 <= long_liq_distance_pct <= 3.0 and spot_cvd_confirming and macro.trend_pass)
     ) and rrr_pass:
         verdict = "Hold"
         confidence = "High" if (spot_cvd_confirming and macro.macro_approved) else "Medium"
-        primary_reason = (
-            f"Liquidity sweep reclaimed with Spot confirmation and asymmetric {rrr_to_magnet:.2f}R payoff (>= 3.0R) toward ${target_magnet:,.0f} magnet."
-        )
+        spot_note = "with Spot CVD confirmation" if spot_cvd_confirming else "(Spot CVD unavailable/unconfirmed)"
+        if setup.signal_active or trade is not None:
+            primary_reason = (
+                f"Liquidity sweep reclaimed {spot_note} and asymmetric {rrr_to_magnet:.2f}R payoff (>= {min_rrr:.1f}R) toward ${target_magnet:,.0f} magnet."
+            )
+        else:
+            primary_reason = (
+                f"Price within {long_liq_distance_pct:.2f}% of long-liq magnet (${long_liq_magnet:,.0f}) in 1D uptrend {spot_note} with {rrr_to_magnet:.2f}R (>= {min_rrr:.1f}R)."
+            )
         invalidation_text = f"Daily close below ${invalidation_level:,.0f} (Pivot/50DMA) or hard stop at ${hard_stop_price:,.0f}."
+        pwh_note = f"structural target PWH (${setup.pwh:,.0f})" if (setup.anchors_ready and setup.pwh > 0) else f"magnet (${target_magnet:,.0f})"
+        cap_note = " [CAPPED AT 100% SPOT]" if spot_capped else ""
+        size_btc = trade.qty_btc if trade is not None else rec_qty
         actionable_note = (
-            f"Hold spot long position ({rec_qty:.4f} BTC @ 1% risk). Action playbook:\n"
+            f"Hold spot long position ({size_btc:.4f} BTC @ {risk_pct:g}% risk{cap_note}). Action playbook:\n"
             f"• Scale 30–50% into ${target_magnet:,.0f} Short-Liq Magnet, then immediately move stop to breakeven (${entry_ref:,.0f}).\n"
-            f"• Trail remaining runner toward structural target PWH (${setup.pwh:,.0f}); exit on 10-day time stop or daily close < ${invalidation_level:,.0f}."
+            f"• Trail remaining runner toward {pwh_note}; exit on 10-day time stop or daily close < ${invalidation_level:,.0f}."
         )
     else:
         verdict = "Do Nothing"
         confidence = "High"
-        if setup.signal_active and not macro.macro_approved:
+        if trade is not None and not rrr_pass:
+            primary_reason = (
+                f"Open spot trade from ${trade.entry:,.0f}, but R:R to ${target_magnet:,.0f} magnet is {rrr_to_magnet:.2f}R (< {min_rrr:.1f}R); do not add."
+            )
+            actionable_note = (
+                f"Do not add to open position while R:R is {rrr_to_magnet:.2f}R (< {min_rrr:.1f}R). Manage existing stop (${trade.current_stop:,.0f}) and triple barriers."
+            )
+        elif setup.signal_active and not macro.macro_approved:
             primary_reason = (
                 f"4H Sweep/Reclaim printed, but 1D Macro Gate is FROZEN (close ${macro.close:,.0f} vs EMA50 ${macro.ema50:,.0f}, BBW rank {macro.bbw_percentile * 100:.0f}%); protocol defaults to cash."
             )
@@ -698,21 +913,21 @@ def compute_magnet_protocol(
             )
         elif setup.signal_active and not rrr_pass:
             primary_reason = (
-                f"Setup reclaimed PWL, but R:R to ${target_magnet:,.0f} magnet is {rrr_to_magnet:.2f}R (rejected by strict >= 3.0R rule; max 3R entry is ${max_entry_for_3r:,.0f})."
+                f"Setup reclaimed PWL, but R:R to ${target_magnet:,.0f} magnet is {rrr_to_magnet:.2f}R (rejected by strict >= {min_rrr:.1f}R rule; max {min_rrr:g}R entry is ${max_entry_for_3r:,.0f})."
             )
             actionable_note = (
-                f"Setup reclaimed PWL, but live R:R is {rrr_to_magnet:.2f}R (< 3.0R). Do not chase. Wait for:\n"
-                f"• Limit pullback <= ${max_entry_for_3r:,.0f} to secure mandatory >= 1:3 RRR.\n"
+                f"Setup reclaimed PWL, but live R:R is {rrr_to_magnet:.2f}R (< {min_rrr:.1f}R). Do not chase. Wait for:\n"
+                f"• Limit pullback <= ${max_entry_for_3r:,.0f} to secure mandatory >= 1:{min_rrr:g} RRR.\n"
                 f"• Short-covering squeeze to sweep into ${short_liq_magnet:,.0f} before considering reversal."
             )
         elif not rrr_pass:
             primary_reason = (
-                f"Price in mid-range with {rrr_to_magnet:.2f}R to ${target_magnet:,.0f} magnet (below mandatory 1:3 RRR; max 3R entry is ${max_entry_for_3r:,.0f})."
+                f"Price in mid-range with {rrr_to_magnet:.2f}R to ${target_magnet:,.0f} magnet (below mandatory 1:{min_rrr:g} RRR; max {min_rrr:g}R entry is ${max_entry_for_3r:,.0f})."
             )
             actionable_note = (
                 "Price in mid-range chop with poor reward-to-risk. Sit 100% in cash. Wait for:\n"
                 f"• Deeper sweep below range low (${range_low_30d:,.0f}) or long-liq magnet (${long_liq_magnet:,.0f}).\n"
-                f"• Pullback price <= ${max_entry_for_3r:,.0f} that guarantees >= 1:3 RRR to ${target_magnet:,.0f}."
+                f"• Pullback price <= ${max_entry_for_3r:,.0f} that guarantees >= 1:{min_rrr:g} RRR to ${target_magnet:,.0f}."
             )
         elif not macro.macro_approved:
             primary_reason = (
@@ -721,16 +936,17 @@ def compute_magnet_protocol(
             actionable_note = (
                 "1D Macro Gate is FROZEN (market in macro downtrend / volatility expansion). Stay 100% in cash. Wait for:\n"
                 f"• Daily close to reclaim 50-day EMA (${macro.ema50:,.0f}) and SMA (${sma50_1d:,.0f}).\n"
-                f"• Volatility compression back into bottom 30% (BBW rank currently {macro.bbw_percentile * 100:.1f}%)."
+                f"• Volatility compression back into bottom {max_bbw_pct_label:.0f}% (BBW rank currently {macro.bbw_percentile * 100:.1f}%)."
             )
         else:
             primary_reason = (
                 f"No positioning imbalance or confirmed range-low reclaim trigger at ${price:,.0f} (R:R {rrr_to_magnet:.2f}R); default is inaction."
             )
+            pwl_txt = f"${setup.pwl:,.0f}" if (setup.anchors_ready and setup.pwl > 0) else "PWL (syncing)"
             actionable_note = (
                 "Sit 100% in cash. No actionable setup at current price. Wait for:\n"
-                f"• 4H sweep below PWL (${setup.pwl:,.0f}) or Long-Liq pool (${long_liq_magnet:,.0f}).\n"
-                f"• Volume reclaim and Spot CVD confirmation with entry <= ${max_entry_for_3r:,.0f} (>= 1:3 RRR)."
+                f"• 4H sweep below PWL ({pwl_txt}) or Long-Liq pool (${long_liq_magnet:,.0f}).\n"
+                f"• Volume reclaim and Spot CVD confirmation with entry <= ${max_entry_for_3r:,.0f} (>= 1:{min_rrr:g} RRR)."
             )
         invalidation_text = f"Daily close below Range Pivot (${range_pivot:,.0f}) or 50-day MA (${sma50_1d:,.0f})."
 
@@ -792,6 +1008,11 @@ def compute_magnet_protocol(
         primary_reason=primary_reason,
         invalidation_text=invalidation_text,
         actionable_note=actionable_note,
+        target_magnet=target_magnet,
+        oi_available=oi_available,
+        funding_available=funding_available,
+        flow_available=flow_available,
+        context_warning=str(ctx.get("_context_warning") or ""),
     )
 
 
@@ -936,10 +1157,13 @@ class SpotSwingEngine:
         self.state_path = state_path or config.spot_swing_state_path
         self.read_only = read_only
         self.state: Dict[str, Any] = load_state(self.state_path)
-        try:
-            self.equity_usd = float(os.getenv("SPOT_SWING_EQUITY_USD", config.spot_swing_account_equity_usd))
-        except ValueError:
+        env_eq = os.getenv("SPOT_SWING_EQUITY_USD")
+        parsed_eq = _parse_positive_float(env_eq) if env_eq else None
+        if env_eq and (parsed_eq is None or parsed_eq <= 0.0):
+            logger.warning("Invalid SPOT_SWING_EQUITY_USD=%r; using configured equity", env_eq)
             self.equity_usd = config.spot_swing_account_equity_usd
+        else:
+            self.equity_usd = parsed_eq if parsed_eq is not None else config.spot_swing_account_equity_usd
         self._cache_key: Optional[Tuple[Any, ...]] = None
         self._cache: Optional[Tuple[SpotSwingMacroGate, SpotSwingSetup]] = None
 
@@ -1000,6 +1224,7 @@ class SpotSwingEngine:
         }
 
     def _not_ready(self, store: StateStore, price: float, notes: List[str], verdict: str) -> SpotSwingEvaluation:
+        sg = compute_safety_guard(store)
         ev = SpotSwingEvaluation(
             timestamp_utc=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
             spot_price=price,
@@ -1014,6 +1239,8 @@ class SpotSwingEngine:
             plain_english_summary="; ".join(notes),
             equity_usd=self.equity_usd,
             risk_pct=self.config.spot_swing_risk_pct,
+            safety_guard_status=sg["status"],
+            safety_guard_detail=sg["detail"],
         )
         store.spot_swing_evaluation = ev
         return ev
@@ -1064,6 +1291,9 @@ class SpotSwingEngine:
             int(df_4h["ts"].iloc[-1]),
             float(df_4h["close"].iloc[-1]),
             week_start,
+            bool(anchors_ready),
+            float(pwl),
+            float(pwh),
             int(self.state["last_traded_sweep_ts_ms"]),
         )
         if key == self._cache_key and self._cache is not None:
@@ -1080,23 +1310,16 @@ class SpotSwingEngine:
             )
             if macro is None:
                 return self._not_ready(store, price, ["Insufficient daily history for BBW percentile rank"], "WARMING UP")
-            if anchors_ready:
-                setup = detect_setup(
-                    df_4h,
-                    pwl,
-                    pwh,
-                    week_start,
-                    window_bars=cfg.spot_swing_sweep_window_bars,
-                    vol_sma_period=cfg.spot_swing_vol_sma_period,
-                    last_traded_sweep_ts_ms=int(self.state["last_traded_sweep_ts_ms"]),
-                )
-            else:
-                setup = SpotSwingSetup(
-                    bar_ts_ms=int(df_4h["ts"].iloc[-1]),
-                    close=float(df_4h["close"].iloc[-1]),
-                    week_start_ms=week_start,
-                    anchors_ready=False,
-                )
+            setup = detect_setup(
+                df_4h,
+                pwl,
+                pwh,
+                week_start,
+                window_bars=cfg.spot_swing_sweep_window_bars,
+                vol_sma_period=cfg.spot_swing_vol_sma_period,
+                last_traded_sweep_ts_ms=int(self.state["last_traded_sweep_ts_ms"]),
+                anchors_ready=anchors_ready,
+            )
             self._cache_key, self._cache = key, (macro, setup)
 
         risk: Optional[SpotSwingRisk] = None
@@ -1111,6 +1334,7 @@ class SpotSwingEngine:
                 tp1_r_multiple=cfg.spot_swing_tp1_r_multiple,
                 tp1_fraction=cfg.spot_swing_tp1_fraction,
                 time_stop_days=cfg.spot_swing_time_stop_days,
+                min_rrr=getattr(cfg, "spot_swing_min_rrr", 3.0),
             )
 
         # --- 3. Module E: state transitions + alerts (idempotent across restarts) ---
@@ -1193,7 +1417,7 @@ class SpotSwingEngine:
         if mutated:
             self._persist()
 
-        # --- 4. Daily Liquidation Magnet Protocol (Master Prompt Steps 1-4 + RRR 1:3) & Verdict ---
+        # --- 4. Daily Liquidation Magnet Protocol (Master Prompt Steps 1-4 + RRR 1:3) ---
         magnet = compute_magnet_protocol(
             df_1d_closed=df_1d,
             df_4h_closed=df_4h,
@@ -1209,10 +1433,18 @@ class SpotSwingEngine:
             trade=trade,
         )
         if risk is not None:
+            eff_target = magnet.target_magnet if magnet.target_magnet > 0 else magnet.short_liq_magnet
             risk.short_liq_magnet = magnet.short_liq_magnet
-            risk.rrr_to_magnet = max(0.0, max(magnet.short_liq_magnet, setup.pwh) - risk.entry) / max(risk.stop_distance, 1e-9)
+            risk.rrr_to_magnet = max(0.0, eff_target - risk.entry) / max(risk.stop_distance, 1e-9)
             risk.rrr_meets_min = bool(risk.rrr_to_magnet >= magnet.min_required_rrr)
-            risk.max_entry_for_3r = (max(magnet.short_liq_magnet, setup.pwh) + magnet.min_required_rrr * risk.stop) / (1.0 + magnet.min_required_rrr)
+            risk.max_entry_for_3r = (eff_target + magnet.min_required_rrr * risk.stop) / (1.0 + magnet.min_required_rrr)
+
+        sg = compute_safety_guard(store)
+        data_notes: List[str] = []
+        if not setup.anchors_ready:
+            data_notes.append("Previous-week anchors syncing (need all 7 daily bars)")
+        if magnet.context_warning:
+            data_notes.append(magnet.context_warning)
 
         verdict, light, summary = self._compose_verdict(macro, setup, risk, trade, new_setup_now, price)
         ev = SpotSwingEvaluation(
@@ -1221,7 +1453,7 @@ class SpotSwingEngine:
             verdict=verdict,
             traffic_light=light,
             data_ready=True,
-            data_notes=[] if setup.anchors_ready else ["Previous-week anchors syncing (need all 7 daily bars)"],
+            data_notes=data_notes,
             macro=macro,
             setup=setup,
             risk=risk,
@@ -1233,6 +1465,8 @@ class SpotSwingEngine:
             equity_usd=self.equity_usd,
             risk_pct=cfg.spot_swing_risk_pct,
             magnet=magnet,
+            safety_guard_status=sg["status"],
+            safety_guard_detail=sg["detail"],
         )
         store.spot_swing_evaluation = ev
         return ev
@@ -1245,6 +1479,7 @@ class SpotSwingEngine:
         trade: Optional[SpotSwingTrade],
         new_setup_now: bool,
         price: float,
+        magnet: Optional[SpotSwingMagnetProtocol] = None,
     ) -> Tuple[str, str, str]:
         if trade is not None:
             frozen_note = " Macro gate is now FROZEN: manage the open trade, open nothing new." if not macro.macro_approved else ""
@@ -1266,7 +1501,9 @@ class SpotSwingEngine:
             if not macro.trend_pass:
                 failed.append("trend (close > EMA50 > EMA200) fails")
             if not macro.compression_pass:
-                failed.append(f"volatility is not compressed (BBW rank {macro.bbw_percentile * 100:.0f}% > 30%)")
+                failed.append(
+                    f"volatility is not compressed (BBW rank {macro.bbw_percentile * 100:.0f}% > {macro.bbw_max_percentile * 100:.0f}%)"
+                )
             return ("FROZEN (100% CASH)", "RED", "Macro gate closed: " + " and ".join(failed) + ". Stay in cash.")
         if not setup.anchors_ready:
             return ("MACRO APPROVED - ANCHORS SYNCING", "YELLOW", "Waiting for a complete previous-week range.")
@@ -1278,12 +1515,18 @@ class SpotSwingEngine:
             )
         if setup.signal_active and risk is None:
             return ("SIGNAL BLOCKED - INVALID STOP", "YELLOW", "Reclaim confirmed but the ATR stop geometry is invalid.")
+        if setup.signal_active and risk is not None and magnet is not None and not (magnet.rrr_pass and risk.rrr_meets_min):
+            return (
+                f"SIGNAL BLOCKED - RRR < {magnet.min_required_rrr:.1f}R",
+                "YELLOW",
+                f"Reclaim confirmed but R:R to ${magnet.target_magnet or magnet.short_liq_magnet:,.0f} is {magnet.rrr_to_magnet:.2f}R (< {magnet.min_required_rrr:.1f}R; max entry ${magnet.max_entry_for_3r:,.0f}).",
+            )
         if setup.sweep_detected:
             missing = []
             if not setup.reclaim_confirmed:
                 missing.append("a 4H close back above PWL")
             if not setup.volume_confirmed:
-                missing.append("reclaim-bar volume above SMA(3)")
+                missing.append(f"reclaim-bar volume above SMA({setup.vol_sma_period})")
             return ("SWEEP DETECTED - AWAITING RECLAIM", "YELLOW", "PWL was swept; still need " + " and ".join(missing) + ".")
         return (
             "MACRO APPROVED - SCANNING",

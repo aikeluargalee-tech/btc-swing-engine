@@ -63,32 +63,124 @@ class TrendPullbackConfig:
     max_daily_stale_hours: float = 48.0
     max_4h_stale_hours: float = 8.5
 
+    @staticmethod
+    def _numeric_rules() -> Dict[str, Tuple[float, float, bool, bool, type]]:
+        return {
+            "daily_sma_period": (10.0, 500.0, True, True, int),
+            "daily_sma_slope_period": (1.0, 250.0, True, True, int),
+            "ema_fast": (2.0, 500.0, True, True, int),
+            "ema_slow": (5.0, 1000.0, True, True, int),
+            "ema_slope_period": (1.0, 100.0, True, True, int),
+            "atr_period": (2.0, 100.0, True, True, int),
+            "pullback_upper_atr": (0.0, 3.0, True, True, float),
+            "pullback_lower_atr": (0.0, 3.0, True, True, float),
+            "recovery_max_extension_atr": (0.1, 5.0, True, True, float),
+            "limit_entry_upper_atr": (0.0, 2.0, True, True, float),
+            "stop_lookback": (1.0, 50.0, True, True, int),
+            "stop_buffer_atr": (0.0, 2.0, True, True, float),
+            "minimum_stop_atr": (0.0, 5.0, False, True, float),
+            "maximum_stop_atr": (0.0, 10.0, False, True, float),
+            "risk_per_trade": (0.0, 0.02, False, True, float),
+            "initial_simulation_equity": (100.0, 100_000_000.0, True, True, float),
+            "setup_expiry_4h_bars": (1.0, 30.0, True, True, int),
+            "entry_fee_pct": (0.0, 0.02, True, True, float),
+            "exit_fee_pct": (0.0, 0.02, True, True, float),
+            "entry_slippage_pct": (0.0, 0.02, True, True, float),
+            "exit_slippage_pct": (0.0, 0.02, True, True, float),
+            "max_daily_stale_hours": (0.0, 168.0, False, True, float),
+            "max_4h_stale_hours": (0.0, 48.0, False, True, float),
+        }
+
+    @classmethod
+    def _validate_numeric_field(cls, key: str, raw_val: Any) -> Any:
+        rules = cls._numeric_rules()
+        lo, hi, lo_inc, hi_inc, expected_type = rules[key]
+        if isinstance(raw_val, bool):
+            raise ValueError(f"Config key '{key}' must be numeric, got bool {raw_val!r}")
+        try:
+            num = float(raw_val)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Config key '{key}' has non-numeric value {raw_val!r}") from exc
+        if not math.isfinite(num):
+            raise ValueError(f"Config key '{key}' must be finite, got {raw_val!r}")
+        if expected_type is int and not num.is_integer():
+            raise ValueError(f"Config key '{key}' must be an integer, got {raw_val!r}")
+        lo_ok = (num >= lo) if lo_inc else (num > lo)
+        hi_ok = (num <= hi) if hi_inc else (num < hi)
+        if not (lo_ok and hi_ok):
+            lo_br = "[" if lo_inc else "("
+            hi_br = "]" if hi_inc else ")"
+            raise ValueError(
+                f"Config key '{key}'={num!r} is outside allowed range {lo_br}{lo}, {hi}{hi_br}"
+            )
+        return int(num) if expected_type is int else num
+
+    def validate(self) -> None:
+        """Validates all numeric config parameters and cross-field relationships."""
+        for key in self._numeric_rules():
+            coerced = self._validate_numeric_field(key, getattr(self, key))
+            object.__setattr__(self, key, coerced)
+
+        if self.ema_fast >= self.ema_slow:
+            raise ValueError(
+                f"Config key 'ema_fast' ({self.ema_fast}) must be < 'ema_slow' ({self.ema_slow})"
+            )
+        if self.minimum_stop_atr >= self.maximum_stop_atr:
+            raise ValueError(
+                f"Config key 'minimum_stop_atr' ({self.minimum_stop_atr}) must be < 'maximum_stop_atr' ({self.maximum_stop_atr})"
+            )
+        if self.recovery_max_extension_atr < self.pullback_upper_atr:
+            raise ValueError(
+                f"Config key 'recovery_max_extension_atr' ({self.recovery_max_extension_atr}) must be >= 'pullback_upper_atr' ({self.pullback_upper_atr})"
+            )
+        if self.limit_entry_upper_atr > self.recovery_max_extension_atr:
+            raise ValueError(
+                f"Config key 'limit_entry_upper_atr' ({self.limit_entry_upper_atr}) must be <= 'recovery_max_extension_atr' ({self.recovery_max_extension_atr})"
+            )
+
+    def __post_init__(self) -> None:
+        self.validate()
+
     @classmethod
     def from_yaml(cls, path: Optional[os.PathLike] = None) -> "TrendPullbackConfig":
-        """Loads configuration from YAML if available; falls back to locked defaults."""
-        cfg = cls()
+        """Loads and strictly validates configuration from YAML; rejects invalid values."""
+        explicit_path = path is not None
         if path is None:
             path = Path(__file__).resolve().parent.parent / "config" / "trend_pullback_config.yaml"
         else:
             path = Path(path)
         if not path.is_file():
-            return cfg
+            if explicit_path:
+                logger.warning("TrendPullbackConfig YAML file not found: %s", path)
+                raise FileNotFoundError(f"TrendPullbackConfig YAML file not found: {path}")
+            logger.warning("Default TrendPullbackConfig YAML not found at %s; using locked defaults", path)
+            return cls()
+
+        rules = cls._numeric_rules()
+        metadata_keys = {"strategy_name", "strategy_status", "mode"}
+        parsed_kwargs: Dict[str, Any] = {}
         try:
             with open(path, "r", encoding="utf-8") as fh:
-                for raw_line in fh:
+                for line_no, raw_line in enumerate(fh, 1):
                     line = raw_line.split("#", 1)[0].strip()
-                    if not line or ":" not in line:
+                    if not line:
                         continue
+                    if ":" not in line:
+                        raise ValueError(f"Malformed YAML line {line_no} (missing ':'): {raw_line.strip()!r}")
                     k, v = [x.strip().strip('"').strip("'") for x in line.split(":", 1)]
-                    if hasattr(cfg, k):
-                        cur_val = getattr(cfg, k)
-                        if isinstance(cur_val, int):
-                            setattr(cfg, k, int(float(v)))
-                        elif isinstance(cur_val, float):
-                            setattr(cfg, k, float(v))
+                    if k in metadata_keys:
+                        continue
+                    if k not in rules:
+                        raise ValueError(f"Unknown config key '{k}' at line {line_no}")
+                    if v.lower() in ("true", "false"):
+                        raise ValueError(f"Config key '{k}' must be numeric, got boolean {v!r}")
+                    parsed_kwargs[k] = cls._validate_numeric_field(k, v)
+            cfg = cls(**parsed_kwargs)
+            cfg.validate()
+            return cfg
         except Exception as exc:
-            logger.debug("Using default TrendPullbackConfig (YAML load skipped: %s)", exc)
-        return cfg
+            logger.warning("Invalid TrendPullbackConfig YAML '%s': %s", path, exc)
+            raise ValueError(f"Invalid TrendPullbackConfig YAML '{path}': {exc}") from exc
 
 
 # ============================================================================
@@ -154,18 +246,24 @@ def synthesize_closed_4h_from_1h(
         return []
     buckets: Dict[int, List[KlineBar]] = {}
     for b in bars_1h:
-        b_key = (int(b.timestamp_ms) // TF_4H_MS) * TF_4H_MS
+        if getattr(b, "timestamp_ms", None) is None:
+            continue
+        ts = int(b.timestamp_ms)
+        if getattr(b, "is_closed", None) is False or (ts + TF_1H_MS > now_ms):
+            continue
+        b_key = (ts // TF_4H_MS) * TF_4H_MS
         buckets.setdefault(b_key, []).append(b)
 
     sorted_keys = sorted(buckets.keys())
     out: List[KlineBar] = []
     for idx, b_key in enumerate(sorted_keys):
-        grp = buckets[b_key]
+        grp = sorted(buckets[b_key], key=lambda x: int(x.timestamp_ms))
+        distinct_ts = {int(x.timestamp_ms) for x in grp}
         # A 4H bucket is complete only if its close boundary has passed (or a successor bucket exists)
-        # and it has all 4 constituent 1H candles.
+        # and it has all 4 distinct closed constituent 1H candles.
         has_successor = idx < len(sorted_keys) - 1
         is_past_close = now_ms >= (b_key + TF_4H_MS)
-        if (has_successor or is_past_close) and len(grp) == 4:
+        if (has_successor or is_past_close) and len(grp) == 4 and len(distinct_ts) == 4:
             out.append(
                 KlineBar(
                     timestamp_ms=b_key,
@@ -199,11 +297,13 @@ def verify_and_extract_completed_candles(
     # 1. Validate OHLCV numeric integrity and timestamp ordering
     seen_ts = set()
     for b in bars:
+        if getattr(b, "timestamp_ms", None) is None:
+            return False, "UNAVAILABLE", [], f"{label} contains missing timestamp."
         vals = (b.open, b.high, b.low, b.close, b.volume)
         if any(v is None or not math.isfinite(float(v)) for v in vals):
             return False, "UNAVAILABLE", [], f"{label} contains NaN or non-finite values."
-        if b.open <= 0 or b.high <= 0 or b.low <= 0 or b.close <= 0:
-            return False, "UNAVAILABLE", [], f"{label} contains non-positive OHLC prices."
+        if b.open <= 0 or b.high <= 0 or b.low <= 0 or b.close <= 0 or b.volume < 0:
+            return False, "UNAVAILABLE", [], f"{label} contains non-positive OHLC prices or negative volume."
         if b.high < b.low or b.high < max(b.open, b.close) or b.low > min(b.open, b.close):
             return False, "UNAVAILABLE", [], f"{label} has inconsistent high/low candle bounds."
         ts = int(b.timestamp_ms)
@@ -455,28 +555,43 @@ def _check_single_bar_recovery(
     atr14: float,
     cfg: TrendPullbackConfig,
 ) -> Tuple[bool, str]:
-    """Evaluates whether a single completed 4H candle satisfies all 4 pullback recovery criteria."""
+    """Evaluates whether a single completed 4H candle satisfies all 5 pullback recovery criteria."""
+    if not (
+        math.isfinite(ema50)
+        and math.isfinite(atr14)
+        and ema50 > 0
+        and atr14 > 0
+        and math.isfinite(bar.open)
+        and math.isfinite(bar.low)
+        and math.isfinite(bar.close)
+    ):
+        return False, "Invalid or non-finite EMA50/ATR14/OHLC inputs for recovery check"
+
     upper_bound = ema50 + (cfg.pullback_upper_atr * atr14)
     lower_bound = ema50 - (cfg.pullback_lower_atr * atr14)
     max_ext = ema50 + (cfg.recovery_max_extension_atr * atr14)
 
-    # 1. Low enters acceptable pullback zone [EMA50 - 0.50*ATR, EMA50 + 0.25*ATR]
+    # 1. Low >= lower bound of pullback zone [EMA50 - pullback_lower_atr*ATR, EMA50 + pullback_upper_atr*ATR]
     if bar.low < lower_bound:
         return False, f"Deep pullback rejected: candle low (${bar.low:,.2f}) fell below lower zone (${lower_bound:,.2f})"
+    # 2. Low <= upper bound of pullback zone
     if bar.low > upper_bound:
         return False, f"No pullback: candle low (${bar.low:,.2f}) remained above pullback zone (${upper_bound:,.2f})"
 
-    # 2. Close is above EMA50
+    # 3. Close is above EMA50
     if bar.close <= ema50:
         return False, f"No recovery: candle close (${bar.close:,.2f}) <= EMA50 (${ema50:,.2f})"
 
-    # 3. Close is above Open (bullish candle)
+    # 4. Close is above Open (bullish candle)
     if bar.close <= bar.open:
         return False, f"Bearish/doji candle rejected: close (${bar.close:,.2f}) <= open (${bar.open:,.2f})"
 
-    # 4. Close is not more than 1.0 ATR above EMA50 (anti-breakout-chasing)
+    # 5. Close is not more than recovery_max_extension_atr * ATR above EMA50 (anti-breakout-chasing)
     if bar.close > max_ext:
-        return False, f"Breakout chasing rejected: close (${bar.close:,.2f}) > EMA50 + 1.0 ATR (${max_ext:,.2f})"
+        return False, (
+            f"Breakout chasing rejected: close (${bar.close:,.2f}) > "
+            f"EMA50 + {cfg.recovery_max_extension_atr:.2f} ATR (${max_ext:,.2f})"
+        )
 
     return True, "Valid 4H pullback & recovery candle confirmed"
 
@@ -487,7 +602,7 @@ def detect_pullback(
     atr14_series: Sequence[float],
     cfg: Optional[TrendPullbackConfig] = None,
 ) -> Dict[str, Any]:
-    """Section 4C & 4D: Evaluates Pullback Zone, Recovery Candle, and 3-Bar Setup Expiry."""
+    """Section 4C & 4D: Evaluates Pullback Zone, Recovery Candle, and N-Bar Setup Expiry."""
     cfg = cfg or TrendPullbackConfig()
     if not completed_4h_bars or not ema50_series or not atr14_series:
         return {
@@ -502,6 +617,17 @@ def detect_pullback(
 
     ema50_now = float(ema50_series[-1])
     atr14_now = float(atr14_series[-1])
+    if not (math.isfinite(ema50_now) and math.isfinite(atr14_now) and ema50_now > 0 and atr14_now > 0):
+        return {
+            "pullback_zone_lower": 0.0,
+            "pullback_zone_upper": 0.0,
+            "max_extension_price": 0.0,
+            "recovery_candle": "NOT CONFIRMED",
+            "setup_status": "WAIT",
+            "bars_since_recovery": -1,
+            "reason": "Invalid or non-finite 4H EMA50/ATR14 for pullback detection",
+        }
+
     upper_bound = ema50_now + (cfg.pullback_upper_atr * atr14_now)
     lower_bound = ema50_now - (cfg.pullback_lower_atr * atr14_now)
     max_ext = ema50_now + (cfg.recovery_max_extension_atr * atr14_now)
@@ -520,21 +646,25 @@ def detect_pullback(
             "reason": reason_now,
         }
 
-    # Check trailing completed 4H bars to determine if an active setup is still within the 3-bar window or has expired
-    max_lookback = min(len(completed_4h_bars), cfg.setup_expiry_4h_bars + 4)
+    # Check trailing completed 4H bars to determine if an active setup is still within the expiry window or has expired
+    n_avail = min(len(completed_4h_bars), len(ema50_series), len(atr14_series))
+    max_lookback = min(n_avail, cfg.setup_expiry_4h_bars + 4)
     for offset in range(1, max_lookback):
-        idx = len(completed_4h_bars) - 1 - offset
+        idx = n_avail - 1 - offset
         b = completed_4h_bars[idx]
         e50 = float(ema50_series[idx])
         a14 = float(atr14_series[idx])
-        if not (math.isfinite(e50) and math.isfinite(a14) and a14 > 0):
+        if not (math.isfinite(e50) and math.isfinite(a14) and e50 > 0 and a14 > 0):
             continue
         ok_hist, _ = _check_single_bar_recovery(b, e50, a14, cfg)
         if ok_hist:
             # Verify subsequent bars have not invalidated structure by closing below EMA50
-            subsequent_bars = completed_4h_bars[idx + 1 :]
-            subsequent_emas = ema50_series[idx + 1 :]
-            broken = any(sb.close < se for sb, se in zip(subsequent_bars, subsequent_emas))
+            subsequent_bars = completed_4h_bars[idx + 1 : n_avail]
+            subsequent_emas = ema50_series[idx + 1 : n_avail]
+            broken = any(
+                not math.isfinite(se) or sb.close < se
+                for sb, se in zip(subsequent_bars, subsequent_emas)
+            )
             if broken:
                 break
             if offset <= cfg.setup_expiry_4h_bars:
@@ -573,9 +703,9 @@ def calculate_entry_zone(
     atr14_4h: float,
     cfg: Optional[TrendPullbackConfig] = None,
 ) -> Dict[str, float]:
-    """Section 4D: Calculates suggested manual limit-entry zone [EMA50, EMA50 + 0.10*ATR14]."""
+    """Section 4D: Calculates suggested manual limit-entry zone [EMA50, EMA50 + cfg.limit_entry_upper_atr*ATR14]."""
     cfg = cfg or TrendPullbackConfig()
-    if ema50_4h <= 0 or atr14_4h <= 0:
+    if not (math.isfinite(ema50_4h) and math.isfinite(atr14_4h)) or ema50_4h <= 0 or atr14_4h <= 0:
         return {"entry_low": 0.0, "entry_high": 0.0, "reference_entry": 0.0}
     low = float(ema50_4h)
     high = float(ema50_4h + cfg.limit_entry_upper_atr * atr14_4h)
@@ -592,17 +722,22 @@ def calculate_stop(
     entry_price: float,
     cfg: Optional[TrendPullbackConfig] = None,
 ) -> Dict[str, Any]:
-    """Section 5: Calculates initial structural stop and validates [0.75 ATR, 3.00 ATR] bounds.
+    """Section 5: Calculates initial structural stop and validates [cfg.minimum_stop_atr, cfg.maximum_stop_atr] bounds.
 
     Formula:
-      lowest_low_5bars = round(min(low of last 5 completed 4H candles), 2)
-      stop_buffer_usd  = round(0.25 * ATR14, 2)
-      stop_price       = round(lowest_low_5bars - stop_buffer_usd, 2)
+      lowest_low_Nbars = round(min(low of last cfg.stop_lookback completed 4H candles), 2)
+      stop_buffer_usd  = round(cfg.stop_buffer_atr * ATR14, 2)
+      stop_price       = round(lowest_low_Nbars - stop_buffer_usd, 2)
       stop_distance_usd = round(round(entry_price, 2) - stop_price, 2)
       stop_distance_atr_exact = stop_distance_usd / ATR14
     """
     cfg = cfg or TrendPullbackConfig()
-    if len(completed_4h_bars) < cfg.stop_lookback or atr14_4h <= 0 or entry_price <= 0:
+    if (
+        len(completed_4h_bars) < cfg.stop_lookback
+        or not (math.isfinite(atr14_4h) and math.isfinite(entry_price))
+        or atr14_4h <= 0
+        or entry_price <= 0
+    ):
         return {
             "lowest_low_5bars": 0.0,
             "atr14_used": 0.0,
@@ -616,7 +751,20 @@ def calculate_stop(
         }
 
     recent = completed_4h_bars[-cfg.stop_lookback :]
-    lowest_low = round(min(float(b.low) for b in recent), 2)
+    lows = [float(b.low) for b in recent]
+    if any(not math.isfinite(lo) or lo <= 0 for lo in lows):
+        return {
+            "lowest_low_5bars": 0.0,
+            "atr14_used": 0.0,
+            "stop_buffer_usd": 0.0,
+            "stop_price": 0.0,
+            "stop_distance_usd": 0.0,
+            "stop_distance_atr": 0.0,
+            "stop_distance_atr_exact": 0.0,
+            "valid": False,
+            "reason": "Non-finite or non-positive candle low in stop lookback window",
+        }
+    lowest_low = round(min(lows), 2)
     stop_buffer_usd = round(cfg.stop_buffer_atr * float(atr14_4h), 2)
     stop_price = round(lowest_low - stop_buffer_usd, 2)
     entry_px = round(float(entry_price), 2)
@@ -634,6 +782,13 @@ def calculate_stop(
         "stop_distance_atr": stop_dist_atr,
         "stop_distance_atr_exact": round(stop_dist_atr_exact, 4),
     }
+
+    if not math.isfinite(stop_dist_atr_exact):
+        return {
+            **base_out,
+            "valid": False,
+            "reason": "Stop rejected: non-finite stop distance",
+        }
 
     if stop_price >= entry_px:
         return {
@@ -677,20 +832,23 @@ def calculate_position_size(
     stop_price: float,
     cfg: Optional[TrendPullbackConfig] = None,
 ) -> Dict[str, float]:
-    """Section 6: Calculates unleveraged spot position size with full fee & slippage audit breakdown.
+    """Section 6: Calculates simulated unleveraged spot position size with full fee & slippage audit breakdown.
 
+    Uses the fictional reference simulation account (`cfg.initial_simulation_equity`) and configured
+    risk fraction (`cfg.risk_per_trade`) — NOT sized to the operator's live account equity.
     Guarantees:
-      1. Total estimated loss (gross price risk + entry/exit fees + entry/exit slippage) <= risk_budget_usd ($500.00).
-      2. Position notional <= equity_usd ($100,000.00, 0.0x leverage).
+      1. Total estimated loss (gross price risk + entry/exit fees + entry/exit slippage) <= risk_budget_usd
+         (`round(cfg.initial_simulation_equity * cfg.risk_per_trade, 2)`).
+      2. Position notional <= equity_usd (`cfg.initial_simulation_equity`, 0.0x leverage, spot only).
       3. All displayed per-BTC and USD risk components reconcile to the cent.
     """
     cfg = cfg or TrendPullbackConfig()
     equity = round(float(cfg.initial_simulation_equity), 2)
     risk_budget = round(equity * float(cfg.risk_per_trade), 2)
-    entry_px = round(float(entry_price), 2)
-    stop_px = round(float(stop_price), 2)
+    entry_px = round(float(entry_price), 2) if math.isfinite(float(entry_price)) else 0.0
+    stop_px = round(float(stop_price), 2) if math.isfinite(float(stop_price)) else 0.0
 
-    if entry_px <= 0 or stop_px <= 0 or stop_px >= entry_px:
+    if not (math.isfinite(entry_px) and math.isfinite(stop_px)) or entry_px <= 0 or stop_px <= 0 or stop_px >= entry_px:
         return {
             "equity_usd": equity,
             "risk_budget_usd": risk_budget,
@@ -906,7 +1064,7 @@ def generate_strategy_verdict(
     pos_mode = position_status.strip().upper()
 
     # Priority 1: Fail Closed on Data Integrity Failure
-    if not data_integrity_ok or current_price <= 0:
+    if not data_integrity_ok or not math.isfinite(current_price) or current_price <= 0:
         return {
             "decision_state": "DATA UNAVAILABLE",
             "trade_decision": "NO TRADE",
@@ -942,7 +1100,7 @@ def generate_strategy_verdict(
             "explanation": "Position active and above structural stop, 4H EMA50, and 1D SMA200. Hold and trail per rules.",
         }
 
-    # User is in CASH (Default): evaluate entry permission gates in strict priority order
+    # User is in CASH (Default): evaluate entry filter gates in strict priority order (veto-only; never authorizes)
     # Priority 2: Daily Regime Filter
     if daily_regime != "BULLISH":
         return {
@@ -982,7 +1140,7 @@ def generate_strategy_verdict(
             "explanation": f"WAIT FOR PULLBACK: Bullish regime & 4H trend active, but {pullback_reason}.",
         }
 
-    # Validate structural stop distance (0.75 ATR - 3.00 ATR)
+    # Validate structural stop distance (configured [minimum_stop_atr, maximum_stop_atr] bounds)
     if not stop_valid:
         return {
             "decision_state": "WAIT FOR PULLBACK",
@@ -990,6 +1148,19 @@ def generate_strategy_verdict(
             "strategy_verdict": "NO TRADE",
             "setup_status": "WAIT",
             "explanation": f"NO ENTRY: Recovery candle printed, but {stop_reason}.",
+        }
+
+    if (
+        not (math.isfinite(limit_entry_low) and math.isfinite(limit_entry_high))
+        or limit_entry_low <= 0
+        or limit_entry_high <= 0
+    ):
+        return {
+            "decision_state": "DATA UNAVAILABLE",
+            "trade_decision": "NO TRADE",
+            "strategy_verdict": "NO TRADE",
+            "setup_status": "WAIT",
+            "explanation": "DATA UNAVAILABLE: Invalid reference limit-entry zone bounds.",
         }
 
     # Priority 5 vs 6: Check if current price moved above the acceptable limit-entry zone
@@ -1005,14 +1176,15 @@ def generate_strategy_verdict(
             ),
         }
 
-    # Priority 6: ENTRY SETUP CONFIRMED
+    # Priority 6: ENTRY SETUP CONFIRMED (setup state only — veto-only stack never authorizes or instructs orders)
     return {
         "decision_state": "ENTRY SETUP CONFIRMED",
         "trade_decision": "ENTRY READY",
         "strategy_verdict": "ENTRY READY",
         "setup_status": "CONFIRMED",
         "explanation": (
-            f"ENTRY SETUP CONFIRMED: Daily regime BULLISH, 4H trend CONFIRMED, 4H recovery candle CONFIRMED. "
+            f"SETUP STATE ONLY (ENTRY READY — NOT an instruction or permission to place an order; operator decides): "
+            f"Daily regime BULLISH, 4H trend CONFIRMED, 4H recovery candle CONFIRMED. "
             f"Reference limit zone: ${limit_entry_low:,.2f} - ${limit_entry_high:,.2f}."
         ),
     }
@@ -1054,26 +1226,56 @@ class TrendPullbackEngine:
         raw_1h = list(getattr(store, "spot_klines_1h", []) or [])
         raw_1w = list(getattr(store, "spot_klines_1w", []) or [])
 
-        spot_price = float(
-            getattr(store, "binance_spot_price", 0.0)
-            or getattr(store, "spot_price", 0.0)
-            or 0.0
+        def _safe_pos_float(val: Any) -> float:
+            try:
+                f = float(val)
+                return f if (math.isfinite(f) and f > 0.0) else 0.0
+            except (TypeError, ValueError):
+                return 0.0
+
+        def _fresh_bar_close(bars: Sequence[KlineBar], tf_ms: int, max_stale_hours: float) -> float:
+            if not bars:
+                return 0.0
+            b = bars[-1]
+            if getattr(b, "timestamp_ms", None) is None:
+                return 0.0
+            px = _safe_pos_float(getattr(b, "close", 0.0))
+            if px <= 0.0:
+                return 0.0
+            age_h = (now_ms - (int(b.timestamp_ms) + tf_ms)) / 3_600_000.0
+            return px if age_h <= max_stale_hours else 0.0
+
+        spot_price = (
+            _safe_pos_float(getattr(store, "binance_spot_price", 0.0))
+            or _safe_pos_float(getattr(store, "spot_price", 0.0))
+            or _fresh_bar_close(raw_1h, TF_1H_MS, cfg.max_4h_stale_hours)
+            or _fresh_bar_close(raw_4h, TF_4H_MS, cfg.max_4h_stale_hours)
+            or _fresh_bar_close(raw_1d, TF_1D_MS, cfg.max_daily_stale_hours)
         )
-        if spot_price <= 0.0 and raw_1h:
-            spot_price = float(raw_1h[-1].close)
-        elif spot_price <= 0.0 and raw_4h:
-            spot_price = float(raw_4h[-1].close)
-        elif spot_price <= 0.0 and raw_1d:
-            spot_price = float(raw_1d[-1].close)
 
-        # Synthesize 4H bars from 1H if dedicated 4H buffer is empty or has fewer bars than 1H synthesis
-        synth_4h = synthesize_closed_4h_from_1h(raw_1h, now_ms=now_ms) if raw_1h else []
-        candidate_4h = raw_4h if len(raw_4h) >= len(synth_4h) else synth_4h
-
-        # 2. Verify Data Integrity & Extract Strictly Completed Candles
+        # Prefer dedicated 4H buffer; synthesize closed 4H bars from 1H only when dedicated 4H history is short
         min_1d = cfg.daily_sma_period + cfg.daily_sma_slope_period
         min_4h = max(cfg.ema_slow, cfg.ema_fast + cfg.ema_slope_period)
+        synth_4h = synthesize_closed_4h_from_1h(raw_1h, now_ms=now_ms) if raw_1h else []
+        if not raw_4h:
+            candidate_4h = synth_4h
+        else:
+            ok_raw4h, status_raw4h, comp_raw4h, err_raw4h = verify_and_extract_completed_candles(
+                raw_4h,
+                tf_ms=TF_4H_MS,
+                min_required=min_4h,
+                now_ms=now_ms,
+                max_stale_hours=cfg.max_4h_stale_hours,
+                label="4H",
+            )
+            if ok_raw4h:
+                candidate_4h = raw_4h
+            elif (len(raw_4h) < min_4h or (status_raw4h == "UNAVAILABLE" and "Insufficient completed" in err_raw4h)) and len(synth_4h) > len(comp_raw4h):
+                candidate_4h = synth_4h
+            else:
+                candidate_4h = raw_4h
 
+        # 2. Verify Data Integrity & Extract Strictly Completed Candles
         ok_1d, status_1d, comp_1d, err_1d = verify_and_extract_completed_candles(
             raw_1d,
             tf_ms=TF_1D_MS,
@@ -1124,21 +1326,29 @@ class TrendPullbackEngine:
         data_integrity_ok = bool(ok_1d and ok_4h and spot_price > 0 and math.isfinite(spot_price))
         integrity_errors = [e for e in (err_1d, err_4h) if e]
         if spot_price <= 0 or not math.isfinite(spot_price):
-            integrity_errors.append("Spot price is missing or non-positive.")
+            integrity_errors.append("Spot price is missing, stale, or non-positive.")
         integrity_failure_reason = " | ".join(integrity_errors)
 
-        # Supplementary Macro 1D & 1W EMA50 + Daily SMA50
+        # Supplementary Macro 1D & 1W EMA50 + Daily SMA50 (only from verified non-stale closed bars)
         ema50_1d_val = 0.0
         sma50_1d_val = 0.0
-        if len(comp_1d) >= 50:
+        if ok_1d and len(comp_1d) >= 50:
             c1d_closes = [float(b.close) for b in comp_1d]
             e50_1d_s = compute_ema_series(c1d_closes, 50)
             s50_1d_s = compute_sma_series(c1d_closes, 50)
             ema50_1d_val = round(e50_1d_s[-1], 2) if math.isfinite(e50_1d_s[-1]) else 0.0
             sma50_1d_val = round(s50_1d_s[-1], 2) if math.isfinite(s50_1d_s[-1]) else 0.0
         ema50_1w_val = 0.0
-        if len(raw_1w) >= 50:
-            e50_1w_s = compute_ema_series([float(b.close) for b in raw_1w], 50)
+        ok_1w, _status_1w, comp_1w, _err_1w = verify_and_extract_completed_candles(
+            raw_1w,
+            tf_ms=7 * TF_1D_MS,
+            min_required=50,
+            now_ms=now_ms,
+            max_stale_hours=(7 * 24.0) + cfg.max_daily_stale_hours,
+            label="Weekly (1W)",
+        )
+        if ok_1w and len(comp_1w) >= 50:
+            e50_1w_s = compute_ema_series([float(b.close) for b in comp_1w], 50)
             ema50_1w_val = round(e50_1w_s[-1], 2) if math.isfinite(e50_1w_s[-1]) else 0.0
 
         # 3. Calculate Daily Regime & 4H Trend
@@ -1388,7 +1598,10 @@ class TrendPullbackEngine:
         if pos_status == "HOLDING":
             entry_elig_str = "IN POSITION (Managing open BTC spot holding; new entries paused)"
         elif verdict_res["strategy_verdict"] == "ENTRY READY":
-            entry_elig_str = "ELIGIBLE (All 1D Regime, 4H Trend, Pullback Recovery, and Stop gates passed)"
+            entry_elig_str = (
+                "SETUP READY (All 1D Regime, 4H Trend, Pullback Recovery, and Stop gates passed — "
+                "setup state only, NOT an order instruction or authorization; operator decides)"
+            )
         else:
             entry_elig_str = f"BLOCKED ({verdict_res['decision_state']})"
 
@@ -1548,6 +1761,27 @@ class TrendPullbackEngine:
             consecutive_1d_closes_below_sma200=consec_1d_below,
             completed_1d_count=len(comp_1d),
             completed_4h_count=len(comp_4h),
+            evaluation_origin="ENGINE_EVALUATE",
+            cfg_daily_sma_period=cfg.daily_sma_period,
+            cfg_daily_sma_slope_period=cfg.daily_sma_slope_period,
+            cfg_ema_fast=cfg.ema_fast,
+            cfg_ema_slow=cfg.ema_slow,
+            cfg_ema_slope_period=cfg.ema_slope_period,
+            cfg_atr_period=cfg.atr_period,
+            cfg_pullback_upper_atr=cfg.pullback_upper_atr,
+            cfg_pullback_lower_atr=cfg.pullback_lower_atr,
+            cfg_recovery_max_extension_atr=cfg.recovery_max_extension_atr,
+            cfg_limit_entry_upper_atr=cfg.limit_entry_upper_atr,
+            cfg_stop_lookback=cfg.stop_lookback,
+            cfg_stop_buffer_atr=cfg.stop_buffer_atr,
+            cfg_minimum_stop_atr=cfg.minimum_stop_atr,
+            cfg_maximum_stop_atr=cfg.maximum_stop_atr,
+            cfg_entry_fee_pct=cfg.entry_fee_pct,
+            cfg_exit_fee_pct=cfg.exit_fee_pct,
+            cfg_entry_slippage_pct=cfg.entry_slippage_pct,
+            cfg_exit_slippage_pct=cfg.exit_slippage_pct,
+            cfg_max_daily_stale_hours=cfg.max_daily_stale_hours,
+            cfg_max_4h_stale_hours=cfg.max_4h_stale_hours,
         )
         ev.summary_markdown = self._build_markdown_summary(ev)
         store.trend_pullback_evaluation = ev
@@ -1564,42 +1798,64 @@ class TrendPullbackEngine:
         prev_1d_diff = round(ev.prev_1d_close - ev.prev_1d_sma200, 2) if ev.prev_1d_sma200 > 0 else 0.0
         spot_le_stop = bool(ev.structural_stop > 0 and ev.spot_price > 0 and ev.spot_price <= ev.structural_stop)
 
+        d_sma = int(getattr(ev, "cfg_daily_sma_period", 200))
+        d_slp = int(getattr(ev, "cfg_daily_sma_slope_period", 20))
+        e_fast = int(getattr(ev, "cfg_ema_fast", 50))
+        e_slow = int(getattr(ev, "cfg_ema_slow", 200))
+        e_slp = int(getattr(ev, "cfg_ema_slope_period", 6))
+        atr_p = int(getattr(ev, "cfg_atr_period", 14))
+        pb_lo = float(getattr(ev, "cfg_pullback_lower_atr", 0.50))
+        pb_hi = float(getattr(ev, "cfg_pullback_upper_atr", 0.25))
+        max_ext = float(getattr(ev, "cfg_recovery_max_extension_atr", 1.00))
+        lim_hi = float(getattr(ev, "cfg_limit_entry_upper_atr", 0.10))
+        stp_lb = int(getattr(ev, "cfg_stop_lookback", 5))
+        stp_buf = float(getattr(ev, "cfg_stop_buffer_atr", 0.25))
+        min_stp = float(getattr(ev, "cfg_minimum_stop_atr", 0.75))
+        max_stp = float(getattr(ev, "cfg_maximum_stop_atr", 3.00))
+        ef_pct = float(getattr(ev, "cfg_entry_fee_pct", 0.0010)) * 100.0
+        xf_pct = float(getattr(ev, "cfg_exit_fee_pct", 0.0010)) * 100.0
+        es_pct = float(getattr(ev, "cfg_entry_slippage_pct", 0.0005)) * 100.0
+        xs_pct = float(getattr(ev, "cfg_exit_slippage_pct", 0.0005)) * 100.0
+        max_1d_stale = float(getattr(ev, "cfg_max_daily_stale_hours", 48.0))
+        max_4h_stale = float(getattr(ev, "cfg_max_4h_stale_hours", 8.5))
+        eval_origin = getattr(ev, "evaluation_origin", "STORED")
+
         lines = [
-            f"# {ev.strategy_name} | DATA-ONLY REPORT ({ev.mode_label})",
-            f"**STATUS:** `{ev.strategy_status}`  |  **Retrieval Time (UTC):** `{ev.timestamp_utc}`  |  **Retrieval Time (SGT):** `{ev.timestamp_sgt}`",
+            f"# {ev.strategy_name} | DATA-ONLY REPORT ({ev.mode_label} | SPOT ONLY)",
+            f"**STATUS:** `{ev.strategy_status}` (NOT VALIDATED FOR LIVE CAPITAL)  |  **Origin:** `{eval_origin}`  |  **Retrieval Time (UTC):** `{ev.timestamp_utc}`  |  **Retrieval Time (SGT):** `{ev.timestamp_sgt}`",
             f"**Spot Price (BTCUSDT):** `${ev.spot_price:,.2f}`",
             "",
             "## 1. DAILY (1D)",
             f"- **Completed 1D Candle Window:** `Open {ev.daily_open_time_utc} -> Close {ev.daily_close_time_utc}`",
             f"- **Last Completed 1D Close:** `${ev.daily_close_completed:,.2f}` (Open `${ev.daily_open_completed:,.2f}`, High `${ev.daily_high_completed:,.2f}`, Low `${ev.daily_low_completed:,.2f}`)",
             f"- **Daily SMA50:** `${ev.daily_sma50:,.2f}`",
-            f"- **Daily SMA200:** `${ev.daily_sma200:,.2f}` (20D Prior SMA200: `${ev.daily_sma200_prev20:,.2f}`)",
-            f"- **Daily SMA200 20D Slope (`SMA200_now - SMA200_20d_ago`):** `${ev.daily_sma200_slope_20d:+,.2f}`",
-            f"- **Close vs SMA200 (`Close - SMA200`):** `${ev.daily_close_vs_sma200_usd:+,.2f}` (`{ev.daily_close_vs_sma200_pct:+.2f}%`)",
+            f"- **Daily SMA{d_sma}:** `${ev.daily_sma200:,.2f}` ({d_slp}D Prior SMA{d_sma}: `${ev.daily_sma200_prev20:,.2f}`)",
+            f"- **Daily SMA{d_sma} {d_slp}D Slope (`SMA{d_sma}_now - SMA{d_sma}_{d_slp}d_ago`):** `${ev.daily_sma200_slope_20d:+,.2f}`",
+            f"- **Close vs SMA{d_sma} (`Close - SMA{d_sma}`):** `${ev.daily_close_vs_sma200_usd:+,.2f}` (`{ev.daily_close_vs_sma200_pct:+.2f}%`)",
             f"- **Close vs SMA50 (`Close - SMA50`):** `${ev.daily_close_vs_sma50_usd:+,.2f}` (`{ev.daily_close_vs_sma50_pct:+.2f}%`)",
-            f"- **Close > SMA200:** `{ev.daily_close_above_sma200}`",
+            f"- **Close > SMA{d_sma}:** `{ev.daily_close_above_sma200}`",
             f"- **Close > SMA50:** `{ev.daily_close_above_sma50}`",
-            f"- **SMA200 Rising Over 20D (`SMA200_now > SMA200_20d_ago`):** `{ev.daily_sma200_rising}`",
+            f"- **SMA{d_sma} Rising Over {d_slp}D (`SMA{d_sma}_now > SMA{d_sma}_{d_slp}d_ago`):** `{ev.daily_sma200_rising}`",
             "",
             "## 2. 4H TREND METRICS",
             f"- **Completed 4H Candle Window:** `Open {ev.candle_4h_open_time_utc} -> Close {ev.candle_4h_close_time_utc}`",
             f"- **Last Completed 4H Close:** `${ev.close_4h_completed:,.2f}`",
-            f"- **4H EMA50:** `${ev.ema50_4h:,.2f}`",
-            f"- **4H EMA200:** `${ev.ema200_4h:,.2f}`",
-            f"- **4H ATR14:** `${ev.atr14_4h:,.2f}`",
-            f"- **4H EMA50 - EMA200:** `${ev.ema50_minus_ema200_4h_usd:+,.2f}`",
-            f"- **4H EMA50 Now vs 6 Bars Ago:** Now `${ev.ema50_4h:,.2f}` vs 6 Bars Ago `${ev.ema50_4h_prev6:,.2f}` (`{ev.ema50_4h_slope_6bars:+,.2f}` USD)",
-            f"- **Last 4H Close vs 4H EMA50 (`Close - EMA50`):** `${ev.close_4h_vs_ema50_usd:+,.2f}` (`{ev.close_4h_vs_ema50_atr:+.4f} ATR` / `{ev.close_4h_vs_ema50_atr:+.2f} ATR`)",
-            f"- **Last 4H Close vs 4H EMA200 (`Close - EMA200`):** `${ev.close_4h_vs_ema200_usd:+,.2f}` (`{ev.close_4h_vs_ema200_atr:+.4f} ATR` / `{ev.close_4h_vs_ema200_atr:+.2f} ATR`)",
-            f"- **4H EMA50 > 4H EMA200:** `{ev.ema50_above_ema200}`",
-            f"- **4H EMA50 Rising Over 6 Bars (`EMA50_now > EMA50_6bars_ago`):** `{ev.ema50_rising_6bars}`",
-            f"- **Last 4H Close > 4H EMA200:** `{ev.close_4h_above_ema200}`",
+            f"- **4H EMA{e_fast}:** `${ev.ema50_4h:,.2f}`",
+            f"- **4H EMA{e_slow}:** `${ev.ema200_4h:,.2f}`",
+            f"- **4H ATR{atr_p}:** `${ev.atr14_4h:,.2f}`",
+            f"- **4H EMA{e_fast} - EMA{e_slow}:** `${ev.ema50_minus_ema200_4h_usd:+,.2f}`",
+            f"- **4H EMA{e_fast} Now vs {e_slp} Bars Ago:** Now `${ev.ema50_4h:,.2f}` vs {e_slp} Bars Ago `${ev.ema50_4h_prev6:,.2f}` (`{ev.ema50_4h_slope_6bars:+,.2f}` USD)",
+            f"- **Last 4H Close vs 4H EMA{e_fast} (`Close - EMA{e_fast}`):** `${ev.close_4h_vs_ema50_usd:+,.2f}` (`{ev.close_4h_vs_ema50_atr:+.4f} ATR` / `{ev.close_4h_vs_ema50_atr:+.2f} ATR`)",
+            f"- **Last 4H Close vs 4H EMA{e_slow} (`Close - EMA{e_slow}`):** `${ev.close_4h_vs_ema200_usd:+,.2f}` (`{ev.close_4h_vs_ema200_atr:+.4f} ATR` / `{ev.close_4h_vs_ema200_atr:+.2f} ATR`)",
+            f"- **4H EMA{e_fast} > 4H EMA{e_slow}:** `{ev.ema50_above_ema200}`",
+            f"- **4H EMA{e_fast} Rising Over {e_slp} Bars (`EMA{e_fast}_now > EMA{e_fast}_{e_slp}bars_ago`):** `{ev.ema50_rising_6bars}`",
+            f"- **Last 4H Close > 4H EMA{e_slow}:** `{ev.close_4h_above_ema200}`",
             "",
             "## 3. PULLBACK ZONE",
-            f"- **Pullback Zone Formula:** `Zone Lower = 4H EMA50 - 0.50 * 4H ATR14` | `Zone Upper = 4H EMA50 + 0.25 * 4H ATR14` | `Max Extension = 4H EMA50 + 1.00 * 4H ATR14`",
-            f"- **Zone Lower (`EMA50 - 0.50 * ATR14`):** `${ev.pullback_zone_lower:,.2f}`",
-            f"- **Zone Upper (`EMA50 + 0.25 * ATR14`):** `${ev.pullback_zone_upper:,.2f}`",
-            f"- **Max Extension (`EMA50 + 1.00 * ATR14`):** `${ev.max_extension_price:,.2f}`",
+            f"- **Pullback Zone Formula:** `Zone Lower = 4H EMA{e_fast} - {pb_lo:.2f} * 4H ATR{atr_p}` | `Zone Upper = 4H EMA{e_fast} + {pb_hi:.2f} * 4H ATR{atr_p}` | `Max Extension = 4H EMA{e_fast} + {max_ext:.2f} * 4H ATR{atr_p}`",
+            f"- **Zone Lower (`EMA{e_fast} - {pb_lo:.2f} * ATR{atr_p}`):** `${ev.pullback_zone_lower:,.2f}`",
+            f"- **Zone Upper (`EMA{e_fast} + {pb_hi:.2f} * ATR{atr_p}`):** `${ev.pullback_zone_upper:,.2f}`",
+            f"- **Max Extension (`EMA{e_fast} + {max_ext:.2f} * ATR{atr_p}`):** `${ev.max_extension_price:,.2f}`",
             f"- **Spot Minus Zone Lower (`Spot - Zone Lower`):** `${ev.spot_minus_zone_lower_usd:+,.2f}` (`{ev.spot_minus_zone_lower_atr:+.4f} ATR` / `{ev.spot_minus_zone_lower_atr:+.2f} ATR`)",
             f"- **Spot Minus Zone Upper (`Spot - Zone Upper`):** `${ev.spot_minus_zone_upper_usd:+,.2f}` (`{ev.spot_minus_zone_upper_atr:+.4f} ATR` / `{ev.spot_minus_zone_upper_atr:+.2f} ATR`)",
             f"- **Last Completed 4H Candle OHLC:** Open `${ev.open_4h_completed:,.2f}`, High `${ev.high_4h_completed:,.2f}`, Low `${ev.low_4h_completed:,.2f}`, Close `${ev.close_4h_completed:,.2f}`",
@@ -1608,55 +1864,77 @@ class TrendPullbackEngine:
             "- **Recovery Candle Sub-Conditions (Last Completed 4H Candle):**",
             f"  - `Candle Low >= Zone Lower`: `{ev.rec_cond1_low_ge_zone_lower}`",
             f"  - `Candle Low <= Zone Upper`: `{ev.rec_cond2_low_le_zone_upper}`",
-            f"  - `Candle Close > 4H EMA50`: `{ev.rec_cond3_close_gt_ema50}`",
+            f"  - `Candle Close > 4H EMA{e_fast}`: `{ev.rec_cond3_close_gt_ema50}`",
             f"  - `Candle Close > Candle Open`: `{ev.rec_cond4_close_gt_open}`",
-            f"  - `Candle Close <= 4H EMA50 + 1.00 * 4H ATR14`: `{ev.rec_cond5_close_le_max_ext}`",
+            f"  - `Candle Close <= 4H EMA{e_fast} + {max_ext:.2f} * 4H ATR{atr_p}`: `{ev.rec_cond5_close_le_max_ext}`",
             f"  - `All 5 Recovery Sub-Conditions True`: `{ev.rec_all_conditions_met}`",
             "",
-            f"## 4. REFERENCE LEVELS (Reference calculation if entered at ${ev.reference_entry_price:,.2f}. Not an order.)",
-            f"- **Reference Entry Zone (`[4H EMA50, 4H EMA50 + 0.10 * 4H ATR14]`):** `${ev.limit_entry_low:,.2f} - ${ev.limit_entry_high:,.2f}`",
-            f"- **Reference Entry Price Used (`4H EMA50 + 0.10 * 4H ATR14`):** `${ev.reference_entry_price:,.2f}`",
+            f"## 4. REFERENCE LEVELS (Reference calculation if entered at ${ev.reference_entry_price:,.2f}. Not an order. Simulated on ${ev.simulation_equity_usd:,.0f} reference paper account — NOT sized to operator's account.)",
+            f"- **Reference Entry Zone (`[4H EMA{e_fast}, 4H EMA{e_fast} + {lim_hi:.2f} * 4H ATR{atr_p}]`):** `${ev.limit_entry_low:,.2f} - ${ev.limit_entry_high:,.2f}`",
+            f"- **Reference Entry Price Used (`4H EMA{e_fast} + {lim_hi:.2f} * 4H ATR{atr_p}`):** `${ev.reference_entry_price:,.2f}`",
             f"- **Distance From Spot To Reference Entry (`Spot - Reference Entry`):** `${ev.spot_to_ref_entry_usd:+,.2f}` (`{ev.spot_to_ref_entry_pct:+.2f}%`)",
-            f"- **Stop Level (`min(low of last 5 completed 4H bars) - 0.25 * 4H ATR14`):** `${ev.structural_stop:,.2f}` (5-Bar Lowest Low `${ev.stop_lowest_low_5bars:,.2f}` - Buffer `${ev.stop_buffer_usd:,.2f}`)",
+            f"- **Stop Level (`min(low of last {stp_lb} completed 4H bars) - {stp_buf:.2f} * 4H ATR{atr_p}`):** `${ev.structural_stop:,.2f}` ({stp_lb}-Bar Lowest Low `${ev.stop_lowest_low_5bars:,.2f}` - Buffer `${ev.stop_buffer_usd:,.2f}`)",
             f"- **Stop Distance From Reference Entry (`Reference Entry ${ev.reference_entry_price:,.2f} - Stop Level ${ev.structural_stop:,.2f}`):** `${ev.stop_distance_usd:,.2f}` (`{ev.stop_distance_atr_exact:.4f} ATR` / `{ev.stop_distance_atr:.2f} ATR`)",
-            f"- **Stop Distance >= 0.75 ATR:** `{ev.stop_dist_ge_min_atr}`",
-            f"- **Stop Distance <= 3.00 ATR:** `{ev.stop_dist_le_max_atr}`",
-            f"- **Reference Simulation Equity:** `${ev.simulation_equity_usd:,.2f}`",
-            f"- **Risk Budget (`0.50%` of Reference Equity):** `${ev.risk_budget_usd:,.2f}`",
-            f"- **Position Size:** `{ev.position_size_btc:.5f} BTC`",
-            f"- **Position Notional (`Position Size * Reference Entry ${ev.reference_entry_price:,.2f}`):** `${ev.position_value_usd:,.2f}`",
+            f"- **Stop Distance >= {min_stp:.2f} ATR:** `{ev.stop_dist_ge_min_atr}`",
+            f"- **Stop Distance <= {max_stp:.2f} ATR:** `{ev.stop_dist_le_max_atr}`",
+            f"- **Reference Simulation Equity (Fictional Paper Account, NOT Operator Equity):** `${ev.simulation_equity_usd:,.2f}`",
+            f"- **Simulated Risk Budget (`{ev.risk_per_trade_pct:.2f}%` of `${ev.simulation_equity_usd:,.0f}` reference account, NOT operator account):** `${ev.risk_budget_usd:,.2f}`",
+            f"- **Simulated Position Size (on `${ev.simulation_equity_usd:,.0f}` reference account, NOT operator account):** `{ev.position_size_btc:.5f} BTC`",
+            f"- **Simulated Position Notional (`Position Size * Reference Entry ${ev.reference_entry_price:,.2f}`, on `${ev.simulation_equity_usd:,.0f}` reference account, NOT operator account):** `${ev.position_value_usd:,.2f}`",
             f"- **Computed Price Risk (`Position Size * Stop Distance ${ev.stop_distance_usd:,.2f}`):** `${ev.gross_price_risk_usd:,.2f}` (`${ev.gross_price_risk_per_btc:,.2f}/BTC`)",
-            f"- **Fee & Slippage Buffer (`0.10%` Entry Fee + `0.10%` Exit Fee + `0.05%` Entry Slippage + `0.05%` Exit Slippage):** `${ev.fee_slippage_buffer_usd:,.2f}` (`${ev.cost_allowance_per_btc:,.2f}/BTC`: Entry Fee `${ev.entry_fee_usd:,.2f}` + Exit Fee `${ev.exit_fee_usd:,.2f}` + Entry Slippage `${ev.entry_slippage_usd:,.2f}` + Exit Slippage `${ev.exit_slippage_usd:,.2f}`)",
+            f"- **Fee & Slippage Buffer (`{ef_pct:.2f}%` Entry Fee + `{xf_pct:.2f}%` Exit Fee + `{es_pct:.2f}%` Entry Slippage + `{xs_pct:.2f}%` Exit Slippage):** `${ev.fee_slippage_buffer_usd:,.2f}` (`${ev.cost_allowance_per_btc:,.2f}/BTC`: Entry Fee `${ev.entry_fee_usd:,.2f}` + Exit Fee `${ev.exit_fee_usd:,.2f}` + Entry Slippage `${ev.entry_slippage_usd:,.2f}` + Exit Slippage `${ev.exit_slippage_usd:,.2f}`)",
             f"- **Total Estimated Risk (`Computed Price Risk + Fee & Slippage Buffer`):** `${ev.total_estimated_risk_usd:,.2f}` (`${ev.total_risk_per_btc:,.2f}/BTC`)",
-            f"- **Total Estimated Risk <= Risk Budget (`${ev.total_estimated_risk_usd:,.2f} <= ${ev.risk_budget_usd:,.2f}`):** `{ev.total_risk_le_budget}`",
+            f"- **Total Estimated Risk <= Simulated Risk Budget (`${ev.total_estimated_risk_usd:,.2f} <= ${ev.risk_budget_usd:,.2f}`):** `{ev.total_risk_le_budget}`",
             "",
             "## 5. EXIT RULE INPUTS",
             f"- **Position Mode Setting:** `{ev.position_status}`",
-            f"- **Completed 4H Candle (t-1) (`Open {ev.prev_4h_open_utc} -> Close {ev.prev_4h_close_utc}`):** Close `${ev.prev_4h_close:,.2f}` vs 4H EMA50 `${ev.prev_4h_ema50:,.2f}` (`{prev_4h_diff:+,.2f}` USD) | `Close < 4H EMA50`: `{ev.prev_4h_close_lt_ema50}`",
-            f"- **Completed 4H Candle (t) (`Open {ev.candle_4h_open_time_utc} -> Close {ev.candle_4h_close_time_utc}`):** Close `${ev.close_4h_completed:,.2f}` vs 4H EMA50 `${ev.ema50_4h:,.2f}` (`{ev.close_4h_vs_ema50_usd:+,.2f}` USD) | `Close < 4H EMA50`: `{ev.last_4h_close_lt_ema50}`",
-            f"- **Consecutive Completed 4H Closes Below 4H EMA50:** `{ev.consecutive_4h_closes_below_ema50}`",
-            f"- **Completed 1D Candle (t-1) (`Open {ev.prev_1d_open_utc} -> Close {ev.prev_1d_close_utc}`):** Close `${ev.prev_1d_close:,.2f}` vs 1D SMA200 `${ev.prev_1d_sma200:,.2f}` (`{prev_1d_diff:+,.2f}` USD) | `Close < 1D SMA200`: `{ev.prev_1d_close_lt_sma200}`",
-            f"- **Completed 1D Candle (t) (`Open {ev.daily_open_time_utc} -> Close {ev.daily_close_time_utc}`):** Close `${ev.daily_close_completed:,.2f}` vs 1D SMA200 `${ev.daily_sma200:,.2f}` (`{ev.daily_close_vs_sma200_usd:+,.2f}` USD) | `Close < 1D SMA200`: `{ev.last_1d_close_lt_sma200}`",
-            f"- **Consecutive Completed 1D Closes Below 1D SMA200:** `{ev.consecutive_1d_closes_below_sma200}`",
+            f"- **Completed 4H Candle (t-1) (`Open {ev.prev_4h_open_utc} -> Close {ev.prev_4h_close_utc}`):** Close `${ev.prev_4h_close:,.2f}` vs 4H EMA{e_fast} `${ev.prev_4h_ema50:,.2f}` (`{prev_4h_diff:+,.2f}` USD) | `Close < 4H EMA{e_fast}`: `{ev.prev_4h_close_lt_ema50}`",
+            f"- **Completed 4H Candle (t) (`Open {ev.candle_4h_open_time_utc} -> Close {ev.candle_4h_close_time_utc}`):** Close `${ev.close_4h_completed:,.2f}` vs 4H EMA{e_fast} `${ev.ema50_4h:,.2f}` (`{ev.close_4h_vs_ema50_usd:+,.2f}` USD) | `Close < 4H EMA{e_fast}`: `{ev.last_4h_close_lt_ema50}`",
+            f"- **Consecutive Completed 4H Closes Below 4H EMA{e_fast}:** `{ev.consecutive_4h_closes_below_ema50}`",
+            f"- **Completed 1D Candle (t-1) (`Open {ev.prev_1d_open_utc} -> Close {ev.prev_1d_close_utc}`):** Close `${ev.prev_1d_close:,.2f}` vs 1D SMA{d_sma} `${ev.prev_1d_sma200:,.2f}` (`{prev_1d_diff:+,.2f}` USD) | `Close < 1D SMA{d_sma}`: `{ev.prev_1d_close_lt_sma200}`",
+            f"- **Completed 1D Candle (t) (`Open {ev.daily_open_time_utc} -> Close {ev.daily_close_time_utc}`):** Close `${ev.daily_close_completed:,.2f}` vs 1D SMA{d_sma} `${ev.daily_sma200:,.2f}` (`{ev.daily_close_vs_sma200_usd:+,.2f}` USD) | `Close < 1D SMA{d_sma}`: `{ev.last_1d_close_lt_sma200}`",
+            f"- **Consecutive Completed 1D Closes Below 1D SMA{d_sma}:** `{ev.consecutive_1d_closes_below_sma200}`",
             f"- **Spot <= Stop Level (`${ev.spot_price:,.2f} <= ${ev.structural_stop:,.2f}`):** `{spot_le_stop}`",
             "",
             "## 6. DATA INTEGRITY",
             f"- **Data Retrieval Time (UTC):** `{ev.timestamp_utc}`",
             f"- **Data Retrieval Time (SGT):** `{ev.timestamp_sgt}`",
             f"- **Data Integrity Pass:** `{ev.data_integrity_ok}`",
-            f"- **Completed 1D Candles Available:** `{ev.completed_1d_count}` | **Last Completed 1D Status:** `{ev.daily_candle_status}` | **Forming 1D Candle Excluded:** `{ev.daily_forming_excluded}` (`{ev.daily_forming_open_utc}`)",
-            f"- **Completed 4H Candles Available:** `{ev.completed_4h_count}` | **Last Completed 4H Status:** `{ev.candle_4h_status}` | **Forming 4H Candle Excluded:** `{ev.candle_4h_forming_excluded}` (`{ev.candle_4h_forming_open_utc}`)",
+            f"- **Completed 1D Candles Available:** `{ev.completed_1d_count}` | **Last Completed 1D Status:** `{ev.daily_candle_status}` (Stale Limit `<= {max_1d_stale:.1f}h`) | **Forming 1D Candle Excluded:** `{ev.daily_forming_excluded}` (`{ev.daily_forming_open_utc}`)",
+            f"- **Completed 4H Candles Available:** `{ev.completed_4h_count}` | **Last Completed 4H Status:** `{ev.candle_4h_status}` (Stale Limit `<= {max_4h_stale:.1f}h`) | **Forming 4H Candle Excluded:** `{ev.candle_4h_forming_excluded}` (`{ev.candle_4h_forming_open_utc}`)",
         ]
+        if ev.integrity_failure_reason:
+            lines.append(f"- **Data Integrity Failure Reason:** `{ev.integrity_failure_reason}`")
         return "\n".join(lines)
 
 
-def copy_trend_pullback_to_clipboard(store: StateStore) -> Tuple[bool, str, int]:
-    """Copies BTC Trend-Pullback v1.0 brief to system clipboard and saves to logs/."""
-    ev = store.trend_pullback_evaluation
-    if ev is None:
-        ev = TrendPullbackEngine().evaluate(store)
+def get_or_recompute_trend_pullback(
+    config: Optional[EngineConfig],
+    store: StateStore,
+    *,
+    recompute: bool = False,
+) -> Tuple[Optional[TrendPullbackEvaluation], bool]:
+    """Returns the stored TrendPullbackEvaluation; only recomputes when explicitly requested."""
+    stored = getattr(store, "trend_pullback_evaluation", None)
+    if stored is not None:
+        return stored, False
+    if not recompute:
+        return None, False
+    ev = TrendPullbackEngine(config).evaluate(store)
+    ev.evaluation_origin = "EXPLICIT_RECOMPUTE"
+    ev.summary_markdown = TrendPullbackEngine._build_markdown_summary(ev)
+    return ev, True
 
-    text = ev.summary_markdown
+
+def copy_trend_pullback_to_clipboard(
+    store: StateStore,
+    *,
+    recompute: bool = False,
+) -> Tuple[bool, str, int]:
+    """Copies BTC Trend-Pullback v1.0 brief to system clipboard and saves to logs/."""
+    from analytics.data_only_reports import build_tab_a_data_only_report
+
+    text = build_tab_a_data_only_report(None, store, recompute=recompute)
     char_count = len(text)
 
     try:

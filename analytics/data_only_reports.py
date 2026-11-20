@@ -616,11 +616,27 @@ def build_tab_m_data_only_report(
     return sanitize_data_only_text("\n".join(lines))
 
 
-def build_tab_a_data_only_report(config: Optional[EngineConfig], store: StateStore) -> str:
-    tp_ev = getattr(store, "trend_pullback_evaluation", None)
+def build_tab_a_data_only_report(
+    config: Optional[EngineConfig],
+    store: StateStore,
+    *,
+    recompute: bool = False,
+) -> str:
+    from analytics.strategy_trend_pullback import get_or_recompute_trend_pullback
+
+    ts_utc, ts_sgt = _timestamps_utc_sgt()
+    tp_ev, _did_recompute = get_or_recompute_trend_pullback(config or DEFAULT_CONFIG, store, recompute=recompute)
     if tp_ev is None:
-        from analytics.strategy_trend_pullback import TrendPullbackEngine
-        tp_ev = TrendPullbackEngine(config or DEFAULT_CONFIG).evaluate(store)
+        lines = [
+            "# BTC TREND-PULLBACK v1.0 | DATA-ONLY REPORT (RESEARCH / PAPER MODE | SPOT ONLY)",
+            f"**STATUS:** `UNVALIDATED` (NOT VALIDATED FOR LIVE CAPITAL)  |  **Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (SGT):** `{ts_sgt}`",
+            "**Data Integrity Pass:** `False`",
+            "",
+            "- **Stored Evaluation:** `UNAVAILABLE` (no `trend_pullback_evaluation` in StateStore; call `SignalDetector.evaluate` or pass `recompute=True` explicitly)",
+            "- **Spot Price (BTCUSDT):** `UNAVAILABLE`",
+            "- **Simulated Position Size (on 100k reference account, NOT operator account):** `0.00000 BTC` (`$0.00` notional)",
+        ]
+        return sanitize_data_only_text("\n".join(lines))
     return sanitize_data_only_text(tp_ev.summary_markdown)
 
 
@@ -1025,9 +1041,9 @@ def build_tab_l_data_only_report(config: Optional[EngineConfig], store: StateSto
         ])
         if tpb is not None:
             lines.append(
-                f"- **Desk [A] Trend-Pullback v1.0 Reference:** Entry `${tpb.reference_entry_price:,.2f}` | "
+                f"- **Desk [A] Trend-Pullback v1.0 Reference (Simulated on ${tpb.simulation_equity_usd:,.0f} reference account, NOT operator equity):** Entry `${tpb.reference_entry_price:,.2f}` | "
                 f"Stop `${tpb.structural_stop:,.2f}` (`-${tpb.stop_distance_usd:,.2f}` / `{tpb.stop_distance_atr:.2f} ATR`) | "
-                f"Size `{tpb.position_size_btc:.6f} BTC` | Reconciled Risk `${tpb.total_estimated_risk_usd:,.2f}`"
+                f"Sim Size `{tpb.position_size_btc:.6f} BTC` (Sim Notional `${tpb.position_value_usd:,.2f}` | Sim Budget `${tpb.risk_budget_usd:,.2f}`) | Reconciled Risk `${tpb.total_estimated_risk_usd:,.2f}`"
             )
         if slsp is not None and slsp.active_setup is not None:
             st = slsp.active_setup

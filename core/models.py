@@ -5239,6 +5239,30 @@ class TrendPullbackEvaluation:
     completed_1d_count: int = 0
     completed_4h_count: int = 0
 
+    evaluation_origin: str = "STORED"  # ENGINE_EVALUATE | EXPLICIT_RECOMPUTE | STORED
+
+    # 9. Config Snapshot (bound to the exact parameters tested during evaluation)
+    cfg_daily_sma_period: int = 200
+    cfg_daily_sma_slope_period: int = 20
+    cfg_ema_fast: int = 50
+    cfg_ema_slow: int = 200
+    cfg_ema_slope_period: int = 6
+    cfg_atr_period: int = 14
+    cfg_pullback_upper_atr: float = 0.25
+    cfg_pullback_lower_atr: float = 0.50
+    cfg_recovery_max_extension_atr: float = 1.00
+    cfg_limit_entry_upper_atr: float = 0.10
+    cfg_stop_lookback: int = 5
+    cfg_stop_buffer_atr: float = 0.25
+    cfg_minimum_stop_atr: float = 0.75
+    cfg_maximum_stop_atr: float = 3.00
+    cfg_entry_fee_pct: float = 0.0010
+    cfg_exit_fee_pct: float = 0.0010
+    cfg_entry_slippage_pct: float = 0.0005
+    cfg_exit_slippage_pct: float = 0.0005
+    cfg_max_daily_stale_hours: float = 48.0
+    cfg_max_4h_stale_hours: float = 8.5
+
 # =============================================================================
 # B1 vs B2 Reconciliation & Data Integrity Audit Models
 # =============================================================================

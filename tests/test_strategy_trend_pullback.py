@@ -800,4 +800,202 @@ def test_24_all_tabs_and_global_ai_packet_data_only_acceptance() -> None:
             assert word not in report_lower, f"Forbidden word '{word}' found in {label} DATA-ONLY report!"
 
 
+def test_25_audit_no_silent_recompute_and_explicit_recompute() -> None:
+    """Audit Finding 1: HUD, Tab A report, clipboard helper, and AI packet must not silently evaluate when missing."""
+    import io
+    from unittest.mock import patch
+    from analytics.data_only_reports import build_tab_a_data_only_report
+    from strategy_trend_pullback import copy_trend_pullback_to_clipboard, get_or_recompute_trend_pullback
+
+    config = EngineConfig()
+    fresh_store = StateStore()
+    fresh_store.binance_spot_price = 80_000.0
+
+    with patch("analytics.strategy_trend_pullback.TrendPullbackEngine.evaluate") as mock_eval:
+        renderable = build_dashboard_renderable(config, fresh_store, tab_override=18)
+        report = build_tab_a_data_only_report(config, fresh_store)
+        packet = build_ai_telemetry_packet(config, fresh_store)
+        with patch("subprocess.run"), patch("subprocess.Popen"):
+            _ok, _msg, _cnt = copy_trend_pullback_to_clipboard(fresh_store)
+        mock_eval.assert_not_called()
+
+    assert fresh_store.trend_pullback_evaluation is None
+    buf = io.StringIO()
+    Console(file=buf, width=140, force_terminal=False).print(renderable)
+    hud_text = buf.getvalue()
+    assert "BTC TREND-PULLBACK v1.0" in hud_text
+    assert "DATA UNAVAILABLE" in hud_text
+    assert "UNAVAILABLE" in report
+    assert "## SECTION 18: TAB [A] BTC TREND-PULLBACK v1.0" in packet
+    assert "DATA UNAVAILABLE" in packet
+
+    # Ensure UNAVAILABLE DATA-ONLY report also has zero forbidden words
+    for word in ("verdict", "trade", "wait", "bullish", "bearish", "confirmed", "rejected", "recommend"):
+        assert word not in report.lower()
+
+    # Explicit recompute path populates store and marks EXPLICIT_RECOMPUTE
+    ev, did_recompute = get_or_recompute_trend_pullback(config, fresh_store, recompute=True)
+    assert did_recompute is True
+    assert ev is not None
+    assert ev.evaluation_origin == "EXPLICIT_RECOMPUTE"
+    assert fresh_store.trend_pullback_evaluation is ev
+
+
+def test_26_audit_yaml_validation_rejects_and_warns(tmp_path, caplog) -> None:
+    """Audit Finding 3: from_yaml validates every numeric key, rejects out-of-range values, and logs WARNING with key name."""
+    import logging
+    import pytest
+
+    # Valid production YAML loads cleanly
+    prod_cfg = TrendPullbackConfig.from_yaml()
+    assert prod_cfg.risk_per_trade == 0.005
+
+    bad_cases = [
+        ("risk_per_trade", "0.05"),       # 10x typo (5%)
+        ("risk_per_trade", "0.5"),        # 50%
+        ("risk_per_trade", "-0.01"),      # negative
+        ("risk_per_trade", "abc"),        # non-numeric
+        ("risk_per_trade", "nan"),        # non-finite
+        ("ema_fast", "50.5"),             # non-integer for int field
+        ("ema_fast", "250"),              # ema_fast >= ema_slow (200)
+        ("minimum_stop_atr", "4.0"),      # >= maximum_stop_atr (3.0)
+        ("max_4h_stale_hours", "0"),      # must be > 0
+        ("max_daily_stale_hours", "500"), # > 168h
+        ("initial_simulation_equity", "-1000"),
+        ("unknown_key", "123"),
+    ]
+    for bad_key, bad_val in bad_cases:
+        yml = tmp_path / f"bad_{bad_key}.yaml"
+        yml.write_text(f"{bad_key}: {bad_val}\n", encoding="utf-8")
+        caplog.clear()
+        with caplog.at_level(logging.WARNING, logger="strategy_trend_pullback"):
+            with pytest.raises(ValueError):
+                TrendPullbackConfig.from_yaml(yml)
+        assert any(
+            rec.levelno == logging.WARNING and bad_key in rec.getMessage()
+            for rec in caplog.records
+        ), f"Expected WARNING mentioning '{bad_key}' for {bad_key}={bad_val}"
+
+
+def test_27_audit_simulated_sizing_threshold_labels_and_vocabulary() -> None:
+    """Audit Findings 2 & 4 + threshold-vs-label: simulated 100k reference wording, >=0.75 ATR label, ENTRY READY setup-only wording."""
+    import io
+
+    config = EngineConfig()
+    store = StateStore()
+    bars_1d = _build_bullish_1d_bars(230, now_ms=NOW_MS)
+    bars_4h = _build_bullish_4h_bars(220, now_ms=NOW_MS)
+    # Give bar[-2] a deeper wick so the 5-bar stop sits inside [0.75, 3.00] ATR, then rebuild bar[-1] recovery candle
+    tr_pre = calculate_trend(bars_4h[:-1], TrendPullbackConfig())
+    bars_4h[-2] = _make_bar(
+        bars_4h[-2].timestamp_ms,
+        tr_pre["ema50"] - 0.2 * tr_pre["atr14"],
+        tr_pre["ema50"] + 0.2 * tr_pre["atr14"],
+        tr_pre["ema50"] - 1.2 * tr_pre["atr14"],
+        tr_pre["ema50"] + 0.05 * tr_pre["atr14"],
+    )
+    tr_mid = calculate_trend(bars_4h[:-1], TrendPullbackConfig())
+    bars_4h[-1] = _make_bar(
+        bars_4h[-1].timestamp_ms,
+        tr_mid["ema50"] - 0.05 * tr_mid["atr14"],
+        tr_mid["ema50"] + 0.35 * tr_mid["atr14"],
+        tr_mid["ema50"] - 0.15 * tr_mid["atr14"],
+        tr_mid["ema50"] + 0.20 * tr_mid["atr14"],
+    )
+    tr = calculate_trend(bars_4h, TrendPullbackConfig())
+    ez = calculate_entry_zone(tr["ema50"], tr["atr14"], TrendPullbackConfig())
+    store.binance_spot_price = ez["entry_high"] - 5.0
+    store.spot_klines_1d.extend(bars_1d)
+    store.spot_klines_4h.extend(bars_4h)
+
+    ev = TrendPullbackEngine(config).evaluate(store, now_ms=NOW_MS)
+    assert ev.strategy_verdict == "ENTRY READY"
+    assert "NOT an instruction or permission to place an order" in ev.verdict_explanation
+    assert "operator decides" in ev.verdict_explanation.lower()
+
+    # Summary markdown: simulated 100k reference disclaimers + zero forbidden words
+    md_lower = ev.summary_markdown.lower()
+    assert "100,000" in ev.summary_markdown
+    assert "not operator account" in md_lower or "not sized to operator's account" in md_lower
+    for word in ("verdict", "trade", "wait", "bullish", "bearish", "confirmed", "rejected", "recommend"):
+        assert word not in md_lower
+
+    # HUD output: >=0.75 ATR (not >=0.50 ATR), ENTRY READY disclaimer, simulated reference account
+    buf = io.StringIO()
+    Console(file=buf, width=180, force_terminal=False).print(
+        build_dashboard_renderable(config, store, tab_override=18)
+    )
+    hud_text = buf.getvalue()
+    assert ">=0.75 ATR" in hud_text
+    assert ">=0.50 ATR" not in hud_text
+    assert "NOT AN ORDER" in hud_text
+    assert "Operator decides" in hud_text
+    assert "NOT operator" in hud_text
+
+    # AI Packet Section 18: simulated reference account & staleness status
+    packet = build_ai_telemetry_packet(config, store)
+    sec18 = packet.split("## SECTION 18:", 1)[1].split("## SECTION 19:", 1)[0]
+    assert "NOT operator account equity" in sec18
+    assert "1D Status:" in sec18
+    assert "4H Status:" in sec18
+    assert "SPOT ONLY" in sec18
+
+
+def test_28_audit_nan_and_staleness_fail_closed() -> None:
+    """Audit fail-open & staleness checks: NaNs fail closed and stale 1H synthesis cannot beat fresh 4H bars."""
+    from strategy_trend_pullback import synthesize_closed_4h_from_1h
+
+    cfg = TrendPullbackConfig()
+    bar = _make_bar(NOW_MS - FOUR_H_MS, 100.0, 105.0, 95.0, 102.0)
+
+    pb_nan = detect_pullback([bar], [float("nan")], [10.0], cfg)
+    assert pb_nan["recovery_candle"] == "NOT CONFIRMED"
+
+    st_nan = calculate_stop([bar] * 5, float("nan"), 100.0, cfg)
+    assert st_nan["valid"] is False
+
+    sz_nan = calculate_position_size(float("nan"), 95.0, cfg)
+    assert sz_nan["position_size_btc"] == 0.0
+
+    verdict_nan = generate_strategy_verdict(
+        data_integrity_ok=True,
+        integrity_reason="",
+        daily_regime="BULLISH",
+        regime_reason="",
+        trend_4h="CONFIRMED",
+        trend_reason="",
+        recovery_candle="CONFIRMED",
+        setup_status="CONFIRMED",
+        pullback_reason="",
+        stop_valid=True,
+        stop_reason="",
+        current_price=100.0,
+        limit_entry_low=99.0,
+        limit_entry_high=float("nan"),
+        position_status="CASH",
+        exit_eval={},
+    )
+    assert verdict_nan["strategy_verdict"] == "NO TRADE"
+
+    # Duplicate 1H timestamps inside one 4H bucket must NOT synthesize a 4H bar
+    dup_1h = [
+        _make_bar(NOW_MS - 4 * ONE_H_MS, 100, 101, 99, 100),
+        _make_bar(NOW_MS - 3 * ONE_H_MS, 100, 101, 99, 100),
+        _make_bar(NOW_MS - 3 * ONE_H_MS, 100, 101, 99, 100),
+        _make_bar(NOW_MS - 2 * ONE_H_MS, 100, 101, 99, 100),
+    ]
+    assert synthesize_closed_4h_from_1h(dup_1h, now_ms=NOW_MS) == []
+
+    # Fresh 4H bars (220) must NOT be overridden by longer stale 1H history (900 bars ending 3 days ago)
+    store = StateStore()
+    store.binance_spot_price = 80_500.0
+    store.spot_klines_1d.extend(_build_bullish_1d_bars(230, now_ms=NOW_MS))
+    store.spot_klines_4h.extend(_build_bullish_4h_bars(220, now_ms=NOW_MS))
+    store.spot_klines_1h.extend(_build_1h_bars(900, now_ms=NOW_MS - 3 * DAY_MS, base_px=75_000.0))
+    ev = TrendPullbackEngine().evaluate(store, now_ms=NOW_MS)
+    assert ev.data_integrity_ok is True
+    assert ev.candle_4h_status.startswith("LAST CLOSE")
+
+
+
 

@@ -183,6 +183,9 @@ class ProtocolV13Evaluator:
 
         # 2. Compute 1D Structural Support & Resistance from Completed 1D Candles (last 14 completed days)
         completed_window = spot_1d[:-1][-14:] if len(spot_1d) >= 3 else spot_1d
+        # With no completed bars these default to spot +/-5%, and Rail A then quotes them as
+        # structure. Keep the numbers (downstream needs them) but publish where they came from.
+        structure_source = "MEASURED_14D" if completed_window else "ASSUMED_5PCT"
         daily_support = min((b.low for b in completed_window), default=current_price * 0.95)
         daily_resistance = max((b.high for b in completed_window), default=current_price * 1.05)
 
@@ -217,8 +220,10 @@ class ProtocolV13Evaluator:
             timing_4h_ready = False
 
         # 5. ATR 14 on 1D (completed bars) and 4H (completed bars)
-        atr_14_1d = max(compute_atr(spot_1d[:-1][-25:] if len(spot_1d) > 2 else spot_1d, period=14), 1.0)
-        atr_14_4h = max(compute_atr(bars_4h[:-1][-25:] if len(bars_4h) > 2 else bars_4h, period=14), 1.0)
+        # 25 bars left Wilder's seed carrying 14/25 of the weight, so the same ATR read
+        # $2,712 / $2,691 / $2,662 at 24 / 25 / 26 bars. Use full history so the seed washes out.
+        atr_14_1d = max(compute_atr(spot_1d[:-1][-250:] if len(spot_1d) > 2 else spot_1d, period=14), 1.0)
+        atr_14_4h = max(compute_atr(bars_4h[:-1][-250:] if len(bars_4h) > 2 else bars_4h, period=14), 1.0)
 
         down_1d_atr = current_price - atr_14_1d
         up_1d_atr = current_price + atr_14_1d
@@ -660,6 +665,7 @@ class ProtocolV13Evaluator:
             upside_ref_1d_atr=round(up_1d_atr, 2),
             downside_ref_4h_atr=round(down_4h_atr, 2),
             upside_ref_4h_atr=round(up_4h_atr, 2),
+            structure_source=structure_source,
             coinglass_rows=coinglass_rows,
             non_trade_zones=non_trade_zones,
             non_trade_zone_status=ntz_status,

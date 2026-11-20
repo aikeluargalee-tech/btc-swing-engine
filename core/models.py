@@ -915,6 +915,9 @@ class ProtocolV13Evaluation:
 
 
     active_ntz_reasons: List[str] = field(default_factory=list)
+    # MEASURED_14D when support/resistance came from closed bars, ASSUMED_5PCT when the
+    # window was empty and they were derived from spot. Appended last on purpose.
+    structure_source: str = "UNAVAILABLE"
 
 
 

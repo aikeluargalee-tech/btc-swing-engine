@@ -219,6 +219,10 @@ def _build_section_0_veto(
     s4h = struct_7a[1] if len(struct_7a) > 1 else None
     veto = dict(evaluate_hard_market_veto(store, spot_px=spot_px, struct_4h=s4h))
     veto["timestamp_status"] = f"{utc_str} | {sgt_str} · Closed-Candle Inputs Only"
+    # Support/resistance fall back to spot +/-5% when the 1D window is empty, and the rails
+    # quote those levels as structure. Publish which of the two produced them.
+    _pev = getattr(store, "protocol_evaluation", None)
+    veto["structure_source"] = str(getattr(_pev, "structure_source", "UNAVAILABLE"))
     return veto
 
 

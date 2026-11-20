@@ -212,7 +212,16 @@ class ReconciliationEngine:
         ladder_notes = []
 
         # Check A1: Inviolable Math Law (Total Ladder must be >= Immediate Tier in B2)
-        if b2.total_l_vol < b2.immediate_l_vol and b2.immediate_l_vol > 0:
+        # A zero total means no ladder was built (no open interest to scale it), which is
+        # missing data, not an arithmetic contradiction. Reporting the latter sent the
+        # operator looking for a maths bug that does not exist.
+        ladder_unavailable = b2.total_l_vol <= 0.0 and b2.total_u_vol <= 0.0
+        if ladder_unavailable and b2.immediate_l_vol > 0:
+            ladder_notes.append(
+                "B2 ladder UNAVAILABLE (no open interest to scale it); the total>=immediate "
+                "law is not testable and is not reported as a contradiction."
+            )
+        elif b2.total_l_vol < b2.immediate_l_vol and b2.immediate_l_vol > 0:
             ladder_passed = False
             msg = (
                 f"MATHEMATICAL IMPOSSIBILITY IN B2: Total lower ladder (${b2.total_l_vol:.1f}M) "

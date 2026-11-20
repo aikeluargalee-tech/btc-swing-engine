@@ -1049,6 +1049,8 @@ class BTCMagnetEngine:
             u_10_vol = round(max(1.0, oi_notional_m * 0.024), 1)
             l_25_vol = round(max(1.0, oi_notional_m * 0.040), 1)
             l_10_vol = round(max(1.0, oi_notional_m * 0.028), 1)
+            # The multiplier is dropped here, not set to 1.0. The token stays ASSUMED_1.0 for
+            # the tests that read it, while the published tag says "split not measured".
             ls_source = "ASSUMED_1.0"
             split_measured = False
             ls_obs_label = "UNMEASURED (L/S split not measured; raw OI share)"

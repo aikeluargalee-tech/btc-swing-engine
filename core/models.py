@@ -3718,9 +3718,15 @@ class EMAStrategySnapshot:
 
 
 @dataclass
+class Tab1Verdict:
+    """Evaluation-layer summary for the Tab 1 traffic light."""
+
+    light: str
+    reason: str
+    conditions: List[str] = field(default_factory=list)
 
 
-
+@dataclass
 class SignalEvaluation:
 
 
@@ -3878,6 +3884,8 @@ class SignalEvaluation:
 
 
     ema_strategy: Optional[EMAStrategySnapshot] = None
+
+    tab1_verdict: Optional[Tab1Verdict] = None
 
 
 

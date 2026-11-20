@@ -340,6 +340,10 @@ def _diagnose_market_driver(flow: Any, deriv: Any) -> Tuple[str, str]:
     return badge, desc
 
 
+TAB1_COINBASE_PREMIUM_FLAT_USD = 10.0
+TAB1_MACRO_RISK_NOTE_PCT = 1.0
+
+
 def _build_tab1_plain_english_panel(sig, flow, deriv, macro_ev) -> Panel:
     """Builds Tab [1] Panel 5: Plain-English Executive Bottom Line."""
     if sig is None:
@@ -355,11 +359,11 @@ def _build_tab1_plain_english_panel(sig, flow, deriv, macro_ev) -> Panel:
     cb_diff = deriv.coinbase_premium_usd
     cb_word = (
         f"selling at a ${abs(cb_diff):,.0f} discount"
-        if cb_diff < -10
-        else (f"buying at a +${cb_diff:,.0f} premium" if cb_diff > 10 else "trading flat with Binance")
+        if cb_diff < -TAB1_COINBASE_PREMIUM_FLAT_USD
+        else (f"buying at a +${cb_diff:,.0f} premium" if cb_diff > TAB1_COINBASE_PREMIUM_FLAT_USD else "trading flat with Binance")
     )
     macro_tag = ""
-    if macro_ev is not None and macro_ev.gatekeeper_veto and tp is not None and tp.risk_pct < 1.0:
+    if macro_ev is not None and macro_ev.gatekeeper_veto and tp is not None and tp.risk_pct < TAB1_MACRO_RISK_NOTE_PCT:
         macro_tag = f" [bold yellow](Macro Note: Below 1D 200 SMA ${macro_ev.sma_200_1d:,.0f} -> Risk capped at {tp.risk_pct:.1f}%)[/bold yellow]"
 
     if sig.regime == MarketRegime.MARKDOWN or sig.gate_state == ExecutionGateState.CASH_MARKDOWN:
@@ -394,8 +398,8 @@ def _build_tab1_plain_english_panel(sig, flow, deriv, macro_ev) -> Panel:
         what_happening = f"BTC is at ${price:,.0f} (Score: {sig.confluence_score:.0f}/100), but a safety or Protocol v1.3 veto is blocking entry."
         why_line = " | ".join(sig.veto_reasons)
         action_line = "[bold yellow]Stay in cash until the active safety veto clears (Press 2 or 3 to inspect Protocol/Macro tabs).[/bold yellow]"
-    elif sig.gate_state == ExecutionGateState.GATE3_RECLAIM_TRIGGERED and sig.confluence_score >= 70.0:
-        headline = "[bold black on green] GREEN LIGHT — BUY SIGNAL TRIGGERED (SAFE FOR SPOT SWING ENTRY) [/bold black on green]"
+    elif sig.tab1_verdict is not None and sig.tab1_verdict.light == "GREEN":
+        headline = "[bold black on green] GREEN — SETUP STATE ONLY [/bold black on green]"
         border_style = "green"
         what_happening = (
             f"BTC (${price:,.0f}) swept support, absorbed futures sellers with real Spot buying ({flow.w_1h.spot_delta_btc:+,.1f} BTC in 1H), and closed back inside the Value Area."
@@ -405,13 +409,14 @@ def _build_tab1_plain_english_panel(sig, flow, deriv, macro_ev) -> Panel:
         )
         if tp:
             action_line = (
-                f"[bold green]BUY SPOT BTC[/bold green] in zone [bold]${tp.entry_zone_low:,.0f} – ${tp.entry_zone_high:,.0f}[/bold] "
+                f"SETUP STATE ONLY: Conditions describe a setup state — NOT an instruction or permission to place an order. Operator decides. "
+                f"Spot plan reference: zone [bold]${tp.entry_zone_low:,.0f} – ${tp.entry_zone_high:,.0f}[/bold] "
                 f"(Size: [bold]{tp.position_size_btc:.4f} BTC[/bold] / ${tp.position_notional_usd:,.0f} at {tp.risk_pct:.1f}% risk). "
-                f"Stop-Loss: [bold red]${tp.stop_loss:,.0f}[/bold red]. "
+                f"Stop reference: [bold red]${tp.stop_loss:,.0f}[/bold red]. "
                 f"TP1 (55%): [bold cyan]${tp.tp1_poc:,.0f}[/bold cyan] ({tp.rr_to_poc:.1f}R) | TP2 (45%): [bold magenta]${tp.tp2_vah:,.0f}[/bold magenta] ({tp.rr_to_vah:.1f}R)."
             )
         else:
-            action_line = "[bold green]Execute Spot Swing Long per Panel 4 parameters.[/bold green]"
+            action_line = "SETUP STATE ONLY: Conditions describe a setup state — NOT an instruction or permission to place an order. Operator decides."
     elif sig.gate_state == ExecutionGateState.GATE4_PENDING_RETEST:
         bars_txt = f"Bar {sig.fsm_bars_elapsed}/{sig.fsm_max_bars}" if sig.fsm_bars_elapsed > 0 else "ARMED"
         headline = f"[bold black on yellow] YELLOW LIGHT — PENDING RETEST ({bars_txt.upper()}) [/bold black on yellow]"
@@ -476,6 +481,7 @@ def _build_tab1_plain_english_panel(sig, flow, deriv, macro_ev) -> Panel:
 
     lines = [
         headline,
+        f"  [bold white]Evaluation Verdict :[/bold white] {sig.tab1_verdict.light if sig.tab1_verdict else 'UNAVAILABLE'} — {sig.tab1_verdict.reason if sig.tab1_verdict else 'Evaluation verdict unavailable; treat as no setup.'}",
         f"  [bold white]Movement Driver  :[/bold white] {driver_badge} — {driver_desc}",
         f"  [bold white]What's Happening :[/bold white] {what_happening}",
         f"  [bold white]Why / Risk Check :[/bold white] {why_line}",

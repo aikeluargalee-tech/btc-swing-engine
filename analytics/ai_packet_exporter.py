@@ -984,6 +984,10 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
 
             f"* **Tab [1] 4-Gate Confluence Breakdown**: `{sig.confluence_score:.1f}/100` (`Location: {sig.location_score:.1f}/25` • `Flow: {sig.flow_score:.1f}/35` • `Derivatives: {sig.derivatives_score:.1f}/20` • `Trigger: {sig.trigger_score:.1f}/20`{fsm_gate_info})",
 
+            f"* **Tab [1] Evaluation Verdict**: `{sig.tab1_verdict.light if sig.tab1_verdict else 'UNAVAILABLE'}` — {sig.tab1_verdict.reason if sig.tab1_verdict else 'Evaluation verdict unavailable; treat as no setup.'}",
+
+            f"  - **Conditions**: {'; '.join(sig.tab1_verdict.conditions) if sig.tab1_verdict else 'UNAVAILABLE'}",
+
             "",
 
             "### 6B. Panel 2 — 4-Layer Institutional Decision Funnel & Conflict Resolver",
@@ -1056,7 +1060,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
 
             f"  - **Management Rule**: `{msev.holder_management_note}`",
 
-            f"* **Tab [1] Tactical TradePlan (Intraday/Swing)**: Entry `${tp.entry_zone_low:,.0f}–${tp.entry_zone_high:,.0f}` | Tactical Stop `${tp.stop_loss:,.0f}` (ATR/Swing Low) | `Tactical TP1 ${tp.tp1_poc:,.0f} ({'7D cPOC' if tp.tp1_poc < sig.c_poc else '30D cPOC'})` | `Tactical TP2 ${tp.tp2_vah:,.0f} (30D cVAH Extreme)`" if tp else "",
+            f"* **Tab [1] Tactical TradePlan (Spot Reference Only)**: SETUP STATE ONLY: Conditions describe a setup state — NOT an instruction or permission to place an order. Operator decides. | Entry `${tp.entry_zone_low:,.0f}–${tp.entry_zone_high:,.0f}` | Size `{tp.position_size_btc:.4f} BTC` / `${tp.position_notional_usd:,.0f}` at `{tp.risk_pct:.1f}%` risk | Stop `${tp.stop_loss:,.0f}` (ATR/Swing Low) | `TP1 (55%): ${tp.tp1_poc:,.0f} ({tp.rr_to_poc:.1f}R)` | `TP2 (45%): ${tp.tp2_vah:,.0f} ({tp.rr_to_vah:.1f}R)`" if tp else "",
 
             "",
 

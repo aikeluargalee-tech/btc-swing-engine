@@ -2143,13 +2143,14 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             recon_eval = None
 
     if recon_eval is not None:
+        from analytics.reconciliation_engine import format_data_integrity_lock as _fmt_lock
         lines.extend([
             "",
             "---",
             "",
-            "## SECTION 19: B1 vs B2 DATA INTEGRITY RECONCILIATION AUDIT & EXECUTION GATE",
+            "## SECTION 19: B1 vs B2 DATA INTEGRITY RECONCILIATION AUDIT (VETO GATE - GRANTS NOTHING)",
             "",
-            f"* **Reconciliation Verdict**: `[{recon_eval.verdict}]` | **Execution Authorization**: `[{recon_eval.execution_authorization}]`",
+            f"* **Reconciliation Verdict**: `[{recon_eval.verdict}]` | **Data-Integrity Lock (veto-only; grants nothing)**: `[{_fmt_lock(recon_eval.execution_authorization)}]`",
             f"* **Capital Sizing Directive**: `{recon_eval.capital_allocation:.2f}x` | **Target Allocation**: `{recon_eval.target_allocation}`",
             f"* **Portfolio Rotation Directive**: `{recon_eval.portfolio_rotation}` | **Trading Status**: `{recon_eval.trading_status}`",
             "",

@@ -104,7 +104,9 @@ class TestNothingMayAuthoriseATrade(unittest.TestCase):
 
     ALLOWED = [
         ("analytics/reconciliation_engine.py", "execution_authorization",
-         "field name and machine value; it is only ever read as DENIED (a lock), never as permission"),
+         "field name and machine value only; it is never rendered. The gate is displayed "
+         "through format_data_integrity_lock(), which prints a LOCK state, because the raw "
+         "value can be AUTHORIZED and that word must never reach an artefact."),
         ("analytics/reconciliation_engine.py", "Execution Authorization",
          "report label for the data-integrity gate above"),
         ("analytics/slsp_engine.py", "execution_authorization",
@@ -120,7 +122,7 @@ class TestNothingMayAuthoriseATrade(unittest.TestCase):
     ]
 
     def test_no_execute_authorisation_claims(self):
-        hits = scan(r"EXECUTION AUTHORIZED|EXECUTION_AUTHORIZED")
+        hits = scan(r"EXECUTION AUTHORIZED|EXECUTION_AUTHORIZED|Execution Authorization")
         offenders = []
         for rel, ln, text in hits:
             if any(rel == a[0] and a[1] in text for a in self.ALLOWED):

@@ -12,6 +12,7 @@ Implements:
 
 from __future__ import annotations
 
+import copy
 import json
 import math
 import statistics
@@ -199,6 +200,9 @@ class FuturesV4ChecklistItem:
 @dataclass
 class FuturesV4Evaluation:
     protocol_version: str = "4.0"
+    read_only: bool = True
+    is_warming_up: bool = False
+    macro_source_status: str = "UNAVAILABLE"
     regime_score: float = 50.0
     regime_bias: str = "FLAT"          # LONG | SHORT | FLAT
     daily_bias: str = "NEUTRAL"        # BULL | BEAR | NEUTRAL
@@ -213,7 +217,7 @@ class FuturesV4Evaluation:
     factor_summaries: Dict[str, str] = field(default_factory=dict)
     checklist: List[FuturesV4ChecklistItem] = field(default_factory=list)
     rejection_reasons: List[str] = field(default_factory=list)
-    # Futures sizing proposal
+    # Futures sizing proposal (hypothetical / paper simulation)
     eval_direction: str = "FLAT"
     entry_method: str = "—"
     entry_price: float = 0.0
@@ -232,14 +236,15 @@ class FuturesV4Evaluation:
     weekend_halved: bool = False
     # Sell Inventory option
     sell_inventory_active: bool = False
+    spot_inventory_btc: float = 0.0
     sell_inventory_pct: float = 20.0
     sell_inventory_btc: float = 0.0
     sell_inventory_usd: float = 0.0
     sell_inventory_ref: str = "—"
     sell_inventory_reason: str = "—"
     # Ledger & Circuit Breakers
-    equity_usd: float = 100000.0
-    realized_equity_usd: float = 100000.0
+    equity_usd: float = 0.0
+    realized_equity_usd: float = 0.0
     drawdown_pct: float = 0.0
     intraday_pnl_pct: float = 0.0
     daily_pnl_pct: float = 0.0
@@ -257,6 +262,55 @@ class FuturesV4Evaluation:
     evaluated_utc: str = ""
 
 
+BREAKER_KEYS: Tuple[str, ...] = (
+    "intraday_halted",
+    "daily_halted",
+    "weekly_halted",
+    "dd_tier1_active",
+    "dd_tier2_locked",
+)
+
+
+def _resolve_macro_event_minutes(
+    store: StateStore,
+    macro_minutes_away: Optional[float],
+    blackout_min: float,
+) -> Tuple[Optional[float], bool, str]:
+    """Resolves minutes to the nearest high-impact macro release and availability.
+
+    Returns (minutes_away, is_known, status_label). Fails closed (is_known=False)
+    when neither an explicit override nor a fetched macro calendar is present.
+    """
+    if macro_minutes_away is not None:
+        m = float(macro_minutes_away)
+        return m, True, f"OVERRIDE ({m:+.0f}m)"
+
+    mi = getattr(store, "macro_intermarket", None)
+    if mi is None:
+        return None, False, "UNAVAILABLE"
+
+    events = getattr(mi, "macro_calendar_events", None) or []
+    fetched = bool(getattr(mi, "macro_calendar_fetched", False))
+    mins_list = [
+        float(ev["minutes_away"])
+        for ev in events
+        if isinstance(ev, dict) and isinstance(ev.get("minutes_away"), (int, float))
+    ]
+    in_blackout = [m for m in mins_list if abs(m) <= blackout_min]
+    if in_blackout:
+        closest = min(in_blackout, key=lambda x: abs(x))
+        return closest, True, f"BLACKOUT ({closest:+.0f}m)"
+
+    upcoming = [m for m in mins_list if m > blackout_min]
+    if upcoming:
+        nxt = min(upcoming)
+        return nxt, True, f"UPCOMING ({nxt:.0f}m)"
+
+    if fetched:
+        return None, True, "CLEAR"
+    return None, False, "UNAVAILABLE"
+
+
 class FuturesV4Engine:
     """Configurable Version 4.0 engine integrated with btc_swing_engine's StateStore."""
 
@@ -269,6 +323,8 @@ class FuturesV4Engine:
         self.read_only = read_only
 
     def reset_review_lock(self, now: Optional[datetime] = None) -> None:
+        if self.read_only:
+            return
         now = now or datetime.now(timezone.utc)
         b = self._ledger["breakers"]
         b["dd_tier2_locked"] = False
@@ -279,7 +335,11 @@ class FuturesV4Engine:
         self._ledger["day_start_equity"] = eq
         self._ledger["intraday_peak_equity"] = eq
         self._ledger["week_start_equity"] = eq
-        self._append_audit(now, "MANUAL_REVIEW_UNLOCK", f"Cleared -10% DD lock at ${eq:,.2f}")
+        self._append_audit(
+            now,
+            "MANUAL_REVIEW_UNLOCK",
+            f"Cleared {self.config.futures_v4_dd_tier2_pct*100:.1f}% DD lock at ${eq:,.2f}",
+        )
         self._save_ledger()
 
     def _init_ledger(self, now: datetime) -> Dict[str, Any]:
@@ -335,11 +395,14 @@ class FuturesV4Engine:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(self._ledger, indent=2), encoding="utf-8")
 
-    def _append_audit(self, now: datetime, event: str, detail: str) -> None:
-        self._ledger["audit_log"].append(
+    def _append_audit(
+        self, now: datetime, event: str, detail: str, ledger: Optional[Dict[str, Any]] = None
+    ) -> None:
+        led = ledger if ledger is not None else self._ledger
+        led["audit_log"].append(
             {"ts": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "event": event, "detail": detail}
         )
-        self._ledger["audit_log"] = self._ledger["audit_log"][-80:]
+        led["audit_log"] = led["audit_log"][-80:]
 
     @staticmethod
     def _to_bars(klines: Sequence[KlineBar]) -> List[Dict[str, float]]:
@@ -451,20 +514,27 @@ class FuturesV4Engine:
         return {"confirmed": False, "type": None, "reason": f"No 4H SHORT BOS/rejection+vol (vol {vol_ratio:.2f}x)"}
 
     def _close_fraction(
-        self, pos: Dict[str, Any], fraction: float, exit_price: float, reason: str, now: datetime
+        self,
+        pos: Dict[str, Any],
+        fraction: float,
+        exit_price: float,
+        reason: str,
+        now: datetime,
+        ledger: Optional[Dict[str, Any]] = None,
     ) -> float:
+        led = ledger if ledger is not None else self._ledger
         close_btc = round(pos["size_btc"] * fraction, 6)
         if close_btc <= 0:
             return 0.0
         sign = 1.0 if pos["direction"] == "LONG" else -1.0
         pnl_usd = sign * (exit_price - pos["entry_price"]) * close_btc
         pnl_r = sign * (exit_price - pos["entry_price"]) / max(pos["initial_stop_dist"], 1e-9)
-        self._ledger["realized_equity"] = round(self._ledger["realized_equity"] + pnl_usd, 2)
+        led["realized_equity"] = round(led["realized_equity"] + pnl_usd, 2)
         pos["size_btc"] = round(pos["size_btc"] - close_btc, 6)
         pos["risk_pct"] = round(pos["risk_pct"] * max(0.0, 1.0 - fraction), 4)
         opened_ms = float(pos.get("opened_at_ms", now.timestamp() * 1000.0))
         hold_h = max(0.0, (now.timestamp() * 1000.0 - opened_ms) / 3_600_000.0)
-        self._ledger["closed_trades"].append(
+        led["closed_trades"].append(
             {
                 "trade_id": pos["id"],
                 "direction": pos["direction"],
@@ -482,36 +552,44 @@ class FuturesV4Engine:
             now,
             f"CLOSE_{pos['direction']}",
             f"{reason} @ ${exit_price:,.1f} ({close_btc:.4f} BTC, {pnl_r:+.2f}R, ${pnl_usd:+,.2f})",
+            ledger=led,
         )
         return pnl_usd
 
     def _manage_positions_and_breakers(
-        self, price: float, score: float, h4: List[Dict[str, float]], now: datetime
+        self,
+        price: float,
+        score: float,
+        h4: List[Dict[str, float]],
+        now: datetime,
+        ledger: Optional[Dict[str, Any]] = None,
     ) -> None:
+        led = ledger if ledger is not None else self._ledger
         cfg = self.config
         day_key = now.strftime("%Y-%m-%d")
         iso = now.isocalendar()
         wk_key = f"{iso.year}-W{iso.week:02d}"
-        b = self._ledger["breakers"]
+        b = led["breakers"]
 
-        if self._ledger.get("day_key") != day_key:
-            self._ledger["day_key"] = day_key
-            self._ledger["day_start_equity"] = self._ledger["equity"]
-            self._ledger["intraday_peak_equity"] = self._ledger["equity"]
+        if led.get("day_key") != day_key:
+            led["day_key"] = day_key
+            led["day_start_equity"] = led["equity"]
+            led["intraday_peak_equity"] = led["equity"]
             b["intraday_halted"] = False
             b["daily_halted"] = False
-        if self._ledger.get("week_key") != wk_key:
-            self._ledger["week_key"] = wk_key
-            self._ledger["week_start_equity"] = self._ledger["equity"]
+        if led.get("week_key") != wk_key:
+            led["week_key"] = wk_key
+            led["week_start_equity"] = led["equity"]
             b["weekly_halted"] = False
 
         ema20 = _ema_series([c["close"] for c in h4], 20)
         trail_ema = ema20[-1] if ema20 else None
-        long_th = cfg.futures_v4_dd_tier1_long if b["dd_tier1_active"] else cfg.futures_v4_long_threshold
-        short_th = cfg.futures_v4_dd_tier1_short if b["dd_tier1_active"] else cfg.futures_v4_short_threshold
+        dd_t1_active = bool(b.get("dd_tier1_active", False))
+        long_th = cfg.futures_v4_dd_tier1_long if dd_t1_active else cfg.futures_v4_long_threshold
+        short_th = cfg.futures_v4_dd_tier1_short if dd_t1_active else cfg.futures_v4_short_threshold
         is_weekend = now.weekday() >= 5
 
-        for pos in list(self._ledger["open_positions"]):
+        for pos in list(led["open_positions"]):
             sign = 1.0 if pos["direction"] == "LONG" else -1.0
             dist = max(pos["initial_stop_dist"], 1e-9)
             cur_r = sign * (price - pos["entry_price"]) / dist
@@ -521,20 +599,20 @@ class FuturesV4Engine:
             pos["hold_hours"] = round(hours_open, 2)
 
             if (price <= pos["stop_price"]) if pos["direction"] == "LONG" else (price >= pos["stop_price"]):
-                self._close_fraction(pos, 1.0, pos["stop_price"], "HARD_OR_TRAIL_STOP", now)
+                self._close_fraction(pos, 1.0, pos["stop_price"], "HARD_OR_TRAIL_STOP", now, ledger=led)
                 continue
             if hours_open >= cfg.futures_v4_max_hold_hours:
-                self._close_fraction(pos, 1.0, price, "MAX_HOLD_24H_EXIT", now)
+                self._close_fraction(pos, 1.0, price, f"MAX_HOLD_{cfg.futures_v4_max_hold_hours:g}H_EXIT", now, ledger=led)
                 continue
             if is_weekend:
                 ext_ok = (pos["direction"] == "LONG" and score >= cfg.futures_v4_weekend_long) or (
                     pos["direction"] == "SHORT" and score <= cfg.futures_v4_weekend_short
                 )
                 if not ext_ok:
-                    self._close_fraction(pos, 1.0, price, "WEEKEND_NON_EXTREME_EXIT", now)
+                    self._close_fraction(pos, 1.0, price, "WEEKEND_NON_EXTREME_EXIT", now, ledger=led)
                     continue
                 if not pos.get("weekend_halved"):
-                    self._close_fraction(pos, 0.50, price, "WEEKEND_EXTREME_HALF_REDUCE", now)
+                    self._close_fraction(pos, 0.50, price, "WEEKEND_EXTREME_HALF_REDUCE", now, ledger=led)
                     pos["weekend_halved"] = True
 
             opened_day = pos.get("opened_utc_day")
@@ -543,26 +621,31 @@ class FuturesV4Engine:
                 entry_sc = float(pos.get("entry_regime_score", score))
                 improved = (score > entry_sc) if pos["direction"] == "LONG" else (score < entry_sc)
                 if not improved:
-                    self._close_fraction(pos, 0.50, price, "DAILY_CLOSE_NO_IMPROVEMENT_REDUCE", now)
+                    self._close_fraction(pos, 0.50, price, "DAILY_CLOSE_NO_IMPROVEMENT_REDUCE", now, ledger=led)
                     if pos["size_btc"] <= 1e-6:
                         continue
 
             if (pos["direction"] == "LONG" and score <= short_th) or (pos["direction"] == "SHORT" and score >= long_th):
-                self._close_fraction(pos, 1.0, price, "REGIME_OPPOSING_EXIT", now)
+                self._close_fraction(pos, 1.0, price, "REGIME_OPPOSING_EXIT", now, ledger=led)
                 continue
 
             best_r = float(pos.get("max_favorable_r", cur_r))
             if hours_open >= cfg.futures_v4_time_exit_hours and best_r < 1.0:
-                self._close_fraction(pos, 1.0, price, "TIME_STOP_12H_EXIT", now)
+                self._close_fraction(pos, 1.0, price, f"TIME_STOP_{cfg.futures_v4_time_exit_hours:g}H_EXIT", now, ledger=led)
                 continue
             if hours_open >= cfg.futures_v4_time_reduce_hours and best_r < 1.0 and not pos.get("time_stop_8h_reduced"):
-                self._close_fraction(pos, 0.50, price, "TIME_STOP_8H_REDUCE", now)
+                self._close_fraction(pos, 0.50, price, f"TIME_STOP_{cfg.futures_v4_time_reduce_hours:g}H_REDUCE", now, ledger=led)
                 pos["time_stop_8h_reduced"] = True
 
             if cur_r >= cfg.futures_v4_be_r and not pos.get("breakeven_moved"):
                 pos["stop_price"] = pos["entry_price"]
                 pos["breakeven_moved"] = True
-                self._append_audit(now, "STOP_TO_BE", f"{pos['direction']} +1.0R -> BE ${pos['entry_price']:,.1f}")
+                self._append_audit(
+                    now,
+                    "STOP_TO_BE",
+                    f"{pos['direction']} +{cfg.futures_v4_be_r:.1f}R -> BE ${pos['entry_price']:,.1f}",
+                    ledger=led,
+                )
 
             if pos.get("breakeven_moved") and trail_ema:
                 if pos["direction"] == "LONG" and pos["stop_price"] < trail_ema < price:
@@ -571,57 +654,89 @@ class FuturesV4Engine:
                     pos["stop_price"] = round(trail_ema, 1)
 
             if cur_r >= cfg.futures_v4_partial_r and not pos.get("partial_taken"):
-                self._close_fraction(pos, cfg.futures_v4_partial_pct, price, "PARTIAL_TP_1.5R", now)
+                self._close_fraction(
+                    pos,
+                    cfg.futures_v4_partial_pct,
+                    price,
+                    f"PARTIAL_TP_{cfg.futures_v4_partial_r:.1f}R",
+                    now,
+                    ledger=led,
+                )
                 pos["partial_taken"] = True
 
-        self._ledger["open_positions"] = [p for p in self._ledger["open_positions"] if p["size_btc"] > 1e-6]
+        led["open_positions"] = [p for p in led["open_positions"] if p["size_btc"] > 1e-6]
 
         unreal = 0.0
-        for p in self._ledger["open_positions"]:
+        for p in led["open_positions"]:
             sign = 1.0 if p["direction"] == "LONG" else -1.0
             u = sign * (price - p["entry_price"]) * p["size_btc"]
             p["unrealized_pnl_usd"] = round(u, 2)
             unreal += u
 
-        eq = round(self._ledger["realized_equity"] + unreal, 2)
-        self._ledger["equity"] = eq
-        if eq > self._ledger["high_water_mark"]:
-            self._ledger["high_water_mark"] = eq
-        if eq > self._ledger.get("intraday_peak_equity", eq):
-            self._ledger["intraday_peak_equity"] = eq
+        eq = round(led["realized_equity"] + unreal, 2)
+        led["equity"] = eq
+        if eq > led["high_water_mark"]:
+            led["high_water_mark"] = eq
+        if eq > led.get("intraday_peak_equity", eq):
+            led["intraday_peak_equity"] = eq
 
-        dd = (eq - self._ledger["high_water_mark"]) / max(self._ledger["high_water_mark"], 1.0)
-        self._ledger["drawdown_pct"] = round(dd * 100.0, 3)
+        dd = (eq - led["high_water_mark"]) / max(led["high_water_mark"], 1.0)
+        led["drawdown_pct"] = round(dd * 100.0, 3)
 
-        intra_pk = max(self._ledger.get("intraday_peak_equity", eq), 1.0)
+        intra_pk = max(led.get("intraday_peak_equity", eq), 1.0)
         intra_pnl = (eq - intra_pk) / intra_pk
-        day_pnl = (eq - max(self._ledger["day_start_equity"], 1.0)) / max(self._ledger["day_start_equity"], 1.0)
-        wk_pnl = (eq - max(self._ledger["week_start_equity"], 1.0)) / max(self._ledger["week_start_equity"], 1.0)
+        day_pnl = (eq - max(led["day_start_equity"], 1.0)) / max(led["day_start_equity"], 1.0)
+        wk_pnl = (eq - max(led["week_start_equity"], 1.0)) / max(led["week_start_equity"], 1.0)
 
-        if intra_pnl <= cfg.futures_v4_intraday_loss_pct and not b["intraday_halted"]:
+        if intra_pnl <= cfg.futures_v4_intraday_loss_pct and not b.get("intraday_halted", False):
             b["intraday_halted"] = True
-            self._append_audit(now, "BREAKER_INTRADAY", f"Intraday {intra_pnl*100:.2f}% <= {cfg.futures_v4_intraday_loss_pct*100:.1f}%")
-        if day_pnl <= cfg.futures_v4_daily_loss_pct and not b["daily_halted"]:
+            self._append_audit(
+                now,
+                "BREAKER_INTRADAY",
+                f"Intraday {intra_pnl*100:.2f}% <= {cfg.futures_v4_intraday_loss_pct*100:.1f}%",
+                ledger=led,
+            )
+        if day_pnl <= cfg.futures_v4_daily_loss_pct and not b.get("daily_halted", False):
             b["daily_halted"] = True
-            self._append_audit(now, "BREAKER_DAILY", f"Daily {day_pnl*100:.2f}% <= {cfg.futures_v4_daily_loss_pct*100:.1f}%")
-        if wk_pnl <= cfg.futures_v4_weekly_loss_pct and not b["weekly_halted"]:
+            self._append_audit(
+                now,
+                "BREAKER_DAILY",
+                f"Daily {day_pnl*100:.2f}% <= {cfg.futures_v4_daily_loss_pct*100:.1f}%",
+                ledger=led,
+            )
+        if wk_pnl <= cfg.futures_v4_weekly_loss_pct and not b.get("weekly_halted", False):
             b["weekly_halted"] = True
-            for p in list(self._ledger["open_positions"]):
-                self._close_fraction(p, 1.0, price, "WEEKLY_LOSS_FLATTEN", now)
-            self._ledger["open_positions"] = []
-            self._append_audit(now, "BREAKER_WEEKLY", f"Weekly {wk_pnl*100:.2f}% -> flattened futures")
-        if dd <= cfg.futures_v4_dd_tier2_pct and not b["dd_tier2_locked"]:
+            for p in list(led["open_positions"]):
+                self._close_fraction(p, 1.0, price, "WEEKLY_LOSS_FLATTEN", now, ledger=led)
+            led["open_positions"] = []
+            self._append_audit(
+                now,
+                "BREAKER_WEEKLY",
+                f"Weekly {wk_pnl*100:.2f}% <= {cfg.futures_v4_weekly_loss_pct*100:.1f}% -> flattened futures",
+                ledger=led,
+            )
+        if dd <= cfg.futures_v4_dd_tier2_pct and not b.get("dd_tier2_locked", False):
             b["dd_tier2_locked"] = True
             b["dd_tier1_active"] = True
-            for p in list(self._ledger["open_positions"]):
-                self._close_fraction(p, 1.0, price, "DD_TIER2_FLATTEN", now)
-            self._ledger["open_positions"] = []
-            self._append_audit(now, "BREAKER_DD_10", f"Drawdown {dd*100:.2f}% -> locked pending manual review")
+            for p in list(led["open_positions"]):
+                self._close_fraction(p, 1.0, price, "DD_TIER2_FLATTEN", now, ledger=led)
+            led["open_positions"] = []
+            self._append_audit(
+                now,
+                "BREAKER_DD_10",
+                f"Drawdown {dd*100:.2f}% <= {cfg.futures_v4_dd_tier2_pct*100:.1f}% -> locked pending manual review",
+                ledger=led,
+            )
         elif dd <= cfg.futures_v4_dd_tier1_pct:
-            if not b["dd_tier1_active"]:
+            if not b.get("dd_tier1_active", False):
                 b["dd_tier1_active"] = True
-                self._append_audit(now, "BREAKER_DD_6", f"Drawdown {dd*100:.2f}% -> 0.2% risk & 75/25 thresholds")
-        elif not b["dd_tier2_locked"] and dd > cfg.futures_v4_dd_tier1_pct * 0.5:
+                self._append_audit(
+                    now,
+                    "BREAKER_DD_6",
+                    f"Drawdown {dd*100:.2f}% <= {cfg.futures_v4_dd_tier1_pct*100:.1f}% -> {cfg.futures_v4_dd_tier1_risk_pct*100:.1f}% risk & {cfg.futures_v4_dd_tier1_long:.0f}/{cfg.futures_v4_dd_tier1_short:.0f} thresholds",
+                    ledger=led,
+                )
+        elif not b.get("dd_tier2_locked", False) and dd > cfg.futures_v4_dd_tier1_pct * 0.5:
             b["dd_tier1_active"] = False
 
     def evaluate(
@@ -649,17 +764,30 @@ class FuturesV4Engine:
             or (h4[-1]["close"] if h4 else 0.0)
         )
 
+        led = copy.deepcopy(self._ledger) if self.read_only else self._ledger
+        b_init = led.get("breakers", {})
+        dd_t1_init = bool(b_init.get("dd_tier1_active", False))
+        init_long_th = cfg.futures_v4_dd_tier1_long if dd_t1_init else cfg.futures_v4_long_threshold
+        init_short_th = cfg.futures_v4_dd_tier1_short if dd_t1_init else cfg.futures_v4_short_threshold
+        init_spot_inv = float(led.get("spot_inventory_btc", cfg.futures_v4_spot_inventory_btc))
+
         ev = FuturesV4Evaluation(
-            long_threshold=cfg.futures_v4_long_threshold,
-            short_threshold=cfg.futures_v4_short_threshold,
+            read_only=self.read_only,
+            long_threshold=init_long_th,
+            short_threshold=init_short_th,
             is_weekend_utc=now.weekday() >= 5,
+            spot_inventory_btc=init_spot_inv,
+            equity_usd=float(led.get("equity", cfg.futures_v4_equity_usd)),
+            realized_equity_usd=float(led.get("realized_equity", cfg.futures_v4_equity_usd)),
+            drawdown_pct=float(led.get("drawdown_pct", 0.0)),
             max_heat_pct=round(cfg.futures_v4_max_heat_pct * 100.0, 2),
             evaluated_utc=now.strftime("%Y-%m-%d %H:%M:%S UTC"),
         )
 
         if len(h4) < 30 or len(d1) < 15 or price <= 0:
+            ev.is_warming_up = True
             ev.rejection_reasons = [f"Warming up 4H/1D OHLCV buffers (4H={len(h4)}/30, 1D={len(d1)}/15)"]
-            ev.breakers = dict(self._ledger["breakers"])
+            ev.breakers = dict(b_init)
             store.futures_v4_evaluation = ev
             return ev
 
@@ -728,7 +856,9 @@ class FuturesV4Engine:
             vol_q = _map_linear(vol_ratio, 2.0, 4.0, 76.0, 36.0)
 
         fund = getattr(store, "funding_rate_pct", None)
-        fund_q = 68.0 if (fund is not None and -0.005 <= fund <= 0.015) else (55.0 if fund is None else 35.0)
+        if fund is None and getattr(store, "derivatives_snapshot", None) is not None:
+            fund = getattr(store.derivatives_snapshot, "funding_rate_pct", None)
+        fund_q = 68.0 if (fund is not None and -0.005 <= fund <= 0.015) else (50.0 if fund is None else 35.0)
         vol_quality = 0.45 * atr_q + 0.35 * vol_q + 0.20 * fund_q
 
         # 4. Session / Context (20%)
@@ -743,12 +873,17 @@ class FuturesV4Engine:
         else:
             sess_name, sess_q = "ASIA_OFFHOURS", 58.0
 
-        ev_min = macro_minutes_away
-        if ev_min is None and getattr(store, "macro_evaluation", None) is not None:
-            ev_min = getattr(store.macro_evaluation, "next_event_minutes", None)
-        event_q = 15.0 if (ev_min is not None and 0.0 <= ev_min <= cfg.futures_v4_macro_blackout_min) else (
-            45.0 if (ev_min is not None and ev_min <= 180.0) else 72.0
+        ev_min, macro_known, macro_status = _resolve_macro_event_minutes(
+            store, macro_minutes_away, cfg.futures_v4_macro_blackout_min
         )
+        if not macro_known:
+            event_q = 50.0
+        elif ev_min is not None and abs(ev_min) <= cfg.futures_v4_macro_blackout_min:
+            event_q = 15.0
+        elif ev_min is not None and ev_min <= 180.0:
+            event_q = 45.0
+        else:
+            event_q = 72.0
         sess_quality = 0.55 * sess_q + 0.45 * event_q
 
         dir_core = (0.30 * s_trend + 0.25 * s_mom) / 0.55
@@ -758,10 +893,10 @@ class FuturesV4Engine:
 
         score = round(0.30 * s_trend + 0.25 * s_mom + 0.25 * s_vol + 0.20 * s_sess, 2)
 
-        # Manage ledger & breakers first (uses updated score)
-        self._manage_positions_and_breakers(price, score, h4, now)
-        b = self._ledger["breakers"]
-        dd_tier1 = bool(b["dd_tier1_active"])
+        # Manage ledger & breakers first (uses updated score; isolated copy in read_only mode)
+        self._manage_positions_and_breakers(price, score, h4, now, ledger=led)
+        b = led["breakers"]
+        dd_tier1 = bool(b.get("dd_tier1_active", False))
         long_th = cfg.futures_v4_dd_tier1_long if dd_tier1 else cfg.futures_v4_long_threshold
         short_th = cfg.futures_v4_dd_tier1_short if dd_tier1 else cfg.futures_v4_short_threshold
         bias = "LONG" if score >= long_th else ("SHORT" if score <= short_th else "FLAT")
@@ -783,7 +918,7 @@ class FuturesV4Engine:
         elif is_wk and ((candidate_dir == "LONG" and score < cfg.futures_v4_weekend_long) or (candidate_dir == "SHORT" and score > cfg.futures_v4_weekend_short)):
             r1_ok, r1_det = False, f"Weekend UTC requires extreme ≥{cfg.futures_v4_weekend_long:.0f}/≤{cfg.futures_v4_weekend_short:.0f} (now {score:.1f})"
         else:
-            r1_ok, r1_det = True, f"Score {score:.1f} qualifies {candidate_dir}" + (" (Weekend 0.5x)" if is_wk else "")
+            r1_ok, r1_det = True, f"Score {score:.1f} qualifies {candidate_dir}" + (f" (Weekend {cfg.futures_v4_weekend_size_mult:g}x)" if is_wk else "")
         checklist.append(FuturesV4ChecklistItem(1, "Regime Score Threshold", r1_ok, r1_det))
         if not r1_ok:
             rejections.append(r1_det)
@@ -808,7 +943,10 @@ class FuturesV4Engine:
         # Rule 3
         conf = self._detect_confirmation(h4, eval_dir, nearest_level["price"] if nearest_level else None)
         r3_ok = bool(conf["confirmed"]) and r1_ok
-        r3_det = str(conf.get("detail") if conf["confirmed"] else conf.get("reason", "No 4H BOS/rejection"))
+        if conf["confirmed"] and not r1_ok:
+            r3_det = f"Gated by Rule 1 ({conf.get('detail')})"
+        else:
+            r3_det = str(conf.get("detail") if conf["confirmed"] else conf.get("reason", "No 4H BOS/rejection"))
         checklist.append(FuturesV4ChecklistItem(3, "4H Confirmation + Volume", r3_ok, r3_det))
         if not r3_ok:
             rejections.append(r3_det)
@@ -856,14 +994,20 @@ class FuturesV4Engine:
         if not r5_ok:
             rejections.append(r5_det)
 
-        open_pos = self._ledger["open_positions"]
+        open_pos = led["open_positions"]
         r6_ok = len(open_pos) < cfg.futures_v4_max_concurrent
-        r6_det = "No open/opposing futures" if r6_ok else f"Open {open_pos[0]['direction']} futures active (max 1)"
-        checklist.append(FuturesV4ChecklistItem(6, "No Opposing / Max 1 Futures", r6_ok, r6_det))
+        r6_det = (
+            "No open/opposing futures"
+            if r6_ok
+            else f"Open {open_pos[0]['direction']} futures active (max {cfg.futures_v4_max_concurrent})"
+        )
+        checklist.append(
+            FuturesV4ChecklistItem(6, f"No Opposing / Max {cfg.futures_v4_max_concurrent} Futures", r6_ok, r6_det)
+        )
         if not r6_ok:
             rejections.append(r6_det)
 
-        equity = float(self._ledger["equity"])
+        equity = float(led["equity"])
         risk_pct = cfg.futures_v4_dd_tier1_risk_pct if dd_tier1 else cfg.futures_v4_risk_per_trade_pct
         if is_wk:
             risk_pct *= cfg.futures_v4_weekend_size_mult
@@ -879,21 +1023,31 @@ class FuturesV4Engine:
         cur_heat = sum(float(p.get("risk_pct", 0.0)) for p in open_pos)
         max_heat = cfg.futures_v4_max_heat_pct * 100.0
         r7_ok = size_btc > 0 and (cur_heat + act_risk_pct) <= max_heat + 1e-9
-        r7_det = f"Post-trade heat {cur_heat + act_risk_pct:.2f}% ≤ {max_heat:.2f}%"
+        if size_btc <= 0:
+            r7_det = "Invalid sizing (size <= 0 BTC)"
+        else:
+            r7_det = f"Post-trade heat {cur_heat + act_risk_pct:.2f}% ≤ {max_heat:.2f}%"
         checklist.append(FuturesV4ChecklistItem(7, f"Portfolio Heat ≤ {max_heat:.1f}%", r7_ok, r7_det))
         if not r7_ok:
             rejections.append(r7_det)
 
-        active_cbs = [k for k in ("intraday_halted", "daily_halted", "weekly_halted", "dd_tier2_locked") if b.get(k)]
+        active_cbs = [k for k in BREAKER_KEYS if b.get(k, True)]
         r8_ok = len(active_cbs) == 0
-        r8_det = "All 5 circuit breakers clear" if r8_ok else f"Active: {', '.join(active_cbs)}"
+        r8_det = f"All {len(BREAKER_KEYS)} circuit breakers clear" if r8_ok else f"Active: {', '.join(active_cbs)}"
         checklist.append(FuturesV4ChecklistItem(8, "No Circuit Breaker Active", r8_ok, r8_det))
         if not r8_ok:
             rejections.append(r8_det)
 
-        macro_blk = ev_min is not None and 0.0 <= ev_min <= cfg.futures_v4_macro_blackout_min
-        r9_ok = not macro_blk
-        r9_det = f"Blocked: macro release in {ev_min:.0f}m" if macro_blk else f"No major release ≤ {int(cfg.futures_v4_macro_blackout_min)}m"
+        if not macro_known:
+            r9_ok = False
+            r9_det = "Blocked: macro calendar UNAVAILABLE (fail-closed)"
+        elif ev_min is not None and abs(ev_min) <= cfg.futures_v4_macro_blackout_min:
+            r9_ok = False
+            when_s = f"in {ev_min:.0f}m" if ev_min >= 0 else f"{abs(ev_min):.0f}m ago"
+            r9_det = f"Blocked: macro release {when_s} (±{int(cfg.futures_v4_macro_blackout_min)}m)"
+        else:
+            r9_ok = True
+            r9_det = f"No major release ≤ {int(cfg.futures_v4_macro_blackout_min)}m"
         checklist.append(FuturesV4ChecklistItem(9, f"No Release ≤ {int(cfg.futures_v4_macro_blackout_min)}m", r9_ok, r9_det))
         if not r9_ok:
             rejections.append(r9_det)
@@ -903,7 +1057,7 @@ class FuturesV4Engine:
         # Sell Inventory (score <= short_th & 4H ref, exempt from checks 3-9 & futures halts)
         inv_active = (score <= short_th) and (nearest_level is not None)
         inv_pct = cfg.futures_v4_sell_inv_default_pct
-        spot_inv = float(self._ledger.get("spot_inventory_btc", cfg.futures_v4_spot_inventory_btc))
+        spot_inv = float(led.get("spot_inventory_btc", cfg.futures_v4_spot_inventory_btc))
         sell_btc = round(spot_inv * inv_pct, 6) if inv_active else 0.0
         sell_usd = round(sell_btc * price, 2) if inv_active else 0.0
         sell_ref = f"{nearest_level['label']} @ ${nearest_level['price']:,.1f}" if nearest_level else "—"
@@ -913,45 +1067,52 @@ class FuturesV4Engine:
             else f"Hold spot (requires score ≤ {short_th:.0f}; now {score:.1f})"
         )
 
-        # Auto paper entry / audit once per 4H bar
+        # Auto paper entry / audit once per 4H bar (only mutate persistent ledger when read_only=False)
         last_4h_ts = h4[-1]["ts"]
-        if futures_status in ("LONG", "SHORT") and size_btc > 0:
-            self._ledger["open_positions"].append(
-                {
-                    "id": f"V4-{now.strftime('%Y%m%d%H%M')}-{uuid.uuid4().hex[:4].upper()}",
-                    "direction": futures_status,
-                    "entry_price": entry_price,
-                    "stop_price": stop_price,
-                    "initial_stop_dist": stop_dist,
-                    "target1_price": target1,
-                    "size_btc": size_btc,
-                    "notional_usd": notional,
-                    "leverage": leverage,
-                    "risk_pct": act_risk_pct,
-                    "opened_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "opened_at_ms": int(now.timestamp() * 1000),
-                    "opened_utc_day": now.strftime("%Y-%m-%d"),
-                    "entry_regime_score": score,
-                    "weekend_halved": is_wk,
-                    "breakeven_moved": False,
-                    "partial_taken": False,
-                    "time_stop_8h_reduced": False,
-                    "current_r": 0.0,
-                    "max_favorable_r": 0.0,
-                    "hold_hours": 0.0,
-                    "unrealized_pnl_usd": 0.0,
-                }
-            )
-            self._append_audit(
-                now,
-                f"OPEN_{futures_status}",
-                f"{size_btc:.4f} BTC @ ${entry_price:,.1f} | Stop ${stop_price:,.1f} ({stop_dist_pct*100:.2f}%) | TP ${target1:,.1f} ({leverage:.2f}x)",
-            )
-        if inv_active and self._ledger.get("last_sell_inventory_4h_ts") != last_4h_ts:
-            self._ledger["last_sell_inventory_4h_ts"] = last_4h_ts
-            self._append_audit(now, "SELL_INVENTORY_SIGNAL", f"Reduce {inv_pct*100:.0f}% spot ({sell_btc:.4f} BTC ≈ ${sell_usd:,.0f}) @ {sell_ref}")
+        if not self.read_only:
+            if futures_status in ("LONG", "SHORT") and size_btc > 0:
+                led["open_positions"].append(
+                    {
+                        "id": f"V4-{now.strftime('%Y%m%d%H%M')}-{uuid.uuid4().hex[:4].upper()}",
+                        "direction": futures_status,
+                        "entry_price": entry_price,
+                        "stop_price": stop_price,
+                        "initial_stop_dist": stop_dist,
+                        "target1_price": target1,
+                        "size_btc": size_btc,
+                        "notional_usd": notional,
+                        "leverage": leverage,
+                        "risk_pct": act_risk_pct,
+                        "opened_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        "opened_at_ms": int(now.timestamp() * 1000),
+                        "opened_utc_day": now.strftime("%Y-%m-%d"),
+                        "entry_regime_score": score,
+                        "weekend_halved": is_wk,
+                        "breakeven_moved": False,
+                        "partial_taken": False,
+                        "time_stop_8h_reduced": False,
+                        "current_r": 0.0,
+                        "max_favorable_r": 0.0,
+                        "hold_hours": 0.0,
+                        "unrealized_pnl_usd": 0.0,
+                    }
+                )
+                self._append_audit(
+                    now,
+                    f"OPEN_{futures_status}",
+                    f"{size_btc:.4f} BTC @ ${entry_price:,.1f} | Stop ${stop_price:,.1f} ({stop_dist_pct*100:.2f}%) | TP ${target1:,.1f} ({leverage:.2f}x)",
+                    ledger=led,
+                )
+            if inv_active and led.get("last_sell_inventory_4h_ts") != last_4h_ts:
+                led["last_sell_inventory_4h_ts"] = last_4h_ts
+                self._append_audit(
+                    now,
+                    "SELL_INVENTORY_SIGNAL",
+                    f"Reduce {inv_pct*100:.0f}% spot ({sell_btc:.4f} BTC ≈ ${sell_usd:,.0f}) @ {sell_ref}",
+                    ledger=led,
+                )
 
-        self._save_ledger()
+            self._save_ledger()
 
         active_sigs: List[str] = []
         if futures_status in ("LONG", "SHORT"):
@@ -961,15 +1122,18 @@ class FuturesV4Engine:
         if not active_sigs:
             active_sigs.append("FLAT")
 
-        closed = self._ledger["closed_trades"]
+        closed = led["closed_trades"]
         wins = [t for t in closed if t["pnl_usd"] > 0]
         losses = [t for t in closed if t["pnl_usd"] < 0]
         gw = sum(t["pnl_usd"] for t in wins)
         gl = abs(sum(t["pnl_usd"] for t in losses))
-        intra_pk = max(self._ledger.get("intraday_peak_equity", equity), 1.0)
-        ds = max(self._ledger["day_start_equity"], 1.0)
-        ws = max(self._ledger["week_start_equity"], 1.0)
+        intra_pk = max(led.get("intraday_peak_equity", equity), 1.0)
+        ds = max(led["day_start_equity"], 1.0)
+        ws = max(led["week_start_equity"], 1.0)
 
+        ev.read_only = self.read_only
+        ev.is_warming_up = False
+        ev.macro_source_status = macro_status
         ev.regime_score = score
         ev.regime_bias = bias
         ev.daily_bias = daily_bias
@@ -1020,22 +1184,23 @@ class FuturesV4Engine:
         ev.actual_risk_usd = act_risk_usd
         ev.weekend_halved = is_wk
         ev.sell_inventory_active = inv_active
+        ev.spot_inventory_btc = spot_inv
         ev.sell_inventory_pct = round(inv_pct * 100.0, 1)
         ev.sell_inventory_btc = sell_btc
         ev.sell_inventory_usd = sell_usd
         ev.sell_inventory_ref = sell_ref
         ev.sell_inventory_reason = sell_reason
         ev.equity_usd = equity
-        ev.realized_equity_usd = float(self._ledger["realized_equity"])
-        ev.drawdown_pct = float(self._ledger["drawdown_pct"])
+        ev.realized_equity_usd = float(led["realized_equity"])
+        ev.drawdown_pct = float(led["drawdown_pct"])
         ev.intraday_pnl_pct = round((equity - intra_pk) / intra_pk * 100.0, 2)
         ev.daily_pnl_pct = round((equity - ds) / ds * 100.0, 2)
         ev.weekly_pnl_pct = round((equity - ws) / ws * 100.0, 2)
-        ev.open_heat_pct = round(sum(float(p.get("risk_pct", 0.0)) for p in self._ledger["open_positions"]), 2)
+        ev.open_heat_pct = round(sum(float(p.get("risk_pct", 0.0)) for p in led["open_positions"]), 2)
         ev.breakers = dict(b)
-        ev.open_positions = list(self._ledger["open_positions"])
+        ev.open_positions = list(led["open_positions"])
         ev.closed_trades = list(closed[-10:])
-        ev.audit_log = list(reversed(self._ledger["audit_log"][-10:]))
+        ev.audit_log = list(reversed(led["audit_log"][-10:]))
         ev.total_closed_legs = len(closed)
         ev.review_win_rate_pct = round(len(wins) / len(closed) * 100.0, 1) if closed else 0.0
         ev.review_profit_factor = round(gw / gl, 2) if gl > 0 else (99.0 if gw > 0 else 0.0)
@@ -1043,3 +1208,103 @@ class FuturesV4Engine:
 
         store.futures_v4_evaluation = ev
         return ev
+
+
+@dataclass(frozen=True)
+class FuturesV4View:
+    """Single source of truth for Tab [X / 20] HUD and exported packet parity."""
+
+    evaluation: FuturesV4Evaluation
+    read_only: bool
+    spot_only_boundary: str
+    mode_label: str
+    action_label: str
+    sizing_active: bool
+    order_tag: str
+    checklist_passed: int
+    checklist_total: int
+    # Thresholds actually tested by the engine (from config & active DD tier)
+    max_leverage: float
+    max_hold_hours: float
+    time_reduce_hours: float
+    time_exit_hours: float
+    be_r: float
+    partial_r: float
+    partial_pct: float
+    max_stop_pct: float
+    min_rr: float
+    max_concurrent: int
+    max_heat_pct: float
+    macro_blackout_min: float
+    weekend_long: float
+    weekend_short: float
+    weekend_size_mult: float
+    intraday_loss_pct: float
+    daily_loss_pct: float
+    weekly_loss_pct: float
+    dd_tier1_pct: float
+    dd_tier1_risk_pct: float
+    dd_tier1_long: float
+    dd_tier1_short: float
+    dd_tier2_pct: float
+
+
+def build_futures_v4_view(config: EngineConfig, store: StateStore) -> FuturesV4View:
+    """Builds the canonical Tab [X / 20] presentation view used by both HUD and export."""
+    ev = getattr(store, "futures_v4_evaluation", None)
+    if ev is None:
+        ev = FuturesV4Engine(config, read_only=True).evaluate(store)
+
+    ro_val = getattr(ev, "read_only", None)
+    read_only = True if ro_val is None else bool(ro_val)
+    sizing_active = (
+        not bool(getattr(ev, "is_warming_up", False))
+        and ev.futures_status in ("LONG", "SHORT")
+        and ev.size_btc > 0
+    )
+    order_tag = "HYPOTHETICAL / PAPER ONLY (NOT AN ORDER)" if read_only else "PAPER SIMULATION ONLY (NOT SPOT)"
+    mode_label = (
+        "READ-ONLY HYPOTHETICAL / PAPER MODEL (NOT AN ORDER TICKET)"
+        if read_only
+        else "PAPER LEDGER SIMULATION (NOT LIVE SPOT EXECUTION)"
+    )
+    checklist_passed = sum(1 for item in ev.checklist if item.passed)
+    checklist_total = len(ev.checklist)
+
+    return FuturesV4View(
+        evaluation=ev,
+        read_only=read_only,
+        spot_only_boundary=(
+            "SPOT-ONLY OPERATOR: NO LEVERAGE, NO MARGIN, NO SHORTS, EVER. "
+            "Tab [X] models hypothetical 4H futures for analytical context only — NEVER place futures/margin/short orders from this tab."
+        ),
+        mode_label=mode_label,
+        action_label=" + ".join(ev.active_signals) if ev.active_signals else "FLAT",
+        sizing_active=sizing_active,
+        order_tag=order_tag,
+        checklist_passed=checklist_passed,
+        checklist_total=checklist_total,
+        max_leverage=float(config.futures_v4_max_leverage),
+        max_hold_hours=float(config.futures_v4_max_hold_hours),
+        time_reduce_hours=float(config.futures_v4_time_reduce_hours),
+        time_exit_hours=float(config.futures_v4_time_exit_hours),
+        be_r=float(config.futures_v4_be_r),
+        partial_r=float(config.futures_v4_partial_r),
+        partial_pct=float(config.futures_v4_partial_pct) * 100.0,
+        max_stop_pct=float(config.futures_v4_max_stop_pct) * 100.0,
+        min_rr=float(config.futures_v4_min_rr),
+        max_concurrent=int(config.futures_v4_max_concurrent),
+        max_heat_pct=float(config.futures_v4_max_heat_pct) * 100.0,
+        macro_blackout_min=float(config.futures_v4_macro_blackout_min),
+        weekend_long=float(config.futures_v4_weekend_long),
+        weekend_short=float(config.futures_v4_weekend_short),
+        weekend_size_mult=float(config.futures_v4_weekend_size_mult),
+        intraday_loss_pct=float(config.futures_v4_intraday_loss_pct) * 100.0,
+        daily_loss_pct=float(config.futures_v4_daily_loss_pct) * 100.0,
+        weekly_loss_pct=float(config.futures_v4_weekly_loss_pct) * 100.0,
+        dd_tier1_pct=float(config.futures_v4_dd_tier1_pct) * 100.0,
+        dd_tier1_risk_pct=float(config.futures_v4_dd_tier1_risk_pct) * 100.0,
+        dd_tier1_long=float(config.futures_v4_dd_tier1_long),
+        dd_tier1_short=float(config.futures_v4_dd_tier1_short),
+        dd_tier2_pct=float(config.futures_v4_dd_tier2_pct) * 100.0,
+    )

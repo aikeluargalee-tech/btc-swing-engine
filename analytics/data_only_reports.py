@@ -913,10 +913,124 @@ def build_tab_l_data_only_report(config: Optional[EngineConfig], store: StateSto
 
 
 # ==============================================================================
+# 10b. TAB [X / 20: 4H FUTURES + INVENTORY PROTOCOL v4.0] DATA-ONLY REPORT
+# ==============================================================================
+def build_tab_x_data_only_report(config: Optional[EngineConfig], store: StateStore) -> str:
+    """Tab [X / 20] serialisation of analytics.futures_v4_engine.build_futures_v4_view.
+
+    Reads the exact same FuturesV4View snapshot as _build_tab20_futures_v4_hud so
+    the exported packet and screen always state the same boundary, mode, thresholds,
+    checklist outcomes, and numbers.
+    """
+    from analytics.futures_v4_engine import build_futures_v4_view
+
+    cfg = config or DEFAULT_CONFIG
+    ts_utc, ts_sgt = _timestamps_utc_sgt()
+    spot_px = _spot_price(store)
+    view = build_futures_v4_view(cfg, store)
+    ev = view.evaluation
+
+    lines = [
+        "# TAB [X / 20: 4H FUTURES + INVENTORY PROTOCOL v4.0] | DATA-ONLY METRICS REPORT",
+        f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (SGT):** `{ts_sgt}`",
+        f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}`",
+        f"**Spot-Only Operator Boundary:** `{view.spot_only_boundary}`",
+        f"**Execution Mode:** `{view.mode_label}` (`read_only={view.read_only}`)",
+        "**Model Source:** `analytics.futures_v4_engine.build_futures_v4_view` (identical to Tab [X / 20] HUD)",
+        "",
+        "## 1. PROTOCOL REGIME & RESOLVED MODEL SIGNAL",
+        f"- **Protocol Spec:** `v{ev.protocol_version} 4H DAY-POSITION (MODEL MAX 1:{view.max_leverage:g} LEV · 4-{view.max_hold_hours:g}h HOLD)`",
+        f"- **Model Signal (`{'HYPOTHETICAL/PAPER' if view.read_only else 'PAPER'}`):** `{view.action_label}` (`futures_status={ev.futures_status}`)",
+        f"- **Regime Score / Bias:** `{ev.regime_score:.1f}/100` (`{ev.regime_bias}`, `1D={ev.daily_bias}`)",
+        f"- **4H Close Anchor (UTC):** `{ev.last_4h_close_utc}`",
+        f"- **Weekend UTC:** `{ev.is_weekend_utc}` (`Weekend Thresholds: L>={view.weekend_long:.0f} / S<={view.weekend_short:.0f} · Size Mult: {view.weekend_size_mult:g}x`)",
+        f"- **Active Regime Thresholds:** `L>={ev.long_threshold:.0f} · Flat · S<={ev.short_threshold:.0f}`",
+        f"- **Macro Calendar Source:** `{ev.macro_source_status}`",
+        "",
+        "## 2. 4H MULTI-FACTOR REGIME BREAKDOWN",
+    ]
+    for k, lbl in (
+        ("trend_structure", "1. Trend Structure (30%)"),
+        ("momentum", "2. Momentum 4H (25%)"),
+        ("volatility_liquidity", "3. Vol & Liquidity 4H (25%)"),
+        ("session_context", "4. Session / Context (20%)"),
+    ):
+        if getattr(ev, "is_warming_up", False) or k not in ev.factor_scores:
+            lines.append(f"- **{lbl}:** `UNAVAILABLE` (`Warming up`)")
+        else:
+            lines.append(
+                f"- **{lbl}:** `{ev.factor_scores[k]:.1f}` (`{ev.factor_summaries.get(k, '—')}`)"
+            )
+
+    lines.extend([
+        "",
+        "## 3. SELL INVENTORY OPTION (HYPOTHETICAL · SEC 2 & 6)",
+        f"- **Spot Model Status:** `{'SELL INVENTORY SIGNAL (HYPOTHETICAL/PAPER)' if (ev.sell_inventory_active and view.read_only) else ('SELL INVENTORY ACTIVE (PAPER)' if ev.sell_inventory_active else 'HOLD SPOT INVENTORY')}`",
+        f"- **Model Spot Inventory Held:** `{ev.spot_inventory_btc:.2f} BTC` (`0% Futures Heat`)",
+        f"- **{'Hypothetical Trim (Paper)' if view.read_only else 'Paper Trim'}:** `{'HYPOTHETICAL / PAPER — NOT AN ORDER: ' if (ev.sell_inventory_active and view.read_only) else ''}{ev.sell_inventory_pct:.0f}% -> {ev.sell_inventory_btc:.4f} BTC (${ev.sell_inventory_usd:,.0f})`" if ev.sell_inventory_active else f"- **{'Hypothetical Trim (Paper)' if view.read_only else 'Paper Trim'}:** `0% -> 0.0000 BTC ($0)` (Requires score <= `{ev.short_threshold:.0f}`)",
+        f"- **4H Structural Ref:** `{ev.sell_inventory_ref}`",
+        "- **Exempt From:** `Weekend ext, Check 2 bias/dist, Checks 3-9 & Halts`",
+        "",
+        f"## 4. 9-POINT FUTURES QUALIFICATION CHECKLIST ({view.checklist_passed}/{view.checklist_total})",
+    ])
+    for item in ev.checklist:
+        st_s = "PASS" if item.passed else "FAIL"
+        lines.append(f"- **Check {item.id} ({item.rule}):** `[{st_s}]` {item.detail}")
+
+    lines.extend([
+        "",
+        "## 5. HYPOTHETICAL PAPER SIZING & HOLD RULES",
+        f"- **Model Boundary:** `{view.order_tag}`",
+    ])
+    if view.sizing_active:
+        prefix = "HYPOTHETICAL / PAPER ONLY (NOT AN ORDER): " if view.read_only else "PAPER SIMULATION ONLY: "
+        lines.extend([
+            f"- **Hypothetical Dir / Method:** `{prefix}{ev.eval_direction} ({ev.entry_method})`",
+            f"- **Hypothetical Entry / Hard Stop:** `{prefix}${ev.entry_price:,.1f} / ${ev.stop_price:,.1f} ({ev.stop_distance_pct:.2f}% <= {view.max_stop_pct:.1f}%)`",
+            f"- **Hypothetical Target 1 ({view.partial_pct:.0f}% @ {view.partial_r:.1f}R):** `{prefix}${ev.target1_price:,.1f} ({ev.target1_label})`",
+            f"- **Raw / Fund-Adj R:R:** `{ev.raw_rr:.2f}:1 / {ev.funding_adj_rr:.2f}:1 (>= {view.min_rr:.1f}:1)`",
+            f"- **Hypothetical Size / Leverage:** `{prefix}{ev.size_btc:.4f} BTC (${ev.notional_usd:,.0f}, {ev.leverage:.2f}x/{view.max_leverage:g}x)`",
+            f"- **Hypothetical Risk:** `{prefix}{ev.actual_risk_pct:.3f}% (${ev.actual_risk_usd:,.2f})`",
+        ])
+    else:
+        lines.extend([
+            f"- **Futures Ticket State:** `FLAT — NO HYPOTHETICAL FUTURES POSITION` (`{view.checklist_passed}/{view.checklist_total} passed`)",
+            f"- **Evaluated Direction:** `{ev.eval_direction} (checklist evaluation only; gated OFF)`",
+            f"- **Eval R:R / Stop:** `UNAVAILABLE (warming up buffers)`"
+            if getattr(ev, "is_warming_up", False)
+            else f"- **Eval R:R / Stop:** `R:R {ev.raw_rr:.2f}:1 / adj {ev.funding_adj_rr:.2f}:1 (>= {view.min_rr:.1f}:1) · Stop {ev.stop_distance_pct:.2f}% (<= {view.max_stop_pct:.1f}%)`",
+        ])
+    lines.append(
+        f"- **Time / Hold Rules:** `BE @ +{view.be_r:g}R · {view.time_reduce_hours:g}h -50% · {view.time_exit_hours:g}h Exit (<1R) · {view.max_hold_hours:g}h Max`"
+    )
+    if ev.open_positions:
+        op = ev.open_positions[0]
+        lines.append(
+            f"- **Open Paper Position:** `{op['direction']} {op['size_btc']} BTC ({op['current_r']:+.2f}R, {op['hold_hours']:.1f}h/{view.max_hold_hours:g}h)`"
+        )
+    else:
+        lines.append(f"- **Open Paper Position:** `FLAT (0 / {view.max_concurrent} Concurrent)`")
+
+    b = ev.breakers or {}
+    lines.extend([
+        "",
+        "## 6. PAPER LEDGER & 5-TIER CIRCUIT BREAKERS (SEC 8)",
+        f"- **Paper Equity / Heat:** `${ev.equity_usd:,.2f}` | `Heat {ev.open_heat_pct:.2f}% / {view.max_heat_pct:.1f}% max`",
+        f"- **Intraday ({view.intraday_loss_pct:g}%):** `{'HALT' if b.get('intraday_halted') else 'OK'}` (`{ev.intraday_pnl_pct:+.2f}%`)",
+        f"- **Daily ({view.daily_loss_pct:g}%):** `{'HALT' if b.get('daily_halted') else 'OK'}` (`{ev.daily_pnl_pct:+.2f}%`)",
+        f"- **Weekly ({view.weekly_loss_pct:g}%):** `{'FLAT' if b.get('weekly_halted') else 'OK'}` (`{ev.weekly_pnl_pct:+.2f}%`)",
+        f"- **DD1 ({view.dd_tier1_pct:g}% -> {view.dd_tier1_risk_pct:g}%/{view.dd_tier1_long:.0f}-{view.dd_tier1_short:.0f}):** `{'ACTIVE' if b.get('dd_tier1_active') else 'OK'}`",
+        f"- **DD2 ({view.dd_tier2_pct:g}%):** `{'LOCKED' if b.get('dd_tier2_locked') else 'OK'}` (`{ev.drawdown_pct:+.2f}%`)",
+        f"- **Closed Paper Legs:** `{ev.total_closed_legs}` (`WR {ev.review_win_rate_pct:.1f}% · PF {ev.review_profit_factor:.2f} · Exp {ev.review_expectancy_r:+.2f}R`)",
+    ])
+    return sanitize_data_only_text("\n".join(lines))
+
+
+# ==============================================================================
 # 11. GLOBAL [C: AI PACKET] MASTER DATA-ONLY PACKET
 # ==============================================================================
 def build_global_data_only_packet(config: Optional[EngineConfig], store: StateStore) -> str:
-    """Combines all 10 primary top-ribbon DATA-ONLY reports into a single master packet."""
+    """Combines all primary top-ribbon DATA-ONLY reports into a single master packet."""
     cfg = config or DEFAULT_CONFIG
     ts_utc, ts_sgt = _timestamps_utc_sgt()
     spot_px = _spot_price(store)
@@ -962,6 +1076,10 @@ def build_global_data_only_packet(config: Optional[EngineConfig], store: StateSt
         "---",
         "",
         build_tab_l_data_only_report(cfg, store),
+        "",
+        "---",
+        "",
+        build_tab_x_data_only_report(cfg, store),
         "",
     ]
     return sanitize_data_only_text("\n".join(sections))
@@ -1682,6 +1800,7 @@ def copy_tab_data_only_report_to_clipboard(
         12: (build_tab_w_data_only_report, "btc_waterfall_latest.md"),
         0: (build_tab_0_data_only_report, "btc_spot_swing_latest.md"),
         10: (build_tab_l_data_only_report, "btc_master_latest.md"),
+        20: (build_tab_x_data_only_report, "btc_futures_v4_latest.md"),
         21: (build_tab_d_data_only_report, "btc_data_hub_latest.md"),
     }
     if tab_id not in dispatch:

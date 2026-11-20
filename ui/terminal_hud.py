@@ -6051,21 +6051,40 @@ def _build_tab20_futures_v4_hud(
     store: StateStore,
     header_panel: Any,
 ) -> Group:
-    """Tab [20 / X]: BTC Short-Term Futures + Inventory Protocol v4.0 (4H Day-Trade Only)."""
-    ev = getattr(store, "futures_v4_evaluation", None)
-    if ev is None:
-        from analytics.futures_v4_engine import FuturesV4Engine
-        ev = FuturesV4Engine(config, read_only=True).evaluate(store)
+    """Tab [20 / X]: BTC Short-Term Futures + Inventory Protocol v4.0 (Analytical / Paper Only)."""
+    from analytics.futures_v4_engine import build_futures_v4_view
 
-    sig_col = "green" if ev.futures_status == "LONG" else ("red" if ev.futures_status == "SHORT" else ("magenta" if ev.sell_inventory_active else "yellow"))
-    act_str = " + ".join(ev.active_signals)
+    view = build_futures_v4_view(config, store)
+    ev = view.evaluation
+
+    sig_col = (
+        "green"
+        if ev.futures_status == "LONG"
+        else ("red" if ev.futures_status == "SHORT" else ("magenta" if ev.sell_inventory_active else "yellow"))
+    )
+    mode_badge = (
+        "[bold white on red] SPOT-ONLY OPERATOR: NO LEVERAGE · NO MARGIN · NO SHORTS · EVER [/bold white on red]"
+    )
+    paper_tag = (
+        "[bold yellow]READ-ONLY HYPOTHETICAL / PAPER ONLY (NOT AN ORDER)[/bold yellow]"
+        if view.read_only
+        else "[bold cyan]PAPER LEDGER SIMULATION (NOT LIVE SPOT EXECUTION)[/bold cyan]"
+    )
+    sig_prefix = "MODEL SIGNAL (HYPOTHETICAL/PAPER)" if view.read_only else "MODEL SIGNAL (PAPER)"
     sub_text = (
-        f"[bold white]PROTOCOL:[/bold white] [cyan]v4.0 4H DAY-TRADE (MAX 1:2 LEV · 4-24h HOLD)[/cyan]  │  "
-        f"[bold white]ACTION:[/bold white] [bold {sig_col}]{act_str}[/bold {sig_col}]  │  "
+        f"{mode_badge}  │  {paper_tag}\n"
+        f"[bold white]PROTOCOL:[/bold white] [cyan]v4.0 4H DAY-TRADE (MODEL MAX 1:{view.max_leverage:g} LEV · 4-{view.max_hold_hours:g}h HOLD)[/cyan]  │  "
+        f"[bold white]{sig_prefix}:[/bold white] [bold {sig_col}]{view.action_label}[/bold {sig_col}]  │  "
         f"[bold white]REGIME:[/bold white] [bold]{ev.regime_score:.1f}/100[/bold] ({ev.regime_bias}, 1D={ev.daily_bias})  │  "
         f"[bold white]4H CLOSE:[/bold white] [dim]{ev.last_4h_close_utc}[/dim]"
     )
-    sub_panel = Panel(sub_text, box=box.ROUNDED, border_style="bright_cyan", padding=(0, 1))
+    sub_panel = Panel(
+        sub_text,
+        title="[bold bright_red]SPOT-ONLY BOUNDARY · ANALYTICAL / PAPER MODEL ONLY[/bold bright_red]",
+        box=box.ROUNDED,
+        border_style="red" if view.read_only else "bright_cyan",
+        padding=(0, 1),
+    )
 
     # Row 1: 4H Multi-Factor Regime Breakdown (left) + Sell Inventory Option (right)
     reg_tbl = Table.grid(expand=True)
@@ -6078,14 +6097,20 @@ def _build_tab20_futures_v4_hud(
         ("volatility_liquidity", "3. Vol & Liquidity 4H (25%)"),
         ("session_context", "4. Session / Context (20%)"),
     ):
-        sc = ev.factor_scores.get(k, 50.0)
-        sc_c = "green" if sc >= ev.long_threshold else ("red" if sc <= ev.short_threshold else "yellow")
-        reg_tbl.add_row(
-            f"[white]{lbl}[/white]",
-            f"[bold {sc_c}]{sc:5.1f}[/bold {sc_c}]",
-            f"[dim]{ev.factor_summaries.get(k, '—')}[/dim]",
-        )
-    wk_badge = f"[yellow]WEEKEND 80/20 HALF[/yellow]" if ev.is_weekend_utc else f"L≥{ev.long_threshold:.0f} · Flat · S≤{ev.short_threshold:.0f}"
+        if getattr(ev, "is_warming_up", False) or k not in ev.factor_scores:
+            sc_cell = "[dim red]UNAVAILABLE[/dim red]"
+            sum_cell = "[dim]Warming up[/dim]"
+        else:
+            sc = ev.factor_scores[k]
+            sc_c = "green" if sc >= ev.long_threshold else ("red" if sc <= ev.short_threshold else "yellow")
+            sc_cell = f"[bold {sc_c}]{sc:5.1f}[/bold {sc_c}]"
+            sum_cell = f"[dim]{ev.factor_summaries.get(k, '—')}[/dim]"
+        reg_tbl.add_row(f"[white]{lbl}[/white]", sc_cell, sum_cell)
+    wk_badge = (
+        f"[yellow]WEEKEND {view.weekend_long:.0f}/{view.weekend_short:.0f} ({view.weekend_size_mult:g}x)[/yellow]"
+        if ev.is_weekend_utc
+        else f"L≥{ev.long_threshold:.0f} · Flat · S≤{ev.short_threshold:.0f}"
+    )
     reg_panel = Panel(
         reg_tbl,
         title=f"[bold bright_white]4H MULTI-FACTOR REGIME ({wk_badge})[/bold bright_white]",
@@ -6097,15 +6122,28 @@ def _build_tab20_futures_v4_hud(
     inv_tbl = Table.grid(expand=True)
     inv_tbl.add_column(ratio=2)
     inv_tbl.add_column(ratio=3, justify="right")
-    inv_badge = "[bold red]SELL INVENTORY ACTIVE[/bold red]" if ev.sell_inventory_active else "[dim]HOLD SPOT INVENTORY[/dim]"
-    inv_tbl.add_row("Spot Action Status", inv_badge)
-    inv_tbl.add_row("Spot Inventory Held", f"{config.futures_v4_spot_inventory_btc:.2f} BTC (0% Futures Heat)")
-    inv_tbl.add_row("Recommended Trim", f"{ev.sell_inventory_pct:.0f}% -> {ev.sell_inventory_btc:.4f} BTC (${ev.sell_inventory_usd:,.0f})")
+    if ev.sell_inventory_active:
+        inv_badge = (
+            "[bold red]SELL INVENTORY SIGNAL[/bold red] [yellow](HYPOTHETICAL/PAPER)[/yellow]"
+            if view.read_only
+            else "[bold red]SELL INVENTORY ACTIVE (PAPER)[/bold red]"
+        )
+        trim_str = (
+            f"[yellow]HYPOTHETICAL / PAPER:[/yellow] {ev.sell_inventory_pct:.0f}% -> {ev.sell_inventory_btc:.4f} BTC (${ev.sell_inventory_usd:,.0f})"
+            if view.read_only
+            else f"{ev.sell_inventory_pct:.0f}% -> {ev.sell_inventory_btc:.4f} BTC (${ev.sell_inventory_usd:,.0f})"
+        )
+    else:
+        inv_badge = "[dim]HOLD SPOT INVENTORY[/dim]"
+        trim_str = f"0% -> 0.0000 BTC ($0) [dim](Requires ≤ {ev.short_threshold:.0f})[/dim]"
+    inv_tbl.add_row("Spot Model Status", inv_badge)
+    inv_tbl.add_row("Model Spot Inventory", f"{ev.spot_inventory_btc:.2f} BTC (0% Futures Heat)")
+    inv_tbl.add_row("Hypothetical Trim" if view.read_only else "Paper Trim", trim_str)
     inv_tbl.add_row("4H Structural Ref", f"{ev.sell_inventory_ref}")
-    inv_tbl.add_row("Exempt From", "Futures Checks 3-9 & Halts")
+    inv_tbl.add_row("Exempt From", "Weekend ext, Check 2 bias/dist, Checks 3-9 & Halts")
     inv_panel = Panel(
         inv_tbl,
-        title="[bold bright_yellow]SELL INVENTORY OPTION (SEC 2 & 6)[/bold bright_yellow]",
+        title="[bold bright_yellow]SELL INVENTORY OPTION (HYPOTHETICAL · SEC 2 & 6)[/bold bright_yellow]",
         box=box.ROUNDED,
         border_style="red" if ev.sell_inventory_active else "dim",
         padding=(0, 1),
@@ -6116,7 +6154,7 @@ def _build_tab20_futures_v4_hud(
     top_grid.add_column(ratio=1)
     top_grid.add_row(reg_panel, inv_panel)
 
-    # Row 2: 9-Point Futures Checklist (left) + Order Sizing & Hold Rules (right)
+    # Row 2: 9-Point Futures Checklist (left) + Hypothetical Paper Sizing & Hold Rules (right)
     chk_tbl = Table(box=box.SIMPLE_HEAVY, expand=True, padding=(0, 1))
     chk_tbl.add_column("#", width=3)
     chk_tbl.add_column("Qualification Rule")
@@ -6124,10 +6162,10 @@ def _build_tab20_futures_v4_hud(
     chk_tbl.add_column("Detail")
     for item in ev.checklist:
         st_s = "[bold green]PASS[/bold green]" if item.passed else "[bold red]FAIL[/bold red]"
-        chk_tbl.add_row(str(item.id), item.rule, st_s, f"[dim]{item.detail[:48]}[/dim]")
+        chk_tbl.add_row(str(item.id), item.rule, st_s, f"[dim]{item.detail}[/dim]")
     chk_panel = Panel(
         chk_tbl,
-        title="[bold bright_white]9-POINT FUTURES QUALIFICATION CHECKLIST[/bold bright_white]",
+        title=f"[bold bright_white]9-POINT FUTURES QUALIFICATION CHECKLIST ({view.checklist_passed}/{view.checklist_total})[/bold bright_white]",
         box=box.ROUNDED,
         border_style="bright_blue",
         padding=(0, 0),
@@ -6136,26 +6174,61 @@ def _build_tab20_futures_v4_hud(
     prop_tbl = Table.grid(expand=True)
     prop_tbl.add_column(ratio=2)
     prop_tbl.add_column(ratio=3, justify="right")
-    prop_tbl.add_row("Eval Dir / Method", f"[bold]{ev.eval_direction}[/bold] ({ev.entry_method})")
-    prop_tbl.add_row("Entry / Hard Stop", f"${ev.entry_price:,.1f} / [red]${ev.stop_price:,.1f}[/red] ({ev.stop_distance_pct:.2f}% ≤ 2.2%)")
-    prop_tbl.add_row("Target 1 (45% @ 1.5R)", f"[green]${ev.target1_price:,.1f}[/green] ({ev.target1_label})")
-    prop_tbl.add_row("Raw / Fund-Adj R:R", f"{ev.raw_rr:.2f}:1 / {ev.funding_adj_rr:.2f}:1 (≥ {config.futures_v4_min_rr:.1f}:1)")
-    prop_tbl.add_row("Risk Sizing / Lev", f"{ev.size_btc:.4f} BTC (${ev.notional_usd:,.0f}, {ev.leverage:.2f}x/2x)")
-    prop_tbl.add_row("Actual Risk", f"{ev.actual_risk_pct:.3f}% (${ev.actual_risk_usd:,.2f})")
-    prop_tbl.add_row("Time / Hold Rules", "BE @ +1R · 8h -50% · 12h Exit (<1R) · 24h Max")
+    if view.sizing_active:
+        hyp_prefix = "[yellow]HYPOTHETICAL/PAPER:[/yellow] " if view.read_only else "[cyan]PAPER:[/cyan] "
+        prop_tbl.add_row("Model Boundary", f"[bold red]{view.order_tag}[/bold red]")
+        prop_tbl.add_row("Hypothetical Dir / Method", f"{hyp_prefix}[bold]{ev.eval_direction}[/bold] ({ev.entry_method})")
+        prop_tbl.add_row(
+            "Hypothetical Entry / Stop",
+            f"{hyp_prefix}${ev.entry_price:,.1f} / [red]${ev.stop_price:,.1f}[/red] ({ev.stop_distance_pct:.2f}% ≤ {view.max_stop_pct:.1f}%)",
+        )
+        prop_tbl.add_row(
+            f"Hypothetical TP1 ({view.partial_pct:.0f}% @ {view.partial_r:.1f}R)",
+            f"{hyp_prefix}[green]${ev.target1_price:,.1f}[/green] ({ev.target1_label})",
+        )
+        prop_tbl.add_row("Raw / Fund-Adj R:R", f"{ev.raw_rr:.2f}:1 / {ev.funding_adj_rr:.2f}:1 (≥ {view.min_rr:.1f}:1)")
+        prop_tbl.add_row(
+            "Hypothetical Size / Lev",
+            f"{hyp_prefix}{ev.size_btc:.4f} BTC (${ev.notional_usd:,.0f}, {ev.leverage:.2f}x/{view.max_leverage:g}x)",
+        )
+        prop_tbl.add_row("Hypothetical Risk", f"{hyp_prefix}{ev.actual_risk_pct:.3f}% (${ev.actual_risk_usd:,.2f})")
+    else:
+        prop_tbl.add_row("Model Boundary", f"[bold yellow]{view.order_tag}[/bold yellow]")
+        prop_tbl.add_row(
+            "Futures Ticket State",
+            f"[bold yellow]FLAT — NO HYPOTHETICAL FUTURES POSITION[/bold yellow] ({view.checklist_passed}/{view.checklist_total} passed)",
+        )
+        prop_tbl.add_row("Evaluated Direction", f"[dim]{ev.eval_direction} (checklist evaluation only; gated OFF)[/dim]")
+        if getattr(ev, "is_warming_up", False):
+            prop_tbl.add_row("Eval R:R / Stop", "[dim red]UNAVAILABLE (warming up buffers)[/dim red]")
+        else:
+            prop_tbl.add_row(
+                "Eval R:R / Stop",
+                f"R:R {ev.raw_rr:.2f}:1 / adj {ev.funding_adj_rr:.2f}:1 (≥ {view.min_rr:.1f}:1) · Stop {ev.stop_distance_pct:.2f}% (≤ {view.max_stop_pct:.1f}%)",
+            )
+    prop_tbl.add_row(
+        "Time / Hold Rules",
+        f"BE @ +{view.be_r:g}R · {view.time_reduce_hours:g}h -50% · {view.time_exit_hours:g}h Exit (<1R) · {view.max_hold_hours:g}h Max",
+    )
     if ev.open_positions:
         op = ev.open_positions[0]
         prop_tbl.add_row(
-            "[bold cyan]Open Futures Pos[/bold cyan]",
-            f"[bold]{op['direction']}[/bold] {op['size_btc']} BTC ({op['current_r']:+.2f}R, {op['hold_hours']:.1f}h/24h)",
+            "[bold cyan]Open Paper Pos[/bold cyan]",
+            f"[bold]{op['direction']}[/bold] {op['size_btc']} BTC ({op['current_r']:+.2f}R, {op['hold_hours']:.1f}h/{view.max_hold_hours:g}h) [PAPER]",
         )
     else:
-        prop_tbl.add_row("Open Futures Pos", "[dim]FLAT (0 / 1 Concurrent)[/dim]")
+        prop_tbl.add_row("Open Paper Pos", f"[dim]FLAT (0 / {view.max_concurrent} Concurrent)[/dim]")
+
+    sizing_title = (
+        "[bold yellow]HYPOTHETICAL PAPER MODEL SIZING (READ-ONLY · NOT AN ORDER)[/bold yellow]"
+        if view.read_only
+        else "[bold bright_white]PAPER SIMULATION SIZING & MANAGEMENT[/bold bright_white]"
+    )
     prop_panel = Panel(
         prop_tbl,
-        title="[bold bright_white]PROPOSED SIZING & TRADE MANAGEMENT[/bold bright_white]",
+        title=sizing_title,
         box=box.ROUNDED,
-        border_style="green" if ev.futures_status != "FLAT" else "yellow",
+        border_style="yellow" if view.read_only else ("green" if ev.futures_status != "FLAT" else "yellow"),
         padding=(0, 1),
     )
 
@@ -6167,15 +6240,15 @@ def _build_tab20_futures_v4_hud(
     # Row 3: 5-Tier Circuit Breakers & Paper Ledger Review
     b = ev.breakers or {}
     cb_badges = [
-        f"Intra(-1.2%):{'[red]HALT[/red]' if b.get('intraday_halted') else '[green]OK[/green]'} {ev.intraday_pnl_pct:+.2f}%",
-        f"Day(-2%):{'[red]HALT[/red]' if b.get('daily_halted') else '[green]OK[/green]'} {ev.daily_pnl_pct:+.2f}%",
-        f"Wk(-4%):{'[red]FLAT[/red]' if b.get('weekly_halted') else '[green]OK[/green]'} {ev.weekly_pnl_pct:+.2f}%",
-        f"DD1(-6%):{'[yellow]0.2%/75-25[/yellow]' if b.get('dd_tier1_active') else '[green]OK[/green]'}",
-        f"DD2(-10%):{'[red]LOCKED[/red]' if b.get('dd_tier2_locked') else '[green]OK[/green]'} {ev.drawdown_pct:+.2f}%",
+        f"Intra({view.intraday_loss_pct:g}%):{'[red]HALT[/red]' if b.get('intraday_halted') else '[green]OK[/green]'} {ev.intraday_pnl_pct:+.2f}%",
+        f"Day({view.daily_loss_pct:g}%):{'[red]HALT[/red]' if b.get('daily_halted') else '[green]OK[/green]'} {ev.daily_pnl_pct:+.2f}%",
+        f"Wk({view.weekly_loss_pct:g}%):{'[red]FLAT[/red]' if b.get('weekly_halted') else '[green]OK[/green]'} {ev.weekly_pnl_pct:+.2f}%",
+        f"DD1({view.dd_tier1_pct:g}%):{'[yellow]' + f'{view.dd_tier1_risk_pct:g}%/{view.dd_tier1_long:.0f}-{view.dd_tier1_short:.0f}' + '[/yellow]' if b.get('dd_tier1_active') else '[green]OK[/green]'}",
+        f"DD2({view.dd_tier2_pct:g}%):{'[red]LOCKED[/red]' if b.get('dd_tier2_locked') else '[green]OK[/green]'} {ev.drawdown_pct:+.2f}%",
     ]
     foot_tbl = Table.grid(expand=True)
     foot_tbl.add_row(
-        f"[bold]Equity:[/bold] ${ev.equity_usd:,.2f}  │  [bold]Heat:[/bold] {ev.open_heat_pct:.2f}% / {ev.max_heat_pct:.1f}% max  │  "
+        f"[bold]Paper Equity:[/bold] ${ev.equity_usd:,.2f}  │  [bold]Paper Heat:[/bold] {ev.open_heat_pct:.2f}% / {view.max_heat_pct:.1f}% max  │  "
         + "  •  ".join(cb_badges)
     )
     last_ev = ev.audit_log[0] if ev.audit_log else None
@@ -6451,7 +6524,7 @@ def print_dry_run_report(
                 t_num = 0
         store.active_tab = t_num if t_num in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21) else 0
         console.print(build_dashboard_renderable(config, store, tab_override=store.active_tab))
-        if store.active_tab in (0, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21):
+        if store.active_tab in (0, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21):
             try:
                 from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
                 copy_tab_data_only_report_to_clipboard(store.active_tab, config, store)
@@ -6509,8 +6582,10 @@ def _poll_keyboard_tab_switch(
                     if store.active_tab != 20:
                         store.active_tab = 20
                         changed = True
-                    rlist, _, _ = select.select([sys.stdin], [], [], 0.0)
-                    continue
+                    else:
+                        from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
+                        copy_tab_data_only_report_to_clipboard(20, config, store)
+                        changed = True
                 elif ch in ("d", "D"):
                     store.show_help = False
                     if store.active_tab != 21:
@@ -6675,8 +6750,10 @@ def _poll_keyboard_tab_switch(
                     if store.active_tab != 20:
                         store.active_tab = 20
                         changed = True
-                    rlist, _, _ = select.select([sys.stdin], [], [], 0.0)
-                    continue
+                    else:
+                        from analytics.data_only_reports import copy_tab_data_only_report_to_clipboard
+                        copy_tab_data_only_report_to_clipboard(20, config, store)
+                        changed = True
                 elif ch in ("d", "D"):
                     store.show_help = False
                     if store.active_tab != 21:

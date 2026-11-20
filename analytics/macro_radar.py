@@ -204,7 +204,16 @@ class MacroRadarEvaluator:
     ) -> MacroRadarEvaluation:
         """Runs full Tab [3] Macro Quant & Cycle Radar evaluation."""
         spot_1h = list(store.spot_klines_1h)
-        spot_1d = list(store.spot_klines_1d) or synthesize_1d_bars_from_1h(spot_1h)
+        spot_1d = list(store.spot_klines_1d)
+        # A missing 1D feed used to be silently replaced by 1H-synthesised bars, which
+        # repainted the current day. The fallback is gone, so the degradation is stated
+        # instead of hidden: daily metrics below fall back to spot and this flags it.
+        if len(spot_1d) >= 2:
+            data_status = "OK"
+        elif spot_1d:
+            data_status = "PARTIAL (1 daily bar; daily metrics degraded)"
+        else:
+            data_status = "UNAVAILABLE (no closed 1D feed; daily metrics use spot only)"
         spot_1w = list(store.spot_klines_1w)
         bars_4h = synthesize_4h_bars(spot_1h)
 
@@ -403,6 +412,7 @@ class MacroRadarEvaluator:
         macro_notes.append(f"4H Wick Flush Sniper: {wick_detail}")
 
         ev = MacroRadarEvaluation(
+            data_status=data_status,
             timestamp_utc=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             current_price=round(current_price, 2),
             completed_1d_close=round(comp_1d_close, 2),

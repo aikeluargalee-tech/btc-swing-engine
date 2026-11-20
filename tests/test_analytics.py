@@ -9,13 +9,42 @@ from typing import List
 from analytics.cvd_engine import compute_derivatives_snapshot, compute_flow_snapshot
 from analytics.signal_detector import SignalDetector
 from analytics.volume_profile import compute_atr, compute_composite_profile, synthesize_4h_bars
+from analytics.protocol_v13 import synthesize_1d_bars_from_1h
 from config.settings import DEFAULT_CONFIG
 from core.models import ExecutionGateState, KlineBar, MarketRegime
 from core.state_store import StateStore
 
+# Tests must not read the operator's live protocol context: that file is a human review
+# record whose age is now checked, so a stale real file would veto every signal in the
+# suite. Write a hermetic, freshly-reviewed fixture instead.
+_PROTOCOL_CTX_PATH = Path(tempfile.gettempdir()) / "btc_swing_test_protocol_context.json"
+
+
+def _write_test_protocol_context() -> None:
+    from datetime import datetime, timezone
+    import json as _json
+    _PROTOCOL_CTX_PATH.write_text(
+        _json.dumps({
+            "last_reviewed_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "liq_cascade_72h_over_300m": "CONFIRMED_CLEAR",
+            "liq_cascade_reclaimed_within_24h": "CONFIRMED_CLEAR",
+            "fomc_cpi_window_override": "AUTO",
+            "s2_risk_level": "LOW",
+            "etf_net_outflow_weakness": "NOT_CONFIRMED",
+            "catalyst_technical_breakdown": "NOT_CONFIRMED",
+            "enforce_200d_hard_veto_on_tab1": False,
+            "cycle_ath_override_usd": DEFAULT_CONFIG.default_cycle_ath_usd,
+        }),
+        encoding="utf-8",
+    )
+
+
+_write_test_protocol_context()
+
 TEST_CONFIG = replace(
     DEFAULT_CONFIG,
     signal_log_path=Path(tempfile.gettempdir()) / "btc_swing_test_signals.jsonl",
+    protocol_context_path=_PROTOCOL_CTX_PATH,
 )
 
 
@@ -140,6 +169,9 @@ class TestBTCAnalyticsEngine(unittest.TestCase):
         ]
 
         store.spot_klines_1h.extend(spot_1h)
+        # Production no longer synthesises a 1D feed silently (that repainted the
+        # current day), so the fixture supplies one rather than leaning on a fallback.
+        store.spot_klines_1d.extend(synthesize_1d_bars_from_1h(spot_1h))
         store.perp_klines_1h.extend(perp_1h)
         store.spot_klines_15m.extend(spot_15m)
         store.perp_klines_15m.extend(perp_15m)
@@ -276,6 +308,9 @@ class TestBTCAnalyticsEngine(unittest.TestCase):
             perp_1h[idx].close = perp_1h[idx].open - 450.0
 
         store.spot_klines_1h.extend(spot_1h)
+        # Production no longer synthesises a 1D feed silently (that repainted the
+        # current day), so the fixture supplies one rather than leaning on a fallback.
+        store.spot_klines_1d.extend(synthesize_1d_bars_from_1h(spot_1h))
         store.perp_klines_1h.extend(perp_1h)
         store.spot_klines_15m.extend(spot_1h[-80:])
         store.perp_klines_15m.extend(perp_1h[-80:])

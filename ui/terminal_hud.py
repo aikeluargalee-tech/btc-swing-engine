@@ -928,7 +928,7 @@ def _build_tab2_protocol_hud(store: StateStore, header_panel: Panel) -> Group:
         f"  [bold white]NOW         :[/bold white] BTC at ${pev.current_price:,.2f} | 1D Completed [-2]: ${pev.completed_1d_close:,.0f} ({pev.completed_1d_change_pct:+.2f}%) | 1D Bias: {pev.daily_bias} | 4H: {pev.structure_4h}.",
         f"  [bold white]DECISION    :[/bold white] {decision_str}",
         f"  [bold white]RISKS       :[/bold white] 1D -1xATR Reference: ${pev.downside_ref_1d_atr:,.0f} | 4H -1xATR Reference: ${pev.downside_ref_4h_atr:,.0f} | Strict BTC OI: {store.derivatives_snapshot.open_interest_btc:,.1f} BTC.",
-        f"  [bold white]LIMITATIONS :[/bold white] External checks (8B/8E/ETF) synced from config/protocol_context.json (Reviewed: {pev.context_last_reviewed}).",
+        f"  [bold white]LIMITATIONS :[/bold white] External checks from config/protocol_context.json: {pev.context_last_reviewed}. UNAVAILABLE claims lock the desk pending operator review.",
     ]
     bottom_panel = Panel(
         "\n".join(p5_lines),

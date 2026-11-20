@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 from pathlib import Path
 
-from typing import List
+from typing import Dict, List
 
 
 
@@ -222,6 +222,14 @@ class EngineConfig:
         default_factory=lambda: BASE_DIR / "config" / "protocol_context.json"
 
     )
+
+    protocol_context_max_age_hours: Dict[str, float] = field(default_factory=lambda: {
+        "liq_cascade_72h_over_300m": 72.0,
+        "liq_cascade_reclaimed_within_24h": 24.0,
+        "s2_risk_level": 24.0,
+        "etf_net_outflow_weakness": 24.0,
+        "catalyst_technical_breakdown": 24.0,
+    })
 
 
 

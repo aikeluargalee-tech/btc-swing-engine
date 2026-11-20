@@ -53,7 +53,11 @@ def synthesize_1d_bars_from_1h(bars_1h: Sequence[KlineBar]) -> List[KlineBar]:
         buckets.setdefault(b_key, []).append(b)
 
     out: List[KlineBar] = []
+    today_key = (int(time.time() * 1000) // day_ms) * day_ms
     for b_key in sorted(buckets.keys()):
+        # A bucket is complete only once the next UTC day has begun.
+        if b_key >= today_key:
+            continue
         grp = buckets[b_key]
         out.append(
             KlineBar(
@@ -85,24 +89,62 @@ class ProtocolV13Evaluator:
 
         self._last_context_load_ts = now
         defaults: Dict[str, Any] = {
-            "last_reviewed_utc": "AUTO",
-            "liq_cascade_72h_over_300m": "CONFIRMED_CLEAR",
-            "liq_cascade_reclaimed_within_24h": "CONFIRMED_CLEAR",
+            "last_reviewed_utc": "UNAVAILABLE",
+            "liq_cascade_72h_over_300m": "UNAVAILABLE",
+            "liq_cascade_reclaimed_within_24h": "UNAVAILABLE",
             "fomc_cpi_window_override": "AUTO",
-            "s2_risk_level": "LOW",
-            "etf_net_outflow_weakness": "NOT_CONFIRMED",
-            "catalyst_technical_breakdown": "NOT_CONFIRMED",
+            "s2_risk_level": "UNAVAILABLE",
+            "etf_net_outflow_weakness": "UNAVAILABLE",
+            "catalyst_technical_breakdown": "UNAVAILABLE",
             "enforce_200d_hard_veto_on_tab1": False,
             "cycle_ath_override_usd": self.config.default_cycle_ath_usd,
         }
+        context_error = ""
         try:
             if self.config.protocol_context_path.exists():
                 with open(self.config.protocol_context_path, "r", encoding="utf-8") as f:
                     loaded = json.load(f)
                     if isinstance(loaded, dict):
                         defaults.update(loaded)
-        except Exception:
-            pass
+                    else:
+                        context_error = "context root is not an object"
+            else:
+                context_error = "context file is missing"
+        except Exception as exc:
+            context_error = f"context unreadable or corrupt ({type(exc).__name__})"
+
+        reviewed = defaults.get("last_reviewed_utc")
+        try:
+            reviewed_dt = datetime.fromisoformat(str(reviewed).replace("Z", "+00:00"))
+            age_hours = (datetime.now(timezone.utc) - reviewed_dt.astimezone(timezone.utc)).total_seconds() / 3600
+            if age_hours < 0:
+                raise ValueError("review timestamp is in the future")
+            defaults["context_age_hours"] = age_hours
+            stale = []
+            for key, max_hours in self.config.protocol_context_max_age_hours.items():
+                if age_hours > max_hours:
+                    defaults[key] = "UNAVAILABLE"
+                    stale.append(f"{key} age {age_hours:.1f}h exceeds {max_hours:g}h")
+            if stale:
+                context_error = "; ".join(stale)
+        except (TypeError, ValueError):
+            defaults["context_age_hours"] = None
+            context_error = "review timestamp missing or invalid"
+
+        allowed = {
+            "liq_cascade_72h_over_300m": {"TRIGGERED", "YES", "ACTIVE", "CONFIRMED_CLEAR", "UNVERIFIED"},
+            "liq_cascade_reclaimed_within_24h": {"FAILED", "CONFIRMED", "CONFIRMED_CLEAR", "UNVERIFIED"},
+            "s2_risk_level": {"LOW", "MED", "MEDIUM", "HIGH", "CRITICAL", "UNVERIFIED"},
+            "etf_net_outflow_weakness": {"CONFIRMED", "NOT_CONFIRMED", "UNVERIFIED"},
+            "catalyst_technical_breakdown": {"CONFIRMED", "NOT_CONFIRMED", "UNVERIFIED"},
+        }
+        for key, values in allowed.items():
+            value = str(defaults.get(key, "UNAVAILABLE")).upper()
+            if value not in values:
+                defaults[key] = "UNAVAILABLE"
+            else:
+                defaults[key] = value
+        defaults["context_error"] = context_error or ""
 
         self._cached_context = defaults
         return defaults
@@ -132,8 +174,9 @@ class ProtocolV13Evaluator:
         ctx = self._load_protocol_context()
         spot_1h = list(store.spot_klines_1h)
         perp_1h = list(store.perp_klines_1h)
-        spot_1d = list(store.spot_klines_1d) or synthesize_1d_bars_from_1h(spot_1h)
-        perp_1d = list(store.perp_klines_1d) or synthesize_1d_bars_from_1h(perp_1h)
+        # Daily indicators require the exchange's daily feed; hourly aggregation is not a substitute.
+        spot_1d = list(store.spot_klines_1d)
+        perp_1d = list(store.perp_klines_1d)
 
         bars_4h = synthesize_4h_bars(spot_1h)
         perp_bars_4h = synthesize_4h_bars(perp_1h)
@@ -327,14 +370,14 @@ class ProtocolV13Evaluator:
         )
 
         # 8B: Recent 72h Liquidation Cascade > $300M
-        raw_8b = str(ctx.get("liq_cascade_72h_over_300m", "CONFIRMED_CLEAR")).upper()
+        raw_8b = str(ctx.get("liq_cascade_72h_over_300m", "UNAVAILABLE")).upper()
         auto_liq_cascade = deriv.oi_change_4h_pct <= -6.0
         if auto_liq_cascade or raw_8b in ("TRIGGERED", "YES", "ACTIVE"):
             status_8b = "TRIGGERED"
             detail_8b = "Active >$300M 72h liquidation cascade (Wait for 24h structural reclaim)"
-        elif raw_8b == "UNVERIFIED":
+        elif raw_8b in ("UNVERIFIED", "UNAVAILABLE"):
             status_8b = "UNVERIFIED"
-            detail_8b = "72h Liquidation Cascade status marked UNVERIFIED in protocol_context.json"
+            detail_8b = f"72h liquidation claim UNAVAILABLE; {ctx.get('context_error') or 'operator review required'}"
         else:
             status_8b = "CLEAR"
             detail_8b = f"No >$300M 72h cascade active (4H dOI: {deriv.oi_change_4h_pct:+.2f}%)"
@@ -372,6 +415,9 @@ class ProtocolV13Evaluator:
         elif raw_8d == "UNVERIFIED":
             status_8d = "UNVERIFIED"
             detail_8d = "FOMC/CPI calendar check marked UNVERIFIED"
+        elif raw_8d not in ("AUTO", "CLEAR", "CONFIRMED_CLEAR", "NOT_CONFIRMED"):
+            status_8d = "UNVERIFIED"
+            detail_8d = f"Unrecognised FOMC/CPI override {raw_8d}; review required"
         elif raw_8d == "AUTO" and today_str in FOMC_CPI_DATES_2026:
             status_8d = "TRIGGERED"
             detail_8d = f"Today ({today_str}) is a scheduled 2026 FOMC / US CPI event date"
@@ -386,10 +432,10 @@ class ProtocolV13Evaluator:
         )
 
         # 8E: S2 Risk Assessment
-        s2_level = str(ctx.get("s2_risk_level", "LOW")).upper()
+        s2_level = str(ctx.get("s2_risk_level", "UNAVAILABLE")).upper()
         if s2_level in ("HIGH", "CRITICAL"):
             status_8e = "TRIGGERED"
-        elif s2_level == "UNVERIFIED":
+        elif s2_level in ("UNVERIFIED", "UNAVAILABLE"):
             status_8e = "UNVERIFIED"
         else:
             status_8e = "CLEAR"
@@ -416,10 +462,15 @@ class ProtocolV13Evaluator:
 
         non_trade_zones = [ntz_8a, ntz_8b, ntz_8c, ntz_8d, ntz_8e, ntz_8f]
         triggered_ntz = [z for z in non_trade_zones if z.status == "TRIGGERED"]
-        if unverified_codes:
-            ntz_status = "UNVERIFIED"
-        elif triggered_ntz:
+        # Precedence: a TRIGGERED non-trade zone outranks an unverifiable one.
+        # 8C (funding + OI + falling price) and 8A/8E are computed from live telemetry and
+        # need no external context, so a stale or missing context file must not be allowed to
+        # relabel a fired technical veto as UNVERIFIED. The old order downgraded a definite
+        # "do not trade" into a data problem, which loses the reason the desk is locked.
+        if triggered_ntz:
             ntz_status = "YES"
+        elif unverified_codes:
+            ntz_status = "UNVERIFIED"
         else:
             ntz_status = "NO"
 
@@ -440,11 +491,11 @@ class ProtocolV13Evaluator:
         )
 
         # Sell Trigger 2: Liquidation cascade fails 24h reclaim
-        raw_reclaim = str(ctx.get("liq_cascade_reclaimed_within_24h", "CONFIRMED_CLEAR")).upper()
+        raw_reclaim = str(ctx.get("liq_cascade_reclaimed_within_24h", "UNAVAILABLE")).upper()
         st2_status = (
             "CONFIRMED"
             if raw_reclaim in ("FAILED", "CONFIRMED")
-            else ("UNVERIFIED" if raw_reclaim == "UNVERIFIED" else "NOT CONFIRMED")
+            else ("UNVERIFIED" if raw_reclaim in ("UNVERIFIED", "UNAVAILABLE") else "NOT CONFIRMED")
         )
         st2 = ProtocolSellTriggerItem(
             trigger_num=2,
@@ -454,11 +505,11 @@ class ProtocolV13Evaluator:
         )
 
         # Sell Trigger 3: Large ETF outflows + price weakness
-        raw_etf = str(ctx.get("etf_net_outflow_weakness", "NOT_CONFIRMED")).upper()
+        raw_etf = str(ctx.get("etf_net_outflow_weakness", "UNAVAILABLE")).upper()
         st3_status = (
             "CONFIRMED"
             if raw_etf == "CONFIRMED"
-            else ("UNVERIFIED" if raw_etf == "UNVERIFIED" else "NOT CONFIRMED")
+            else ("UNVERIFIED" if raw_etf in ("UNVERIFIED", "UNAVAILABLE") else "NOT CONFIRMED")
         )
         st3 = ProtocolSellTriggerItem(
             trigger_num=3,
@@ -468,11 +519,11 @@ class ProtocolV13Evaluator:
         )
 
         # Sell Trigger 4: Catalyst + technical breakdown
-        raw_cat = str(ctx.get("catalyst_technical_breakdown", "NOT_CONFIRMED")).upper()
+        raw_cat = str(ctx.get("catalyst_technical_breakdown", "UNAVAILABLE")).upper()
         st4_status = (
             "CONFIRMED"
             if raw_cat == "CONFIRMED"
-            else ("UNVERIFIED" if raw_cat == "UNVERIFIED" else "NOT CONFIRMED")
+            else ("UNVERIFIED" if raw_cat in ("UNVERIFIED", "UNAVAILABLE") else "NOT CONFIRMED")
         )
         st4 = ProtocolSellTriggerItem(
             trigger_num=4,
@@ -636,7 +687,12 @@ class ProtocolV13Evaluator:
             sell_triggers=sell_triggers,
             any_sell_confirmed=any_sell_confirmed,
             enforce_200d_hard_veto_on_tab1=bool(ctx.get("enforce_200d_hard_veto_on_tab1", False)),
-            context_last_reviewed=str(ctx.get("last_reviewed_utc", "AUTO")),
+            context_last_reviewed=(
+                f"{ctx.get('last_reviewed_utc', 'UNAVAILABLE')} | age "
+                f"{ctx.get('context_age_hours'):.1f}h; {ctx.get('context_error') or 'claims current'}"
+                if isinstance(ctx.get("context_age_hours"), (int, float))
+                else f"UNAVAILABLE; {ctx.get('context_error') or 'operator review required'}"
+            ),
             sma_50_1d=round(sma_50_1d, 2),
             range_pivot_usd=round(range_pivot_usd, 2),
             short_liq_magnet_usd=round(short_liq_magnet_usd, 2),

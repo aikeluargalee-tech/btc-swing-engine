@@ -468,7 +468,12 @@ class MasterSynthesisEvaluator:
             master_alignment_score = round(min(raw_alignment, 25.0), 1)
             alignment_status = "DEFENSIVE VETO ACTIVE"
         elif g_cnt >= 3 and r_cnt == 0:
-            master_alignment_score = round(max(raw_alignment, 75.0), 1)
+            # Multi-desk alignment is a real state, but it must not invent readiness.
+            # A floor of 75 made the published score unrecomputable from the desks beside
+            # it (3 green + 5 yellow = 65.6 printed as 75.0) and could cross the >=70
+            # readiness gate on its own. The label carries the interpretation; the
+            # number stays the actual mean.
+            master_alignment_score = round(raw_alignment, 1)
             alignment_status = "MULTI-DESK ALIGNMENT"
         elif (g_cnt + b_cnt) >= 4 and r_cnt == 0:
             master_alignment_score = round(raw_alignment, 1)

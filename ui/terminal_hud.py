@@ -1867,6 +1867,13 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
         if states.get(SETUP_TRIGGER_KEY) == "OBSERVED"
         else "no desk reports an entry trigger"
     )
+    # The regime matrix is a state key, not a tab row, so it has no conclusion of its own.
+    # Flattening it to "no reported conclusion" (as my first rewrite did) told the operator
+    # nothing about a desk that was reporting LIVE.
+    conclusions.setdefault(
+        "[4] Regime Matrix",
+        f"active configuration: {getattr(msev, 'regime_code', 'UNAVAILABLE')}",
+    )
     source_lines = [
         _one_line(f"{desk} | {states.get(desk, 'UNAVAILABLE')} | "
                   f"{conclusions.get(desk, 'no reported conclusion')}")

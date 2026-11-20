@@ -391,9 +391,9 @@ class MasterSynthesisEvaluator:
         if sw_ev is not None and sw_ev.data_ready and sw_ev.macro is not None:
             sw_light = sw_ev.traffic_light if sw_ev.traffic_light in ("GREEN", "BLUE", "YELLOW", "RED") else "YELLOW"
             rrr_val = sw_ev.magnet.rrr_to_magnet if sw_ev.magnet else 0.0
-            sw_status = f"1D:{'PASS' if sw_ev.macro.macro_approved else 'WAIT'} • R:R {rrr_val:.2f}R"
-            sw_driver = f"50D:${pev.sma_50_1d:,.0f} | RRR:{rrr_val:.2f}R (req >=3.0R)"
-            sw_conc = f"{sw_ev.verdict} (R:R {rrr_val:.2f}R)"
+            sw_status = f"1D:{'PASS' if sw_ev.macro.macro_approved else 'WAIT'} • R:R to magnet {rrr_val:.2f}R"
+            sw_driver = f"50D:${pev.sma_50_1d:,.0f} | R:R to magnet {rrr_val:.2f}R (req >=3.0R)"
+            sw_conc = f"{sw_ev.verdict} (R:R to magnet {rrr_val:.2f}R)"
         else:
             sw_light = "YELLOW"
             sw_status = "UNAVAILABLE"

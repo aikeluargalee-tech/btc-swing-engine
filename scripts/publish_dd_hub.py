@@ -147,7 +147,8 @@ def _build_section_7c_data(store: Optional[StateStore]) -> Dict[str, Any]:
             "macro_calendar": [],
         }
     mag = getattr(store, "btc_magnet_evaluation", None)
-    tiers_raw = (getattr(mag, "levels_ladder", None) or {}).get("tiers_6") if mag is not None else None
+    ladder_dict = (getattr(mag, "levels_ladder", None) or {}) if mag is not None else {}
+    tiers_raw = ladder_dict.get("tiers_6")
     ladder: List[Dict[str, Any]] = []
     if isinstance(tiers_raw, list):
         for t in tiers_raw:
@@ -160,6 +161,9 @@ def _build_section_7c_data(store: Optional[StateStore]) -> Dict[str, Any]:
                 "price": round(float(px), 2) if isinstance(px, (int, float)) else None,
                 "distance_pct": round(float(dp), 2) if isinstance(dp, (int, float)) else None,
                 "estimated_vol_m": round(float(vm), 2) if isinstance(vm, (int, float)) else None,
+                "ls_source": t.get("ls_source"),
+                "ls_observable": t.get("ls_observable"),
+                "split_measured": t.get("split_measured"),
             })
 
     mi = getattr(store, "macro_intermarket", None)
@@ -183,6 +187,7 @@ def _build_section_7c_data(store: Optional[StateStore]) -> Dict[str, Any]:
             })
     return {
         "liquidation_ladder": ladder,
+        "ladder_ls_basis": ladder_dict.get("ls_observable") or "UNMEASURED (L/S split not measured; raw OI share)",
         "macro_calendar_fetched": cal_fetched,
         "macro_calendar": events,
     }

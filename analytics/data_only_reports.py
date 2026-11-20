@@ -561,6 +561,11 @@ def build_tab_m_data_only_report(
         lo_line,
         f"- **Immediate Tier (100x) Imbalance Ratio:** `{mag.immediate_ratio:.2f}x` (${mag.immediate_l_vol:.1f}M Lower vs ${mag.immediate_u_vol:.1f}M Upper)",
         f"- **Total Ladder (10x-100x, MODELLED) Imbalance Ratio:** `{mag.total_ladder_ratio:.2f}x` (${mag.total_l_vol:.1f}M Lower vs ${mag.total_u_vol:.1f}M Upper)",
+        (
+            f"- **Ladder L/S Split Basis:** `{(getattr(mag, 'levels_ladder', None) or {}).get('ls_observable')}`"
+            if (getattr(mag, "levels_ladder", None) or {}).get("ls_observable")
+            else "- **Ladder L/S Split Basis:** `UNMEASURED (L/S split not measured; raw OI share)`"
+        ),
         f"- **Dominant Pull Direction:** `{mag.pull_direction}`",
         "",
         "## 3. LIQUIDATION SWEEP CONFIRMATION ENGINE (LSCE)",
@@ -1922,10 +1927,12 @@ def build_tab_d_data_only_report(
         lines.append("")
 
     mag = getattr(store, "btc_magnet_evaluation", None)
-    tiers_6 = (getattr(mag, "levels_ladder", None) or {}).get("tiers_6") if mag is not None else None
+    ladder_dict = getattr(mag, "levels_ladder", None) or {} if mag is not None else {}
+    tiers_6 = ladder_dict.get("tiers_6")
+    ladder_ls_note = ladder_dict.get("ls_observable") or "UNMEASURED (L/S split not measured; raw OI share)"
     lines.extend([
         "### 7C. MODELED LIQUIDATION LADDER (`10x-100x`) & USD MACRO CALENDAR",
-        "**6-Tier Modeled Liquidation Ladder:**",
+        f"**6-Tier Modeled Liquidation Ladder (`{ladder_ls_note}`):**",
         "| Tier | Side | Level ($) | Dist% | Est Pool ($M) |",
         "|---|---|---|---|---|",
     ])

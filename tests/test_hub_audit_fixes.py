@@ -69,6 +69,50 @@ class TestLadderDoesNotFabricateOpenInterest(unittest.TestCase):
         self.assertEqual("MEASURED", measured.get("ls_source"))
         self.assertEqual("ASSUMED_1.0", assumed.get("ls_source"))
 
+    def test_crowding_weight_is_not_a_constant(self):
+        def _eval_with_ls(**attrs):
+            store = StateStore()
+            store.binance_spot_price = self.SPOT
+            store.open_interest_btc = 97_000.0
+            for k, v in attrs.items():
+                setattr(store, k, v)
+            engine = BTCMagnetEngine(DEFAULT_CONFIG)
+            engine._last_fetch_ts = 1e12
+            engine._cached_liq_data = {
+                "levels": {
+                    "above": [{"price": self.SPOT * 1.01, "dist_pct": 1.0, "usd": 5_000_000.0}],
+                    "below": [{"price": self.SPOT * 0.99, "dist_pct": -1.0, "usd": 5_000_000.0}],
+                }
+            }
+            return engine.evaluate(store)
+
+        # Unmeasured defaults must NOT be dressed as MEASURED and must publish raw OI shares
+        ev_unmeasured = _eval_with_ls()
+        tiers_unm = ev_unmeasured.levels_ladder["tiers_6"]
+        self.assertEqual("ASSUMED_1.0", tiers_unm[0]["ls_source"])
+        self.assertFalse(tiers_unm[0]["split_measured"])
+        self.assertIn("not measured", tiers_unm[0]["ls_observable"].lower())
+        oi_m = (97_000.0 * self.SPOT) / 1e6
+        u25_unm = next(t["estimated_vol_m"] for t in tiers_unm if t["tier"] == "25x Shorts")
+        l25_unm = next(t["estimated_vol_m"] for t in tiers_unm if t["tier"] == "25x Longs")
+        self.assertAlmostEqual(u25_unm, round(oi_m * 0.032, 1), places=1)
+        self.assertAlmostEqual(l25_unm, round(oi_m * 0.040, 1), places=1)
+
+        # Observable taker / top-trader / global L/S must actively move band volumes
+        ev_low_ls = _eval_with_ls(taker_long_short_ratio_5m=0.60, perp_5m_delta_btc=-50.0)
+        ev_high_ls = _eval_with_ls(taker_long_short_ratio_5m=2.50, perp_5m_delta_btc=50.0)
+        tiers_low = ev_low_ls.levels_ladder["tiers_6"]
+        tiers_high = ev_high_ls.levels_ladder["tiers_6"]
+        self.assertEqual("MEASURED", tiers_low[0]["ls_source"])
+        self.assertTrue(tiers_low[0]["split_measured"])
+        self.assertEqual("taker_long_short_ratio_5m", tiers_low[0]["ls_observable"])
+        l25_low = next(t["estimated_vol_m"] for t in tiers_low if t["tier"] == "25x Longs")
+        l25_high = next(t["estimated_vol_m"] for t in tiers_high if t["tier"] == "25x Longs")
+        u25_low = next(t["estimated_vol_m"] for t in tiers_low if t["tier"] == "25x Shorts")
+        u25_high = next(t["estimated_vol_m"] for t in tiers_high if t["tier"] == "25x Shorts")
+        self.assertGreater(l25_high, l25_low)
+        self.assertGreater(u25_low, u25_high)
+
 
 class TestFormatterRefusesHardcodedBands(unittest.TestCase):
     def test_bands_only_object_yields_no_ladder(self):

@@ -2092,7 +2092,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             up_line,
             f"* **Center Spot Horizon**: `{spot_s}` (`{chg_s}`)",
             lo_line,
-            f"* **Gravitational Pull**: `{magnet.pull_direction} MAGNET` (Immediate 100x: `{getattr(magnet, 'immediate_ratio', 0.0):.1f}x` | Total Ladder (MODELLED): `{getattr(magnet, 'total_ladder_ratio', 0.0):.2f}x`)",
+            f"* **Gravitational Pull**: `{magnet.pull_direction} MAGNET` (Immediate 100x: `{getattr(magnet, 'immediate_ratio', 0.0):.1f}x` | Total Ladder (MODELLED): `{getattr(magnet, 'total_ladder_ratio', 0.0):.2f}x` | L/S Split Basis: `{(getattr(magnet, 'levels_ladder', None) or {}).get('ls_observable', 'UNMEASURED (L/S split not measured; raw OI share)')}`)",
             f"* **Perpetual Funding**: `{fund_s}` | **4h OI Velocity**: `{oi_s}` | **Regime**: `{magnet.market_regime}`",
             "",
             "### 17B. 7 Internal Speaking Rules Audit",

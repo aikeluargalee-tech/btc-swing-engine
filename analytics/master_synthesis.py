@@ -482,10 +482,16 @@ class MasterSynthesisEvaluator:
         # said REFUSED. A live setup is an active sweep/retest FSM, not the presence of a plan.
         _ACTIVE_FSM_STATES = {"SEEKING_REJECTION", "PENDING_RETEST", "TRIGGERED"}
         tp_affirmative = getattr(sig, "fsm_state", None) in _ACTIVE_FSM_STATES
-        setup_observed = bool(
-            tp_affirmative or tpb_affirmative
-            or (sw_ev is not None and getattr(sw_ev, "verdict", "") == "NEW LONG SETUP")
+        # A desk that cannot produce an answer cannot create a trigger. Tab [0] carries a verdict
+        # field even when its own data_ready/macro inputs are missing - the desk row then reports
+        # UNAVAILABLE while the trigger read OBSERVED off the same object.
+        sw_affirmative = bool(
+            sw_ev is not None
+            and getattr(sw_ev, "data_ready", False)
+            and getattr(sw_ev, "macro", None) is not None
+            and getattr(sw_ev, "verdict", "") == "NEW LONG SETUP"
         )
+        setup_observed = bool(tp_affirmative or tpb_affirmative or sw_affirmative)
         input_states[SETUP_TRIGGER_KEY] = "OBSERVED" if setup_observed else "NONE"
         decision_verdict = tab_z_precedence(input_states)
         master_light = "RED" if decision_verdict == "NO_TRADE" else ("BLUE" if decision_verdict == "SETUP_FORMING" else "YELLOW")
@@ -915,6 +921,7 @@ class MasterSynthesisEvaluator:
         # Kept as additive attributes to preserve the shared evaluation model API.
         ev.input_states = input_states
         ev.decision_verdict = decision_verdict
+        ev.master_alignment_raw = round(raw_alignment, 1)
         ev.regime_code = config_code
         store.master_synthesis_evaluation = ev
         return ev

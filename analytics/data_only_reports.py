@@ -793,6 +793,9 @@ def build_tab_f_data_only_report(config: Optional[EngineConfig], store: StateSto
         ref_stop = round(float(f_ev.stop_loss or 0.0), 2)
         stop_dist = round(abs(ref_entry - ref_stop), 2) if ref_stop > 0 else 0.0
         lines.extend([
+            f"- **Footprint Source:** `{getattr(f_ev, 'data_source', 'UNAVAILABLE')}` | **Data Status:** `{getattr(f_ev, 'data_status', 'UNAVAILABLE')}` | **Synthetic:** `{bool(getattr(f_ev, 'is_synthetic', False))}` | **Data Age:** `{getattr(f_ev, 'data_age_seconds', None)} seconds`",
+            f"- **Evaluation Data Timestamp (UTC):** `{f_ev.timestamp_utc}`",
+            f"- **Auction Completed:** `{getattr(f_ev, 'auction_completed', None) if getattr(f_ev, 'auction_completed', None) is not None else 'UNAVAILABLE'}` | **Bar POC Reclaimed:** `{getattr(f_ev, 'bar_poc_reclaimed', None) if getattr(f_ev, 'bar_poc_reclaimed', None) is not None else 'UNAVAILABLE'}`",
             f"- **Active 15m Bar Net Delta:** `{f_ev.active_bar_delta:+.2f} BTC`",
             f"- **Previous Completed 15m Bar Net Delta:** `{f_ev.prev_bar_delta:+.2f} BTC`",
             f"- **Active Battle Zone Price:** `${f_ev.active_battle_zone:,.2f}`",

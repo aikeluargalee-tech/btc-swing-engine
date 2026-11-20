@@ -19,6 +19,15 @@ from unittest.mock import MagicMock
 
 from analytics.ai_packet_exporter import build_ai_telemetry_packet
 from analytics.footprint_engine import FootprintEngine
+import time as _time
+
+# Bar timestamps in these fixtures used to be epoch-millisecond literals (1000, 901000...).
+# The engine now rejects footprint data older than `footprint_stale_after_seconds` (1800s),
+# so a fixture stamped in 1970 is correctly STALE and gates close before they are evaluated.
+# Shift every literal timestamp by the same offset so the relative bar structure is preserved
+# while the newest bar sits a few minutes in the past - i.e. a plausible live tape.
+_TS_SHIFT = int(_time.time() * 1000) - 60_000   # one minute ago: comfortably FRESH
+
 from analytics.signal_detector import SignalDetector
 from config.settings import EngineConfig
 from core.models import (
@@ -62,7 +71,7 @@ class TestFootprintEngine(unittest.TestCase):
 
     def test_trade_ingestion_and_active_bar_updates(self) -> None:
         """Verifies trades populate OHLCV, net delta, and cluster rows."""
-        base_ts = 1_700_000_000_000  # Start of a 15m window
+        base_ts = _TS_SHIFT  # Start of a 15m window
 
         # Aggressive buy lifting ask: 2.5 BTC at $78,425 (is_buyer_maker=False)
         self.engine.ingest_trade(price=78425.0, qty=2.5, is_buyer_maker=False, ts_ms=base_ts + 1000)
@@ -95,8 +104,8 @@ class TestFootprintEngine(unittest.TestCase):
     def test_diagonal_300_percent_imbalances(self) -> None:
         """Verifies diagonal imbalance detection (Ask[P+$25] vs Bid[P])."""
         bar = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=78400.0,
             high=78450.0,
             low=78400.0,
@@ -122,8 +131,8 @@ class TestFootprintEngine(unittest.TestCase):
     def test_stacked_buy_and_sell_imbalances(self) -> None:
         """Verifies stacked imbalances (>= 3 consecutive levels)."""
         bar = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=78400.0,
             high=78500.0,
             low=78400.0,
@@ -147,8 +156,8 @@ class TestFootprintEngine(unittest.TestCase):
     def test_institutional_battle_zone_detection(self) -> None:
         """Verifies battle zones where intense two-way churn occurs."""
         bar = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=78400.0,
             high=78450.0,
             low=78400.0,
@@ -169,8 +178,8 @@ class TestFootprintEngine(unittest.TestCase):
         """Verifies absorption of aggressive sells in the lower 25% wick followed by candle bounce."""
         # Candle range: 78300 (low) to 78400 (high) -> span = 100. Lower wick = 78300 to 78325
         bar = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=78350.0,
             high=78400.0,
             low=78300.0,
@@ -193,8 +202,8 @@ class TestFootprintEngine(unittest.TestCase):
         """Verifies transition from negative delta in prior bar to positive delta in active bar."""
         # Bar 1: negative net delta
         bar1 = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=78400.0,
             high=78450.0,
             low=78350.0,
@@ -206,8 +215,8 @@ class TestFootprintEngine(unittest.TestCase):
 
         # Bar 2: active forming bar with positive net delta
         self.engine.active_bar = FootprintBarData(
-            start_ts_ms=901000,
-            end_ts_ms=1801000,
+            start_ts_ms=_TS_SHIFT + 901000,
+            end_ts_ms=_TS_SHIFT + 1801000,
             open=78360.0,
             high=78420.0,
             low=78350.0,
@@ -238,8 +247,8 @@ class TestFootprintEngine(unittest.TestCase):
         """Verifies 3-Gate Execution Funnel: Gate 1 Level Tap, Gate 2 Absorption, Gate 3 Delta Flip."""
         # Setup previous completed bar with negative delta (-5.0 BTC)
         prev_bar = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=78500.0,
             high=78520.0,
             low=78320.0,
@@ -251,8 +260,8 @@ class TestFootprintEngine(unittest.TestCase):
 
         # Active bar touching 30D cVAL at $78,350 with lower wick absorption and positive delta
         active_bar = FootprintBarData(
-            start_ts_ms=901000,
-            end_ts_ms=1801000,
+            start_ts_ms=_TS_SHIFT + 901000,
+            end_ts_ms=_TS_SHIFT + 1801000,
             open=78330.0,
             high=78425.0,
             low=78300.0,   # Taps level
@@ -290,8 +299,8 @@ class TestFootprintEngine(unittest.TestCase):
     def test_continuous_ladder_generation(self) -> None:
         """Verifies get_ladder_rows produces continuous sorted rows centered around target price."""
         self.engine.active_bar = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=78400.0,
             high=78450.0,
             low=78350.0,
@@ -329,7 +338,7 @@ class TestFootprintEngine(unittest.TestCase):
         for i in range(820):
             store.spot_klines_1h.append(
                 KlineBar(
-                    timestamp_ms=1_700_000_000_000 + (i * 3600_000),
+                    timestamp_ms=_TS_SHIFT + (i * 3600_000),
                     open=78400.0 + (i % 5) * 10,
                     high=78500.0 + (i % 5) * 10,
                     low=78300.0,
@@ -343,7 +352,7 @@ class TestFootprintEngine(unittest.TestCase):
         for i in range(20):
             store.spot_klines_15m.append(
                 KlineBar(
-                    timestamp_ms=1_700_000_000_000 + (i * 900_000),
+                    timestamp_ms=_TS_SHIFT + (i * 900_000),
                     open=78400.0,
                     high=78450.0,
                     low=78350.0,
@@ -354,8 +363,8 @@ class TestFootprintEngine(unittest.TestCase):
             )
 
         # Ingest live trades into StateStore
-        store.record_spot_trade(price=78425.0, qty=5.0, is_buyer_maker=False, ts_ms=1_700_100_000_000)
-        store.record_spot_trade(price=78400.0, qty=1.5, is_buyer_maker=True, ts_ms=1_700_100_001_000)
+        store.record_spot_trade(price=78425.0, qty=5.0, is_buyer_maker=False, ts_ms=_TS_SHIFT + 1000)
+        store.record_spot_trade(price=78400.0, qty=1.5, is_buyer_maker=True, ts_ms=_TS_SHIFT + 2000)
 
         # Run signal detector
         detector = SignalDetector(config)
@@ -379,8 +388,8 @@ class TestFootprintEngine(unittest.TestCase):
         """Verifies detection of trapped aggressive buyers at the upper wick (Distribution / Ceiling)."""
         # Range: 71,750 to 72,000 (span = 250). Upper wick = 71,937.5 to 72,000.
         bar = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=71800.0,
             high=72000.0,
             low=71750.0,
@@ -401,8 +410,8 @@ class TestFootprintEngine(unittest.TestCase):
     def test_bearish_delta_flip(self) -> None:
         """Verifies transition from positive delta in prior bar to negative delta in active bar."""
         prev_bar = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=71800.0,
             high=72000.0,
             low=71800.0,
@@ -413,8 +422,8 @@ class TestFootprintEngine(unittest.TestCase):
         self.engine.completed_bars.append(prev_bar)
 
         self.engine.active_bar = FootprintBarData(
-            start_ts_ms=901000,
-            end_ts_ms=1801000,
+            start_ts_ms=_TS_SHIFT + 901000,
+            end_ts_ms=_TS_SHIFT + 1801000,
             open=71980.0,
             high=72010.0,
             low=71840.0,
@@ -431,8 +440,8 @@ class TestFootprintEngine(unittest.TestCase):
     def test_three_gate_distribution_sell_and_rebuy_target(self) -> None:
         """Verifies 3-Gate Distribution Funnel: Upper Resistance Tap + Trapped Buyers + Negative Delta Shift."""
         prev_bar = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=71800.0,
             high=72000.0,
             low=71800.0,
@@ -443,8 +452,8 @@ class TestFootprintEngine(unittest.TestCase):
         self.engine.completed_bars.append(prev_bar)
 
         active_bar = FootprintBarData(
-            start_ts_ms=901000,
-            end_ts_ms=1801000,
+            start_ts_ms=_TS_SHIFT + 901000,
+            end_ts_ms=_TS_SHIFT + 1801000,
             open=71980.0,
             high=72025.0,  # Taps $72,000 resistance
             low=71820.0,
@@ -482,8 +491,8 @@ class TestFootprintEngine(unittest.TestCase):
     def test_no_simultaneous_buy_and_sell_imbalance_on_same_bin(self) -> None:
         """Verifies a single price bin cannot simultaneously hold both BUY IMB and SELL IMB."""
         bar = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=78375.0,
             high=78400.0,
             low=78350.0,
@@ -515,7 +524,7 @@ class TestFootprintEngine(unittest.TestCase):
         for i in range(820):
             store.spot_klines_1h.append(
                 KlineBar(
-                    timestamp_ms=1_700_000_000_000 + (i * 3600_000),
+                    timestamp_ms=_TS_SHIFT + (i * 3600_000),
                     open=78300.0,
                     high=78500.0,
                     low=78200.0,
@@ -556,8 +565,8 @@ class TestFootprintEngine(unittest.TestCase):
         """Verifies 4-Gate Spot Accumulation Confluence (Macro Tap + Positioning + Wick Absorption + Delta Flip)."""
         # Prior bar with negative delta (-8.0 BTC)
         prev_bar = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=68500.0,
             high=68550.0,
             low=68380.0,
@@ -569,8 +578,8 @@ class TestFootprintEngine(unittest.TestCase):
 
         # Active bar tapping $68,400 HVN support with lower-wick absorption and +142.5 BTC delta
         active_bar = FootprintBarData(
-            start_ts_ms=901000,
-            end_ts_ms=1801000,
+            start_ts_ms=_TS_SHIFT + 901000,
+            end_ts_ms=_TS_SHIFT + 1801000,
             open=68390.0,
             high=68520.0,
             low=68350.0,   # Taps support floor
@@ -617,7 +626,7 @@ class TestFootprintEngine(unittest.TestCase):
         for i in range(20):
             store.spot_klines_15m.append(
                 KlineBar(
-                    timestamp_ms=1_700_000_000_000 + (i * 900_000),
+                    timestamp_ms=_TS_SHIFT + (i * 900_000),
                     open=68400.0,
                     high=68500.0,
                     low=68350.0,
@@ -648,7 +657,7 @@ class TestFootprintEngine(unittest.TestCase):
         for i in range(20):
             store.spot_klines_15m.append(
                 KlineBar(
-                    timestamp_ms=1_700_000_000_000 + (i * 900_000),
+                    timestamp_ms=_TS_SHIFT + (i * 900_000),
                     open=68400.0,
                     high=68500.0,
                     low=68350.0,
@@ -689,7 +698,7 @@ class TestFootprintEngine(unittest.TestCase):
         for i in range(20):
             store.spot_klines_15m.append(
                 KlineBar(
-                    timestamp_ms=1_700_000_000_000 + (i * 900_000),
+                    timestamp_ms=_TS_SHIFT + (i * 900_000),
                     open=68400.0,
                     high=68500.0,
                     low=68350.0,
@@ -722,8 +731,8 @@ class TestFootprintEngine(unittest.TestCase):
     def test_unfinished_auction_wick_rejection(self) -> None:
         """Verifies Gate 3 rejects lower-wick absorption if the lowest price bin is an unfinished auction (zero ask vol)."""
         bar = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=78350.0,
             high=78400.0,
             low=78300.0,
@@ -740,8 +749,8 @@ class TestFootprintEngine(unittest.TestCase):
     def test_bar_poc_reclaim_requirement_at_gate4(self) -> None:
         """Verifies Gate 4 requires the 15m close price to be >= the 15m Bar POC."""
         prev_bar = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=68500.0,
             high=68550.0,
             low=68380.0,
@@ -752,8 +761,8 @@ class TestFootprintEngine(unittest.TestCase):
         self.engine.completed_bars.append(prev_bar)
 
         active_bar = FootprintBarData(
-            start_ts_ms=901000,
-            end_ts_ms=1801000,
+            start_ts_ms=_TS_SHIFT + 901000,
+            end_ts_ms=_TS_SHIFT + 1801000,
             open=68390.0,
             high=68520.0,
             low=68350.0,
@@ -778,8 +787,8 @@ class TestFootprintEngine(unittest.TestCase):
     def test_deterministic_capital_preservation_order_card(self) -> None:
         """Verifies 1% risk budget sizing and 50% equity notional clamping when all 4 gates pass."""
         prev_bar = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=80000.0,
             high=80100.0,
             low=79900.0,
@@ -790,8 +799,8 @@ class TestFootprintEngine(unittest.TestCase):
         self.engine.completed_bars.append(prev_bar)
 
         active_bar = FootprintBarData(
-            start_ts_ms=901000,
-            end_ts_ms=1801000,
+            start_ts_ms=_TS_SHIFT + 901000,
+            end_ts_ms=_TS_SHIFT + 1801000,
             open=79920.0,
             high=80050.0,
             low=79850.0,

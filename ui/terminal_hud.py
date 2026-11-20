@@ -2952,16 +2952,26 @@ def _build_tab_footprint_hud(store: StateStore, header_panel: Panel) -> Group:
     current_price = store.binance_spot_price or (f_ev.current_price if f_ev else 0.0)
 
     if f_ev is None or not f_ev.active_ladder_rows:
+        no_ladder_text = "Awaiting live spot trade flow to populate 15m Footprint ladder and 4-gate confluence..."
+        if f_ev is not None and getattr(f_ev, "data_status", "") == "STALE":
+            age = getattr(f_ev, "data_age_seconds", None)
+            no_ladder_text = f"Footprint STALE / UNAVAILABLE | Source: {getattr(f_ev, 'data_source', 'UNAVAILABLE')} | Age: {age:.0f}s" if age is not None else "Footprint STALE / UNAVAILABLE"
         return Group(
             header_panel,
             Panel(
-                "[dim]Awaiting live spot trade flow to populate 15m Footprint ladder and 4-gate confluence...[/dim]",
+                f"[dim]{no_ladder_text}[/dim]",
                 title="[bold cyan]DESK [F: FOOTPRINT SWING][/bold cyan]",
                 box=box.ROUNDED,
             ),
         )
 
     is_distribute = (f_ev.direction == "DISTRIBUTE_SELL")
+    source = str(getattr(f_ev, "data_source", "UNAVAILABLE"))
+    data_status = str(getattr(f_ev, "data_status", "UNAVAILABLE"))
+    age = getattr(f_ev, "data_age_seconds", None)
+    provenance = f"Source: {source} | {data_status}"
+    if age is not None:
+        provenance += f" | Age: {age:.0f}s"
 
     # 1. Top Section: BTC Price, 15m Delta, CPI, Regime, NTZ Shield & Daily VWAP
     bar_delta = f_ev.active_bar_delta
@@ -3003,6 +3013,7 @@ def _build_tab_footprint_hud(store: StateStore, header_panel: Panel) -> Group:
         f"[bold white]REGIME:[/bold white] {regime_desc}  [dim]│[/dim]  [bold white]VWAP:[/bold white] {vwap_str}",
         f"[bold white]NTZ:[/bold white] {ntz_badge}",
     )
+    top_grid.add_row(f"[bold yellow]{provenance}[/bold yellow]", "")
 
     # 2. 4-Gate Confluence Checklist
     gate_table = Table(box=box.MINIMAL, expand=True, show_header=False, pad_edge=False)
@@ -3029,11 +3040,13 @@ def _build_tab_footprint_hud(store: StateStore, header_panel: Panel) -> Group:
         g2_icon = "[bold green][✓][/bold green]" if f_ev.gate2_positioning_crowded else "[dim yellow][○][/dim yellow]"
         g2_text = f"{g2_icon} Gate 2: Perp Short Crowding / CVD Absorption Confirmed"
 
-        auc_tag = "Completed Auction" if getattr(f_ev, "auction_completed", False) else "Unfinished Auction"
+        auc_value = getattr(f_ev, "auction_completed", None)
+        auc_tag = "UNAVAILABLE (synthetic)" if auc_value is None else ("Completed Auction" if auc_value else "Unfinished Auction")
         g3_icon = "[bold green][✓][/bold green]" if f_ev.gate3_wick_absorption else "[dim yellow][○][/dim yellow]"
         g3_text = f"{g3_icon} Gate 3: Lower-Wick Absorption Held ({auc_tag})"
 
-        poc_tag = "Closed + POC Reclaim" if getattr(f_ev, "bar_poc_reclaimed", False) else "Below Bar POC"
+        poc_value = getattr(f_ev, "bar_poc_reclaimed", None)
+        poc_tag = "UNAVAILABLE (synthetic)" if poc_value is None else ("Closed + POC Reclaim" if poc_value else "Below Bar POC")
         g4_icon = "[bold green][✓][/bold green]" if f_ev.gate4_delta_flip else "[dim yellow][○][/dim yellow]"
         g4_text = f"{g4_icon} Gate 4: 15m Positive Delta Flip ({poc_tag})"
 

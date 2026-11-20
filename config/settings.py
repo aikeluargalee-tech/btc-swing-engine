@@ -192,6 +192,7 @@ class EngineConfig:
     signal_confluence_threshold: float = 70.0 # Minimum 0-100 score for actionable signal
 
     portfolio_equity_usd: float = 100_000.0   # Reference portfolio size for position sizing
+    footprint_stale_after_seconds: int = 1800  # Footprint data older than 30 minutes is unavailable
 
     risk_per_trade_pct: float = 1.0           # 1.0% equity risk per swing setup
 

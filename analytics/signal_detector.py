@@ -21,6 +21,8 @@ from core.models import (
 )
 from core.state_store import StateStore
 from .cvd_engine import compute_derivatives_snapshot, compute_flow_snapshot
+
+logger = logging.getLogger(__name__)
 from .ema_strategy_engine import EMAStrategyEngine
 from .gartley_engine import GartleyEngine
 from .macro_radar import MacroRadarEvaluator
@@ -270,6 +272,51 @@ class SignalDetector:
             risk_pct=round(eff_risk_pct, 2),
         )
 
+    def _reject_implausible_profile(self, vp, bars, need_bars, store):
+        """Returns None (-> UNAVAILABLE) when a profile cannot be trusted.
+
+        Only EXACT tests reject here - no arbitrary market thresholds, because a genuine
+        crash legitimately puts spot far outside a 30-day value area and must not be
+        suppressed. The published corruption on 2026-11-20 (value-area low 9.5% ABOVE
+        spot, POC $16,000 off) is caught by the empirical recompute in the btc-cortex
+        doctor, which is the right place for a market-plausibility judgement.
+        """
+        if vp is None:
+            return None
+        try:
+            if len(bars) < need_bars:
+                # Warn only: a shorter window still describes real prices.
+                logger.warning("Macro profile is short-history: %d bars, %d expected for %dD.",
+                               len(bars), need_bars, self.config.macro_profile_days)
+
+            # Exact test 1: the profile's own price range must equal the range of the
+            # bars handed to it. A mismatch means the object came from a different
+            # (stale, cached, or regressed) bar set - which no later check can detect.
+            bar_low = min(float(b.low) for b in bars)
+            bar_high = max(float(b.high) for b in bars)
+            if abs(vp.range_low - bar_low) > 0.5 or abs(vp.range_high - bar_high) > 0.5:
+                logger.warning(
+                    "Macro profile REJECTED: range %s-%s does not match input bars %s-%s.",
+                    f"{vp.range_low:,.2f}", f"{vp.range_high:,.2f}",
+                    f"{bar_low:,.2f}", f"{bar_high:,.2f}")
+                return None
+
+            # Exact test 2: the series must reach the present. A frozen 1H feed produces
+            # a perfectly self-consistent profile of last week - so warn loudly.
+            try:
+                newest_ms = int(bars[-1].timestamp_ms)
+                age_h = (time.time() * 1000 - newest_ms) / 3_600_000.0
+                if age_h > 2.0:
+                    logger.warning(
+                        "Macro profile is built on a STALE 1H series: newest bar is %.1fh old.",
+                        age_h)
+            except Exception:
+                pass
+        except Exception as exc:
+            logger.warning("Macro profile plausibility guard errored: %s", exc)
+            return None
+        return vp
+
     def evaluate(self, store: StateStore) -> Optional[SignalEvaluation]:
         """Runs a full evaluation cycle across Volume Profile, CVD, Derivatives, and the 4-Gate FSM."""
         spot_1h = list(store.spot_klines_1h)
@@ -277,8 +324,19 @@ class SignalDetector:
         if len(spot_1h) < 24:
             return None
 
+        # Sort and de-duplicate the 1H series before slicing. A tail slice of an unsorted
+        # or duplicated series is not "the most recent 30 days", and the resulting profile
+        # is wrong without anything downstream being able to tell.
+        spot_1h.sort(key=lambda b: b.timestamp_ms)
+        _dedup = []
+        for _b in spot_1h:
+            if not _dedup or _dedup[-1].timestamp_ms != _b.timestamp_ms:
+                _dedup.append(_b)
+        spot_1h = _dedup
+
         # 1. Compute Composite Volume Profiles (30D Macro, 7D Tactical, 24H Session)
-        macro_bars = spot_1h[-self.config.macro_profile_days * 24 :]
+        macro_need = self.config.macro_profile_days * 24
+        macro_bars = spot_1h[-macro_need:]
         tactical_bars = spot_1h[-self.config.tactical_profile_days * 24 :]
         session_bars = spot_1h[-24:]
 
@@ -291,6 +349,12 @@ class SignalDetector:
             lvn_rel_threshold=self.config.lvn_relative_threshold,
             hvn_rel_threshold=self.config.hvn_relative_threshold,
         )
+        # A profile can be internally ordered (VAH > POC > VAL) and still be absurd:
+        # the 2026-11-20 publish reported a value-area low 9.5% ABOVE the market with a
+        # POC $16,000 off an independent recompute. Publishing that as OK poisons every
+        # level anchored to the 30D VAL. Refuse it instead - UNAVAILABLE beats invented.
+        macro_vp = self._reject_implausible_profile(macro_vp, macro_bars, macro_need, store)
+
         tactical_vp = compute_composite_profile(
             tactical_bars,
             horizon_label=f"{self.config.tactical_profile_days}D Tactical",

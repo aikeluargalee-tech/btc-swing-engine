@@ -2082,28 +2082,45 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
 
     # --- SECTION 18: TAB [A] BTC TREND-PULLBACK v1.0 · RESEARCH / PAPER MODE ---
     tp_ev = getattr(store, "trend_pullback_evaluation", None)
-    if tp_ev is None:
-        try:
-            from analytics.strategy_trend_pullback import TrendPullbackEngine
-            tp_ev = TrendPullbackEngine(config).evaluate(store)
-        except Exception:
-            tp_ev = None
 
-    if tp_ev is not None:
+    if tp_ev is None:
         lines.extend([
             "",
             "---",
             "",
             "## SECTION 18: TAB [A] BTC TREND-PULLBACK v1.0 · DATA-ONLY METRICS REPORT",
             "",
-            f"* **Strategy Name**: `{tp_ev.strategy_name}` | **Mode**: `{tp_ev.mode_label}` | **Status**: `{tp_ev.strategy_status}`",
+            "* **Status**: `DATA UNAVAILABLE` (no stored `trend_pullback_evaluation` in StateStore; no silent recompute performed)",
+            "* **Mode**: `RESEARCH / PAPER MODE` (`UNVALIDATED` · `SPOT ONLY` · `Operator Decides`)",
+            "* **Simulated Sizing**: `0.00000 BTC` (`Simulated on 100k reference account — NOT operator account equity`)",
+        ])
+    else:
+        eval_origin = getattr(tp_ev, "evaluation_origin", "STORED")
+        d_sma = int(getattr(tp_ev, "cfg_daily_sma_period", 200))
+        d_slp = int(getattr(tp_ev, "cfg_daily_sma_slope_period", 20))
+        e_fast = int(getattr(tp_ev, "cfg_ema_fast", 50))
+        e_slow = int(getattr(tp_ev, "cfg_ema_slow", 200))
+        e_slp = int(getattr(tp_ev, "cfg_ema_slope_period", 6))
+        atr_p = int(getattr(tp_ev, "cfg_atr_period", 14))
+        min_stp = float(getattr(tp_ev, "cfg_minimum_stop_atr", 0.75))
+        max_stp = float(getattr(tp_ev, "cfg_maximum_stop_atr", 3.00))
+        max_1d_stale = float(getattr(tp_ev, "cfg_max_daily_stale_hours", 48.0))
+        max_4h_stale = float(getattr(tp_ev, "cfg_max_4h_stale_hours", 8.5))
+        lines.extend([
+            "",
+            "---",
+            "",
+            "## SECTION 18: TAB [A] BTC TREND-PULLBACK v1.0 · DATA-ONLY METRICS REPORT",
+            "",
+            f"* **Strategy Name**: `{tp_ev.strategy_name}` | **Mode**: `{tp_ev.mode_label}` (`SPOT ONLY`) | **Status**: `{tp_ev.strategy_status}` (NOT VALIDATED FOR LIVE CAPITAL) | **Origin**: `{eval_origin}`",
             f"* **Spot BTCUSDT**: `${tp_ev.spot_price:,.2f}` | **Retrieval (SGT)**: `{tp_ev.timestamp_sgt}` | **Retrieval (UTC)**: `{tp_ev.timestamp_utc}`",
-            f"* **1. Daily (1D)**: `Open {tp_ev.daily_open_time_utc} -> Close {tp_ev.daily_close_time_utc}` | `1D Close ${tp_ev.daily_close_completed:,.2f}` | `SMA50 ${tp_ev.daily_sma50:,.2f}` | `SMA200 ${tp_ev.daily_sma200:,.2f}` | `20D Slope ${tp_ev.daily_sma200_slope_20d:+,.2f}` | `Close vs SMA200: ${tp_ev.daily_close_vs_sma200_usd:+,.2f} ({tp_ev.daily_close_vs_sma200_pct:+.2f}%)` | `Close > SMA200: {tp_ev.daily_close_above_sma200}` | `Close > SMA50: {tp_ev.daily_close_above_sma50}` | `SMA200 Rising: {tp_ev.daily_sma200_rising}`",
-            f"* **2. 4H Trend**: `Open {tp_ev.candle_4h_open_time_utc} -> Close {tp_ev.candle_4h_close_time_utc}` | `4H Close ${tp_ev.close_4h_completed:,.2f}` | `EMA50 ${tp_ev.ema50_4h:,.2f}` | `EMA200 ${tp_ev.ema200_4h:,.2f}` | `ATR14 ${tp_ev.atr14_4h:,.2f}` | `6-Bar Slope ${tp_ev.ema50_4h_slope_6bars:+,.2f}` | `EMA50 > EMA200: {tp_ev.ema50_above_ema200}` | `EMA50 Rising 6B: {tp_ev.ema50_rising_6bars}` | `Close > EMA200: {tp_ev.close_4h_above_ema200}`",
+            f"* **1. Daily (1D)**: `Open {tp_ev.daily_open_time_utc} -> Close {tp_ev.daily_close_time_utc}` | `1D Close ${tp_ev.daily_close_completed:,.2f}` | `SMA50 ${tp_ev.daily_sma50:,.2f}` | `SMA{d_sma} ${tp_ev.daily_sma200:,.2f}` | `{d_slp}D Slope ${tp_ev.daily_sma200_slope_20d:+,.2f}` | `Close vs SMA{d_sma}: ${tp_ev.daily_close_vs_sma200_usd:+,.2f} ({tp_ev.daily_close_vs_sma200_pct:+.2f}%)` | `Close > SMA{d_sma}: {tp_ev.daily_close_above_sma200}` | `Close > SMA50: {tp_ev.daily_close_above_sma50}` | `SMA{d_sma} Rising: {tp_ev.daily_sma200_rising}`",
+            f"* **2. 4H Trend**: `Open {tp_ev.candle_4h_open_time_utc} -> Close {tp_ev.candle_4h_close_time_utc}` | `4H Close ${tp_ev.close_4h_completed:,.2f}` | `EMA{e_fast} ${tp_ev.ema50_4h:,.2f}` | `EMA{e_slow} ${tp_ev.ema200_4h:,.2f}` | `ATR{atr_p} ${tp_ev.atr14_4h:,.2f}` | `{e_slp}-Bar Slope ${tp_ev.ema50_4h_slope_6bars:+,.2f}` | `EMA{e_fast} > EMA{e_slow}: {tp_ev.ema50_above_ema200}` | `EMA{e_fast} Rising {e_slp}B: {tp_ev.ema50_rising_6bars}` | `Close > EMA{e_slow}: {tp_ev.close_4h_above_ema200}`",
             f"* **3. Pullback Zone**: `Lower ${tp_ev.pullback_zone_lower:,.2f}` | `Upper ${tp_ev.pullback_zone_upper:,.2f}` | `Max Ext ${tp_ev.max_extension_price:,.2f}` | `Spot Minus Lower ${tp_ev.spot_minus_zone_lower_usd:+,.2f} ({tp_ev.spot_minus_zone_lower_atr:+.4f} ATR)` | `Low < Zone Lower: {tp_ev.candle_4h_low_below_zone_lower}` | `All 5 Recovery Conditions Met: {tp_ev.rec_all_conditions_met}`",
-            f"* **4. Reference Levels (`Reference calculation if entered at ${tp_ev.sizing_entry_price:,.2f}. Not an order.`)**: `Ref Entry ${tp_ev.sizing_entry_price:,.2f}` | `Stop ${tp_ev.structural_stop:,.2f}` | `Stop Distance ${tp_ev.stop_distance_usd:,.2f} ({tp_ev.stop_distance_atr:.2f} ATR / exact {tp_ev.stop_distance_atr_exact:.4f} ATR)` | `Budget ${tp_ev.risk_budget_usd:,.2f}` | `Size {tp_ev.position_size_btc:.5f} BTC (${tp_ev.position_value_usd:,.2f})` | `Computed Price Risk ${tp_ev.gross_price_risk_usd:,.2f} + Fee/Slippage Buffer ${tp_ev.fee_slippage_buffer_usd:,.2f} = ${tp_ev.total_estimated_risk_usd:,.2f}` | `Spot to Ref Entry ${tp_ev.spot_to_ref_entry_usd:+,.2f} ({tp_ev.spot_to_ref_entry_pct:+.2f}%)`",
-            f"* **5. Exit Rule Inputs**: `Position {tp_ev.position_status}` | `Consecutive 4H Closes < EMA50: {tp_ev.consecutive_4h_closes_below_ema50}` | `Consecutive 1D Closes < SMA200: {tp_ev.consecutive_1d_closes_below_sma200}`",
-            f"* **6. Data Integrity**: `Data Integrity OK: {tp_ev.data_integrity_ok}` (`1D Count: {tp_ev.completed_1d_count}` [Forming Excl: `{tp_ev.daily_forming_excluded}`] • `4H Count: {tp_ev.completed_4h_count}` [Forming Excl: `{tp_ev.candle_4h_forming_excluded}`])",
+            f"* **4. Reference Levels (`Reference calculation if entered at ${tp_ev.sizing_entry_price:,.2f}. Not an order. Simulated on ${tp_ev.simulation_equity_usd:,.0f} reference paper account — NOT operator account equity.`)**: `Ref Entry ${tp_ev.sizing_entry_price:,.2f}` | `Stop ${tp_ev.structural_stop:,.2f}` | `Stop Distance ${tp_ev.stop_distance_usd:,.2f} ({tp_ev.stop_distance_atr:.2f} ATR / exact {tp_ev.stop_distance_atr_exact:.4f} ATR, bounds [{min_stp:.2f}, {max_stp:.2f}] ATR)` | `Sim Budget ${tp_ev.risk_budget_usd:,.2f} ({tp_ev.risk_per_trade_pct:.2f}% of ${tp_ev.simulation_equity_usd:,.0f} ref acct, not operator equity)` | `Sim Size {tp_ev.position_size_btc:.5f} BTC (Sim Notional ${tp_ev.position_value_usd:,.2f} on ${tp_ev.simulation_equity_usd:,.0f} ref acct)` | `Computed Price Risk ${tp_ev.gross_price_risk_usd:,.2f} + Fee/Slippage Buffer ${tp_ev.fee_slippage_buffer_usd:,.2f} = ${tp_ev.total_estimated_risk_usd:,.2f}` | `Spot to Ref Entry ${tp_ev.spot_to_ref_entry_usd:+,.2f} ({tp_ev.spot_to_ref_entry_pct:+.2f}%)`",
+            f"* **5. Exit Rule Inputs**: `Position {tp_ev.position_status}` | `Consecutive 4H Closes < EMA{e_fast}: {tp_ev.consecutive_4h_closes_below_ema50}` | `Consecutive 1D Closes < SMA{d_sma}: {tp_ev.consecutive_1d_closes_below_sma200}`",
+            f"* **6. Data Integrity**: `Data Integrity OK: {tp_ev.data_integrity_ok}` (`1D Status: {tp_ev.daily_candle_status}` [Limit `<= {max_1d_stale:.1f}h`, Count `{tp_ev.completed_1d_count}`, Forming Excl `{tp_ev.daily_forming_excluded}`] • `4H Status: {tp_ev.candle_4h_status}` [Limit `<= {max_4h_stale:.1f}h`, Count `{tp_ev.completed_4h_count}`, Forming Excl `{tp_ev.candle_4h_forming_excluded}`])"
+            + (f" | `Failure: {tp_ev.integrity_failure_reason}`" if tp_ev.integrity_failure_reason else ""),
         ])
 
     # --- SECTION 19: B1 vs B2 DATA INTEGRITY RECONCILIATION AUDIT & EXECUTION GATE ---

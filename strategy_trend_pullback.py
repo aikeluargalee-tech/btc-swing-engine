@@ -19,6 +19,7 @@ from analytics.strategy_trend_pullback import (
     detect_pullback,
     evaluate_exit,
     generate_strategy_verdict,
+    get_or_recompute_trend_pullback,
     synthesize_closed_4h_from_1h,
     verify_and_extract_completed_candles,
 )
@@ -38,6 +39,7 @@ __all__ = [
     "detect_pullback",
     "evaluate_exit",
     "generate_strategy_verdict",
+    "get_or_recompute_trend_pullback",
     "synthesize_closed_4h_from_1h",
     "verify_and_extract_completed_candles",
 ]

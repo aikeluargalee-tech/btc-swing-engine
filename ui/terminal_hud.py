@@ -1950,7 +1950,7 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
     if tpb is not None:
         p4_table.add_row(
             "[bold cyan]DESK [A] TREND-PULLBACK v1.0[/bold cyan]",
-            f"Ref Entry ${tpb.reference_entry_price:,.2f} • Stop ${tpb.structural_stop:,.2f} (-${tpb.stop_distance_usd:,.2f} / {tpb.stop_distance_atr:.2f} ATR) • Size {tpb.position_size_btc:.5f} BTC",
+            f"Ref Entry ${tpb.reference_entry_price:,.2f} • Stop ${tpb.structural_stop:,.2f} (-${tpb.stop_distance_usd:,.2f} / {tpb.stop_distance_atr:.2f} ATR) • Sim Size {tpb.position_size_btc:.5f} BTC (${tpb.simulation_equity_usd:,.0f} ref acct, not operator equity)",
         )
     slsp = getattr(store, "slsp_evaluation", None)
     if slsp is not None and slsp.active_setup is not None:
@@ -5783,21 +5783,57 @@ def _build_tab18_trend_pullback_hud(
     header_panel: Panel,
 ) -> Group:
     """Builds Desk 18 [A: BTC STRATEGY] - BTC TREND-PULLBACK v1.0 (DATA-ONLY Metrics & True/False Report)."""
+    # Single source of truth: read stored evaluation without silent recomputation
     tp_eval = getattr(store, "trend_pullback_evaluation", None)
     if tp_eval is None:
-        from analytics.strategy_trend_pullback import TrendPullbackEngine
-        tp_eval = TrendPullbackEngine(config).evaluate(store)
+        spot_fallback = getattr(store, "binance_spot_price", 0.0) or 0.0
+        sub_grid = Table.grid(expand=True)
+        sub_grid.add_column(justify="left", no_wrap=True)
+        sub_grid.add_column(justify="right", no_wrap=True)
+        sub_grid.add_row(
+            "[bold bright_cyan]BTC TREND-PULLBACK v1.0 | DATA-ONLY | RESEARCH / PAPER MODE | SPOT ONLY[/bold bright_cyan]  │  "
+            "[bold black on bright_yellow] STATUS: UNVALIDATED [/bold black on bright_yellow]",
+            f"[bold white]Spot: [cyan]${spot_fallback:,.2f}[/cyan][/bold white]",
+        )
+        sub_panel = Panel(sub_grid, box=box.ROUNDED, border_style="bright_cyan", padding=(0, 1))
+        unavail_panel = Panel(
+            "[bold yellow]DATA UNAVAILABLE — NO STORED EVALUATION[/bold yellow]\n"
+            "[white]No stored BTC Trend-Pullback evaluation exists in StateStore yet. "
+            "Desk [A] reads only the SignalDetector cycle snapshot (no silent recompute on render).[/white]",
+            title="[bold bright_white]DESK [A] • BTC TREND-PULLBACK STATUS (STRATEGY VERDICT: NO TRADE)[/bold bright_white]",
+            box=box.ROUNDED,
+            border_style="bright_yellow",
+            padding=(0, 1),
+        )
+        return Group(header_panel, sub_panel, unavail_panel)
 
     spot_p = tp_eval.spot_price or store.binance_spot_price or 0.0
+    d_sma = int(getattr(tp_eval, "cfg_daily_sma_period", 200))
+    d_slp = int(getattr(tp_eval, "cfg_daily_sma_slope_period", 20))
+    e_fast = int(getattr(tp_eval, "cfg_ema_fast", 50))
+    e_slow = int(getattr(tp_eval, "cfg_ema_slow", 200))
+    e_slp = int(getattr(tp_eval, "cfg_ema_slope_period", 6))
+    atr_p = int(getattr(tp_eval, "cfg_atr_period", 14))
+    pb_lo_atr = float(getattr(tp_eval, "cfg_pullback_lower_atr", 0.50))
+    pb_hi_atr = float(getattr(tp_eval, "cfg_pullback_upper_atr", 0.25))
+    max_ext_atr = float(getattr(tp_eval, "cfg_recovery_max_extension_atr", 1.00))
+    lim_hi_atr = float(getattr(tp_eval, "cfg_limit_entry_upper_atr", 0.10))
+    stp_lb = int(getattr(tp_eval, "cfg_stop_lookback", 5))
+    stp_buf_atr = float(getattr(tp_eval, "cfg_stop_buffer_atr", 0.25))
+    min_stp_atr = float(getattr(tp_eval, "cfg_minimum_stop_atr", 0.75))
+    max_stp_atr = float(getattr(tp_eval, "cfg_maximum_stop_atr", 3.00))
+    max_1d_stale = float(getattr(tp_eval, "cfg_max_daily_stale_hours", 48.0))
+    max_4h_stale = float(getattr(tp_eval, "cfg_max_4h_stale_hours", 8.5))
+    eval_origin = getattr(tp_eval, "evaluation_origin", "STORED")
 
     # 1. Sub-Ribbon Header (DATA-ONLY Metrics Header)
     sub_grid = Table.grid(expand=True)
     sub_grid.add_column(justify="left", no_wrap=True)
     sub_grid.add_column(justify="right", no_wrap=True)
     sub_grid.add_row(
-        f"[bold bright_cyan]{tp_eval.strategy_name} | DATA-ONLY | {tp_eval.mode_label}[/bold bright_cyan]  │  "
+        f"[bold bright_cyan]{tp_eval.strategy_name} | DATA-ONLY | {tp_eval.mode_label} | SPOT ONLY[/bold bright_cyan]  │  "
         f"[bold black on bright_yellow] STATUS: {tp_eval.strategy_status} [/bold black on bright_yellow]",
-        f"[bold white]Spot: [cyan]${spot_p:,.2f}[/cyan] • [bright_cyan]{tp_eval.timestamp_sgt}[/bright_cyan][/bold white]",
+        f"[bold white]Spot: [cyan]${spot_p:,.2f}[/cyan] • Origin: [white]{eval_origin}[/white] • [bright_cyan]{tp_eval.timestamp_sgt}[/bright_cyan][/bold white]",
     )
     sub_panel = Panel(sub_grid, box=box.ROUNDED, border_style="bright_cyan", padding=(0, 1))
 
@@ -5805,11 +5841,11 @@ def _build_tab18_trend_pullback_hud(
     daily_lines = [
         f"[bold white]1D Open -> Close:[/bold white]     [white]{tp_eval.daily_open_time_utc} -> {tp_eval.daily_close_time_utc}[/white]",
         f"[bold white]Last 1D Close:[/bold white]        [cyan]${tp_eval.daily_close_completed:,.2f}[/cyan] [dim](O ${tp_eval.daily_open_completed:,.2f} H ${tp_eval.daily_high_completed:,.2f} L ${tp_eval.daily_low_completed:,.2f})[/dim]",
-        f"[bold white]1D SMA50 / SMA200:[/bold white]    [cyan]${tp_eval.daily_sma50:,.2f}[/cyan] / [cyan]${tp_eval.daily_sma200:,.2f}[/cyan]",
-        f"[bold white]20D SMA200 Slope:[/bold white]     [white]${tp_eval.daily_sma200_slope_20d:+,.2f}[/white] [dim](20D ago: ${tp_eval.daily_sma200_prev20:,.2f})[/dim]",
-        f"[bold white]Close vs SMA200:[/bold white]      [white]${tp_eval.daily_close_vs_sma200_usd:+,.2f} ({tp_eval.daily_close_vs_sma200_pct:+.2f}%)[/white]",
+        f"[bold white]1D SMA50 / SMA{d_sma}:[/bold white]    [cyan]${tp_eval.daily_sma50:,.2f}[/cyan] / [cyan]${tp_eval.daily_sma200:,.2f}[/cyan]",
+        f"[bold white]{d_slp}D SMA{d_sma} Slope:[/bold white]     [white]${tp_eval.daily_sma200_slope_20d:+,.2f}[/white] [dim]({d_slp}D ago: ${tp_eval.daily_sma200_prev20:,.2f})[/dim]",
+        f"[bold white]Close vs SMA{d_sma}:[/bold white]      [white]${tp_eval.daily_close_vs_sma200_usd:+,.2f} ({tp_eval.daily_close_vs_sma200_pct:+.2f}%)[/white]",
         f"[bold white]Close vs SMA50:[/bold white]       [white]${tp_eval.daily_close_vs_sma50_usd:+,.2f} ({tp_eval.daily_close_vs_sma50_pct:+.2f}%)[/white]",
-        f"[bold white]Close > SMA200:[/bold white]       [cyan]{tp_eval.daily_close_above_sma200}[/cyan]  •  [bold white]Close > SMA50:[/bold white] [cyan]{tp_eval.daily_close_above_sma50}[/cyan]  •  [bold white]SMA200 Rising:[/bold white] [cyan]{tp_eval.daily_sma200_rising}[/cyan]",
+        f"[bold white]Close > SMA{d_sma}:[/bold white]       [cyan]{tp_eval.daily_close_above_sma200}[/cyan]  •  [bold white]Close > SMA50:[/bold white] [cyan]{tp_eval.daily_close_above_sma50}[/cyan]  •  [bold white]SMA{d_sma} Rising:[/bold white] [cyan]{tp_eval.daily_sma200_rising}[/cyan]",
     ]
     daily_panel = Panel(
         "\n".join(daily_lines),
@@ -5821,12 +5857,12 @@ def _build_tab18_trend_pullback_hud(
 
     trend_lines = [
         f"[bold white]4H Open -> Close:[/bold white]     [white]{tp_eval.candle_4h_open_time_utc} -> {tp_eval.candle_4h_close_time_utc}[/white]",
-        f"[bold white]Last 4H Close / ATR14:[/bold white][cyan]${tp_eval.close_4h_completed:,.2f}[/cyan] / [cyan]${tp_eval.atr14_4h:,.2f}[/cyan]",
-        f"[bold white]4H EMA50 / EMA200:[/bold white]    [cyan]${tp_eval.ema50_4h:,.2f}[/cyan] / [cyan]${tp_eval.ema200_4h:,.2f}[/cyan] [dim](EMA50-EMA200: ${tp_eval.ema50_minus_ema200_4h_usd:+,.2f})[/dim]",
-        f"[bold white]6-Bar EMA50 Slope:[/bold white]    [white]${tp_eval.ema50_4h_slope_6bars:+,.2f}[/white] [dim](6 bars ago: ${tp_eval.ema50_4h_prev6:,.2f})[/dim]",
-        f"[bold white]Close vs EMA50:[/bold white]       [white]${tp_eval.close_4h_vs_ema50_usd:+,.2f} ({tp_eval.close_4h_vs_ema50_atr:+.4f} ATR / {tp_eval.close_4h_vs_ema50_atr:+.2f} ATR)[/white]",
-        f"[bold white]Close vs EMA200:[/bold white]      [white]${tp_eval.close_4h_vs_ema200_usd:+,.2f} ({tp_eval.close_4h_vs_ema200_atr:+.4f} ATR / {tp_eval.close_4h_vs_ema200_atr:+.2f} ATR)[/white]",
-        f"[bold white]EMA50>EMA200:[/bold white]         [cyan]{tp_eval.ema50_above_ema200}[/cyan]  •  [bold white]EMA50 Rising 6B:[/bold white] [cyan]{tp_eval.ema50_rising_6bars}[/cyan]  •  [bold white]Close>EMA200:[/bold white] [cyan]{tp_eval.close_4h_above_ema200}[/cyan]",
+        f"[bold white]Last 4H Close / ATR{atr_p}:[/bold white][cyan]${tp_eval.close_4h_completed:,.2f}[/cyan] / [cyan]${tp_eval.atr14_4h:,.2f}[/cyan]",
+        f"[bold white]4H EMA{e_fast} / EMA{e_slow}:[/bold white]    [cyan]${tp_eval.ema50_4h:,.2f}[/cyan] / [cyan]${tp_eval.ema200_4h:,.2f}[/cyan] [dim](EMA{e_fast}-EMA{e_slow}: ${tp_eval.ema50_minus_ema200_4h_usd:+,.2f})[/dim]",
+        f"[bold white]{e_slp}-Bar EMA{e_fast} Slope:[/bold white]    [white]${tp_eval.ema50_4h_slope_6bars:+,.2f}[/white] [dim]({e_slp} bars ago: ${tp_eval.ema50_4h_prev6:,.2f})[/dim]",
+        f"[bold white]Close vs EMA{e_fast}:[/bold white]       [white]${tp_eval.close_4h_vs_ema50_usd:+,.2f} ({tp_eval.close_4h_vs_ema50_atr:+.4f} ATR / {tp_eval.close_4h_vs_ema50_atr:+.2f} ATR)[/white]",
+        f"[bold white]Close vs EMA{e_slow}:[/bold white]      [white]${tp_eval.close_4h_vs_ema200_usd:+,.2f} ({tp_eval.close_4h_vs_ema200_atr:+.4f} ATR / {tp_eval.close_4h_vs_ema200_atr:+.2f} ATR)[/white]",
+        f"[bold white]EMA{e_fast}>EMA{e_slow}:[/bold white]         [cyan]{tp_eval.ema50_above_ema200}[/cyan]  •  [bold white]EMA{e_fast} Rising {e_slp}B:[/bold white] [cyan]{tp_eval.ema50_rising_6bars}[/cyan]  •  [bold white]Close>EMA{e_slow}:[/bold white] [cyan]{tp_eval.close_4h_above_ema200}[/cyan]",
     ]
     trend_panel = Panel(
         "\n".join(trend_lines),
@@ -5837,13 +5873,13 @@ def _build_tab18_trend_pullback_hud(
     )
 
     pullback_lines = [
-        f"[bold white]Zone Lower / Upper:[/bold white]   [cyan]${tp_eval.pullback_zone_lower:,.2f}[/cyan] [dim](EMA50-0.50*ATR)[/dim] / [cyan]${tp_eval.pullback_zone_upper:,.2f}[/cyan] [dim](EMA50+0.25*ATR)[/dim]",
-        f"[bold white]Max Extension:[/bold white]        [cyan]${tp_eval.max_extension_price:,.2f}[/cyan] [dim](EMA50 + 1.00 * ATR14)[/dim]",
+        f"[bold white]Zone Lower / Upper:[/bold white]   [cyan]${tp_eval.pullback_zone_lower:,.2f}[/cyan] [dim](EMA{e_fast}-{pb_lo_atr:.2f}*ATR)[/dim] / [cyan]${tp_eval.pullback_zone_upper:,.2f}[/cyan] [dim](EMA{e_fast}+{pb_hi_atr:.2f}*ATR)[/dim]",
+        f"[bold white]Max Extension:[/bold white]        [cyan]${tp_eval.max_extension_price:,.2f}[/cyan] [dim](EMA{e_fast} + {max_ext_atr:.2f} * ATR{atr_p})[/dim]",
         f"[bold white]Spot Minus Lower:[/bold white]     [white]${tp_eval.spot_minus_zone_lower_usd:+,.2f} ({tp_eval.spot_minus_zone_lower_atr:+.4f} ATR / {tp_eval.spot_minus_zone_lower_atr:+.2f} ATR)[/white]",
         f"[bold white]Spot Minus Upper:[/bold white]     [white]${tp_eval.spot_minus_zone_upper_usd:+,.2f} ({tp_eval.spot_minus_zone_upper_atr:+.4f} ATR / {tp_eval.spot_minus_zone_upper_atr:+.2f} ATR)[/white]",
         f"[bold white]Last 4H OHLC:[/bold white]         [white]O ${tp_eval.open_4h_completed:,.2f} H ${tp_eval.high_4h_completed:,.2f} L ${tp_eval.low_4h_completed:,.2f} C ${tp_eval.close_4h_completed:,.2f}[/white]",
         f"[bold white]Low < Zone Lower:[/bold white]     [cyan]{tp_eval.candle_4h_low_below_zone_lower}[/cyan]  •  [bold white]Low>=Lower:[/bold white] [cyan]{tp_eval.rec_cond1_low_ge_zone_lower}[/cyan]  •  [bold white]Low<=Upper:[/bold white] [cyan]{tp_eval.rec_cond2_low_le_zone_upper}[/cyan]",
-        f"[bold white]Recovery Booleans:[/bold white]    [bold white]C>EMA50:[/bold white] [cyan]{tp_eval.rec_cond3_close_gt_ema50}[/cyan] • [bold white]C>O:[/bold white] [cyan]{tp_eval.rec_cond4_close_gt_open}[/cyan] • [bold white]C<=MaxExt:[/bold white] [cyan]{tp_eval.rec_cond5_close_le_max_ext}[/cyan] • [bold white]All 5:[/bold white] [cyan]{tp_eval.rec_all_conditions_met}[/cyan]",
+        f"[bold white]Recovery Booleans:[/bold white]    [bold white]C>EMA{e_fast}:[/bold white] [cyan]{tp_eval.rec_cond3_close_gt_ema50}[/cyan] • [bold white]C>O:[/bold white] [cyan]{tp_eval.rec_cond4_close_gt_open}[/cyan] • [bold white]C<=MaxExt:[/bold white] [cyan]{tp_eval.rec_cond5_close_le_max_ext}[/cyan] • [bold white]All 5:[/bold white] [cyan]{tp_eval.rec_all_conditions_met}[/cyan]",
     ]
     pullback_panel = Panel(
         "\n".join(pullback_lines),
@@ -5861,20 +5897,20 @@ def _build_tab18_trend_pullback_hud(
 
     # 3. Row 2 Grid: 4. REFERENCE LEVELS + 5. EXIT RULE INPUTS + 6. DATA INTEGRITY
     ref_lines = [
-        f"[bold yellow]Reference calculation if entered at ${tp_eval.sizing_entry_price:,.2f}. Not an order.[/bold yellow]",
-        f"[bold white]Ref Entry Price:[/bold white]      [cyan]${tp_eval.sizing_entry_price:,.2f}[/cyan] [dim](4H EMA50 ${tp_eval.ema50_4h:,.2f} + 0.10*ATR14)[/dim]",
-        f"[bold white]Stop Level:[/bold white]           [cyan]${tp_eval.structural_stop:,.2f}[/cyan] [dim](5B Low ${tp_eval.stop_lowest_low_5bars:,.2f} - 0.25*ATR ${tp_eval.stop_buffer_usd:,.2f})[/dim]",
+        f"[bold yellow]Simulated on ${tp_eval.simulation_equity_usd:,.0f} reference account — NOT operator account. Ref at ${tp_eval.sizing_entry_price:,.2f}, not an order.[/bold yellow]",
+        f"[bold white]Ref Entry Price:[/bold white]      [cyan]${tp_eval.sizing_entry_price:,.2f}[/cyan] [dim](4H EMA{e_fast} ${tp_eval.ema50_4h:,.2f} + {lim_hi_atr:.2f}*ATR{atr_p})[/dim]",
+        f"[bold white]Stop Level:[/bold white]           [cyan]${tp_eval.structural_stop:,.2f}[/cyan] [dim]({stp_lb}B Low ${tp_eval.stop_lowest_low_5bars:,.2f} - {stp_buf_atr:.2f}*ATR ${tp_eval.stop_buffer_usd:,.2f})[/dim]",
         f"[bold white]Stop Distance:[/bold white]        [white]${tp_eval.stop_distance_usd:,.2f} ({tp_eval.stop_distance_atr:.2f} ATR / exact {tp_eval.stop_distance_atr_exact:.4f} ATR)[/white]",
-        f"[bold white]Stop Dist Booleans:[/bold white]   [bold white]>=0.50 ATR:[/bold white] [cyan]{tp_eval.stop_dist_ge_min_atr}[/cyan]  •  [bold white]<=3.00 ATR:[/bold white] [cyan]{tp_eval.stop_dist_le_max_atr}[/cyan]",
-        f"[bold white]Budget / Size / Not.:[/bold white] [cyan]${tp_eval.risk_budget_usd:,.2f}[/cyan] [dim]({tp_eval.risk_per_trade_pct:.2f}% of ${tp_eval.simulation_equity_usd:,.2f})[/dim] • [bold bright_cyan]{tp_eval.position_size_btc:.5f} BTC[/bold bright_cyan] ([cyan]${tp_eval.position_value_usd:,.2f}[/cyan])",
+        f"[bold white]Stop Dist Booleans:[/bold white]   [bold white]>={min_stp_atr:.2f} ATR:[/bold white] [cyan]{tp_eval.stop_dist_ge_min_atr}[/cyan]  •  [bold white]<={max_stp_atr:.2f} ATR:[/bold white] [cyan]{tp_eval.stop_dist_le_max_atr}[/cyan]",
+        f"[bold white]Sim Budget/Size/Not.:[/bold white] [cyan]${tp_eval.risk_budget_usd:,.2f}[/cyan] [dim]({tp_eval.risk_per_trade_pct:.2f}% of ${tp_eval.simulation_equity_usd:,.0f} ref acct, not operator acct)[/dim] • [bold bright_cyan]{tp_eval.position_size_btc:.5f} BTC[/bold bright_cyan] ([cyan]${tp_eval.position_value_usd:,.2f}[/cyan])",
         f"[bold white]Computed Price Risk:[/bold white]  [white]{tp_eval.position_size_btc:.5f} * ${tp_eval.stop_distance_usd:,.2f} =[/white] [cyan]${tp_eval.gross_price_risk_usd:,.2f}[/cyan]",
         f"[bold white]Fee & Slippage Buf.:[/bold white]  [white]${tp_eval.fee_slippage_buffer_usd:,.2f}[/white] [dim](Fees ${tp_eval.entry_fee_usd:,.2f}+${tp_eval.exit_fee_usd:,.2f}, Slip ${tp_eval.entry_slippage_usd:,.2f}+${tp_eval.exit_slippage_usd:,.2f})[/dim]",
-        f"[bold white]Total Risk Reconcile:[/bold white] [cyan]${tp_eval.gross_price_risk_usd:,.2f} + ${tp_eval.fee_slippage_buffer_usd:,.2f} = ${tp_eval.total_estimated_risk_usd:,.2f}[/cyan] [dim](<=Budget: {tp_eval.total_risk_le_budget})[/dim]",
+        f"[bold white]Total Risk Reconcile:[/bold white] [cyan]${tp_eval.gross_price_risk_usd:,.2f} + ${tp_eval.fee_slippage_buffer_usd:,.2f} = ${tp_eval.total_estimated_risk_usd:,.2f}[/cyan] [dim](<=Sim Budget: {tp_eval.total_risk_le_budget})[/dim]",
         f"[bold white]Spot to Ref Entry:[/bold white]    [white]${tp_eval.spot_to_ref_entry_usd:+,.2f} ({tp_eval.spot_to_ref_entry_pct:+.2f}%)[/white]",
     ]
     ref_panel = Panel(
         "\n".join(ref_lines),
-        title="[bold bright_white]4. REFERENCE LEVELS[/bold bright_white]",
+        title="[bold bright_white]4. REFERENCE LEVELS (SIMULATED 100K REF ACCOUNT)[/bold bright_white]",
         box=box.ROUNDED,
         border_style="bright_cyan",
         padding=(0, 1),
@@ -5882,12 +5918,12 @@ def _build_tab18_trend_pullback_hud(
 
     exit_lines = [
         f"[bold white]Position State:[/bold white]       [cyan]{tp_eval.position_status}[/cyan]",
-        f"[bold white]4H Close (t-1):[/bold white]       [white]{tp_eval.prev_4h_close_utc}[/white] • [cyan]${tp_eval.prev_4h_close:,.2f}[/cyan] vs EMA50 [cyan]${tp_eval.prev_4h_ema50:,.2f}[/cyan] [dim](C<EMA50: {tp_eval.prev_4h_close_lt_ema50})[/dim]",
-        f"[bold white]4H Close (t):[/bold white]         [white]{tp_eval.candle_4h_close_time_utc}[/white] • [cyan]${tp_eval.close_4h_completed:,.2f}[/cyan] vs EMA50 [cyan]${tp_eval.ema50_4h:,.2f}[/cyan] [dim](C<EMA50: {tp_eval.last_4h_close_lt_ema50})[/dim]",
-        f"[bold white]Consec. 4H < EMA50:[/bold white]   [cyan]{tp_eval.consecutive_4h_closes_below_ema50}[/cyan]",
-        f"[bold white]1D Close (t-1):[/bold white]       [white]{tp_eval.prev_1d_close_utc}[/white] • [cyan]${tp_eval.prev_1d_close:,.2f}[/cyan] vs SMA200 [cyan]${tp_eval.prev_1d_sma200:,.2f}[/cyan] [dim](C<SMA200: {tp_eval.prev_1d_close_lt_sma200})[/dim]",
-        f"[bold white]1D Close (t):[/bold white]         [white]{tp_eval.daily_close_time_utc}[/white] • [cyan]${tp_eval.daily_close_completed:,.2f}[/cyan] vs SMA200 [cyan]${tp_eval.daily_sma200:,.2f}[/cyan] [dim](C<SMA200: {tp_eval.last_1d_close_lt_sma200})[/dim]",
-        f"[bold white]Consec. 1D < SMA200:[/bold white]  [cyan]{tp_eval.consecutive_1d_closes_below_sma200}[/cyan]",
+        f"[bold white]4H Close (t-1):[/bold white]       [white]{tp_eval.prev_4h_close_utc}[/white] • [cyan]${tp_eval.prev_4h_close:,.2f}[/cyan] vs EMA{e_fast} [cyan]${tp_eval.prev_4h_ema50:,.2f}[/cyan] [dim](C<EMA{e_fast}: {tp_eval.prev_4h_close_lt_ema50})[/dim]",
+        f"[bold white]4H Close (t):[/bold white]         [white]{tp_eval.candle_4h_close_time_utc}[/white] • [cyan]${tp_eval.close_4h_completed:,.2f}[/cyan] vs EMA{e_fast} [cyan]${tp_eval.ema50_4h:,.2f}[/cyan] [dim](C<EMA{e_fast}: {tp_eval.last_4h_close_lt_ema50})[/dim]",
+        f"[bold white]Consec. 4H < EMA{e_fast}:[/bold white]   [cyan]{tp_eval.consecutive_4h_closes_below_ema50}[/cyan]",
+        f"[bold white]1D Close (t-1):[/bold white]       [white]{tp_eval.prev_1d_close_utc}[/white] • [cyan]${tp_eval.prev_1d_close:,.2f}[/cyan] vs SMA{d_sma} [cyan]${tp_eval.prev_1d_sma200:,.2f}[/cyan] [dim](C<SMA{d_sma}: {tp_eval.prev_1d_close_lt_sma200})[/dim]",
+        f"[bold white]1D Close (t):[/bold white]         [white]{tp_eval.daily_close_time_utc}[/white] • [cyan]${tp_eval.daily_close_completed:,.2f}[/cyan] vs SMA{d_sma} [cyan]${tp_eval.daily_sma200:,.2f}[/cyan] [dim](C<SMA{d_sma}: {tp_eval.last_1d_close_lt_sma200})[/dim]",
+        f"[bold white]Consec. 1D < SMA{d_sma}:[/bold white]  [cyan]{tp_eval.consecutive_1d_closes_below_sma200}[/cyan]",
     ]
     exit_panel = Panel(
         "\n".join(exit_lines),
@@ -5902,8 +5938,8 @@ def _build_tab18_trend_pullback_hud(
         f"[bold white]Data Integrity OK:[/bold white]    [bold {di_col}]{tp_eval.data_integrity_ok}[/bold {di_col}]",
         f"[bold white]Retrieval (UTC):[/bold white]      [white]{tp_eval.timestamp_utc}[/white]",
         f"[bold white]Retrieval (SGT):[/bold white]      [white]{tp_eval.timestamp_sgt}[/white]",
-        f"[bold white]1D Series Count:[/bold white]      [cyan]{tp_eval.completed_1d_count}[/cyan] [dim](Forming Excl: {tp_eval.daily_forming_excluded} [{tp_eval.daily_forming_open_utc}])[/dim]",
-        f"[bold white]4H Series Count:[/bold white]      [cyan]{tp_eval.completed_4h_count}[/cyan] [dim](Forming Excl: {tp_eval.candle_4h_forming_excluded} [{tp_eval.candle_4h_forming_open_utc}])[/dim]",
+        f"[bold white]1D Series Count:[/bold white]      [cyan]{tp_eval.completed_1d_count}[/cyan] [dim](Limit <= {max_1d_stale:.1f}h • Forming Excl: {tp_eval.daily_forming_excluded} [{tp_eval.daily_forming_open_utc}])[/dim]",
+        f"[bold white]4H Series Count:[/bold white]      [cyan]{tp_eval.completed_4h_count}[/cyan] [dim](Limit <= {max_4h_stale:.1f}h • Forming Excl: {tp_eval.candle_4h_forming_excluded} [{tp_eval.candle_4h_forming_open_utc}])[/dim]",
         f"[bold white]1D Candle Status:[/bold white]     [white]{tp_eval.daily_candle_status}[/white]",
         f"[bold white]4H Candle Status:[/bold white]     [white]{tp_eval.candle_4h_status}[/white]",
         f"[bold white]Integrity Failure:[/bold white]    [dim]{tp_eval.integrity_failure_reason or 'None'}[/dim]",
@@ -5924,7 +5960,7 @@ def _build_tab18_trend_pullback_hud(
 
     # 4. STRATEGY VERDICT Panel (On-screen visual summary for human operator; excluded from DATA-ONLY clipboard export)
     verdict_badge_map = {
-        "ENTRY READY": "[bold black on bright_green] ENTRY READY [/bold black on bright_green]",
+        "ENTRY READY": "[bold black on bright_green] SETUP: ENTRY READY (NOT AN ORDER) [/bold black on bright_green]",
         "WAIT": "[bold black on bright_yellow] WAIT [/bold black on bright_yellow]",
         "HOLD": "[bold black on bright_cyan] HOLD [/bold black on bright_cyan]",
         "EXIT ALERT": "[bold white on red] EXIT ALERT [/bold white on red]",
@@ -5942,9 +5978,17 @@ def _build_tab18_trend_pullback_hud(
         f"[bold bright_white]STRATEGY VERDICT:[/bold bright_white] {v_badge}  │  "
         f"[bold bright_cyan]DECISION STATE:[/bold bright_cyan] [bold white]{tp_eval.decision_state}[/bold white]  │  "
         f"[bold yellow]STATUS: {tp_eval.strategy_status}[/bold yellow]  │  "
-        f"[dim]{tp_eval.mode_label}[/dim]"
+        f"[dim]{tp_eval.mode_label} • SPOT ONLY[/dim]"
     )
     verdict_grid.add_row(f"[bold bright_cyan]EXPLANATION:[/bold bright_cyan] [white]{tp_eval.verdict_explanation}[/white]")
+    if tp_eval.strategy_verdict == "ENTRY READY":
+        verdict_grid.add_row(
+            "[bold yellow]SETUP STATE ONLY: ENTRY READY means setup conditions passed — NOT an instruction or permission to place an order. Operator decides.[/bold yellow]"
+        )
+    else:
+        verdict_grid.add_row(
+            "[dim]VETO-ONLY SETUP MONITOR: UNVALIDATED RESEARCH / PAPER MODE • SPOT ONLY • No auto-execution; operator decides.[/dim]"
+        )
 
     verdict_panel = Panel(
         verdict_grid,

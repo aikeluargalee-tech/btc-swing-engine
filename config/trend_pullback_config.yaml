@@ -1,4 +1,5 @@
-# BTC TREND-PULLBACK STRATEGY v1.0 — RESEARCH / PAPER MODE CONFIGURATION
+# BTC TREND-PULLBACK STRATEGY v1.0 — UNVALIDATED RESEARCH / PAPER MODE CONFIGURATION
+# SPOT ONLY • NO LEVERAGE • NO AUTO-EXECUTION • VETO-ONLY SETUP MONITOR (OPERATOR DECIDES)
 # Do not optimize these parameters during initial baseline evaluation.
 
 strategy_name: "BTC TREND-PULLBACK v1.0"
@@ -28,7 +29,9 @@ stop_buffer_atr: 0.25
 minimum_stop_atr: 0.75
 maximum_stop_atr: 3.00
 
-# 5. Position Sizing & Simulation Assumptions (No Leverage, Spot Only)
+# 5. Simulated Paper Position Sizing & Cost Assumptions (No Leverage, Spot Only)
+# WARNING: initial_simulation_equity is a fictional 100k reference paper account,
+# NOT the operator's live account equity. Position sizes are reference simulations only.
 risk_per_trade: 0.005
 initial_simulation_equity: 100000.0
 entry_fee_pct: 0.0010

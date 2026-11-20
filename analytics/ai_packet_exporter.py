@@ -961,6 +961,18 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
 
             "### 6A. Panel 1 — 9-Desk Executive Verdict Rollup Matrix (Specialist Desks `[1]–[9]`)",
 
+            "### Tab [10] Decision Surface",
+
+            f"* **1. VERDICT**: `{getattr(msev, 'decision_verdict', 'NO_TRADE')}` — `{msev.master_headline}`",
+
+            f"* **2. WHY**: `{' | '.join(row.tab_name + ': ' + row.tab_conclusion for row in msev.tab_rows[:4])}`",
+
+            f"* **3. WHAT CHANGES IT**: `{' | '.join(msev.upgrade_catalysts[:3]) or 'No specific upgrade condition published.'}`",
+
+            f"* **4. WHAT IS REFUSED**: `{'; '.join(([msev.supreme_veto_reason] if msev.supreme_veto_active else []) + [desk + ': ' + state for desk, state in getattr(msev, 'input_states', {}).items() if state in ('UNAVAILABLE', 'STALE', 'SYNTHETIC', 'NO_MATCH', 'REFUSED')]) or 'No active veto or non-LIVE input recorded'}`",
+
+            f"* **Source states**: `{getattr(msev, 'input_states', {})}`",
+
             "",
 
             "| Tab | Light | Score / State | Primary Driver | Executive Conclusion |",

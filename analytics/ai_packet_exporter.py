@@ -1815,7 +1815,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             lines.extend([
                 f"* **1.5R Runway Obstacle Check**: `{setup.obstacle_r:.2f}R` clearance to resistance | Status: **`{obs_flag}`** ({setup.obstacle_description})",
                 f"* **4H Candlestick Rejection**: Type: `{setup.rejection_candle_type}` (Lower Wick Ratio: `{setup.rejection_wick_ratio*100:.1f}%`) | 4H Volume vs 20 SMA: `{setup.rejection_volume_ratio:.2f}x`",
-                f"* **Macro Sizing & Risk Allocation**: Sized: `{setup.position_size_btc:.4f} BTC` (`${setup.notional_value_usd:,.2f}` notional | Macro Factor: `{slsp.macro_sizing_factor:.2f}x` | Zero Leverage Spot) | Max Risk: `${100000.0 * (setup.risk_pct/100):,.2f}`",
+                f"* **Macro Sizing & Risk Allocation**: Sized: `{setup.position_size_btc:.4f} BTC` (`${setup.notional_value_usd:,.2f}` notional | Macro Factor: `{slsp.macro_sizing_factor:.2f}x` | Zero Leverage Spot) | Max Risk: `${float(getattr(config, 'spot_swing_account_equity_usd', 100_000.0)) * (setup.risk_pct/100):,.2f}` (on ${float(getattr(config, 'spot_swing_account_equity_usd', 100_000.0)):,.0f} equity)",
                 f"* **Execution Geometry & Dual Stops**: Entry: `${setup.entry_price:,.2f}` | Structural Stop (1H Close): `${slsp.structural_stop_price:,.2f}` ({slsp.structural_stop_dist_pct:.2f}%) | Disaster Hard Stop (Below 200 SMA & 25x Shelf): `${slsp.disaster_stop_price:,.2f}` ({slsp.disaster_stop_dist_pct:.2f}%) | Risk Budget Pass: `{bool(slsp.disaster_stop_dist_pct <= 4.5)}` | TP1 (+1.5R): `${setup.tp1_price:,.2f}` | TP2 (+2.5R): `${setup.tp2_price:,.2f}` | Breakeven Ratchet (+1.0R): `${setup.breakeven_trigger_price:,.2f}`",
             ])
         else:

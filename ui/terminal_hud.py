@@ -3533,6 +3533,10 @@ def _build_tab_waterfall_hud(store: StateStore, header_panel: Panel) -> Group:
     5. Sniper Trigger (15m Footprint Lower-Wick Absorption & Positive Delta Flip)
     """
     f_ev = getattr(store, "footprint_evaluation", None)
+    # Fail CLOSED: with no footprint evaluation the auction is NOT complete and the
+    # bar POC is NOT reclaimed. These defaulted to True, which asserted both.
+    auc_comp = bool(getattr(f_ev, "auction_completed", False) if f_ev else False)
+    poc_rec = bool(getattr(f_ev, "bar_poc_reclaimed", False) if f_ev else False)
     macro_ev = getattr(store, "macro_evaluation", None)
     spot_ev = getattr(store, "spot_swing_evaluation", None)
     proto_ev = getattr(store, "protocol_evaluation", None)
@@ -3700,8 +3704,6 @@ def _build_tab_waterfall_hud(store: StateStore, header_panel: Panel) -> Group:
     wick_abs = bool(getattr(f_ev, "gate3_wick_absorption", False) if f_ev else False)
     delta_flip = bool(getattr(f_ev, "gate4_delta_flip", False) if f_ev else False)
     all_gates_pass = bool(getattr(f_ev, "all_gates_pass", False) if f_ev else False)
-    auc_comp = bool(getattr(f_ev, "auction_completed", True) if f_ev else True)
-    poc_rec = bool(getattr(f_ev, "bar_poc_reclaimed", True) if f_ev else True)
 
     if all_gates_pass or (wick_abs and delta_flip):
         dp7_badge = "[bold black on bright_cyan] 🎯 TRIGGERED [/bold black on bright_cyan]"

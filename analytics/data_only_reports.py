@@ -988,7 +988,7 @@ def build_tab_0_data_only_report(config: Optional[EngineConfig], store: StateSto
 
 
 # ==============================================================================
-# 10. TAB [L: MASTER] DATA-ONLY REPORT (9-FLAGSHIP TOP-RIBBON MATRIX)
+# 10. TAB [Z] DECISION-SURFACE DATA-ONLY REPORT (9-FLAGSHIP TOP-RIBBON MATRIX)
 # ==============================================================================
 def build_tab_l_data_only_report(config: Optional[EngineConfig], store: StateStore) -> str:
     ts_utc, ts_sgt = _timestamps_utc_sgt()
@@ -999,7 +999,7 @@ def build_tab_l_data_only_report(config: Optional[EngineConfig], store: StateSto
     sw = getattr(store, "spot_swing_evaluation", None)
 
     lines = [
-        "# TAB [L: MASTER] | 8-FLAGSHIP DESK DATA-ONLY METRICS REPORT",
+        "# TAB [Z: DECISION SURFACE] | 8-FLAGSHIP DESK DATA-ONLY METRICS REPORT",
         f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (SGT):** `{ts_sgt}`",
         f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}`",
         "**Desk Purpose & Scope:** `Single-screen 8-Flagship-Desk Telemetry Matrix (P, G, R, M, A, F, W, 0) & 4-Domain Readiness Overview. Keeps each strategy's reference entry, stop, and sizing calculations strictly unblended.`",

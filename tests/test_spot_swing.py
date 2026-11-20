@@ -714,7 +714,7 @@ class TestHudRouting(SpotSwingBase):
 
     def test_dry_run_report_accepts_new_tab_arguments(self) -> None:
         store = self._store_with_eval()
-        for arg, needle in (("0", "BTC SPOT SWING SCREENING"), ("l", "Master"), ("all", "TAB [L: MASTER")):
+        for arg, needle in (("0", "BTC SPOT SWING SCREENING"), ("l", "Master"), ("all", "TAB [Z: DECISION SURFACE")):
             buf = io.StringIO()
             with contextlib.redirect_stdout(buf):
                 print_dry_run_report(CONFIG, store, tab_arg=arg)

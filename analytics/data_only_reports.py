@@ -58,12 +58,56 @@ FORBIDDEN_WORDS_REPLACEMENTS: Tuple[Tuple[re.Pattern[str], str], ...] = (
 )
 
 
-def sanitize_data_only_text(text: str) -> str:
-    """Guarantees zero occurrences of forbidden interpretive words in any DATA-ONLY report."""
+PROTECTED_TERMS: Tuple[str, ...] = (
+    # The protocol's own vocabulary. These are proper nouns and state tokens, not commentary,
+    # and the forbidden-word filter is a blunt substring pass - so without this it renamed the
+    # system's own states in the artefact a reviewer trusts most:
+    #   "Non-Trade Zone (8A-8F)" -> "Non-position Zone (8A-8F)"
+    #   "NO_TRADE"               -> "NO_position"
+    # Longest first, so a longer phrase is masked before a shorter one inside it.
+    "Non-Trade Zone",
+    "WAIT FOR RETEST",
+    "CONFIRMED_CLEAR",
+    "NO_TRADE",
+    "CONFIRMED",
+    "REJECTED",
+)
+
+_MASK_START = "\u0001"
+_MASK_END = "\u0002"
+
+
+def strip_protected_terms(text: str) -> str:
+    """Remove the protocol's proper nouns so a test can assert the prose ban on its own.
+
+    The forbidden-word rule targets interpretive language ("bearish", "recommend"), not the
+    names of the system's own states. Tests that assert "zero forbidden words" must therefore
+    look at the prose, which is this function's job.
+    """
     out = text
-    for pattern, repl in FORBIDDEN_WORDS_REPLACEMENTS:
-        out = pattern.sub(repl, out)
+    for term in PROTECTED_TERMS:
+        out = out.replace(term, "")
     return out
+
+
+def sanitize_data_only_text(text: str) -> str:
+    """Guarantees zero occurrences of forbidden interpretive words in any DATA-ONLY report.
+
+    Protocol proper nouns are masked through the substitution and restored afterwards, so the
+    filter cannot rename a state it does not understand.
+    """
+    masked = text
+    restored: List[Tuple[str, str]] = []
+    for idx, term in enumerate(PROTECTED_TERMS):
+        if term in masked:
+            token = f"{_MASK_START}{idx}{_MASK_END}"
+            masked = masked.replace(term, token)
+            restored.append((token, term))
+    for pattern, repl in FORBIDDEN_WORDS_REPLACEMENTS:
+        masked = pattern.sub(repl, masked)
+    for token, term in restored:
+        masked = masked.replace(token, term)
+    return masked
 
 
 def _timestamps_utc_sgt() -> Tuple[str, str]:

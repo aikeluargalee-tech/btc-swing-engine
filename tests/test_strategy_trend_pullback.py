@@ -745,6 +745,7 @@ def test_24_all_tabs_and_global_ai_packet_data_only_acceptance() -> None:
     'confirmed', 'rejected', 'recommend').
     """
     from analytics.data_only_reports import (
+        strip_protected_terms,
         build_global_data_only_packet,
         build_tab_0_data_only_report,
         build_tab_a_data_only_report,
@@ -795,7 +796,10 @@ def test_24_all_tabs_and_global_ai_packet_data_only_acceptance() -> None:
     for label, fn in builders:
         report = fn(config, store)
         assert len(report) > 150
-        report_lower = report.lower()
+        # The ban is on interpretive PROSE. The protocol's own proper nouns ("Non-Trade Zone",
+        # "NO_TRADE") legitimately contain a banned substring, so they are removed before the
+        # check - renaming them was the defect, not the fix.
+        report_lower = strip_protected_terms(report).lower()
         for word in forbidden_words:
             assert word not in report_lower, f"Forbidden word '{word}' found in {label} DATA-ONLY report!"
 

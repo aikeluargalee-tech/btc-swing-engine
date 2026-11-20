@@ -220,14 +220,39 @@ class TestTabZExportCarriesTheDecision(unittest.TestCase):
             self.assertNotIn(word, lower,
                              f"forbidden interpretive word '{word}' in the data-only export")
 
-    def test_unavailable_desk_cannot_create_a_setup_trigger(self):
-        """A desk reporting UNAVAILABLE cannot be the source of an observed setup: its verdict
-        field is stale by definition. Without this, Tab [0] read OBSERVED while its own row
-        said UNAVAILABLE, because the trigger was taken from the same object."""
-        for desk, state in self.states.items():
-            if state == "UNAVAILABLE" and desk.endswith("Spot Swing"):
-                self.assertNotEqual(self.states.get("[Setup Trigger]"), "OBSERVED",
-                                    f"{desk} is UNAVAILABLE yet the setup trigger is OBSERVED")
+    def test_unavailable_desk_is_listed_as_a_blocking_input(self):
+        """An UNAVAILABLE desk must appear in the blocking list: it is a reason the decision is
+        BLOCKED, not a footnote. (The rule that such a desk may not *fire* the trigger is a
+        code-shape invariant in test_invariants, because asserting it from live states is
+        timing-dependent - the sweep/retest FSM expires on the clock, so this assertion passed
+        alone and failed in the suite.)"""
+        unavailable = [d for d, st in self.states.items() if st == "UNAVAILABLE"]
+        if not unavailable:
+            self.skipTest("no unavailable desk in this fixture")
+        blocking = next(l for l in self.report.splitlines()
+                        if l.startswith("- **Blocking inputs:**"))
+        for desk in unavailable:
+            self.assertIn(desk, blocking,
+                          f"{desk} is UNAVAILABLE but not listed as blocking")
+
+    def test_protocol_nouns_survive_the_filter(self):
+        """The filter bans interpretive PROSE. The protocol's own state names contain banned
+        substrings, and renaming them published vocabulary that exists nowhere in the system."""
+        from analytics.data_only_reports import sanitize_data_only_text
+        out = sanitize_data_only_text(
+            "Desk [W/2] Non-Trade Zone (8A-8F); NO_TRADE; CONFIRMED; WAIT FOR RETEST")
+        for term in ("Non-Trade Zone", "NO_TRADE", "CONFIRMED", "WAIT FOR RETEST"):
+            self.assertIn(term, out, f"the filter renamed the protocol term {term!r}")
+        self.assertNotIn("Non-position Zone", out)
+        self.assertNotIn("NO_position", out)
+
+    def test_prose_is_still_filtered(self):
+        """Exempting proper nouns must not open the door to the language the ban exists for."""
+        from analytics.data_only_reports import sanitize_data_only_text
+        out = sanitize_data_only_text(
+            "the market looks bearish and we recommend caution; awaiting a verdict; a trade here")
+        for word in ("bearish", "recommend", "awaiting", "verdict", "trade"):
+            self.assertNotIn(word, out.lower(), f"prose word {word!r} survived the filter")
 
     def test_export_does_not_corrupt_state_names(self):
         self.assertNotIn("NO_position", self.report,

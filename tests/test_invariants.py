@@ -153,6 +153,9 @@ class TestNoSetupFromObjectPresence(unittest.TestCase):
                          "trade_plan is never None, so `tp or` is a constant True")
         self.assertIn("_ACTIVE_FSM_STATES", code,
                       "the setup trigger must be derived from an active sweep/retest FSM state")
+        self.assertIn('getattr(sw_ev, "data_ready", False)', code,
+                      "the spot-swing desk may not fire the trigger unless it is data_ready: it "
+                      "holds a verdict field even when its own row renders UNAVAILABLE")
 
 
 if __name__ == "__main__":

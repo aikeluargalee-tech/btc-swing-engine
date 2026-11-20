@@ -872,5 +872,98 @@ class TestLiquidationMagnetProtocol(SpotSwingBase):
         self.assertIn("Max 3R Entry:", packet)
 
 
+class TestTab0AuditFixes(SpotSwingBase):
+    def test_detect_setup_structural_anchors_guard(self) -> None:
+        df = _frame("signal")
+        s_zero = detect_setup(df, 0.0, 0.0, 0)
+        self.assertFalse(s_zero.anchors_ready)
+        self.assertFalse(s_zero.reclaim_confirmed)
+        self.assertFalse(s_zero.signal_active)
+        s_flag = detect_setup(df, PWL_T, PWH_T, 0, anchors_ready=False)
+        self.assertFalse(s_flag.anchors_ready)
+        self.assertFalse(s_flag.signal_active)
+
+    def test_corrupt_and_invalid_protocol_context_warns_and_ignores_unknown_keys(self) -> None:
+        from analytics.spot_swing_engine import _load_magnet_overrides
+
+        bad_file = Path(self._tmp.name) / "bad_ctx.json"
+        bad_file.write_text("{corrupt json", encoding="utf-8")
+        cfg_bad = replace(CONFIG, protocol_context_path=bad_file)
+        res_bad = _load_magnet_overrides(cfg_bad)
+        self.assertTrue(res_bad["_context_warning"])
+
+        ev = SpotSwingEngine(cfg_bad, notifier=FakeNotifier(), state_path=self.state_path).evaluate(make_store("no_sweep"), now_ms=NOW_MS)
+        self.assertTrue(any("protocol_context.json" in n for n in ev.data_notes))
+
+        weird_file = Path(self._tmp.name) / "weird_ctx.json"
+        weird_file.write_text(json.dumps({
+            "short_liq_magnet_price": "not_a_number",
+            "short_liq_size_override_usd": True,
+            "long_liq_magnet_override_usd": -500.0,
+            "injected_arbitrary_key": 12345,
+        }), encoding="utf-8")
+        res_weird = _load_magnet_overrides(replace(CONFIG, protocol_context_path=weird_file))
+        self.assertEqual(res_weird["short_liq_magnet_override_usd"], 0.0)
+        self.assertEqual(res_weird["short_liq_size_override_usd"], 0.0)
+        self.assertEqual(res_weird["long_liq_magnet_override_usd"], 0.0)
+        self.assertNotIn("injected_arbitrary_key", res_weird)
+        self.assertTrue(res_weird["_context_warning"])
+
+    def test_missing_flow_and_derivatives_fail_closed(self) -> None:
+        # Missing flow_snapshot and zero-delta 1H bars must NEVER read as spot_cvd_confirming=True
+        store = make_store("signal")
+        ev = self.engine().evaluate(store, now_ms=NOW_MS)
+        self.assertFalse(ev.magnet.flow_available)
+        self.assertFalse(ev.magnet.spot_cvd_confirming)
+        self.assertIn("UNAVAILABLE", ev.magnet.spot_cvd_assessment)
+        self.assertFalse(ev.magnet.oi_available)
+        self.assertFalse(ev.magnet.funding_available)
+        self.assertIn("UNAVAILABLE", ev.magnet.oi_trend)
+        self.assertIn("UNAVAILABLE", ev.magnet.funding_status)
+
+        # Near range high without flow/funding telemetry must NOT trigger Partial Profit into Magnet
+        self.state_path.unlink(missing_ok=True)
+        store_high = make_store("no_sweep", price=107_200.0)
+        ev_high = self.engine().evaluate(store_high, now_ms=NOW_MS)
+        self.assertEqual(ev_high.magnet.verdict, "Do Nothing")
+
+    def test_no_order_ticket_next_to_frozen_or_do_nothing(self) -> None:
+        from analytics.ai_packet_exporter import build_ai_telemetry_packet
+        from analytics.data_only_reports import build_tab_0_data_only_report
+
+        # Signal active on 4H, but 1D macro is FROZEN -> must emit NO active order ticket
+        store = make_store("signal", daily=make_daily_bars(drift=-0.0015))
+        ev = self.engine().evaluate(store, now_ms=NOW_MS)
+        self.assertEqual(ev.verdict, "FROZEN (100% CASH)")
+        self.assertEqual(ev.magnet.verdict, "Do Nothing")
+
+        hud_text = _render(build_dashboard_renderable(CONFIG, store, tab_override=0))
+        self.assertNotIn("Position size", hud_text)
+        self.assertNotIn("Scale 30–50%", hud_text)
+        self.assertNotIn("PERMITTED", hud_text)
+        self.assertIn("NO ACTIVE ENTRY", hud_text)
+
+        packet = build_ai_telemetry_packet(CONFIG, store)
+        self.assertNotIn("Entry Reference (P_entry)", packet)
+        self.assertNotIn("Position Sizing:", packet)
+        self.assertIn("NO ACTIVE ORDER CARD", packet)
+        self.assertIn("NONE (100% Cash / Do Nothing)", packet)
+
+        data_report = build_tab_0_data_only_report(CONFIG, store)
+        self.assertIn("Macro Gate Approved", data_report)
+        self.assertIn("NONE (100% Cash / Gate Closed", data_report)
+        self.assertNotIn("Reference Entry Price", data_report)
+
+    def test_data_only_report_matches_real_evaluation_when_active(self) -> None:
+        from analytics.data_only_reports import build_tab_0_data_only_report
+
+        store = make_store("signal")
+        self.engine().evaluate(store, now_ms=NOW_MS)
+        report = build_tab_0_data_only_report(CONFIG, store)
+        self.assertIn("ACTIVE POSITION LEVELS", report)
+        self.assertIn("1C. Daily Liquidation Magnet Protocol", report)
+        self.assertIn("UNAVAILABLE", report)  # missing companion feeds / OI / CVD reported as UNAVAILABLE
+
+
 if __name__ == "__main__":
     unittest.main()

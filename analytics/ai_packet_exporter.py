@@ -338,14 +338,17 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
                 if m.bar_ts_ms > 0
                 else str(m.bar_ts_ms)
             )
+            bbw_thr_pct = getattr(m, "bbw_max_percentile", 0.30) * 100.0
+            bbw_p = getattr(m, "bbw_period", 20)
+            bbw_w = getattr(m, "bbw_rank_window", 180)
 
             lines.extend([
 
                 f"| **Trend Baseline** | `Close > EMA50 > EMA200` | Close: `${m.close:,.2f}` • EMA50: `${m.ema50:,.2f}` • EMA200: `${m.ema200:,.2f}` | `{'PASS (BULLISH)' if m.trend_pass else 'FAIL (NO TREND)'}` |",
 
-                f"| **Volatility Squeeze** | `20 BBW 180D Rank <= 30%` | BBW: `{m.bbw * 100:.2f}%` • Percentile Rank: `{m.bbw_percentile * 100:.1f}%` (Lookback: `{m.squeeze_lookback_bars}D`) | `{'PASS (COMPRESSED)' if m.compression_pass else 'FAIL (EXPANDED)'}` |",
+                f"| **Volatility Squeeze** | `{bbw_p} BBW {bbw_w}D Rank <= {bbw_thr_pct:.0f}%` | BBW: `{m.bbw * 100:.2f}%` • Percentile Rank: `{m.bbw_percentile * 100:.1f}%` (Lookback: `{m.squeeze_lookback_bars}D`) | `{'PASS (COMPRESSED)' if m.compression_pass else 'FAIL (EXPANDED)'}` |",
 
-                f"| **Macro Gate Permission** | `Trend AND Squeeze` | Finalized 1D Bar: `{bar_dt_str}` (`{m.bar_ts_ms}`) | `{'APPROVED (SPOT ALLOCATION PERMITTED)' if m.macro_approved else 'FROZEN (100% CASH)'}` |",
+                f"| **Macro Gate Permission** | `Trend AND Squeeze` | Finalized 1D Bar: `{bar_dt_str}` (`{m.bar_ts_ms}`) | `{'APPROVED (GATE OPEN)' if m.macro_approved else 'FROZEN (100% CASH)'}` |",
 
             ])
 
@@ -369,7 +372,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
 
         ])
 
-        if sw_ev.setup is not None and sw_ev.setup.anchors_ready:
+        if sw_ev.setup is not None and sw_ev.setup.anchors_ready and sw_ev.setup.pwl > 0:
 
             s = sw_ev.setup
 
@@ -377,11 +380,11 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
 
                 f"| **Previous Week High / Low** | Mon–Sun Weekly Anchor | PWH: `${s.pwh:,.2f}` • PWL: `${s.pwl:,.2f}` | `READY` |",
 
-                f"| **Rolling 12-Bar 4H Sweep** | `4H Low < PWL` | Lowest Wick: `${s.sweep_low:,.2f}` | `{'SWEEP DETECTED' if s.sweep_detected else 'NO SWEEP'}` |",
+                f"| **Rolling {getattr(s, 'sweep_window_bars', 12)}-Bar 4H Sweep** | `4H Low < PWL` | Lowest Wick: `{f'${s.sweep_low:,.2f}' if s.sweep_detected else 'NONE'}` | `{'SWEEP DETECTED' if s.sweep_detected else 'NO SWEEP'}` |",
 
                 f"| **Finalized 4H Reclaim** | `4H Close > PWL` | Closed Candle: `${s.close:,.2f}` | `{'RECLAIM CONFIRMED' if s.reclaim_confirmed else 'NO RECLAIM'}` |",
 
-                f"| **Volume Expansion** | `4H Volume > SMA_vol(3)` | Bar Vol: `{s.volume:,.1f}` vs SMA3: `{s.vol_sma3:,.1f}` | `{'VOLUME CONFIRMED' if s.volume_confirmed else 'LOW VOLUME'}` |",
+                f"| **Volume Expansion** | `4H Volume > SMA_vol({getattr(s, 'vol_sma_period', 3)}) (incl. bar)` | Bar Vol: `{s.volume:,.1f}` vs SMA: `{s.vol_sma3:,.1f}` | `{'VOLUME CONFIRMED' if s.volume_confirmed else 'LOW VOLUME'}` |",
 
                 f"| **Signal Trigger Status** | `Sweep AND Reclaim AND Vol` | Freshness: `{'FRESH' if s.is_fresh else 'ALREADY ACTED'}` | `{'ACTIVE LONG SETUP' if s.signal_active else 'STANDBY'}` |",
 
@@ -402,6 +405,16 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             "",
 
         ])
+
+        from analytics.spot_swing_engine import compute_safety_guard
+
+        mg_check = sw_ev.magnet
+        macro_ok = bool(sw_ev.macro is not None and sw_ev.macro.macro_approved)
+        order_card_allowed = bool(
+            sw_ev.risk is not None
+            and macro_ok
+            and (mg_check is None or (mg_check.rrr_pass and mg_check.verdict not in ("Do Nothing", "Reduce or Exit")))
+        )
 
         if sw_ev.trade is not None:
 
@@ -429,7 +442,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
 
             ])
 
-        elif sw_ev.risk is not None:
+        elif order_card_allowed and sw_ev.risk is not None:
 
             rk = sw_ev.risk
 
@@ -439,7 +452,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
 
                 f"* **Stop Loss (P_stop)**: `${rk.stop:,.2f}` (Sweep Low − 0.5 × 14-ATR `${rk.atr14:,.2f}` • Distance: `${rk.stop_distance:,.2f}` / `{rk.stop_distance_pct:.2f}%`)",
 
-                f"* **Position Sizing**: `{rk.qty_btc:.6f} BTC` (${rk.notional_usd:,.2f} USD notional • `{rk.equity_alloc_pct:.1f}%` of `${rk.equity_usd:,.0f}` Equity • `{'CAPPED AT 100% SPOT' if rk.spot_capped else '1.0% RISK COMPLIANT'}`)",
+                f"* **Position Sizing**: `{rk.qty_btc:.6f} BTC` (${rk.notional_usd:,.2f} USD notional • `{rk.equity_alloc_pct:.1f}%` of `${rk.equity_usd:,.0f}` Equity • `{'CAPPED AT 100% SPOT' if rk.spot_capped else f'{rk.risk_pct:g}% RISK COMPLIANT'}`)",
 
                 f"* **Barrier 2a Target (+2.0R)**: `${rk.tp1:,.2f}` (Sell 50%, move stop to breakeven)",
 
@@ -451,30 +464,33 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
 
         else:
 
-            lines.append("* **Standing Risk Protocol**: 1.0% Equity Risk, 14-period ATR buffer below sweep low, 100% Spot ceiling, +2.0R / PWH dual targets, 10-day time barrier.")
+            lines.append(
+                f"* **Standing Risk Protocol (NO ACTIVE ORDER CARD)**: {sw_ev.risk_pct:g}% Equity Risk, 14-period ATR buffer below sweep low, 100% Spot ceiling, +2.0R / PWH dual targets, 10-day time barrier."
+            )
 
-
-
-        liq_rep = store.trap_evaluation.liquidation_report if store.trap_evaluation else None
-
-        tt_ev = store.exhaustion_evaluation.tell_tale if store.exhaustion_evaluation else None
-
-        liq_str = f"{liq_rep.verdict} (Q={liq_rep.liquidation_multiple_24h:.2f}x)" if (liq_rep and liq_rep.is_available) else "STANDBY / OFFLINE"
-
-        tt_str = tt_ev.plain_status if tt_ev else "NORMAL"
-
-        lines.append(f"* **Pre-Flight Safety Guard**: Liquidation Cascade: `{liq_str}` | Tell-Tale Climax: `{tt_str}`")
+        sg = compute_safety_guard(store)
+        lines.append(f"* **Pre-Flight Safety Guard**: `{sg['status']}` (`{sg['detail']}`)")
 
         if sw_ev.magnet is not None:
             mg = sw_ev.magnet
+            eff_target = mg.target_magnet if getattr(mg, "target_magnet", 0.0) > 0 else mg.short_liq_magnet
+            actionable_sz = bool(
+                sw_ev.trade is not None
+                or (macro_ok and mg.rrr_pass and mg.verdict in ("Hold", "Rare Add Consideration", "Partial Profit into Magnet"))
+            )
+            sz_segment = (
+                f" | {sw_ev.risk_pct:g}% Risk Size: `{mg.recommended_qty_btc:.6f} BTC` (`${mg.recommended_notional_usd:,.2f}`)"
+                if actionable_sz
+                else " | Active Order Size: `NONE (100% Cash / Do Nothing)`"
+            )
             lines.extend([
                 "",
-                "### 0D. Daily Liquidation Magnet Protocol & RRR 1:3 Verdict (Master Prompt Output)",
+                f"### 0D. Daily Liquidation Magnet Protocol & RRR 1:{mg.min_required_rrr:g} Verdict (Master Prompt Output)",
                 "",
                 f"* **Regime**: `{mg.regime}` ({mg.regime_detail})",
                 "* **Key Levels**:",
-                f"  * **Short-liq magnet**: `${mg.short_liq_magnet:,.2f}` (`+{mg.short_liq_distance_pct:.2f}%` • `{mg.short_liq_size_label}` • `{mg.short_liq_source}`)",
-                f"  * **Long-liq magnet**: `${mg.long_liq_magnet:,.2f}` (`-{mg.long_liq_distance_pct:.2f}%` • `{mg.long_liq_size_label}` • `{mg.long_liq_source}`)",
+                f"  * **Short-liq magnet**: `${mg.short_liq_magnet:,.2f}` (`{mg.short_liq_distance_pct:+.2f}%` • `{mg.short_liq_size_label}` • `{mg.short_liq_source}`)",
+                f"  * **Long-liq magnet**: `${mg.long_liq_magnet:,.2f}` (`{-mg.long_liq_distance_pct:+.2f}%` • `{mg.long_liq_size_label}` • `{mg.long_liq_source}`)",
                 f"  * **50-day MA**: `${mg.sma50_1d:,.2f}` (EMA50: `${mg.ema50_1d:,.2f}` • 5D Slope: `{mg.sma50_slope_5d_pct:+.2f}%`)",
                 f"  * **Range pivot / invalidation**: `${mg.range_pivot:,.2f}` / `${mg.invalidation_level:,.2f}` (30–45D Range: `${mg.range_low_30d:,.2f} – ${mg.range_high_30d:,.2f}`)",
                 "* **Positioning Snapshot**:",
@@ -483,13 +499,15 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
                 f"  * **Spot CVD on recent move**: `{mg.spot_cvd_assessment}`",
                 f"  * **24H Cumulative Liquidations**: `{mg.cum_liq_24h_summary}`",
                 f"* **Headline Filter**: `{mg.headline_filter}`",
-                f"* **RRR 1:3 Money Management Check**: Live R:R = `{mg.rrr_to_magnet:.2f}R` (`{'PASS >= 3.0R' if mg.rrr_pass else 'REJECTED < 3.0R'}`) | Hard Stop: `${mg.hard_stop_price:,.2f}` | 3R Target: `${mg.tp_3r_price:,.2f}` | Max 3R Entry: `<=${mg.max_entry_for_3r:,.2f}` | 1% Risk Size: `{mg.recommended_qty_btc:.6f} BTC` (`${mg.recommended_notional_usd:,.2f}`)",
+                f"* **RRR 1:{mg.min_required_rrr:g} Money Management Check**: Live R:R to `${eff_target:,.2f}` = `{mg.rrr_to_magnet:.2f}R` (`{'PASS >= ' + f'{mg.min_required_rrr:.1f}R' if mg.rrr_pass else 'REJECTED < ' + f'{mg.min_required_rrr:.1f}R'}`) | Hard Stop: `${mg.hard_stop_price:,.2f}` | {mg.min_required_rrr:g}R Target: `${mg.tp_3r_price:,.2f}` | Max 3R Entry: `<=${mg.max_entry_for_3r:,.2f}`{sz_segment}",
                 f"* **Verdict**: **`{mg.verdict}`**",
                 f"* **Confidence**: `{mg.confidence}`",
                 f"* **Primary Reason**: {mg.primary_reason}",
                 f"* **Invalidation**: {mg.invalidation_text}",
                 f"* **Actionable Note**: {mg.actionable_note}",
             ])
+            if getattr(mg, "context_warning", ""):
+                lines.append(f"* **Context Warning**: `{mg.context_warning}`")
 
 
 

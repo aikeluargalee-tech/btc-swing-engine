@@ -48,6 +48,7 @@ from rich.text import Text
 
 from analytics.ai_packet_exporter import copy_ai_packet_to_clipboard_and_disk
 from analytics.signal_detector import SignalDetector
+from analytics.spot_swing_engine import compute_safety_guard
 from analytics.waterfall import evaluate_waterfall
 from config.settings import EngineConfig
 from core.models import ExecutionGateState, MarketRegime
@@ -1399,17 +1400,6 @@ def _magnet_verdict_style(verdict: str) -> str:
     return "bold white on blue"
 
 
-def _magnet_verdict_style(verdict: str) -> str:
-    v = verdict.upper()
-    if "HOLD" in v or "RARE ADD" in v:
-        return "bold black on green"
-    if "PARTIAL PROFIT" in v:
-        return "bold black on yellow"
-    if "REDUCE" in v or "EXIT" in v:
-        return "bold white on red"
-    return "bold white on blue"
-
-
 def _build_tab0_spot_swing_hud(store: StateStore, header_panel: Panel) -> Group:
     """Renders Tab [0]: BTC Spot Swing Screening & Daily Liquidation Magnet Engine (Modules B-F)."""
     ev = store.spot_swing_evaluation
@@ -1424,10 +1414,11 @@ def _build_tab0_spot_swing_hud(store: StateStore, header_panel: Panel) -> Group:
         )
 
     # --- Introduction Card ---
+    min_rrr = ev.magnet.min_required_rrr if ev.magnet is not None else 3.0
     intro_lines = [
         "[bold cyan]▶ CORE LAW & PURPOSE:[/bold cyan] [bold yellow]In a range-bound regime, trade the liquidation magnet and positioning imbalance — not the headline.[/bold yellow] Deterministic BTC spot swing screener (3-day to 3-week hold).",
-        "[bold cyan]▶ CORE MODELS & FEEDS:[/bold cyan] Daily Liquidation Magnet Protocol (50D MA + 30–45D Range + Short/Long Liq Clusters + OI/Funding/Spot CVD) • 1D Macro Gate • 4H PWL/PWH Sweep & Reclaim • Strict RRR ≥ 1:3.",
-        "[bold cyan]▶ EXECUTION MANDATE:[/bold cyan] [bold yellow]Closed bars only.[/bold yellow] Default is Do Nothing (100% Cash). Require RRR ≥ 1:3 to Short-Liq Magnet, 1% fixed risk (max 100% spot), scale 30–50% into magnet, hard stop below pivot/50DMA.",
+        f"[bold cyan]▶ CORE MODELS & FEEDS:[/bold cyan] Daily Liquidation Magnet Protocol (50D MA + 30–45D Range + Short/Long Liq Clusters + OI/Funding/Spot CVD) • 1D Macro Gate • 4H PWL/PWH Sweep & Reclaim • Strict RRR ≥ 1:{min_rrr:g}.",
+        f"[bold cyan]▶ EXECUTION MANDATE:[/bold cyan] [bold yellow]Closed bars only.[/bold yellow] Default is Do Nothing (100% Cash). Require RRR ≥ 1:{min_rrr:g} to Short-Liq Magnet, {ev.risk_pct:g}% fixed risk (max 100% spot), scale 30–50% into magnet, hard stop below pivot/50DMA.",
     ]
     intro_panel = Panel(
         "\n".join(intro_lines),
@@ -1449,14 +1440,14 @@ def _build_tab0_spot_swing_hud(store: StateStore, header_panel: Panel) -> Group:
 
     if mag is not None:
         mv_style = _magnet_verdict_style(mag.verdict)
-        rrr_badge = f"[bold green]{mag.rrr_to_magnet:.2f}R (≥3R PASS)[/bold green]" if mag.rrr_pass else f"[bold yellow]{mag.rrr_to_magnet:.2f}R (<3R WAIT)[/bold yellow]"
+        rrr_badge = f"[bold green]{mag.rrr_to_magnet:.2f}R (≥{min_rrr:g}R PASS)[/bold green]" if mag.rrr_pass else f"[bold yellow]{mag.rrr_to_magnet:.2f}R (<{min_rrr:g}R WAIT)[/bold yellow]"
         card_magnet = (
             f"[bold white]Magnet Verdict:[/bold white] [{mv_style}] {mag.verdict.upper()} [/{mv_style}] ({mag.confidence})\n"
             f"Regime: [bold cyan]{mag.regime.upper()}[/bold cyan] • Live R:R: {rrr_badge}"
         )
         card_clusters = (
-            f"[bold white]Short-Liq Magnet (↑):[/bold white] [bold magenta]${mag.short_liq_magnet:,.0f}[/bold magenta] (+{mag.short_liq_distance_pct:.2f}%)\n"
-            f"[bold white]Long-Liq Magnet  (↓):[/bold white] [bold cyan]${mag.long_liq_magnet:,.0f}[/bold cyan] (-{mag.long_liq_distance_pct:.2f}%)"
+            f"[bold white]Short-Liq Magnet (↑):[/bold white] [bold magenta]${mag.short_liq_magnet:,.0f}[/bold magenta] ({mag.short_liq_distance_pct:+.2f}%)\n"
+            f"[bold white]Long-Liq Magnet  (↓):[/bold white] [bold cyan]${mag.long_liq_magnet:,.0f}[/bold cyan] ({-mag.long_liq_distance_pct:+.2f}%)"
         )
     else:
         card_magnet = (
@@ -1476,7 +1467,7 @@ def _build_tab0_spot_swing_hud(store: StateStore, header_panel: Panel) -> Group:
 
     card_alert = (
         f"[bold white]Alert Dispatcher:[/bold white] {alert_state}\n"
-        f"Sizing equity: [cyan]${store_equity_label(ev)}[/cyan] • Risk: [cyan]{risk.risk_pct if risk else ev.risk_pct:.1f}%[/cyan]/trade • Min RRR: [bold green]1:3.0[/bold green]"
+        f"Sizing equity: [cyan]${store_equity_label(ev)}[/cyan] • Risk: [cyan]{risk.risk_pct if risk else ev.risk_pct:.1f}%[/cyan]/trade • Min RRR: [bold green]1:{min_rrr:.1f}[/bold green]"
     )
     ribbon_table = Table.grid(expand=True)
     ribbon_table.add_column(ratio=3)
@@ -1533,7 +1524,12 @@ def _build_tab0_spot_swing_hud(store: StateStore, header_panel: Panel) -> Group:
             _pass_badge(ev.spot_price >= mag.sma50_1d, "ABOVE 50D", "BELOW 50D"),
         )
 
-    squeeze_rule = "BBW(20) 180D rank ≤ 30%" if macro.squeeze_lookback_bars <= 1 else f"BBW rank ≤ 30% (any of last {macro.squeeze_lookback_bars}D)"
+    bbw_pct_thr = macro.bbw_max_percentile * 100.0
+    squeeze_rule = (
+        f"BBW({macro.bbw_period}) {macro.bbw_rank_window}D rank ≤ {bbw_pct_thr:.0f}%"
+        if macro.squeeze_lookback_bars <= 1
+        else f"BBW({macro.bbw_period}) {macro.bbw_rank_window}D rank ≤ {bbw_pct_thr:.0f}% (last {macro.squeeze_lookback_bars}D)"
+    )
     p1.add_row(
         "Trend baseline",
         "Close > EMA50 > EMA200",
@@ -1563,42 +1559,63 @@ def _build_tab0_spot_swing_hud(store: StateStore, header_panel: Panel) -> Group:
     if mag is not None:
         p2.add_row(
             "Short-Liq Magnet (↑)",
-            "Nearest dense cluster above",
-            f"${mag.short_liq_magnet:,.0f} (+{mag.short_liq_distance_pct:.2f}%)",
+            f"Nearest cluster above {mag.short_liq_source}",
+            f"${mag.short_liq_magnet:,.0f} ({mag.short_liq_distance_pct:+.2f}%)",
             f"[magenta]{mag.short_liq_size_label}[/magenta]",
         )
         p2.add_row(
             "Long-Liq Magnet (↓)",
-            "Nearest dense cluster below",
-            f"${mag.long_liq_magnet:,.0f} (-{mag.long_liq_distance_pct:.2f}%)",
+            f"Nearest cluster below {mag.long_liq_source}",
+            f"${mag.long_liq_magnet:,.0f} ({-mag.long_liq_distance_pct:+.2f}%)",
             f"[cyan]{mag.long_liq_size_label}[/cyan]",
         )
-        oi_word = mag.oi_trend.split(" (")[0].upper()
-        fund_word = "NEG" if mag.funding_rate_8h_pct < -0.0005 else ("NEUT" if mag.funding_rate_8h_pct <= 0.006 else "POS")
+        oi_avail = getattr(mag, "oi_available", not mag.oi_trend.startswith("UNAVAILABLE"))
+        fund_avail = getattr(mag, "funding_available", not mag.funding_status.startswith("UNAVAILABLE"))
+        oi_word = mag.oi_trend.split(" (")[0].upper() if oi_avail else "UNAVAILABLE"
+        if not fund_avail:
+            fund_word = "UNAVAILABLE"
+        else:
+            fund_word = "NEG" if mag.funding_rate_8h_pct < -0.0005 else ("NEUT" if mag.funding_rate_8h_pct <= 0.006 else "POS")
+        oi_fund_val = (
+            f"24H dOI {mag.oi_change_24h_pct:+.2f}% • Fund {mag.funding_rate_8h_pct:+.4f}%"
+            if (oi_avail and fund_avail)
+            else (
+                f"24H dOI {mag.oi_change_24h_pct:+.2f}% • Fund UNAVAILABLE"
+                if oi_avail
+                else (f"OI UNAVAILABLE • Fund {mag.funding_rate_8h_pct:+.4f}%" if fund_avail else "UNAVAILABLE")
+            )
+        )
         p2.add_row(
             "OI & 8H Funding",
             "24H OI trend & Perp rate",
-            f"24H dOI {mag.oi_change_24h_pct:+.2f}% • Fund {mag.funding_rate_8h_pct:+.4f}%",
+            oi_fund_val,
             f"[bold]{oi_word} / {fund_word}[/bold]",
         )
+        flow_avail = getattr(mag, "flow_available", not mag.spot_cvd_assessment.startswith("UNAVAILABLE"))
+        if not flow_avail:
+            cvd_val = "UNAVAILABLE"
+            cvd_badge = "[bold black on yellow] UNAVAILABLE [/bold black on yellow]"
+        else:
+            cvd_val = f"4H S:{mag.spot_cvd_4h_btc:+,.0f} P:{mag.perp_cvd_4h_btc:+,.0f} BTC"
+            cvd_badge = _pass_badge(mag.spot_cvd_confirming, "CONFIRMING", "UNCONFIRMED")
         p2.add_row(
             "Spot CVD Truth Serum",
             "Spot vs Perp on recent move",
-            f"4H S:{mag.spot_cvd_4h_btc:+,.0f} P:{mag.perp_cvd_4h_btc:+,.0f} BTC",
-            _pass_badge(mag.spot_cvd_confirming, "CONFIRMING", "UNCONFIRMED"),
+            cvd_val,
+            cvd_badge,
         )
 
-    if setup.anchors_ready:
+    if setup.anchors_ready and setup.pwl > 0:
         px = ev.spot_price
         p2.add_row("PWH / PWL", "Prev Mon-Sun week high / low", f"${setup.pwh:,.0f} / ${setup.pwl:,.0f}", f"[dim]{(px / setup.pwl - 1) * 100:+.2f}% vs PWL[/dim]")
         p2.add_row(
             "Sweep",
-            "4H low < PWL (last 12 bars)",
+            f"4H low < PWL (last {setup.sweep_window_bars} bars)",
             f"wick ${setup.sweep_low:,.0f}" if setup.sweep_detected else "none",
             _pass_badge(setup.sweep_detected, "DETECTED", "NONE"),
         )
         p2.add_row("Reclaim", "Last closed 4H close > PWL", f"close ${setup.close:,.0f}", _pass_badge(setup.reclaim_confirmed, "CONFIRMED", "NO"))
-        p2.add_row("Volume", "Reclaim vol > SMA(3)", f"{setup.volume:,.0f} vs {setup.vol_sma3:,.0f}", _pass_badge(setup.volume_confirmed, "CONFIRMED", "NO"))
+        p2.add_row("Volume", f"Reclaim vol > SMA({setup.vol_sma_period}) (incl. bar)", f"{setup.volume:,.0f} vs {setup.vol_sma3:,.0f}", _pass_badge(setup.volume_confirmed, "CONFIRMED", "NO"))
         if setup.signal_active and setup.is_fresh:
             sig_badge = "[bold black on green] ACTIVE LONG [/bold black on green]"
         elif setup.signal_active:
@@ -1607,36 +1624,14 @@ def _build_tab0_spot_swing_hud(store: StateStore, header_panel: Panel) -> Group:
             sig_badge = "[dim] INACTIVE [/dim]"
         p2.add_row("Signal", "sweep AND reclaim AND volume", "", sig_badge)
 
-        # Safety Pre-flight checks: Liquidation cascade & Tell-Tale knife pause
-        liq_rep = store.trap_evaluation.liquidation_report if store.trap_evaluation else None
-        tt_ev = store.exhaustion_evaluation.tell_tale if store.exhaustion_evaluation else None
-
-        liq_status = "STANDBY"
-        liq_pass = True
-        if liq_rep and liq_rep.is_available:
-            if "EXTREME" in liq_rep.magnitude_tier and not (
-                liq_rep.post_flush_price_structure and liq_rep.post_flush_price_structure.stabilisation_confirmed
-            ):
-                liq_status = "FLUSH IN PROGRESS (PAUSE)"
-                liq_pass = False
-            elif liq_rep.post_flush_price_structure and (
-                liq_rep.post_flush_price_structure.stabilisation_confirmed or liq_rep.post_flush_price_structure.higher_low_formed
-            ):
-                liq_status = "STABILIZED"
-                liq_pass = True
-            else:
-                liq_status = "NORMAL / QUIET"
-                liq_pass = True
-
-        tt_status = "CLEAR"
-        tt_pass = True
-        if tt_ev and tt_ev.is_selling_climax:
-            tt_status = "CLIMAX DUMP"
-            tt_pass = False
-
-        safety_state = "CLEAR" if (liq_pass and tt_pass) else "CAUTION"
-        safety_badge = "[bold black on green] PERMITTED [/bold black on green]" if safety_state == "CLEAR" else "[bold black on yellow] PAUSED [/bold black on yellow]"
-        p2.add_row("Safety guard", f"Liq: {liq_status} • Climax: {tt_status}", "", safety_badge)
+        sg = compute_safety_guard(store)
+        if sg["veto_active"]:
+            safety_badge = "[bold black on yellow] PAUSED (VETO) [/bold black on yellow]"
+        elif sg["all_available"]:
+            safety_badge = "[bold black on green] NO VETO [/bold black on green]"
+        else:
+            safety_badge = "[bold black on yellow] UNAVAILABLE [/bold black on yellow]"
+        p2.add_row("Safety guard", sg["detail"], "", safety_badge)
     else:
         p2.add_row("PWH / PWL", "Previous Mon-Sun week", "syncing…", "[bold black on yellow] WAIT [/bold black on yellow]")
 
@@ -1659,27 +1654,51 @@ def _build_tab0_spot_swing_hud(store: StateStore, header_panel: Panel) -> Group:
         left_h = max(0.0, (expiry_ms - now_ms) / 3_600_000.0)
         return f"{left_h / 24.0:.1f}d / {int(left_h // 4)} x 4H bars left"
 
+    actionable_sizing = bool(
+        trade is not None
+        or (
+            macro.macro_approved
+            and mag is not None
+            and mag.rrr_pass
+            and mag.verdict in ("Hold", "Rare Add Consideration", "Partial Profit into Magnet")
+        )
+    )
+
     if mag is not None:
+        eff_target = mag.target_magnet if getattr(mag, "target_magnet", 0.0) > 0 else mag.short_liq_magnet
         rrr_state = (
-            "[bold black on green] PASS (≥ 1:3 RRR) [/bold black on green]"
+            f"[bold black on green] PASS (≥ 1:{min_rrr:g} RRR) [/bold black on green]"
             if mag.rrr_pass
-            else "[bold black on yellow] REJECTED (< 1:3 RRR — DO NOT CHASE) [/bold black on yellow]"
+            else f"[bold black on yellow] REJECTED (< 1:{min_rrr:g} RRR — DO NOT CHASE) [/bold black on yellow]"
         )
         p3.add_row(
-            "RRR 1:3 Mandate Gate",
+            f"RRR 1:{min_rrr:g} Mandate Gate",
             f"{mag.rrr_to_magnet:.2f}R (Min {mag.min_required_rrr:.1f}R)",
-            f"{rrr_state} • Reward +${mag.reward_to_magnet_usd:,.0f} (to ${mag.short_liq_magnet:,.0f}) vs Risk -${mag.risk_distance_usd:,.0f} (Stop ${mag.hard_stop_price:,.0f}) • Max 3R Entry: ≤ ${mag.max_entry_for_3r:,.0f}",
+            f"{rrr_state} • Reward +${mag.reward_to_magnet_usd:,.0f} (to ${eff_target:,.0f}) vs Risk -${mag.risk_distance_usd:,.0f} (Stop ${mag.hard_stop_price:,.0f}) • Max {min_rrr:g}R Entry: ≤ ${mag.max_entry_for_3r:,.0f}",
         )
-        p3.add_row(
-            "Magnet Scaling Plan",
-            f"Scale 30–50% @ ${mag.short_liq_magnet:,.0f}",
-            f"3R Target: ${mag.tp_3r_price:,.0f} • Invalidation: 1D Close < ${mag.invalidation_level:,.0f} (Pivot/50DMA) • 1% Risk Size: {mag.recommended_qty_btc:.4f} BTC (${mag.recommended_notional_usd:,.0f})",
-        )
+        if actionable_sizing:
+            p3.add_row(
+                "Magnet Scaling Plan",
+                f"Scale 30–50% @ ${eff_target:,.0f}",
+                f"{min_rrr:g}R Target: ${mag.tp_3r_price:,.0f} • Invalidation: 1D Close < ${mag.invalidation_level:,.0f} (Pivot/50DMA) • {ev.risk_pct:g}% Risk Size: {mag.recommended_qty_btc:.4f} BTC (${mag.recommended_notional_usd:,.0f})",
+            )
+        else:
+            p3.add_row(
+                "Magnet Plan Status",
+                "NO ACTIVE ENTRY",
+                f"Invalidation: 1D Close < ${mag.invalidation_level:,.0f} (Pivot/50DMA) • Pullback ≤ ${mag.max_entry_for_3r:,.0f} required for 1:{min_rrr:g} RRR",
+            )
+
+    order_card_allowed = bool(
+        risk is not None
+        and macro.macro_approved
+        and (mag is None or (mag.rrr_pass and mag.verdict not in ("Do Nothing", "Reduce or Exit")))
+    )
 
     if trade is not None:
         dist = max(trade.entry - trade.initial_stop, 1e-9)
         r_now = (ev.spot_price - trade.entry) / dist
-        p3_title = f"[bold green]3. Tight RRR 1:3 Money Management & Open Trade — Triple-Barrier Tracker ({trade.status})[/bold green]"
+        p3_title = f"[bold green]3. Tight RRR 1:{min_rrr:g} Money Management & Open Trade — Triple-Barrier Tracker ({trade.status})[/bold green]"
         p3.add_row("Entry", f"${trade.entry:,.2f}", f"{trade.qty_btc:.6f} BTC (${trade.qty_btc * trade.entry:,.0f}) • opened {datetime.fromtimestamp(trade.entry_ts_ms / 1000, tz=timezone.utc).strftime('%m-%d %H:%M')} UTC")
         p3.add_row("Live P/L", f"{r_now:+.2f}R", f"spot ${ev.spot_price:,.2f}")
         p3.add_row("Barrier 1: Stop", f"${trade.current_stop:,.2f}", f"initial ${trade.initial_stop:,.2f}" + (" • moved to BREAKEVEN" if trade.tp1_hit else "") + f" • {((ev.spot_price / trade.current_stop) - 1) * 100:+.2f}% away")
@@ -1687,23 +1706,22 @@ def _build_tab0_spot_swing_hud(store: StateStore, header_panel: Panel) -> Group:
         p3.add_row("Barrier 2b: PWH", f"${trade.tp2:,.2f}", "runner target")
         p3.add_row("Barrier 3: Time", datetime.fromtimestamp(trade.time_stop_ts_ms / 1000, tz=timezone.utc).strftime("%m-%d %H:%M UTC"), _time_left(trade.time_stop_ts_ms))
         p3_border = "green"
-    elif risk is not None:
-        preview = "" if macro.macro_approved else " — PREVIEW ONLY, MACRO FROZEN"
-        p3_title = f"[bold magenta]3. Tight RRR 1:3 Money Management & Triple-Barrier Sizing{preview}[/bold magenta]"
+    elif order_card_allowed and risk is not None:
+        p3_title = f"[bold magenta]3. Tight RRR 1:{min_rrr:g} Money Management & Triple-Barrier Sizing[/bold magenta]"
         p3.add_row("Entry (P_entry)", f"${risk.entry:,.2f}", "close of the reclaim 4H candle")
         p3.add_row("Stop (P_stop)", f"${risk.stop:,.2f}", f"sweep low − 0.5 × ATR14 (${risk.atr14:,.0f}) • distance {risk.stop_distance_pct:.2f}%")
         cap_note = " [bold yellow]CAPPED at 100% spot[/bold yellow]" if risk.spot_capped else ""
         p3.add_row("Position size", f"{risk.qty_btc:.6f} BTC", f"${risk.notional_usd:,.0f} = {risk.equity_alloc_pct:.1f}% of ${risk.equity_usd:,.0f} • risk ${risk.realized_risk_usd:,.0f}{cap_note}")
-        p3.add_row("Barrier 2a: +2.0R", f"${risk.tp1:,.2f}", f"sell 50% & move stop to breakeven (3R Target: ${risk.tp_3r:,.0f})")
+        p3.add_row("Barrier 2a: +2.0R", f"${risk.tp1:,.2f}", f"sell 50% & move stop to breakeven ({min_rrr:g}R Target: ${risk.tp_3r:,.2f})")
         warn = " [yellow](PWH is inside +2R)[/yellow]" if risk.tp2_inside_tp1 else ""
         p3.add_row("Barrier 2b: PWH", f"${risk.tp2_pwh:,.2f}", f"structural runner target{warn}")
         p3.add_row("Barrier 3: Time", datetime.fromtimestamp(risk.time_stop_ts_ms / 1000, tz=timezone.utc).strftime("%m-%d %H:%M UTC"), _time_left(risk.time_stop_ts_ms))
         p3_border = "magenta"
     else:
-        p3_title = "[bold magenta]3. Tight RRR 1:3 Money Management & Triple-Barrier Sizing (standing rules)[/bold magenta]"
+        p3_title = f"[bold magenta]3. Tight RRR 1:{min_rrr:g} Money Management & Triple-Barrier Sizing (standing rules)[/bold magenta]"
         p3.add_row("Stop", "sweep low − 0.5×ATR14", "4H Wilder ATR; invalidation below swept liquidity or Range Pivot / 50D MA")
-        p3.add_row("Size", "equity × 1% ÷ stop dist", f"capped at 100% of equity (spot, no leverage) • equity ${store_equity_label(ev)}")
-        p3.add_row("Barrier 2", "Short-Liq Magnet / +3.0R", "scale 30–50% into Short-Liq Magnet (+2R to +3R), stop to breakeven, runner to PWH")
+        p3.add_row("Size", f"equity × {ev.risk_pct:g}% ÷ stop dist", f"capped at 100% of equity (spot, no leverage) • equity ${store_equity_label(ev)}")
+        p3.add_row("Barrier 2", f"Short-Liq Magnet / +{min_rrr:.1f}R", "scale 30–50% into Short-Liq Magnet (+2R to +3R), stop to breakeven, runner to PWH")
         p3.add_row("Barrier 3", "10 days", "time stop frees capital from stagnant swings")
         p3_border = "dim"
     p3_panel = Panel(p3, title=p3_title, box=box.ROUNDED, border_style=p3_border)
@@ -1717,17 +1735,24 @@ def _build_tab0_spot_swing_hud(store: StateStore, header_panel: Panel) -> Group:
     p4_lines: List[str] = []
     if mag is not None:
         mv_style = _magnet_verdict_style(mag.verdict)
+        note_style = (
+            "bold red"
+            if "REDUCE" in mag.verdict.upper() or "EXIT" in mag.verdict.upper()
+            else ("bold yellow" if "PARTIAL" in mag.verdict.upper() else ("white" if mag.verdict == "Do Nothing" else "bold green"))
+        )
         p4_lines.extend([
             f"[{mv_style}] MAGNET VERDICT: {mag.verdict.upper()} (Confidence: {mag.confidence}) [/{mv_style}]   [{v_style}] SCREENER: {ev.verdict} [/{v_style}]   {copy_badge}",
             f"  [bold cyan]Regime[/bold cyan]               : [bold white]{mag.regime}[/bold white] — {mag.regime_detail}",
-            f"  [bold cyan]Key Levels[/bold cyan]           : Short-liq magnet: [bold magenta]${mag.short_liq_magnet:,.0f}[/bold magenta] ({mag.short_liq_size_label})  •  Long-liq magnet: [bold cyan]${mag.long_liq_magnet:,.0f}[/bold cyan] ({mag.long_liq_size_label})  •  50-day MA: [bold]${mag.sma50_1d:,.0f}[/bold]  •  Range pivot / invalidation: [bold yellow]${mag.range_pivot:,.0f} / ${mag.invalidation_level:,.0f}[/bold yellow]",
+            f"  [bold cyan]Key Levels[/bold cyan]           : Short-liq magnet: [bold magenta]${mag.short_liq_magnet:,.0f}[/bold magenta] ({mag.short_liq_size_label} {mag.short_liq_source})  •  Long-liq magnet: [bold cyan]${mag.long_liq_magnet:,.0f}[/bold cyan] ({mag.long_liq_size_label} {mag.long_liq_source})  •  50-day MA: [bold]${mag.sma50_1d:,.0f}[/bold]  •  Range pivot / invalidation: [bold yellow]${mag.range_pivot:,.0f} / ${mag.invalidation_level:,.0f}[/bold yellow]",
             f"  [bold cyan]Positioning Snapshot[/bold cyan] : OI: [white]{mag.oi_trend}[/white]  •  Funding: [white]{mag.funding_status}[/white]  •  Spot CVD: [white]{mag.spot_cvd_assessment}[/white]",
             f"  [bold cyan]Headline Filter[/bold cyan]      : [white]{mag.headline_filter}[/white]  •  [dim]{mag.cum_liq_24h_summary}[/dim]",
             f"  [bold cyan]Primary Reason[/bold cyan]       : {mag.primary_reason}",
             f"  [bold cyan]Invalidation[/bold cyan]         : [bold red]{mag.invalidation_text}[/bold red]",
-            f"  [bold cyan]Actionable Note[/bold cyan]      : [bold green]{mag.actionable_note}[/bold green]",
+            f"  [bold cyan]Actionable Note[/bold cyan]      : [{note_style}]{mag.actionable_note}[/{note_style}]",
             f"  [bold white]Plain English[/bold white]        : {ev.plain_english_summary}",
         ])
+        if getattr(mag, "context_warning", ""):
+            p4_lines.append(f"  [bold yellow]Context Warning[/bold yellow]      : [yellow]{mag.context_warning}[/yellow]")
     else:
         p4_lines.extend([
             f"[{v_style}] {ev.verdict} [/{v_style}]  {copy_badge}",

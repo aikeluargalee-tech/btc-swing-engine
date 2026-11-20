@@ -3989,6 +3989,12 @@ class SpotSwingMacroGate:
 
 
 
+    bbw_max_percentile: float = 0.30
+    bbw_period: int = 20
+    bbw_rank_window: int = 180
+
+
+
 
 
 
@@ -4070,6 +4076,8 @@ class SpotSwingSetup:
 
 
     anchors_ready: bool = False
+    sweep_window_bars: int = 12
+    vol_sma_period: int = 3
 
 
 
@@ -4356,6 +4364,13 @@ class SpotSwingMagnetProtocol:
     invalidation_text: str = ""
     actionable_note: str = ""
 
+    # Transparency & availability metadata
+    target_magnet: float = 0.0           # Effective upper target used for R:R & Max 3R Entry
+    oi_available: bool = False
+    funding_available: bool = False
+    flow_available: bool = False
+    context_warning: str = ""
+
 
 @dataclass
 
@@ -4435,6 +4450,8 @@ class SpotSwingEvaluation:
 
     risk_pct: float = 1.0
     magnet: Optional[SpotSwingMagnetProtocol] = None
+    safety_guard_status: str = "UNAVAILABLE"
+    safety_guard_detail: str = ""
 
 
 # ============================================================================

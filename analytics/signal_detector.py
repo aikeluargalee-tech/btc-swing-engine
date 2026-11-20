@@ -1019,16 +1019,15 @@ class SignalDetector:
         )
 
         store.latest_signal = evaluation
-        if store.regime_matrix_evaluation is not None:
-            self.master_synthesis_evaluator.evaluate(
-                store=store,
-                sig=evaluation,
-                pev=protocol_ev,
-                mev=macro_ev,
-                rmev=store.regime_matrix_evaluation,
-                flow=flow,
-                deriv=deriv,
-            )
+        self.master_synthesis_evaluator.evaluate(
+            store=store,
+            sig=evaluation,
+            pev=protocol_ev,
+            mev=macro_ev,
+            rmev=store.regime_matrix_evaluation,
+            flow=flow,
+            deriv=deriv,
+        )
         self._maybe_log_signal(evaluation, flow, deriv)
         try:
             self.data_hub_engine.evaluate(store)

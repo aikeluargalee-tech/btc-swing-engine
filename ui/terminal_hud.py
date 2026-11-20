@@ -50,7 +50,7 @@ from analytics.ai_packet_exporter import copy_ai_packet_to_clipboard_and_disk
 from analytics.signal_detector import SignalDetector
 from analytics.spot_swing_engine import compute_safety_guard
 from analytics.waterfall import evaluate_waterfall
-from config.settings import EngineConfig
+from config.settings import EngineConfig, RISK_BUDGET_MAX_PCT
 from core.models import ExecutionGateState, MarketRegime
 from core.state_store import StateStore
 
@@ -5423,35 +5423,44 @@ def _build_tab17_btc_magnet_hud(
     header_panel: Panel,
 ) -> Group:
     """Builds Desk 17 [M: BTC MAGNET] - Institutional 5-Regime Radar & LSCE Liquidation Gravity Deck."""
-    magnet_eval = store.btc_magnet_evaluation
-    if magnet_eval is None:
-        from analytics.btc_magnet_engine import BTCMagnetEngine
-        engine = BTCMagnetEngine(config)
-        magnet_eval = engine.evaluate(store)
-
-    spot_p = magnet_eval.spot_price or store.binance_spot_price or 76000.0
-    up = magnet_eval.upper_magnet
-    lo = magnet_eval.lower_magnet
-
     # 1. Sub-Ribbon Header
     sub_grid = Table.grid(expand=True)
     sub_grid.add_column(justify="left", no_wrap=True)
     sub_grid.add_column(justify="right", no_wrap=True)
     sub_grid.add_row(
         "[bold bright_cyan]DESK [M]: BTC MAGNET | LIQUIDATION GRAVITATIONAL RADAR[/bold bright_cyan]  |  "
-        "[bold bright_white]5-REGIME RADAR • LSCE SWEEP ENGINE • SPOT SWING COCKPIT[/bold bright_white]",
+        "[bold bright_white]5-REGIME RADAR • LSCE SWEEP ENGINE • SPOT-ONLY COCKPIT[/bold bright_white]",
         "[dim]Press [bold cyan]'M'[/bold cyan] (or [bold cyan]'MM'[/bold cyan]) to copy Shareable Magnet Brief[/dim]",
     )
     sub_panel = Panel(sub_grid, box=box.ROUNDED, border_style="bright_cyan", padding=(0, 1))
 
+    # Single source of truth: read stored evaluation without silent recomputation
+    magnet_eval = getattr(store, "btc_magnet_evaluation", None)
+    if magnet_eval is None:
+        unavail_panel = Panel(
+            "[bold yellow]DATA UNAVAILABLE — NO STORED EVALUATION[/bold yellow]\n"
+            "[white]No stored BTC Magnet evaluation exists in StateStore yet. "
+            "Desk [M] reads only the SignalDetector cycle snapshot (no silent recompute or network fetch on render).[/white]",
+            title="[bold bright_white]DESK [M] • BTC MAGNET STATUS[/bold bright_white]",
+            box=box.ROUNDED,
+            border_style="bright_yellow",
+            padding=(0, 1),
+        )
+        return Group(header_panel, sub_panel, unavail_panel)
+
+    spot_avail = bool(getattr(magnet_eval, "spot_available", False)) or float(getattr(magnet_eval, "spot_price", 0.0) or 0.0) > 0.0
+    spot_p = float(magnet_eval.spot_price or 0.0) if spot_avail else 0.0
+    up = magnet_eval.upper_magnet
+    lo = magnet_eval.lower_magnet
+
     # 2. STEP 1 • MACRO REGIME DIAGNOSIS (MAJORITY VOTING >= 3/4)
-    reg_id = getattr(magnet_eval, "regime_id", "RANGE_LIQUIDATION_MAGNET")
-    reg_name = getattr(magnet_eval, "regime_name", "Range / Liquidation Magnet")
-    score_str = getattr(magnet_eval, "majority_score", "3/4")
-    diag_str = getattr(magnet_eval, "regime_diagnosis", "Positioning imbalance and forced liquidations dominate")
-    action_str = getattr(magnet_eval, "action", "Stand Aside (0.0x)")
+    reg_id = getattr(magnet_eval, "regime_id", "TRANSITION_MIXED")
+    reg_name = getattr(magnet_eval, "regime_name", "Transition / Mixed")
+    score_str = getattr(magnet_eval, "majority_score", "0/4")
+    diag_str = getattr(magnet_eval, "regime_diagnosis", "")
+    action_str = getattr(magnet_eval, "action", "Wait / Cash Only (0.00x)")
     rotation_str = getattr(magnet_eval, "rotation", "Remain USDT")
-    sizing = getattr(magnet_eval, "sizing_factor", 0.0)
+    sizing = float(getattr(magnet_eval, "sizing_factor", 0.0) or 0.0)
 
     regime_color = "bright_cyan"
     if reg_id == "SPOT_LED_EXPANSION":
@@ -5470,11 +5479,31 @@ def _build_tab17_btc_magnet_hud(
         f"[bold bright_white]STEP 1 • MACRO REGIME DIAGNOSIS:[/bold bright_white]  "
         f"[bold black on {regime_color}] {reg_name.upper()} [/bold black on {regime_color}]  "
         f"[bold bright_white][ {score_str} OBSERVATIONS CONFIRMED ][/bold bright_white]  |  "
-        f"[dim]Sizing:[/dim] [bold {regime_color}]{sizing:.2f}x[/bold {regime_color}]  "
+        f"[dim]Sizing (Spot <= 1.00x):[/dim] [bold {regime_color}]{sizing:.2f}x[/bold {regime_color}]  "
         f"[dim]Rotation:[/dim] [bold white]{rotation_str}[/bold white]"
     )
     step1_table.add_row(header_line)
     step1_table.add_row(f"[dim]Diagnosis:[/dim] [bold bright_white]{diag_str}[/bold bright_white]")
+
+    # Data Provenance & Availability Summary
+    liqmap_src = getattr(magnet_eval, "liqmap_source", "UNAVAILABLE")
+    eval_origin = getattr(magnet_eval, "evaluation_origin", "STORED")
+    liqmap_err = getattr(magnet_eval, "liqmap_error", "")
+    prov_dict = getattr(magnet_eval, "input_provenance", {}) or {}
+    m_cnt = sum(1 for v in prov_dict.values() if v.startswith("MEASURED") or v in ("LIVE_EDGEORNOT", "CACHED_LIQMAP"))
+    d_cnt = sum(1 for v in prov_dict.values() if v.startswith("DERIVED"))
+    e_cnt = sum(1 for v in prov_dict.values() if "MODELLED" in v or "ESTIMATED" in v)
+    u_cnt = sum(1 for v in prov_dict.values() if v == "UNAVAILABLE")
+    liq_color = "bright_green" if liqmap_src in ("LIVE_EDGEORNOT", "CACHED_LIQMAP") else "bright_yellow"
+    prov_line = (
+        f"[dim]Provenance:[/dim] [white]Origin={eval_origin}[/white]  |  "
+        f"[dim]LiqMap:[/dim] [{liq_color}]{liqmap_src}[/{liq_color}]  |  "
+        f"[dim]Inputs:[/dim] [green]{m_cnt} MEASURED[/green] · [cyan]{d_cnt} DERIVED[/cyan] · "
+        f"[yellow]{e_cnt} MODELLED/EST[/yellow] · [red]{u_cnt} UNAVAILABLE[/red]"
+    )
+    if liqmap_err:
+        prov_line += f"  |  [dim]Fetch Note: {liqmap_err}[/dim]"
+    step1_table.add_row(prov_line)
 
     if getattr(magnet_eval, "is_conflicted", False):
         step1_table.add_row(
@@ -5484,8 +5513,8 @@ def _build_tab17_btc_magnet_hud(
 
     # Reconciliation Gate Badge
     recon_eval = getattr(store, "reconciliation_evaluation", None)
+    auth_status = getattr(recon_eval, "execution_authorization", None) or getattr(magnet_eval, "reconciliation_auth", "AUTHORIZED")
     if recon_eval is not None:
-        auth_status = recon_eval.execution_authorization
         if auth_status == "DENIED":
             fail_line = recon_eval.fail_reasons[0] if recon_eval.fail_reasons else "Critical data integrity discrepancy"
             step1_table.add_row(
@@ -5521,13 +5550,18 @@ def _build_tab17_btc_magnet_hud(
             col2 = rows_to_render[i+1] if i+1 < len(rows_to_render) else ""
             obs_grid.add_row(col1, col2)
     else:
-        obs_grid.add_row("[dim]Evaluating on-exchange positioning metrics...[/dim]", "")
+        obs_grid.add_row("[dim]No positioning observations recorded.[/dim]", "")
 
     step1_table.add_row(obs_grid)
-    step1_table.add_row(
-        f"[dim]Execution Directives:[/dim] [bold cyan]{action_str}[/bold cyan]  •  "
-        f"[dim]Entry:[/dim] [white]{getattr(magnet_eval, 'entry_instruction', 'Await confirmed signal')}[/white]"
-    )
+    if magnet_eval.verdict == "SPEAK" and auth_status != "DENIED":
+        step1_table.add_row(
+            f"[dim]Execution Directives:[/dim] [bold cyan]{action_str}[/bold cyan]  •  "
+            f"[dim]Entry:[/dim] [white]{getattr(magnet_eval, 'entry_instruction', '')}[/white]"
+        )
+    else:
+        step1_table.add_row(
+            f"[dim]Execution Directives:[/dim] [yellow]{action_str}  •  NO ENTRY DIRECTIVE (Verdict: {magnet_eval.verdict})[/yellow]"
+        )
 
     step1_panel = Panel(
         step1_table,
@@ -5543,35 +5577,55 @@ def _build_tab17_btc_magnet_hud(
     horizon_table.add_column("◆ SPOT HORIZON (CENTER ZERO)", justify="center", ratio=4)
     horizon_table.add_column("▼ LOWER SUPPORT (LONG LIQUIDATIONS)", justify="center", ratio=3)
 
-    up_dist_usd = up.price - spot_p
-    lo_dist_usd = spot_p - lo.price
+    up_src = getattr(up, "source", "UNAVAILABLE")
+    lo_src = getattr(lo, "source", "UNAVAILABLE")
 
-    col_up = (
-        f"[bold bright_cyan]${up.price:,.0f}[/bold bright_cyan]  "
-        f"[cyan]({up.dist_pct:+.1f}% / +${up_dist_usd:,.0f})[/cyan]\n"
-        f"[dim]Density: ${up.usd_volume/1e6:,.1f}M Cluster[/dim]"
+    if spot_p > 0.0 and up.price > 0.0:
+        up_dist_usd = up.price - spot_p
+        col_up = (
+            f"[bold bright_cyan]${up.price:,.0f}[/bold bright_cyan]  "
+            f"[cyan]({up.dist_pct:+.1f}% / +${up_dist_usd:,.0f})[/cyan]\n"
+            f"[dim]Density: ${up.usd_volume/1e6:,.1f}M Cluster [{up_src}][/dim]"
+        )
+    else:
+        col_up = "[bold red]UNAVAILABLE[/bold red]\n[dim]Source: UNAVAILABLE[/dim]"
+
+    chg_24h_avail = bool(getattr(magnet_eval, "price_change_24h_available", False)) or (
+        "price_change_24h" not in prov_dict and magnet_eval.price_change_24h_pct != 0.0
     )
+    if spot_p > 0.0:
+        chg_str = (
+            f"[{'green' if magnet_eval.price_change_24h_pct >= 0 else 'red'}]({magnet_eval.price_change_24h_pct:+.2f}% 24h)[/{'green' if magnet_eval.price_change_24h_pct >= 0 else 'red'}]"
+            if chg_24h_avail
+            else "[dim](24h Chg: UNAVAILABLE)[/dim]"
+        )
+        spot_disp = f"[bold bright_white]SPOT: ${spot_p:,.2f}[/bold bright_white]  {chg_str}"
+    else:
+        spot_disp = "[bold red]SPOT: UNAVAILABLE[/bold red]"
 
     pull_color = "bright_cyan" if magnet_eval.pull_direction == "UPPER" else ("bright_yellow" if magnet_eval.pull_direction == "LOWER" else "white")
     col_center = (
-        f"[bold bright_white]SPOT: ${spot_p:,.2f}[/bold bright_white]  "
-        f"[{'green' if magnet_eval.price_change_24h_pct >= 0 else 'red'}]({magnet_eval.price_change_24h_pct:+.2f}% 24h)[/{'green' if magnet_eval.price_change_24h_pct >= 0 else 'red'}]\n"
+        f"{spot_disp}\n"
         f"[bold {pull_color}]PULL: {magnet_eval.pull_direction} MAGNET[/bold {pull_color}]\n"
-        f"[dim]Immediate (100x): {getattr(magnet_eval, 'immediate_ratio', 1.0):.1f}x Skew • Total Ladder (10x-100x): {getattr(magnet_eval, 'total_ladder_ratio', 1.0):.2f}x Skew[/dim]"
+        f"[dim]Immediate (100x): {getattr(magnet_eval, 'immediate_ratio', 0.0):.1f}x Skew • Total Ladder (10x-100x, MODELLED): {getattr(magnet_eval, 'total_ladder_ratio', 0.0):.2f}x Skew[/dim]"
     )
 
-    col_lo = (
-        f"[bold bright_yellow]${lo.price:,.0f}[/bold bright_yellow]  "
-        f"[yellow]({lo.dist_pct:+.1f}% / -${lo_dist_usd:,.0f})[/yellow]\n"
-        f"[dim]Density: ${lo.usd_volume/1e6:,.1f}M Cluster[/dim]"
-    )
+    if spot_p > 0.0 and lo.price > 0.0:
+        lo_dist_usd = spot_p - lo.price
+        col_lo = (
+            f"[bold bright_yellow]${lo.price:,.0f}[/bold bright_yellow]  "
+            f"[yellow]({lo.dist_pct:+.1f}% / -${lo_dist_usd:,.0f})[/yellow]\n"
+            f"[dim]Density: ${lo.usd_volume/1e6:,.1f}M Cluster [{lo_src}][/dim]"
+        )
+    else:
+        col_lo = "[bold red]UNAVAILABLE[/bold red]\n[dim]Source: UNAVAILABLE[/dim]"
 
     horizon_table.add_row(col_up, col_center, col_lo)
 
     # Gravitational Density Gauges & Vector Direction
     max_vol = max(up.usd_volume, lo.usd_volume, 1.0)
-    up_blocks = max(1, int(round((up.usd_volume / max_vol) * 16)))
-    lo_blocks = max(1, int(round((lo.usd_volume / max_vol) * 16)))
+    up_blocks = max(1, int(round((up.usd_volume / max_vol) * 16))) if up.usd_volume > 0 else 0
+    lo_blocks = max(1, int(round((lo.usd_volume / max_vol) * 16))) if lo.usd_volume > 0 else 0
     up_bar = f"[bright_cyan]{'■' * up_blocks}{'░' * (16 - up_blocks)}[/bright_cyan] [dim](${up.usd_volume/1e6:,.0f}M Short Pool)[/dim]"
     lo_bar = f"[bright_yellow]{'■' * lo_blocks}{'░' * (16 - lo_blocks)}[/bright_yellow] [dim](${lo.usd_volume/1e6:,.0f}M Long Pool)[/dim]"
     if magnet_eval.pull_direction == "LOWER":
@@ -5604,16 +5658,18 @@ def _build_tab17_btc_magnet_hud(
 
     lsce_grid = Table.grid(expand=True)
     lsce_grid.add_column()
+    reclaim_lvl = float(getattr(magnet_eval, "lsce_reclaim_level", 0.0) or 0.0)
+    reclaim_str = f"${reclaim_lvl:,.2f}" if reclaim_lvl > 0.0 else "UNAVAILABLE"
     lsce_grid.add_row(
         f"[bold bright_white]LSCE EXECUTION STATE:[/bold bright_white]  "
         f"[bold black on {lsce_color}] {lsce_status} [/bold black on {lsce_color}]  |  "
-        f"[dim]Tested Cluster:[/dim] [bold white]{getattr(magnet_eval, 'lsce_cluster_tested', 'N/A')}[/bold white]  |  "
+        f"[dim]Tested Cluster:[/dim] [bold white]{getattr(magnet_eval, 'lsce_cluster_tested', 'UNAVAILABLE')}[/bold white]  |  "
         f"[dim]Sweep Depth:[/dim] [bold {lsce_color}]{getattr(magnet_eval, 'lsce_sweep_depth_pct', 0.0):+.2f}%[/bold {lsce_color}]  |  "
-        f"[dim]Reclaim Level:[/dim] [bold bright_white]${getattr(magnet_eval, 'lsce_reclaim_level', 0.0):,.2f}[/bold bright_white]  |  "
-        f"[dim]Absorption:[/dim] [bold white]{getattr(magnet_eval, 'lsce_spot_absorption', 'Neutral')}[/bold white]"
+        f"[dim]Reclaim Level:[/dim] [bold bright_white]{reclaim_str}[/bold bright_white]  |  "
+        f"[dim]Absorption:[/dim] [bold white]{getattr(magnet_eval, 'lsce_spot_absorption', 'UNAVAILABLE')}[/bold white]"
     )
     lsce_grid.add_row(
-        f"[bold cyan]SWEEP DIRECTIVE:[/bold cyan] [white]{getattr(magnet_eval, 'lsce_action_verdict', '')}[/white]"
+        f"[bold cyan]LSCE READOUT:[/bold cyan] [white]{getattr(magnet_eval, 'lsce_action_verdict', '')}[/white]"
     )
 
     step3_panel = Panel(
@@ -5628,18 +5684,27 @@ def _build_tab17_btc_magnet_hud(
     risk_grid = Table.grid(expand=True)
     risk_grid.add_column()
 
-    s_stop = getattr(magnet_eval, "structural_stop_price", 0.0)
-    s_dist = getattr(magnet_eval, "structural_stop_dist_pct", 0.0)
-    d_stop = getattr(magnet_eval, "disaster_stop_price", 0.0)
-    d_dist = getattr(magnet_eval, "disaster_stop_dist_pct", 0.0)
-    budget_pass = getattr(magnet_eval, "risk_budget_pass", False)
+    s_stop = float(getattr(magnet_eval, "structural_stop_price", 0.0) or 0.0)
+    s_dist = float(getattr(magnet_eval, "structural_stop_dist_pct", 0.0) or 0.0)
+    d_stop = float(getattr(magnet_eval, "disaster_stop_price", 0.0) or 0.0)
+    d_dist = float(getattr(magnet_eval, "disaster_stop_dist_pct", 0.0) or 0.0)
+    budget_pass = bool(getattr(magnet_eval, "risk_budget_pass", False))
+    ma200_avail = bool(getattr(magnet_eval, "ma_200d_available", False))
 
-    budget_badge = "[bold black on green] [OK] PASS (<= 4.5%) [/bold black on green]" if budget_pass else "[bold white on red] [X] FAIL (> 4.5%) [/bold white on red]"
+    s_stop_str = f"${s_stop:,.2f} (-{s_dist:.2f}%)" if s_stop > 0.0 else "UNAVAILABLE"
+    d_stop_str = f"${d_stop:,.2f} (-{d_dist:.2f}%)" if d_stop > 0.0 else "UNAVAILABLE"
+    d_stop_label = "Disaster Hard Stop (200D SMA & Shelf):" if ma200_avail else "Disaster Hard Stop (Swing/Liq Shelf):"
+
+    budget_badge = (
+        f"[bold black on green] [OK] PASS (<= {RISK_BUDGET_MAX_PCT}%) [/bold black on green]"
+        if budget_pass
+        else f"[bold white on red] [X] FAIL (> {RISK_BUDGET_MAX_PCT}% or UNAVAILABLE) [/bold white on red]"
+    )
 
     risk_grid.add_row(
         f"[bold bright_white]INVIOLABLE STOPS & RISK BUDGET:[/bold bright_white]  "
-        f"[dim]Structural Stop (1H Close):[/dim] [bold bright_white]${s_stop:,.2f} (-{s_dist:.2f}%)[/bold bright_white]  |  "
-        f"[dim]Disaster Hard Stop (200 SMA & 25x):[/dim] [bold bright_yellow]${d_stop:,.2f} (-{d_dist:.2f}%)[/bold bright_yellow]  |  "
+        f"[dim]Structural Stop (24H Low -0.2%):[/dim] [bold bright_white]{s_stop_str}[/bold bright_white]  |  "
+        f"[dim]{d_stop_label}[/dim] [bold bright_yellow]{d_stop_str}[/bold bright_yellow]  |  "
         f"[dim]Risk Budget Compliance:[/dim] {budget_badge}"
     )
 
@@ -5667,11 +5732,11 @@ def _build_tab17_btc_magnet_hud(
     rules_table.add_column("STATUS", justify="center", ratio=2)
 
     specs = [
-        "Meaningful liquidation cluster within 0.8% - 4.5% reach (>= $100M)",
+        "Meaningful live liquidation cluster within 0.8% - 4.5% reach (>= $100M)",
         "Open interest expanding or stable into magnet (4h velocity >= -0.5%)",
-        "Borrow carry not contradictory (-10.0% to +28.0% annual funding)",
+        "Perpetual funding carry not contradictory (-10.0% to +28.0% annual)",
         "Range regime (primary) or Trend-aligned in direction of magnet",
-        "Basic structure & spot-flow alignment (no extreme opposite momentum)",
+        "Basic structure & spot-flow alignment (|24h| < 6.5%, no opposing flow)",
         "Target liquidation cluster intact and not already swept",
         "At least 5 of 6 cleanly met with 0 direct conflicts (otherwise: WAIT)",
     ]

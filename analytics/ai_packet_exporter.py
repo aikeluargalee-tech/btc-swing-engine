@@ -30,7 +30,7 @@ from typing import Optional, Tuple
 
 
 
-from config.settings import EngineConfig
+from config.settings import EngineConfig, RISK_BUDGET_MAX_PCT
 
 from core.state_store import StateStore
 
@@ -1985,14 +1985,68 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
 
     # --- SECTION 17: TAB [M] BTC MAGNET — LIQUIDATION GRAVITY & SWING EDGE DETECTOR ---
     magnet = getattr(store, "btc_magnet_evaluation", None)
-    if magnet is None:
-        try:
-            from analytics.btc_magnet_engine import BTCMagnetEngine
-            magnet = BTCMagnetEngine(config).evaluate(store)
-        except Exception:
-            magnet = None
 
-    if magnet is not None:
+    if magnet is None:
+        lines.extend([
+            "",
+            "---",
+            "",
+            "## SECTION 17: TAB [M] BTC MAGNET — LIQUIDATION GRAVITY & SWING EDGE DETECTOR",
+            "",
+            "* **Status**: `DATA UNAVAILABLE` (no stored `btc_magnet_evaluation` in StateStore; no silent recompute performed)",
+            "* **Recommended Sizing**: `0.00x` (`Remain USDT`)",
+        ])
+    else:
+        prov_dict = getattr(magnet, "input_provenance", None) or {}
+        spot_avail = bool(getattr(magnet, "spot_available", False)) or float(getattr(magnet, "spot_price", 0.0) or 0.0) > 0.0
+        chg_avail = bool(getattr(magnet, "price_change_24h_available", False)) or (
+            "price_change_24h" not in prov_dict and float(getattr(magnet, "price_change_24h_pct", 0.0) or 0.0) != 0.0
+        )
+        fund_avail = bool(getattr(magnet, "funding_available", False)) or (
+            "funding_rate" not in prov_dict and float(getattr(magnet, "funding_rate_annual_pct", 0.0) or 0.0) != 0.0
+        )
+        oi_avail = bool(getattr(magnet, "oi_available", False)) or (
+            "oi_delta_4h" not in prov_dict and float(getattr(magnet, "oi_delta_4h_pct", 0.0) or 0.0) != 0.0
+        )
+        m_cnt = sum(1 for v in prov_dict.values() if v.startswith("MEASURED") or v in ("LIVE_EDGEORNOT", "CACHED_LIQMAP"))
+        d_cnt = sum(1 for v in prov_dict.values() if v.startswith("DERIVED"))
+        e_cnt = sum(1 for v in prov_dict.values() if "MODELLED" in v or "ESTIMATED" in v)
+        u_cnt = sum(1 for v in prov_dict.values() if v == "UNAVAILABLE")
+        liqmap_src = getattr(magnet, "liqmap_source", "UNAVAILABLE")
+        liqmap_err = getattr(magnet, "liqmap_error", "")
+        eval_origin = getattr(magnet, "evaluation_origin", "STORED")
+
+        s_stop = float(getattr(magnet, "structural_stop_price", 0.0) or 0.0)
+        d_stop = float(getattr(magnet, "disaster_stop_price", 0.0) or 0.0)
+        d_dist = float(getattr(magnet, "disaster_stop_dist_pct", 0.0) or 0.0)
+        s_stop_s = f"${s_stop:,.2f}" if s_stop > 0.0 else "UNAVAILABLE"
+        d_stop_s = f"${d_stop:,.2f} (-{d_dist:.2f}%)" if d_stop > 0.0 else "UNAVAILABLE"
+        budget_ok = bool(getattr(magnet, "risk_budget_pass", False))
+
+        spot_s = f"${magnet.spot_price:,.2f}" if spot_avail and magnet.spot_price > 0 else "UNAVAILABLE"
+        chg_s = f"{magnet.price_change_24h_pct:+.2f}% 24h" if chg_avail else "UNAVAILABLE 24h"
+        fund_s = f"{magnet.funding_rate_annual_pct:+.1f}%/yr" if fund_avail else "UNAVAILABLE"
+        oi_s = f"{magnet.oi_delta_4h_pct:+.1f}%" if oi_avail else "UNAVAILABLE"
+
+        up_src = getattr(magnet.upper_magnet, "source", "UNAVAILABLE")
+        lo_src = getattr(magnet.lower_magnet, "source", "UNAVAILABLE")
+        up_line = (
+            f"* **Upper Magnet (Short Liquidations)**: `${magnet.upper_magnet.price:,.0f}` (`{magnet.upper_magnet.dist_pct:+.1f}%`) — `${magnet.upper_magnet.usd_volume/1e6:.1f}M` cluster (`{up_src}`)"
+            if spot_avail and magnet.upper_magnet.price > 0
+            else "* **Upper Magnet (Short Liquidations)**: `UNAVAILABLE`"
+        )
+        lo_line = (
+            f"* **Lower Support (Long Liquidations)**: `${magnet.lower_magnet.price:,.0f}` (`{magnet.lower_magnet.dist_pct:+.1f}%`) — `${magnet.lower_magnet.usd_volume/1e6:.1f}M` cluster (`{lo_src}`)"
+            if spot_avail and magnet.lower_magnet.price > 0
+            else "* **Lower Support (Long Liquidations)**: `UNAVAILABLE`"
+        )
+
+        entry_line = (
+            f"* **Entry Directive**: {getattr(magnet, 'entry_instruction', '')}"
+            if (magnet.verdict == "SPEAK" and getattr(magnet, "reconciliation_auth", "AUTHORIZED") != "DENIED")
+            else f"* **Entry Directive**: NO ENTRY DIRECTIVE (Verdict: {magnet.verdict})"
+        )
+
         lines.extend([
             "",
             "---",
@@ -2003,19 +2057,22 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             f"* **Status Headline**: {magnet.headline}",
             f"* **Explanation Readout**: {magnet.body}",
             f"* **Rule Subtitle**: *{magnet.rule_subtitle}*",
+            f"* **Provenance**: `Origin={eval_origin}` | `LiqMap={liqmap_src}` | `Measured={m_cnt}, Derived={d_cnt}, Modelled/Est={e_cnt}, Unavailable={u_cnt}`"
+            + (f" | `Fetch Error: {liqmap_err}`" if liqmap_err else ""),
             "",
-            f"* **5-Regime Radar**: `{getattr(magnet, 'regime_name', 'Range / Liquidation Magnet')}` (`{getattr(magnet, 'majority_score', '3/4')}` confirmed)",
+            f"* **5-Regime Radar**: `{getattr(magnet, 'regime_name', 'Transition / Mixed')}` (`{getattr(magnet, 'majority_score', '0/4')}` confirmed)",
             f"* **Regime Diagnosis**: {getattr(magnet, 'regime_diagnosis', '')}",
-            f"* **Recommended Sizing**: `{getattr(magnet, 'sizing_factor', 0.0):.2f}x` ({getattr(magnet, 'action', '')}) | Rotation: `{getattr(magnet, 'rotation', 'Remain USDT')}`",
+            f"* **Recommended Sizing (Spot Only, Cap <= 1.00x)**: `{getattr(magnet, 'sizing_factor', 0.0):.2f}x` ({getattr(magnet, 'action', '')}) | Rotation: `{getattr(magnet, 'rotation', 'Remain USDT')}`",
+            entry_line,
             f"* **LSCE Sweep State**: `[{getattr(magnet, 'lsce_status', 'UNTESTED')}]` — {getattr(magnet, 'lsce_action_verdict', '')}",
-            f"* **Dual Stops**: Structural `${getattr(magnet, 'structural_stop_price', 0.0):,.2f}` | Disaster Hard Stop `${getattr(magnet, 'disaster_stop_price', 0.0):,.2f}` (-{getattr(magnet, 'disaster_stop_dist_pct', 0.0):.2f}%)",
+            f"* **Dual Stops**: Structural (24H Low -0.2%) `{s_stop_s}` | Disaster Hard Stop `{d_stop_s}` | **Risk Budget (<= {RISK_BUDGET_MAX_PCT}%)**: `{'PASS' if budget_ok else 'FAIL'}`",
             "",
             "### 17A. Liquidation Gravitational Horizon",
-            f"* **Upper Magnet (Short Liquidations)**: `${magnet.upper_magnet.price:,.0f}` (`{magnet.upper_magnet.dist_pct:+.1f}%`) — `${magnet.upper_magnet.usd_volume/1e6:.1f}M` cluster",
-            f"* **Center Spot Horizon**: `${magnet.spot_price:,.2f}` (`{magnet.price_change_24h_pct:+.2f}% 24h`)",
-            f"* **Lower Support (Long Liquidations)**: `${magnet.lower_magnet.price:,.0f}` (`{magnet.lower_magnet.dist_pct:+.1f}%`) — `${magnet.lower_magnet.usd_volume/1e6:.1f}M` cluster",
-            f"* **Gravitational Pull**: `{magnet.pull_direction} MAGNET` (Immediate 100x: `{getattr(magnet, 'immediate_ratio', 1.0):.1f}x` | Total Ladder: `{getattr(magnet, 'total_ladder_ratio', 1.0):.2f}x`)",
-            f"* **Perpetual Funding**: `{magnet.funding_rate_annual_pct:+.1f}%/yr` | **4h OI Velocity**: `{magnet.oi_delta_4h_pct:+.1f}%` | **Regime**: `{magnet.market_regime}`",
+            up_line,
+            f"* **Center Spot Horizon**: `{spot_s}` (`{chg_s}`)",
+            lo_line,
+            f"* **Gravitational Pull**: `{magnet.pull_direction} MAGNET` (Immediate 100x: `{getattr(magnet, 'immediate_ratio', 0.0):.1f}x` | Total Ladder (MODELLED): `{getattr(magnet, 'total_ladder_ratio', 0.0):.2f}x`)",
+            f"* **Perpetual Funding**: `{fund_s}` | **4h OI Velocity**: `{oi_s}` | **Regime**: `{magnet.market_regime}`",
             "",
             "### 17B. 7 Internal Speaking Rules Audit",
         ])

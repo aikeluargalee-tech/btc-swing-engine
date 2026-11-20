@@ -417,24 +417,72 @@ def build_tab_r_data_only_report(config: Optional[EngineConfig], store: StateSto
 # ==============================================================================
 # 5. TAB [M: MAGNET] DATA-ONLY REPORT
 # ==============================================================================
-def build_tab_m_data_only_report(config: Optional[EngineConfig], store: StateStore) -> str:
-    ts_utc, ts_sgt = _timestamps_utc_sgt()
-    mag = getattr(store, "btc_magnet_evaluation", None)
-    if mag is None:
-        from analytics.btc_magnet_engine import BTCMagnetEngine
-        mag = BTCMagnetEngine(config or DEFAULT_CONFIG).evaluate(store)
+def build_tab_m_data_only_report(
+    config: Optional[EngineConfig],
+    store: StateStore,
+    *,
+    recompute: bool = False,
+) -> str:
+    from analytics.btc_magnet_engine import get_or_recompute_btc_magnet
 
-    spot_px = round(float(mag.spot_price), 2)
+    ts_utc, ts_sgt = _timestamps_utc_sgt()
+    mag, _did_recompute = get_or_recompute_btc_magnet(config or DEFAULT_CONFIG, store, recompute=recompute)
+
+    if mag is None:
+        lines = [
+            "# TAB [M: MAGNET] | DATA-ONLY METRICS REPORT",
+            f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (SGT):** `{ts_sgt}`",
+            "**Status:** `DATA UNAVAILABLE`",
+            "",
+            "- **Stored Evaluation:** `UNAVAILABLE` (no `btc_magnet_evaluation` in StateStore; call `SignalDetector.evaluate` or pass `recompute=True` explicitly)",
+            "- **Spot Price (BTCUSDT):** `UNAVAILABLE`",
+            "- **Liquidation Map Source:** `UNAVAILABLE`",
+            "- **Recommended Spot Sizing:** `0.00x` (`Remain USDT`)",
+        ]
+        return sanitize_data_only_text("\n".join(lines))
+
+    prov_dict = getattr(mag, "input_provenance", None) or {}
+    spot_avail = bool(getattr(mag, "spot_available", False)) or float(getattr(mag, "spot_price", 0.0) or 0.0) > 0.0
+    spot_px = round(float(mag.spot_price), 2) if spot_avail else 0.0
+    chg_avail = bool(getattr(mag, "price_change_24h_available", False)) or (
+        "price_change_24h" not in prov_dict and float(getattr(mag, "price_change_24h_pct", 0.0) or 0.0) != 0.0
+    )
+    funding_avail = bool(getattr(mag, "funding_available", False)) or (
+        "funding_rate" not in prov_dict and float(getattr(mag, "funding_rate_annual_pct", 0.0) or 0.0) != 0.0
+    )
+    oi_avail = bool(getattr(mag, "oi_available", False)) or (
+        "oi_delta_4h" not in prov_dict and float(getattr(mag, "oi_delta_4h_pct", 0.0) or 0.0) != 0.0
+    )
+
     up_px = round(float(mag.upper_magnet.price), 2)
     lo_px = round(float(mag.lower_magnet.price), 2)
     up_diff_usd = round(up_px - spot_px, 2)
     lo_diff_usd = round(lo_px - spot_px, 2)
     passed_count = sum(1 for r in mag.rule_checks[:6] if r.passed)
 
+    m_keys = [k for k, v in prov_dict.items() if v.startswith("MEASURED") or v in ("LIVE_EDGEORNOT", "CACHED_LIQMAP")]
+    d_keys = [k for k, v in prov_dict.items() if v.startswith("DERIVED")]
+    e_keys = [k for k, v in prov_dict.items() if "MODELLED" in v or "ESTIMATED" in v]
+    u_keys = [k for k, v in prov_dict.items() if v == "UNAVAILABLE"]
+
+    spot_str = f"`${spot_px:,.2f}`" if spot_avail and spot_px > 0.0 else "`UNAVAILABLE`"
+    chg_str = f"`24H Change: {mag.price_change_24h_pct:+.2f}%`" if chg_avail else "`24H Change: UNAVAILABLE`"
+    liqmap_src = getattr(mag, "liqmap_source", "UNAVAILABLE")
+    liqmap_err = getattr(mag, "liqmap_error", "")
+    eval_origin = getattr(mag, "evaluation_origin", "STORED")
+
     lines = [
         "# TAB [M: MAGNET] | DATA-ONLY METRICS REPORT",
         f"**Retrieval Time (UTC):** `{ts_utc}`  |  **Retrieval Time (SGT):** `{ts_sgt}`",
-        f"**Spot Price (BTCUSDT):** `${spot_px:,.2f}` (`24H Change: {mag.price_change_24h_pct:+.2f}%`)",
+        f"**Evaluation Timestamp (UTC):** `{mag.timestamp_utc or 'UNAVAILABLE'}`  |  **Origin:** `{eval_origin}`",
+        f"**Spot Price (BTCUSDT):** {spot_str} ({chg_str})",
+        f"**Liquidation Map Source:** `{liqmap_src}`" + (f" (`{liqmap_err}`)" if liqmap_err else ""),
+        (
+            f"**Input Provenance Tally:** `Measured ({len(m_keys)}): {', '.join(m_keys) or 'none'}` | "
+            f"`Derived ({len(d_keys)}): {', '.join(d_keys) or 'none'}` | "
+            f"`Modelled/Est ({len(e_keys)}): {', '.join(e_keys) or 'none'}` | "
+            f"`Unavailable ({len(u_keys)}): {', '.join(u_keys) or 'none'}`"
+        ),
         "",
         "## 1. 5-REGIME RADAR DIAGNOSIS & MAJORITY VOTING",
         f"- **Active Market Regime:** `{mag.regime_name}` (ID: `{mag.regime_id}`)",
@@ -448,35 +496,60 @@ def build_tab_m_data_only_report(config: Optional[EngineConfig], store: StateSto
     for obs, passed in mag.all_observations:
         lines.append(f"  * `{obs}`: `{bool(passed)}`")
 
+    up_src = getattr(mag.upper_magnet, "source", "UNAVAILABLE")
+    lo_src = getattr(mag.lower_magnet, "source", "UNAVAILABLE")
+    up_line = (
+        f"- **Upper Liquidation Cluster (Short Liquidations):** `${up_px:,.2f}` (`{mag.upper_magnet.dist_pct:+.2f}%` / `${up_diff_usd:+,.2f}` from Spot) | Volume: `${mag.upper_magnet.usd_volume/1e6:.2f}M` | Source: `{up_src}`"
+        if spot_avail and up_px > 0.0
+        else "- **Upper Liquidation Cluster (Short Liquidations):** `UNAVAILABLE`"
+    )
+    lo_line = (
+        f"- **Lower Liquidation Cluster (Long Liquidations):** `${lo_px:,.2f}` (`{mag.lower_magnet.dist_pct:+.2f}%` / `${lo_diff_usd:+,.2f}` from Spot) | Volume: `${mag.lower_magnet.usd_volume/1e6:.2f}M` | Source: `{lo_src}`"
+        if spot_avail and lo_px > 0.0
+        else "- **Lower Liquidation Cluster (Long Liquidations):** `UNAVAILABLE`"
+    )
+
     lines.extend([
         "",
         "## 2. LIQUIDATION GRAVITATIONAL HORIZON & DUAL-LADDER DEPTH",
-        f"- **Upper Liquidation Cluster (Short Liquidations):** `${up_px:,.2f}` (`{mag.upper_magnet.dist_pct:+.2f}%` / `${up_diff_usd:+,.2f}` from Spot) | Volume: `${mag.upper_magnet.usd_volume/1e6:.2f}M`",
-        f"- **Center Spot Price:** `${spot_px:,.2f}`",
-        f"- **Lower Liquidation Cluster (Long Liquidations):** `${lo_px:,.2f}` (`{mag.lower_magnet.dist_pct:+.2f}%` / `${lo_diff_usd:+,.2f}` from Spot) | Volume: `${mag.lower_magnet.usd_volume/1e6:.2f}M`",
+        up_line,
+        f"- **Center Spot Price:** {spot_str}",
+        lo_line,
         f"- **Immediate Tier (100x) Imbalance Ratio:** `{mag.immediate_ratio:.2f}x` (${mag.immediate_l_vol:.1f}M Lower vs ${mag.immediate_u_vol:.1f}M Upper)",
-        f"- **Total Ladder (10x-100x) Imbalance Ratio:** `{mag.total_ladder_ratio:.2f}x` (${mag.total_l_vol:.1f}M Lower vs ${mag.total_u_vol:.1f}M Upper)",
+        f"- **Total Ladder (10x-100x, MODELLED) Imbalance Ratio:** `{mag.total_ladder_ratio:.2f}x` (${mag.total_l_vol:.1f}M Lower vs ${mag.total_u_vol:.1f}M Upper)",
         f"- **Dominant Pull Direction:** `{mag.pull_direction}`",
         "",
         "## 3. LIQUIDATION SWEEP CONFIRMATION ENGINE (LSCE)",
         f"- **LSCE State:** `[{mag.lsce_status}]`",
         f"- **Cluster Tested:** `{mag.lsce_cluster_tested}`",
         f"- **Sweep Depth Pct:** `{mag.lsce_sweep_depth_pct:+.2f}%`",
-        f"- **Reclaim Target Level:** `${mag.lsce_reclaim_level:,.2f}`",
+        f"- **Reclaim Target Level:** `{f'${mag.lsce_reclaim_level:,.2f}' if mag.lsce_reclaim_level > 0 else 'UNAVAILABLE'}`",
         f"- **Spot Absorption Readout:** `{mag.lsce_spot_absorption}`",
         f"- **LSCE Action Verdict:** `{mag.lsce_action_verdict}`",
         "",
-        "## 4. INVIOLABLE RISK DIRECTIVES & CAPITAL SIZING",
+        "## 4. INVIOLABLE RISK DIRECTIVES & CAPITAL SIZING (SPOT ONLY, CAP <= 1.00x)",
         f"- **Recommended Spot Sizing:** `{mag.sizing_factor:.2f}x` ({mag.action})",
         f"- **Capital Rotation Directive:** `{mag.rotation}`",
-        f"- **Entry Instruction:** `{mag.entry_instruction}`",
-        f"- **Structural Invalidation Stop:** `${mag.structural_stop_price:,.2f}` (`{mag.structural_stop_dist_pct:.2f}%` from Spot)",
-        f"- **Disaster Hard Stop (Below 200 SMA & 25x Shelf):** `${mag.disaster_stop_price:,.2f}` (`{mag.disaster_stop_dist_pct:.2f}%` from Spot)",
-        f"- **Risk Budget Compliance Pass (<= 4.5%):** `{mag.risk_budget_pass}`",
+        (
+            f"- **Entry Instruction:** `{mag.entry_instruction}`"
+            if (mag.verdict == "SPEAK" and getattr(mag, "reconciliation_auth", "AUTHORIZED") != "DENIED")
+            else f"- **Entry Instruction:** `NO ENTRY DIRECTIVE (Verdict: {mag.verdict})`"
+        ),
+        (
+            f"- **Structural Invalidation Stop (24H Low -0.2%):** `${mag.structural_stop_price:,.2f}` (`{mag.structural_stop_dist_pct:.2f}%` from Spot)"
+            if mag.structural_stop_price > 0.0
+            else "- **Structural Invalidation Stop (24H Low -0.2%):** `UNAVAILABLE`"
+        ),
+        (
+            f"- **Disaster Hard Stop ({'200D SMA & Shelf' if getattr(mag, 'ma_200d_available', False) else 'Swing/Liq Shelf; 200D SMA UNAVAILABLE'}):** `${mag.disaster_stop_price:,.2f}` (`{mag.disaster_stop_dist_pct:.2f}%` from Spot)"
+            if mag.disaster_stop_price > 0.0
+            else "- **Disaster Hard Stop:** `UNAVAILABLE`"
+        ),
+        f"- **Risk Budget Compliance Pass (<= {RISK_BUDGET_MAX_PCT}%):** `{mag.risk_budget_pass}`",
         "",
         "## 5. DERIVATIVES & VOLATILITY INPUTS",
-        f"- **Annualized Perpetual Funding Rate:** `{mag.funding_rate_annual_pct:+.2f}%/yr`",
-        f"- **4H Open Interest Delta:** `{mag.oi_delta_4h_pct:+.2f}%`",
+        f"- **Annualized Perpetual Funding Rate:** `{f'{mag.funding_rate_annual_pct:+.2f}%/yr' if funding_avail else 'UNAVAILABLE'}`",
+        f"- **4H Open Interest Delta:** `{f'{mag.oi_delta_4h_pct:+.2f}%' if oi_avail else 'UNAVAILABLE'}`",
         f"- **24H Classification Label:** `{mag.market_regime}`",
         "",
         "## 6. 7 INTERNAL CONDITION BOOLEANS (TRUE/FALSE)",

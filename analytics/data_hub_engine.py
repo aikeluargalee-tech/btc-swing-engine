@@ -377,6 +377,39 @@ def record_and_query_telemetry_archive(
                             "UPDATE telemetry_snapshots SET closed_4h_bar_utc = ? WHERE id = ?",
                             (canon, lid),
                         )
+            pre_row = conn.execute(
+                "SELECT COUNT(*), COALESCE(MAX(closed_4h_bar_utc), '') FROM telemetry_snapshots"
+            ).fetchone()
+            already_logged = conn.execute(
+                "SELECT 1 FROM telemetry_snapshots WHERE closed_4h_bar_utc = ?",
+                (bar_key,),
+            ).fetchone()
+            pre_cnt = int(pre_row[0]) if pre_row else 0
+            pre_last = str(pre_row[1]) if pre_row and pre_row[1] else ""
+            proj_cnt = pre_cnt + (0 if already_logged else 1)
+            proj_last = max(pre_last, bar_key) if pre_last else bar_key
+            if not any(r.label == "Telemetry History Archive (SQLite)" for r in ev.panel_6_macro_onchain):
+                ev.panel_6_macro_onchain.append(
+                    _row(
+                        "Telemetry History Archive (SQLite)",
+                        f"{proj_cnt} bars logged (Last: {proj_last})" if proj_cnt > 0 else "0 snapshots (no closed 4H bar)",
+                        "DB Archive",
+                        "OK" if proj_cnt > 0 else "UNAVAILABLE",
+                    )
+                )
+                all_now = (
+                    ev.panel_1_feeds
+                    + ev.panel_2_trend_vol
+                    + ev.panel_3_structure_magnets
+                    + ev.panel_4_flow_quant
+                    + ev.panel_5_derivs_liq
+                    + ev.panel_6_macro_onchain
+                )
+                ev.total_metrics = len(all_now)
+                ev.ok_count = sum(1 for r in all_now if r.status == "OK")
+                ev.unavailable_count = sum(1 for r in all_now if r.status == "UNAVAILABLE")
+                ev.stale_count = sum(1 for r in all_now if r.status == "STALE")
+                ev.proxy_or_static_count = sum(1 for r in all_now if r.status in ("PROXY", "STATIC"))
             payload = {
                 "schema_version": "dd_v2",
                 "instrument": "BTCUSDT",
@@ -997,13 +1030,14 @@ class DataHubEngine:
             db_path=self._db_path,
             write_enabled=self._write_archive,
         )
-        arch_row = _row(
-            "Telemetry History Archive (SQLite)",
-            f"{arch_cnt} bars logged (Last: {arch_last})" if arch_cnt > 0 else "0 snapshots (no closed 4H bar)",
-            "DB Archive",
-            "OK" if arch_cnt > 0 else "UNAVAILABLE",
-        )
-        panel_6.append(arch_row)
+        if not any(r.label == "Telemetry History Archive (SQLite)" for r in panel_6):
+            arch_row = _row(
+                "Telemetry History Archive (SQLite)",
+                f"{arch_cnt} bars logged (Last: {arch_last})" if arch_cnt > 0 else "0 snapshots (no closed 4H bar)",
+                "DB Archive",
+                "OK" if arch_cnt > 0 else "UNAVAILABLE",
+            )
+            panel_6.append(arch_row)
 
         all_rows = panel_1 + panel_2 + panel_3 + panel_4 + panel_5 + panel_6
         ev.total_metrics = len(all_rows)

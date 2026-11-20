@@ -95,7 +95,7 @@ class MMBTCEngine:
         taker_delta = (2.0 * sub["taker_buy_volume"].values) - sub["volume"].values
         cvd = np.cumsum(taker_delta)
         cvd_std = np.std(cvd) if np.std(cvd) > 1e-6 else 1.0
-        cvd_norm = (cvd - np.mean(cvd)) / (cvd_std * window)
+        cvd_norm = (cvd - np.mean(cvd)) / cvd_std
 
         oi_vals = sub["open_interest"].values
         oi_std = np.std(oi_vals)
@@ -362,17 +362,27 @@ class MMBTCEngine:
         p = clipped.values
         outliers_detected = int(outlier_mask.sum())
 
-        n = len(p)
+        detrend_win = max(int(median_window) * 4, 48)
+        baseline = clipped.rolling(detrend_win, min_periods=max(6, int(median_window))).mean().bfill()
+        osc = (clipped - baseline).values
+
+        n = len(osc)
         phases: List[float] = []
         for i in range(6, n):
-            q = (p[i] - p[i - 6] + 0.5 * (p[i - 2] - p[i - 4])) / 1.5
-            in_phase = p[i - 3]
-            theta_rad = np.arctan2(q, in_phase + 1e-8)
-            theta_deg = (np.degrees(theta_rad) + 360.0) % 360.0
+            q = (osc[i] - osc[i - 6] + 0.5 * (osc[i - 2] - osc[i - 4])) / 1.5
+            in_phase = osc[i - 3]
+            theta_rad = np.arctan2(in_phase, q + 1e-12)
+            theta_deg = (np.degrees(theta_rad) + 90.0 + 360.0) % 360.0
             phases.append(theta_deg)
 
         if len(phases) < median_window + 1:
-            return HilbertResult(dominant_cycle=24, phase=90.0, phase_state="MARKUP", bias="CYCLE ACCUMULATION", outliers_cleaned=outliers_detected)
+            return HilbertResult(
+                dominant_cycle=0,
+                phase=0.0,
+                phase_state="INSUFFICIENT_DATA",
+                bias="NEUTRAL",
+                outliers_cleaned=outliers_detected,
+            )
 
         d_theta: List[float] = []
         for j in range(1, len(phases)):

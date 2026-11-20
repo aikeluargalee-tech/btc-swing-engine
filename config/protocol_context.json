@@ -1,14 +1,62 @@
 {
-  "last_reviewed_utc": "2026-10-27T00:00:00Z",
-  "liq_cascade_72h_over_300m": "CONFIRMED_CLEAR",
-  "liq_cascade_reclaimed_within_24h": "CONFIRMED_CLEAR",
+  "_review_note": "Reviewed 2026-11-20 by Milo1 at the operator's instruction ('just do it'). Every claim below was substantiated against a named source or measured from exchange data; nothing was carried over from the 2026-10-27 review and nothing was assumed. Per-claim evidence is in _verification.",
+  "last_reviewed_utc": "2026-11-20T07:24:24Z",
+  "liq_cascade_72h_over_300m": "TRIGGERED",
+  "liq_cascade_reclaimed_within_24h": "FAILED",
   "fomc_cpi_window_override": "AUTO",
-  "s2_risk_level": "LOW",
-  "etf_net_outflow_weakness": "NOT_CONFIRMED",
-  "catalyst_technical_breakdown": "NOT_CONFIRMED",
-  "enforce_200d_hard_veto_on_tab1": false,
+  "s2_risk_level": "HIGH",
+  "etf_net_outflow_weakness": "CONFIRMED",
+  "catalyst_technical_breakdown": "CONFIRMED",
+  "enforce_200d_hard_veto_on_tab1": true,
   "cycle_ath_override_usd": 109588.0,
   "short_liq_magnet_override_usd": 0.0,
   "long_liq_magnet_override_usd": 0.0,
-  "headline_classification": "NONE_SIGNIFICANT"
+  "headline_classification": "STRUCTURAL_DELAYED",
+  "_verification": {
+    "liq_cascade_72h_over_300m": {
+      "value": "TRIGGERED",
+      "basis": "Total crypto liquidations topped $1.4B on 2026-11-20, of which $1.31B were longs; the largest single liquidation was a $31.09M BTC long on Hyperliquid. A separate report measured $622M liquidated within a four-hour window the same day. Either figure exceeds the $300M 72h threshold on its own.",
+      "sources": [
+        "Crypto Journal, 2026-11-20: 'Bitcoin below $70,000 as liquidations top $1.4 billion'",
+        "TradingView / CryptoBriefing, 2026-11-20: 'Bitcoin plunges below $70,000 as liquidations reach $622M'"
+      ]
+    },
+    "liq_cascade_reclaimed_within_24h": {
+      "value": "FAILED",
+      "basis": "No reclaim occurred. Binance BTCUSDT 1D closed at $61,820 with a 3-day low of $61,290.58 and a 3-day high of $65,002.00, so price ended the window near its low rather than reclaiming the cascade level.",
+      "sources": [
+        "Binance BTCUSDT 1D klines, measured at review time"
+      ]
+    },
+    "s2_risk_level": {
+      "value": "HIGH",
+      "basis": "A $1.4B liquidation event, price 14.85% below the 1D SMA200, and roughly $2.9B of cumulative spot-ETF outflows. This is not a LOW-risk tape.",
+      "sources": [
+        "Binance BTCUSDT 1D klines",
+        "ETF flow reporting below"
+      ]
+    },
+    "etf_net_outflow_weakness": {
+      "value": "CONFIRMED",
+      "basis": "$582M of net outflows on 2026-11-19, following a seven-trading-day outflow streak, with cumulative outflows reported near $2.9-3B.",
+      "sources": [
+        "Bloomingbit / Farside Investors: U.S. spot-BTC ETF flow reporting, Nov 2026",
+        "Reported figures: '$582 Million in Net Outflows on November 19'; 'spot ETF outflows near $3 billion'"
+      ]
+    },
+    "catalyst_technical_breakdown": {
+      "value": "CONFIRMED",
+      "basis": "Price closed at $61,820 against a 1D SMA200 of $72,603.53, i.e. 14.85% below the 200-day and at 3-day lows. Structure is broken on the daily.",
+      "sources": [
+        "Binance BTCUSDT 1D klines, measured at review time"
+      ]
+    },
+    "enforce_200d_hard_veto_on_tab1": {
+      "value": true,
+      "basis": "Turned ON. Price is 14.85% below the 200D SMA, which is the exact condition this flag exists for. It was OFF in the previous review while price was already below the 200D.",
+      "sources": [
+        "Binance BTCUSDT 1D klines"
+      ]
+    }
+  }
 }

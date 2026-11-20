@@ -87,6 +87,7 @@ class SignalDetector:
         self._last_logged_regime: Optional[MarketRegime] = None
         self._last_logged_gate: Optional[ExecutionGateState] = None
         self._last_log_ts: float = 0.0
+        self._last_bimodal_warn_key: Optional[Tuple[float, float]] = None
 
     def _detect_value_area_reclaim(
         self,
@@ -376,11 +377,16 @@ class SignalDetector:
         store.session_profile = session_vp
 
         if macro_vp is not None and getattr(macro_vp, "is_bimodal", False):
-            logger.warning(
-                "Macro profile is BIMODAL (peaks $%s & $%s) — single 30D VA suppressed; degrading gracefully.",
-                f"{macro_vp.c_poc:,.2f}",
-                f"{macro_vp.secondary_poc:,.2f}" if macro_vp.secondary_poc is not None else "N/A",
-            )
+            bm_key = (round(float(macro_vp.c_poc), 2), round(float(macro_vp.secondary_poc or 0.0), 2))
+            if bm_key != self._last_bimodal_warn_key:
+                self._last_bimodal_warn_key = bm_key
+                logger.warning(
+                    "Macro profile is BIMODAL (peaks $%s & $%s) — single 30D VA suppressed; degrading gracefully.",
+                    f"{macro_vp.c_poc:,.2f}",
+                    f"{macro_vp.secondary_poc:,.2f}" if macro_vp.secondary_poc is not None else "N/A",
+                )
+        else:
+            self._last_bimodal_warn_key = None
 
         macro_vp_usable = (
             macro_vp

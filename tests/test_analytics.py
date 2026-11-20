@@ -461,6 +461,135 @@ class TestBTCAnalyticsEngine(unittest.TestCase):
         self.assertIn(msev.master_why_resolution, ai_packet)
         self.assertIn(msev.master_final_command, ai_packet)
 
+    @staticmethod
+    def _generate_bimodal_1h_bars() -> List[KlineBar]:
+        """Generates a 720-bar 1H bimodal series (~$80.5k upper mode, ~$65.0k lower mode)."""
+        bars: List[KlineBar] = []
+        base_ts = 1_720_000_000_000
+        for i in range(720):
+            ts = base_ts + i * 3_600_000
+            if i < 345:
+                # Upper mode centered at $80,500
+                k = (i % 23) - 11
+                center = 80_500.0 + k * 60.0
+                vol = 1_000.0 if abs(k) <= 4 else 500.0
+            elif i < 375:
+                # Sparse transition bridge through $72k LVN
+                center = 80_000.0 - ((i - 345) * 500.0)
+                vol = 120.0
+            else:
+                # Lower mode centered at $65,000 (~3% lower volume than upper mode)
+                k = (i % 23) - 11
+                center = 65_000.0 + k * 60.0
+                vol = 970.0 if abs(k) <= 4 else 485.0
+            bars.append(
+                KlineBar(
+                    timestamp_ms=ts,
+                    open=center - 60.0,
+                    high=center + 140.0,
+                    low=center - 140.0,
+                    close=center + 60.0,
+                    volume=vol,
+                    taker_buy_volume=vol * 0.51,
+                )
+            )
+        return bars
+
+    def test_bimodal_profile_poc_stability_and_detection(self) -> None:
+        unimodal_vp = compute_composite_profile(_generate_synthetic_consolidation_bars(240), num_bins=100)
+        assert unimodal_vp is not None
+        self.assertFalse(unimodal_vp.is_bimodal)
+        self.assertIsNone(unimodal_vp.secondary_poc)
+
+        bars = self._generate_bimodal_1h_bars()
+        pocs = []
+        for nb in range(100, 151):
+            vp = compute_composite_profile(bars, horizon_label="30D Macro", num_bins=nb)
+            self.assertIsNotNone(vp)
+            assert vp is not None
+            self.assertTrue(vp.is_bimodal, f"Expected bimodal flag at num_bins={nb}")
+            self.assertIsNotNone(vp.secondary_poc, f"Expected secondary_poc at num_bins={nb}")
+            pocs.append(vp.c_poc)
+
+        self.assertLess(max(pocs) - min(pocs), 600.0)
+        self.assertGreater(min(pocs), 79_500.0)
+
+    def test_bimodal_macro_profile_degrades_gracefully_in_detector_and_hub(self) -> None:
+        from analytics.data_hub_engine import UNAVAILABLE, DataHubEngine
+
+        store = StateStore()
+        spot_1h = self._generate_bimodal_1h_bars()
+        perp_1h = self._generate_bimodal_1h_bars()
+        store.spot_klines_1h.extend(spot_1h)
+        store.perp_klines_1h.extend(perp_1h)
+        store.spot_klines_15m.extend(_generate_synthetic_consolidation_bars(120))
+        store.perp_klines_15m.extend(_generate_synthetic_consolidation_bars(120))
+        store.binance_spot_price = spot_1h[-1].close
+        store.binance_perp_price = perp_1h[-1].close
+        store.coinbase_spot_price = spot_1h[-1].close + 15.0
+
+        detector = SignalDetector(TEST_CONFIG)
+        ev = detector.evaluate(store)
+        self.assertIsNotNone(ev)
+        assert ev is not None
+        self.assertEqual(ev.active_horizon, f"{TEST_CONFIG.tactical_profile_days}D Tactical")
+        self.assertIsNotNone(store.macro_profile)
+        assert store.macro_profile is not None
+        self.assertTrue(store.macro_profile.is_bimodal)
+        self.assertIsNotNone(store.regime_matrix_evaluation)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            hub_ev = DataHubEngine(TEST_CONFIG, db_path=Path(tmp) / "hub.sqlite", write_archive=False).evaluate(store)
+        rows = {r.label: r for r in (hub_ev.panel_1_feeds + hub_ev.panel_2_trend_vol)}
+        self.assertIn("BIMODAL", rows["Macro 30D VAH / POC / VAL"].value)
+        self.assertEqual(rows["Macro 30D VAH / POC / VAL"].status, "UNAVAILABLE")
+        self.assertIn(UNAVAILABLE, rows["30D VA Pos% & Dist to VAL"].value)
+        self.assertEqual(rows["30D VA Pos% & Dist to VAL"].status, "UNAVAILABLE")
+        self.assertEqual(rows["Binance Spot / Perp ($)"].status, "OK")
+        self.assertEqual(rows["Spot/Perp CVD (15m / 1h)"].status, "OK")
+        self.assertEqual(
+            hub_ev.ok_count + hub_ev.unavailable_count + hub_ev.stale_count + hub_ev.proxy_or_static_count,
+            hub_ev.total_metrics,
+        )
+
+    def test_rejected_macro_profile_range_guard_degrades_without_cascading(self) -> None:
+        from unittest.mock import patch
+        from analytics.data_hub_engine import UNAVAILABLE, DataHubEngine
+
+        store = StateStore()
+        spot_1h = _generate_synthetic_consolidation_bars(240)
+        perp_1h = _generate_synthetic_consolidation_bars(240)
+        store.spot_klines_1h.extend(spot_1h)
+        store.perp_klines_1h.extend(perp_1h)
+        store.spot_klines_15m.extend(_generate_synthetic_consolidation_bars(120))
+        store.perp_klines_15m.extend(_generate_synthetic_consolidation_bars(120))
+        store.binance_spot_price = spot_1h[-1].close
+        store.binance_perp_price = perp_1h[-1].close
+
+        detector = SignalDetector(TEST_CONFIG)
+        # Verify the exact range-match guard rejects a mismatched profile
+        mismatched = compute_composite_profile(spot_1h, num_bins=100)
+        assert mismatched is not None
+        mismatched.range_low -= 500.0
+        self.assertIsNone(detector._reject_implausible_profile(mismatched, spot_1h, 720, store))
+
+        # When macro_profile is rejected -> None, SignalDetector must still evaluate dependent tabs
+        with patch.object(detector, "_reject_implausible_profile", return_value=None):
+            ev = detector.evaluate(store)
+        self.assertIsNotNone(ev)
+        self.assertIsNone(store.macro_profile)
+        self.assertIsNotNone(store.regime_matrix_evaluation)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            hub_ev = DataHubEngine(TEST_CONFIG, db_path=Path(tmp) / "hub.sqlite", write_archive=False).evaluate(store)
+        rows = {r.label: r for r in (hub_ev.panel_1_feeds + hub_ev.panel_2_trend_vol)}
+        self.assertEqual(rows["Macro 30D VAH / POC / VAL"].value, UNAVAILABLE)
+        self.assertEqual(rows["Macro 30D VAH / POC / VAL"].status, "UNAVAILABLE")
+        self.assertEqual(rows["30D VA Pos% & Dist to VAL"].value, UNAVAILABLE)
+        self.assertEqual(rows["30D VA Pos% & Dist to VAL"].status, "UNAVAILABLE")
+        self.assertEqual(rows["Binance Spot / Perp ($)"].status, "OK")
+        self.assertEqual(rows["Spot/Perp CVD (15m / 1h)"].status, "OK")
+
 
 if __name__ == "__main__":
     unittest.main()

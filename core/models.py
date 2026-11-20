@@ -334,6 +334,14 @@ class VolumeProfileResult:
 
 
 
+    is_bimodal: bool = False
+
+
+
+    secondary_poc: Optional[float] = None
+
+
+
 
 
 

@@ -375,13 +375,18 @@ class SignalDetector:
         store.tactical_profile = tactical_vp
         store.session_profile = session_vp
 
-        if macro_vp is None or tactical_vp is None:
-            if hasattr(store, "footprint_engine") and store.footprint_engine is not None:
-                try:
-                    store.footprint_evaluation = store.footprint_engine.evaluate(store)
-                except Exception:
-                    pass
-            return None
+        if macro_vp is not None and getattr(macro_vp, "is_bimodal", False):
+            logger.warning(
+                "Macro profile is BIMODAL (peaks $%s & $%s) — single 30D VA suppressed; degrading gracefully.",
+                f"{macro_vp.c_poc:,.2f}",
+                f"{macro_vp.secondary_poc:,.2f}" if macro_vp.secondary_poc is not None else "N/A",
+            )
+
+        macro_vp_usable = (
+            macro_vp
+            if (macro_vp is not None and not getattr(macro_vp, "is_bimodal", False))
+            else None
+        )
 
         # 2. Compute Order Flow & Derivatives Snapshots
         flow = compute_flow_snapshot(self.config, store)
@@ -391,10 +396,10 @@ class SignalDetector:
 
         # 2b. Evaluate Tab [2] Protocol v1.3, Tab [3] Macro Radar, Tab [4] Regime Matrix A-J, Special Tab [S1] MM-BTC, Special Tab [S2] Volatility Cone, & Special Tab [S3] Gartley 222
         protocol_ev = self.protocol_evaluator.evaluate(store, flow, deriv)
-        macro_ev = self.macro_evaluator.evaluate(store, flow, deriv, macro_vp)
-        self.regime_matrix_evaluator.evaluate(store, flow, deriv, macro_vp)
+        macro_ev = self.macro_evaluator.evaluate(store, flow, deriv, macro_vp_usable)
+        self.regime_matrix_evaluator.evaluate(store, flow, deriv, macro_vp_usable)
         self.mm_btc_engine.evaluate(store, spot_1h, spot_15m, deriv)
-        self.volatility_cone_engine.evaluate(store, spot_1h, macro_vp)
+        self.volatility_cone_engine.evaluate(store, spot_1h, macro_vp_usable)
         self.gartley_engine.evaluate(store)
 
         current_price = store.binance_spot_price or spot_1h[-1].close
@@ -403,8 +408,16 @@ class SignalDetector:
         atr_4h = max(compute_atr(bars_4h[-30:], period=self.config.atr_period), 1.0)
 
         # Select active structural profile:
-        # Primary structure is 30D Macro Profile; switch to 7D Tactical only when expanding above 30D cVAH
-        active_vp = tactical_vp if current_price > macro_vp.c_vah else macro_vp
+        # Primary structure is 30D Macro Profile (when available & unimodal); switch to 7D Tactical
+        # when expanding above 30D cVAH or when 30D Macro is unavailable/bimodal.
+        if macro_vp_usable is not None:
+            active_vp = (
+                tactical_vp
+                if (tactical_vp is not None and current_price > macro_vp_usable.c_vah)
+                else macro_vp_usable
+            )
+        else:
+            active_vp = tactical_vp
 
         # 2c. Evaluate Special Tab [S4]: Pattern Invalidation & Special Tab [S5]: Terminal Exhaustion
         self.trap_engine.evaluate(store, spot_1h, spot_15m, deriv, flow, active_vp=active_vp)
@@ -481,6 +494,13 @@ class SignalDetector:
         except Exception:
             logging.getLogger("futures_v4").exception("Futures Protocol v4.0 evaluation failed")
 
+        if active_vp is None:
+            try:
+                self.data_hub_engine.evaluate(store)
+            except Exception:
+                logging.getLogger("data_hub").exception("Unified Data Hub evaluation failed")
+            return None
+
         c_vah = active_vp.c_vah
         c_poc = active_vp.c_poc
         c_val = active_vp.c_val
@@ -499,7 +519,10 @@ class SignalDetector:
         # --- GATE 1: Structural Location Score (Max 25 pts) ---
         location_score = 0.0
         in_val_zone = abs(dist_to_val_atr) <= self.config.val_proximity_atr_mult
-        in_tact_val_zone = abs(current_price - tactical_vp.c_val) <= self.config.val_proximity_atr_mult * atr_1h
+        in_tact_val_zone = (
+            tactical_vp is not None
+            and abs(current_price - tactical_vp.c_val) <= self.config.val_proximity_atr_mult * atr_1h
+        )
         sweeping_lvn = (
             current_price < c_val
             and (support_hvn is None or current_price >= support_hvn - 0.25 * atr_1h)

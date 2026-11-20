@@ -558,6 +558,28 @@ class DataHubEngine:
             f"Asia:{_fmt_price(asia_l) or 'N/A'}-{_fmt_price(asia_h) or 'N/A'}"
         ) if struct_any else None
 
+        if mv is None:
+            macro_vp_row = _row("Macro 30D VAH / POC / VAL", None, "1,3,6,11,19")
+        elif getattr(mv, "is_bimodal", False):
+            sec_poc = getattr(mv, "secondary_poc", None)
+            peaks_s = (
+                f"{_fmt_price(mv.c_poc)} & {_fmt_price(sec_poc)}"
+                if _valid_num(sec_poc, allow_zero=False)
+                else f"{_fmt_price(mv.c_poc)}"
+            )
+            macro_vp_row = _row(
+                "Macro 30D VAH / POC / VAL",
+                f"BIMODAL (Peaks: {peaks_s} — single VA UNAVAILABLE)",
+                "1,3,6,11,19",
+                "UNAVAILABLE",
+            )
+        else:
+            macro_vp_row = _row(
+                "Macro 30D VAH / POC / VAL",
+                f"{_fmt_price(mv.c_vah)} / {_fmt_price(mv.c_poc)} / {_fmt_price(mv.c_val)}",
+                "1,3,6,11,19",
+            )
+
         panel_1 = [
             _row("Binance Spot / Perp ($)", f"{_fmt_price(spot_px) or UNAVAILABLE} / {_fmt_price(perp_px) or UNAVAILABLE}", "All Tabs", "OK" if spot_px > 0 else "UNAVAILABLE"),
             _row("Coinbase Spot ($)", _fmt_price(cb_px), "1,11,15,17"),
@@ -570,7 +592,7 @@ class DataHubEngine:
             _row("RSI(14) 1D / 4H & 4H ROC12", f"1D:{_fmt_num(rsi_1d, '.1f') or 'N/A'} · 4H:{_fmt_num(rsi_4h, '.1f') or 'N/A'} · ROC:{_fmt_num(roc12_4h, '+.2f', True, '%') or 'N/A'}" if (rsi_1d is not None or rsi_4h is not None) else None, "3,7,20"),
             _row("ADX(14) 1D/4H & ATR(14) 1D/4H/1H", f"ADX 1D:{_fmt_num(adx_1d, '.1f') or 'N/A'} 4H:{_fmt_num(adx_4h, '.1f') or 'N/A'} | ATR:{_fmt_price(atr_1d) or 'N/A'}/{_fmt_price(atr_4h) or 'N/A'}/{_fmt_price(atr_1h) or 'N/A'}" if (adx_1d or adx_4h or atr_1d or atr_4h or atr_1h) else None, "0,1,2,8,13,18,20"),
             _row("4H ATR(14)% Pctile & RelVol(20)", f"ATR%:{_fmt_num(atr4h_pct, '.2f', False, '%') or 'N/A'} ({_fmt_num(atr4h_pctile, '.0f', False, 'th') or 'N/A'} pct/120b) · RelVol:{_fmt_num(rel_vol_4h, '.2f', False, 'x') or 'N/A'}" if (atr4h_pct is not None or rel_vol_4h is not None) else None, "0,1,2,20"),
-            _row("Macro 30D VAH / POC / VAL", f"{_fmt_price(mv.c_vah)} / {_fmt_price(mv.c_poc)} / {_fmt_price(mv.c_val)}" if mv else None, "1,3,6,11,19"),
+            macro_vp_row,
             _row("Structure (L20/H20, PW, Asia)", struct_str, "0,8,11,19"),
         ]
 
@@ -634,6 +656,17 @@ class DataHubEngine:
             else None
         )
 
+        if mv is None:
+            va_pos_row = _row("30D VA Pos% & Dist to VAL", None, "1")
+        elif getattr(mv, "is_bimodal", False):
+            va_pos_row = _row("30D VA Pos% & Dist to VAL", "BIMODAL — DATA UNAVAILABLE", "1", "UNAVAILABLE")
+        else:
+            va_pos_row = _row(
+                "30D VA Pos% & Dist to VAL",
+                f"{_fmt_num(getattr(sig, 'va_position_pct', None), '.1f', True, '%')} | {_fmt_num(getattr(sig, 'distance_to_val_pct', None), '+.2f', True, '%')} ({_fmt_num(getattr(sig, 'distance_to_val_atr', None), '+.2f', True, ' ATR')})" if sig else None,
+                "1",
+            )
+
         panel_2 = [
             _row("Spot/Perp CVD (15m / 1h)", f"15m:{_fmt_num(getattr(w15, 'spot_delta_btc', None), '+.1f')}/{_fmt_num(getattr(w15, 'perp_delta_btc', None), '+.1f')} | 1h:{_fmt_num(getattr(w1h, 'spot_delta_btc', None), '+.1f')}/{_fmt_num(getattr(w1h, 'perp_delta_btc', None), '+.1f')} BTC" if (w15 and w1h) else None, "1,8,15"),
             _row("Spot/Perp CVD (4h / 24h)", f"4h:{_fmt_num(getattr(w4h, 'spot_delta_btc', None), '+.1f')}/{_fmt_num(getattr(w4h, 'perp_delta_btc', None), '+.1f')} | 24h:{_fmt_num(getattr(w24, 'spot_delta_btc', None), '+.1f')}/{_fmt_num(getattr(w24, 'perp_delta_btc', None), '+.1f')} BTC" if (w4h and w24) else None, "0,1,15,16,17"),
@@ -645,7 +678,7 @@ class DataHubEngine:
             _row("Cross-Exch 24H Spot Vol (BN/CB)", xexch_vol_str, "1,11,Macro"),
             _row("L2 Depth ±1%/±2%, OBI & Spread", depth_str, "16,Macro"),
             _row("Tactical 7D / Session 24H VP", vp_pair_str, "1,11"),
-            _row("30D VA Pos% & Dist to VAL", f"{_fmt_num(getattr(sig, 'va_position_pct', None), '.1f', True, '%')} | {_fmt_num(getattr(sig, 'distance_to_val_pct', None), '+.2f', True, '%')} ({_fmt_num(getattr(sig, 'distance_to_val_atr', None), '+.2f', True, ' ATR')})" if sig else None, "1"),
+            va_pos_row,
             _row("SLSP Support / Resistance", f"Sup:{_fmt_price(nsup) or 'N/A'} | Res:{_fmt_price(nres) or 'N/A'}" if (nsup or nres) else None, "13"),
         ]
 

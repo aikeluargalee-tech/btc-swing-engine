@@ -19,6 +19,49 @@ def _gaussian_smooth_1d(values: np.ndarray, sigma: float = 1.5) -> np.ndarray:
     return np.convolve(padded, kernel, mode="valid")
 
 
+def _detect_bimodal_peaks(
+    smoothed: np.ndarray,
+    bin_centers: np.ndarray,
+    min_peak_sep_bins: int = 4,
+    max_peak_diff_ratio: float = 0.05,
+    max_valley_ratio: float = 0.85,
+) -> tuple[bool, Optional[float]]:
+    """Detects whether a smoothed volume distribution has two competing modes within ~5% volume."""
+    n = len(smoothed)
+    if n < 3:
+        return False, None
+
+    peaks: List[int] = []
+    for i in range(n):
+        left = float(smoothed[i - 1]) if i > 0 else -1.0
+        right = float(smoothed[i + 1]) if i < n - 1 else -1.0
+        cur = float(smoothed[i])
+        if cur >= left and cur >= right and (cur > left or cur > right):
+            peaks.append(i)
+
+    if len(peaks) < 2:
+        return False, None
+
+    peaks.sort(key=lambda idx: float(smoothed[idx]), reverse=True)
+    p1_idx = peaks[0]
+    p1_vol = float(smoothed[p1_idx])
+    if p1_vol <= 0.0:
+        return False, None
+
+    for p2_idx in peaks[1:]:
+        p2_vol = float(smoothed[p2_idx])
+        if (p1_vol - p2_vol) / p1_vol > max_peak_diff_ratio:
+            break
+        if abs(p2_idx - p1_idx) < min_peak_sep_bins:
+            continue
+        lo, hi = min(p1_idx, p2_idx), max(p1_idx, p2_idx)
+        valley_vol = float(np.min(smoothed[lo : hi + 1]))
+        if valley_vol <= max_valley_ratio * p2_vol:
+            return True, float(bin_centers[p2_idx])
+
+    return False, None
+
+
 def compute_composite_profile(
     bars: Sequence[KlineBar],
     horizon_label: str = "30D Macro",
@@ -75,9 +118,19 @@ def compute_composite_profile(
     if total_vol <= 0:
         return None
 
-    # 1. Point of Control (cPOC)
-    poc_idx = int(np.argmax(bin_volumes))
+    # Gaussian-smooth the histogram prior to POC & topology detection so a shifting
+    # linspace grid cannot flip POC by $15k+ on a raw single-bin volume tie.
+    smoothed = _gaussian_smooth_1d(bin_volumes, sigma=gaussian_sigma)
+
+    # 1. Point of Control (cPOC) on Gaussian-smoothed volumes
+    poc_idx = int(np.argmax(smoothed))
     c_poc = float(bin_centers[poc_idx])
+    min_sep = max(4, int(round(3.0 * gaussian_sigma))) if gaussian_sigma > 0 else 4
+    is_bimodal, secondary_poc = _detect_bimodal_peaks(
+        smoothed,
+        bin_centers,
+        min_peak_sep_bins=min_sep,
+    )
 
     # 2. CME-Standard 70% Value Area Expansion
     target_va_vol = total_vol * value_area_pct
@@ -125,7 +178,6 @@ def compute_composite_profile(
     c_vah = float(bin_centers[high_idx])
 
     # 3. Gaussian-Smoothed Topology for HVN and LVN Detection
-    smoothed = _gaussian_smooth_1d(bin_volumes, sigma=gaussian_sigma)
     mean_bin_vol = float(np.mean(smoothed))
 
     lvn_levels: List[float] = []
@@ -182,6 +234,8 @@ def compute_composite_profile(
         support_hvn_below_val=support_hvn_below_val,
         bin_centers=[float(x) for x in bin_centers],
         bin_volumes=[float(x) for x in bin_volumes],
+        is_bimodal=is_bimodal,
+        secondary_poc=secondary_poc,
     )
 
 

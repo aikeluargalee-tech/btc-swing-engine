@@ -216,26 +216,13 @@ def _format_modeled_liq_ladder(mag: Any) -> Optional[str]:
             elif t.get("side") == "lower":
                 dn_parts.append(part)
         if up_parts and dn_parts:
-            return f"Up[{' / '.join(up_parts)}] | Dn[{' / '.join(dn_parts)}] [Modeled]"
+            ls_assumed = any(isinstance(t, dict) and t.get("ls_source") == "ASSUMED_1.0" for t in tiers_6)
+            tag = " [Modeled \u00b7 L/S assumed 1.0]" if ls_assumed else " [Modeled]"
+            return f"Up[{' / '.join(up_parts)}] | Dn[{' / '.join(dn_parts)}]{tag}"
 
-    bands = ladder.get("bands")
-    if isinstance(bands, dict) and bands:
-        up_keys = ("100x_short", "25x_short", "10x_short")
-        dn_keys = ("100x_long", "25x_long", "10x_long")
-        up_parts = []
-        dn_parts = []
-        for k in up_keys:
-            b = bands.get(k)
-            if isinstance(b, dict) and _valid_num(b.get("price")):
-                vm = float(b.get("usd", 0.0)) / 1e6
-                up_parts.append(f"{k.split('_')[0]}:${float(b['price']):,.0f}(${vm:.0f}M)")
-        for k in dn_keys:
-            b = bands.get(k)
-            if isinstance(b, dict) and _valid_num(b.get("price")):
-                vm = float(b.get("usd", 0.0)) / 1e6
-                dn_parts.append(f"{k.split('_')[0]}:${float(b['price']):,.0f}(${vm:.0f}M)")
-        if up_parts and dn_parts:
-            return f"Up[{' / '.join(up_parts)}] | Dn[{' / '.join(dn_parts)}] [Modeled]"
+    # No tiers means no ladder. The old fallback printed a hardcoded band set
+    # (45M/85M/110M short / 95M/140M/190M long) that never moved with open interest, so a
+    # missing evaluation still produced a confident-looking $M ladder.
     return None
 
 
@@ -616,6 +603,7 @@ class DataHubEngine:
         tot_vol_24h = (bn_vol_24h or 0.0) + (cb_vol_24h or 0.0)
         xexch_vol_str = (
             f"BN:{_fmt_num(bn_vol_24h, ',.0f', False) or 'N/A'} · CB:{_fmt_num(cb_vol_24h, ',.0f', False) or 'N/A'} · Tot:{tot_vol_24h:,.0f} BTC"
+            + ("" if (bn_vol_24h is not None and cb_vol_24h is not None) else " (partial)")
             if (bn_vol_24h or cb_vol_24h) else None
         )
 
@@ -771,6 +759,9 @@ class DataHubEngine:
         dn_mag = _first_num(getattr(slsp, "lower_magnet_price", None), getattr(getattr(mag, "lower_magnet", None), "price", None), getattr(getattr(ss, "magnet", None), "long_liq_magnet", None), allow_zero=False)
         imm_r = _first_num(getattr(slsp, "immediate_ratio", None), getattr(mag, "immediate_ratio", None))
         tot_r = _first_num(getattr(slsp, "total_ladder_ratio", None), getattr(mag, "total_ladder_ratio", None))
+        _ladder_bands = (getattr(mag, "levels_ladder", None) or {}).get("bands") if mag is not None else None
+        if not _ladder_bands:
+            tot_r = None      # a ratio of two zero totals is not a measurement
         pull_r = _first_num(getattr(mag, "pull_ratio", None))
         lsce_st = getattr(mag, "lsce_status", None) or getattr(slsp, "lsce_status", None)
 

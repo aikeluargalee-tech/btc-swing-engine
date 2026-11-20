@@ -55,6 +55,9 @@ class TestBTCMagnetEngine(unittest.TestCase):
         self.store.funding_rate_pct = 0.0055  # ~6.0% annual
         self.store.high_24h = 76_800.0
         self.store.low_24h = 75_200.0
+        # The ladder is OI-scaled. This fixture previously supplied no open interest and still
+        # produced a ladder, because the engine fell back to an assumed $5B baseline.
+        self.store.open_interest_btc = 79_000.0
 
         for b in _create_synthetic_bars(count=48, base_price=75_000.0):
             self.store.spot_klines_1h.append(b)

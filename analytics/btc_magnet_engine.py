@@ -913,22 +913,47 @@ class BTCMagnetEngine:
         """
         upper, lower = self._get_liquidation_magnets(spot_price, store=store)
 
-        # Scale 100x band to the immediate cluster volume if higher
-        imm_short_usd = max(upper.usd_volume, 4_200_000.0)
-        imm_long_usd = max(lower.usd_volume, 102_800_000.0)
+        # These bands used to be literal dollars (45M/85M/110M short, 95M/140M/190M long) at
+        # fixed percentages of spot, so they never moved with the market while being published
+        # beside measured open interest. A modeled shelf must scale with OI or not exist.
+        oi_btc_bands = 0.0
+        if store is not None:
+            oi_btc_bands = float(getattr(store, "open_interest_btc", 0.0) or 0.0)
+            if oi_btc_bands <= 0.0 and getattr(store, "derivatives_snapshot", None) is not None:
+                oi_btc_bands = float(getattr(store.derivatives_snapshot, "open_interest_btc", 0.0) or 0.0)
+        oi_m_bands = (oi_btc_bands * spot_price) / 1e6 if oi_btc_bands > 0.0 else 0.0
 
-        short_bands = {
-            "100x_short": {"price": round(spot_price * 1.008, 2), "usd": imm_short_usd},
-            "50x_short": {"price": round(spot_price * 1.018, 2), "usd": 45_000_000.0},
-            "25x_short": {"price": round(spot_price * 1.034, 2), "usd": 85_000_000.0},
-            "10x_short": {"price": round(spot_price * 1.075, 2), "usd": 110_000_000.0},
-        }
-        long_bands = {
-            "100x_long": {"price": round(spot_price * 0.994, 2), "usd": imm_long_usd},
-            "50x_long": {"price": round(spot_price * 0.982, 2), "usd": 95_000_000.0},
-            "25x_long": {"price": round(spot_price * 0.965, 2), "usd": 140_000_000.0},
-            "10x_long": {"price": round(spot_price * 0.915, 2), "usd": 190_000_000.0},
-        }
+        # The immediate tier used fixed floors (4.2M / 102.8M) that invented volume whenever the
+        # live cluster was absent. Fall back to an OI share instead, and to zero when OI is absent.
+        imm_short_usd = (
+            float(upper.usd_volume) if upper.usd_volume > 0.0
+            else (oi_m_bands * 0.008 * 1e6 if oi_m_bands > 0.0 else 0.0)
+        )
+        imm_long_usd = (
+            float(lower.usd_volume) if lower.usd_volume > 0.0
+            else (oi_m_bands * 0.010 * 1e6 if oi_m_bands > 0.0 else 0.0)
+        )
+
+        if oi_m_bands > 0.0:
+            # Liquidation distance is 1/leverage, so the band prices are geometric. The 100x
+            # band stays anchored on the observed cluster when one exists.
+            short_bands = {
+                "100x_short": {"price": round(spot_price * (1.0 + 1/100), 2), "usd": float(upper.usd_volume)},
+                "50x_short":  {"price": round(spot_price * (1.0 + 1/50), 2),  "usd": round(oi_m_bands * 0.018 * 1e6, 2)},
+                "25x_short":  {"price": round(spot_price * (1.0 + 1/25), 2),  "usd": round(oi_m_bands * 0.032 * 1e6, 2)},
+                "10x_short":  {"price": round(spot_price * (1.0 + 1/10), 2),  "usd": round(oi_m_bands * 0.024 * 1e6, 2)},
+            }
+            long_bands = {
+                "100x_long": {"price": round(spot_price * (1.0 - 1/100), 2), "usd": float(lower.usd_volume)},
+                "50x_long":  {"price": round(spot_price * (1.0 - 1/50), 2),  "usd": round(oi_m_bands * 0.020 * 1e6, 2)},
+                "25x_long":  {"price": round(spot_price * (1.0 - 1/25), 2),  "usd": round(oi_m_bands * 0.040 * 1e6, 2)},
+                "10x_long":  {"price": round(spot_price * (1.0 - 1/10), 2),  "usd": round(oi_m_bands * 0.028 * 1e6, 2)},
+            }
+        else:
+            # No open interest means no ladder. Publishing one from an assumed $5B baseline is
+            # how a fabricated number looks measured.
+            short_bands = {}
+            long_bands = {}
 
         # Dynamic sum of bands guarantees total >= immediate
         tot_upper_usd = round(sum(b["usd"] for b in short_bands.values()), 2)
@@ -968,8 +993,14 @@ class BTCMagnetEngine:
             oi_btc = float(getattr(store, "open_interest_btc", 0.0) or 0.0)
             if oi_btc <= 0.0 and getattr(store, "derivatives_snapshot", None) is not None:
                 oi_btc = float(getattr(store.derivatives_snapshot, "open_interest_btc", 0.0) or 0.0)
-        oi_source = "MEASURED_OI" if oi_btc > 0.0 else "ESTIMATED_BASELINE"
-        oi_notional_m = max(10.0, (oi_btc * cur_p) / 1e6) if oi_btc > 0.0 else 5000.0
+        if oi_btc <= 0.0:
+            # No open interest means no ladder. This used to fall back to an assumed $5,000M
+            # notional, so a missing OI feed still published full $M volumes - and the oi_source
+            # tag that recorded the assumption was written and never read by anything.
+            return []
+        oi_source = "MEASURED_OI"
+        oi_notional_m = max(10.0, (oi_btc * cur_p) / 1e6)
+        ls_source = "MEASURED" if long_short_ratio > 0.0 else "ASSUMED_1.0"
         ls = long_short_ratio if long_short_ratio > 0.0 else 1.0
         long_share = ls / (1.0 + ls)
         l_crowd_w = max(0.50, long_share / 0.50)
@@ -986,12 +1017,15 @@ class BTCMagnetEngine:
         lo_ref = min(swing_low_4h, cur_p)
         use_up_near = (cur_p * 1.002) <= upper.price <= (hi_ref * 1.035)
         use_lo_near = (lo_ref * 0.965) <= lower.price <= (cur_p * 0.998)
-        u_near_p = round(upper.price, 2) if use_up_near else round(max(swing_high_4h * 1.005, cur_p * 1.008), 2)
-        s25_p = round(max(swing_high_4h * 1.012, u_near_p * 1.010), 2)
-        s10_p = round(max(swing_high_4h * 1.025, s25_p * 1.015), 2)
-        l_near_p = round(lower.price, 2) if use_lo_near else round(min(swing_low_4h * 0.995, cur_p * 0.992), 2)
-        l25_p = round(min(swing_low_4h * 0.988, l_near_p * 0.990), 2)
-        l10_p = round(min(swing_low_4h * 0.975, l25_p * 0.985), 2)
+        # A liquidation distance is 1/leverage: 100x ~1%, 25x ~4%, 10x ~10%. The previous prices
+        # were swing-high/swing-low multiples (1.5%/1.2%/2.5%), so tiers labelled 10x-100x sat on
+        # levels that no leverage ratio produces.
+        u_near_p = round(cur_p * (1.0 + 1.0 / 100.0), 2)
+        s25_p = round(cur_p * (1.0 + 1.0 / 25.0), 2)
+        s10_p = round(cur_p * (1.0 + 1.0 / 10.0), 2)
+        l_near_p = round(cur_p * (1.0 - 1.0 / 100.0), 2)
+        l25_p = round(cur_p * (1.0 - 1.0 / 25.0), 2)
+        l10_p = round(cur_p * (1.0 - 1.0 / 10.0), 2)
 
         def _tier(tier: str, lev: str, side: str, lvl: float, vol_m: float, dist_override: Optional[float] = None, is_nearest: bool = False) -> Dict[str, Any]:
             signed_pct = ((lvl - cur_p) / cur_p) * 100.0
@@ -1006,14 +1040,18 @@ class BTCMagnetEngine:
                 "estimated_vol_m": round(vol_m, 1),
                 "modeled": True,
                 "oi_source": oi_source,
+                "ls_source": ls_source,
                 "is_nearest": is_nearest,
             }
 
         return [
             _tier("10x Shorts", "10x", "upper", s10_p, u_10_vol),
             _tier("25x Shorts", "25x", "upper", s25_p, u_25_vol),
-            _tier("50-100x Shorts", "50-100x", "upper", u_near_p, u_near_vol, upper.dist_pct if use_up_near else None, is_nearest=True),
-            _tier("100x Longs", "100x", "lower", l_near_p, l_near_vol, lower.dist_pct if use_lo_near else None, is_nearest=True),
+            # No distance override: the printed distance must follow the printed price. Passing the
+            # observed magnet's distance beside a geometric price made one tier read -1.80% while
+            # its own price sat at -1.00%.
+            _tier("50-100x Shorts", "50-100x", "upper", u_near_p, u_near_vol, None, is_nearest=True),
+            _tier("100x Longs", "100x", "lower", l_near_p, l_near_vol, None, is_nearest=True),
             _tier("25x Longs", "25x", "lower", l25_p, l_25_vol),
             _tier("10x Longs", "10x", "lower", l10_p, l_10_vol),
         ]
@@ -1038,9 +1076,14 @@ class BTCMagnetEngine:
     ) -> Dict[str, str]:
         """Evaluates the 6 descriptive hierarchy factors with explicit UNAVAILABLE/MODELLED tags."""
         src_tag = "LIVE" if liqmap_source in ("LIVE_EDGEORNOT", "CACHED_LIQMAP") else "MODELLED"
+        tot_txt = (
+            f"LOWER {tot_ratio:.2f}x (${tot_l:.1f}M vs ${tot_u:.1f}M)"
+            if (tot_u > 0.0 and tot_l > 0.0)
+            else "UNAVAILABLE (no open interest to scale the ladder)"
+        )
         f1 = (
             f"[{src_tag} 100x / MODELLED Ladder] Immediate: LOWER {imm_ratio:.1f}x (${imm_l:.1f}M vs ${imm_u:.1f}M) | "
-            f"Total Ladder: LOWER {tot_ratio:.2f}x (${tot_l:.1f}M vs ${tot_u:.1f}M)"
+            f"Total Ladder: {tot_txt}"
         )
         spot_str = f"{spot_cvd_ratio:.2f}" if spot_cvd_ratio is not None else "UNAVAILABLE"
         f2 = f"Spot CVD ratio {spot_str} vs Perp CVD {perp_cvd_trend}"

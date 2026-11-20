@@ -582,7 +582,7 @@ class FootprintEngine:
                 active_bz_price = self.active_bar.poc_price
         eval_res.stacked_imbalances_count = stacked_cnt
         eval_res.active_battle_zone = active_bz_price
-        eval_res.auction_completed = bool(getattr(self.active_bar, "auction_completed", True))
+        eval_res.auction_completed = bool(getattr(self.active_bar, "auction_completed", False))
         eval_res.bar_poc_reclaimed = (
             (self.active_bar.close >= self.active_bar.poc_price)
             if (self.active_bar and self.active_bar.poc_price > 0)
@@ -633,7 +633,9 @@ class FootprintEngine:
             liq_rep = getattr(trap_ev, "liquidation_report", None)
             if liq_rep is not None and not str(type(liq_rep)).endswith("MagicMock'>"):
                 flush_active = bool(getattr(liq_rep, "is_extreme_flush", False))
-                stabilized = bool(getattr(liq_rep, "post_flush_stabilized", True))
+                # A veto must fail CLOSED: if stabilisation is unknown during an active flush,
+                # the cascade veto stays armed rather than being silently disarmed.
+                stabilized = bool(getattr(liq_rep, "post_flush_stabilized", False))
                 if flush_active and not stabilized:
                     eval_res.cascade_velocity_veto = True
 
@@ -642,7 +644,7 @@ class FootprintEngine:
             sma200 = getattr(macro_ev, "sma_200_1d", 0.0)
             if isinstance(sma200, (int, float)) and sma200 > 0:
                 eval_res.sma_200_1d = float(sma200)
-                eval_res.above_200d_sma = bool(getattr(macro_ev, "above_200d_sma", True))
+                eval_res.above_200d_sma = bool(getattr(macro_ev, "above_200d_sma", False))
 
         # -------------------------------------------------------------------------
         # GATE 2: POSITIONING FILTER (rest_metrics.py & cvd_engine.py)

@@ -2991,11 +2991,11 @@ def _build_tab_footprint_hud(store: StateStore, header_panel: Panel) -> Group:
         g2_icon = "[bold green][✓][/bold green]" if f_ev.gate2_positioning_crowded else "[dim yellow][○][/dim yellow]"
         g2_text = f"{g2_icon} Gate 2: Perp Short Crowding / CVD Absorption Confirmed"
 
-        auc_tag = "Completed Auction" if getattr(f_ev, "auction_completed", True) else "Unfinished Auction"
+        auc_tag = "Completed Auction" if getattr(f_ev, "auction_completed", False) else "Unfinished Auction"
         g3_icon = "[bold green][✓][/bold green]" if f_ev.gate3_wick_absorption else "[dim yellow][○][/dim yellow]"
         g3_text = f"{g3_icon} Gate 3: Lower-Wick Absorption Held ({auc_tag})"
 
-        poc_tag = "Closed + POC Reclaim" if getattr(f_ev, "bar_poc_reclaimed", True) else "Below Bar POC"
+        poc_tag = "Closed + POC Reclaim" if getattr(f_ev, "bar_poc_reclaimed", False) else "Below Bar POC"
         g4_icon = "[bold green][✓][/bold green]" if f_ev.gate4_delta_flip else "[dim yellow][○][/dim yellow]"
         g4_text = f"{g4_icon} Gate 4: 15m Positive Delta Flip ({poc_tag})"
 
@@ -3236,7 +3236,7 @@ def _build_tab_footprint_hud(store: StateStore, header_panel: Panel) -> Group:
         macro_table.add_row("[dim]30D Volume Profile[/dim]", "[dim]Syncing...[/dim]", "[dim]Waiting for 30D 1H bars[/dim]")
 
     sma200_px = float(getattr(f_ev, "sma_200_1d", 0.0))
-    above_200 = bool(getattr(f_ev, "above_200d_sma", True))
+    above_200 = bool(getattr(f_ev, "above_200d_sma", False))
     if sma200_px > 0:
         sma_badge = "[bold green]ABOVE (1.00% Full Risk)[/bold green]" if above_200 else "[bold yellow]BELOW (0.50% Defensive Risk)[/bold yellow]"
         macro_footer = Text.from_markup(f" • [white]1D 200 SMA Gatekeeper:[/white] [cyan]${sma200_px:,.0f}[/cyan] • {sma_badge}")
@@ -5605,7 +5605,7 @@ def _build_tab17_btc_magnet_hud(
     s_dist = getattr(magnet_eval, "structural_stop_dist_pct", 0.0)
     d_stop = getattr(magnet_eval, "disaster_stop_price", 0.0)
     d_dist = getattr(magnet_eval, "disaster_stop_dist_pct", 0.0)
-    budget_pass = getattr(magnet_eval, "risk_budget_pass", True)
+    budget_pass = getattr(magnet_eval, "risk_budget_pass", False)
 
     budget_badge = "[bold black on green] [OK] PASS (<= 4.5%) [/bold black on green]" if budget_pass else "[bold white on red] [X] FAIL (> 4.5%) [/bold white on red]"
 
@@ -6795,7 +6795,7 @@ async def run_terminal_hud(
         build_dashboard_renderable(config, store),
         console=console,
         refresh_per_second=config.hud_refresh_rate_hz,
-        screen=False,
+        screen=True,
     ) as live:
         while True:
             try:

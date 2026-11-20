@@ -1251,6 +1251,9 @@ class MacroRadarEvaluation:
 
 
     macro_notes: List[str] = field(default_factory=list)
+    # Provenance: "OK" only when a real closed 1D feed produced the daily metrics.
+    # Appended last so existing positional construction is unaffected.
+    data_status: str = "OK"
 
 
 
@@ -1427,6 +1430,9 @@ class RegimeMatrixEvaluation:
 
 
     configs: List[RegimeConfigItem] = field(default_factory=list)
+    # Provenance: "OK" only when a real closed 1D feed produced the daily metrics.
+    # Appended last so existing positional construction is unaffected.
+    data_status: str = "OK"
 
 
 

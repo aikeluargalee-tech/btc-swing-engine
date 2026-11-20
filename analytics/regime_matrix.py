@@ -56,7 +56,14 @@ class RegimeMatrixEvaluator:
     ) -> RegimeMatrixEvaluation:
         """Evaluates all 10 Microstructure Configurations (A-J) against live StateStore telemetry."""
         spot_1h = list(store.spot_klines_1h)
-        spot_1d = list(store.spot_klines_1d) or synthesize_1d_bars_from_1h(spot_1h)
+        spot_1d = list(store.spot_klines_1d)
+        # See macro_radar: no silent 1H->1D synthesis any more, so state the degradation.
+        if len(spot_1d) >= 21:
+            data_status = "OK"
+        elif spot_1d:
+            data_status = f"PARTIAL ({len(spot_1d)} daily bars; 20D/200D metrics degraded)"
+        else:
+            data_status = "UNAVAILABLE (no closed 1D feed; configs use spot only)"
         bars_4h = synthesize_4h_bars(spot_1h)
 
         current_price = store.binance_spot_price or (spot_1h[-1].close if spot_1h else 0.0)
@@ -566,6 +573,7 @@ class RegimeMatrixEvaluator:
                 item.is_active = True
 
         ev = RegimeMatrixEvaluation(
+            data_status=data_status,
             timestamp_utc=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             current_price=round(current_price, 2),
             daily_vwap=round(daily_vwap, 2),

@@ -162,5 +162,131 @@ class TestAtrUsesFullHistory(unittest.TestCase):
         self.assertIn("[-250:]", src)
 
 
+class TestRequirement3SweepFixes(unittest.TestCase):
+    """Regression tests for provable Requirement 2 audit findings fixed in Requirement 3."""
+
+    def test_hilbert_recovers_cycle_period_on_sinusoid(self):
+        import numpy as np
+        import pandas as pd
+        from analytics.mm_btc_engine import MMBTCEngine
+
+        n = 160
+        t = np.arange(n, dtype=float)
+        # 20-bar cycle around $65,000 BTC spot; un-detrended in_phase pinned this to 72
+        wave = 65_000.0 + 1_000.0 * np.sin(2.0 * np.pi * t / 20.0) + t * 5.0
+        df = pd.DataFrame({
+            "open": wave,
+            "high": wave + 50.0,
+            "low": wave - 50.0,
+            "close": wave,
+            "volume": np.full(n, 500.0),
+            "taker_buy_volume": np.full(n, 260.0),
+            "open_interest": np.full(n, 95_000.0),
+        })
+        res = MMBTCEngine(DEFAULT_CONFIG).evaluate_hilbert(df, median_window=12)
+        self.assertLessEqual(abs(res.dominant_cycle - 20), 2,
+                             f"Hilbert cycle saturated/drifted ({res.dominant_cycle}) instead of ~20")
+
+    def test_rough_path_cvd_normalization_not_attenuated_by_window(self):
+        import numpy as np
+        import pandas as pd
+        from analytics.mm_btc_engine import MMBTCEngine
+
+        n = 64
+        t = np.arange(n, dtype=float)
+        # Flow leads price by quarter cycle -> signed Levy area A(P,V) should be non-trivial (~O(1))
+        price = 65_000.0 + 600.0 * np.sin(2.0 * np.pi * t / 16.0 - np.pi / 2.0)
+        flow_sig = 300.0 + 100.0 * np.cos(2.0 * np.pi * t / 16.0)
+        df = pd.DataFrame({
+            "open": price,
+            "high": price + 80.0,
+            "low": price - 80.0,
+            "close": price,
+            "volume": np.full(n, 1_000.0),
+            "taker_buy_volume": flow_sig,
+            "open_interest": np.full(n, 95_000.0),
+        })
+        sig = MMBTCEngine(DEFAULT_CONFIG).evaluate_path_signature(df, window=48)
+        self.assertGreater(abs(sig.area_price_flow), 0.1,
+                           f"area_price_flow={sig.area_price_flow} appears attenuated by window division")
+
+    def test_five_day_macro_changes_use_five_trading_days(self):
+        import asyncio
+        from unittest.mock import AsyncMock, patch
+        from collectors.macro_collector import fetch_macro_and_intermarket_snapshot
+
+        # 7 daily closes: indices 0..6 -> 5 trading days ago from index 6 is index 1 (value 102.0), NOT index 2 (103.0)
+        closes_7 = [100.0, 102.0, 103.0, 104.0, 105.0, 106.0, 108.0]
+        fake_yahoo = {
+            "dxy": {"price": 108.0, "closes": closes_7, "highs": closes_7, "lows": closes_7, "cv_pairs": []},
+            "tnx": {"price": 4.80, "closes": [4.10, 4.20, 4.30, 4.40, 4.50, 4.60, 4.80], "highs": [], "lows": [], "cv_pairs": []},
+            "spx": {"price": 7200.0, "closes": [7000.0, 7000.0, 7100.0, 7120.0, 7150.0, 7180.0, 7200.0], "highs": [], "lows": [], "cv_pairs": []},
+            "nasdaq": {"price": 24000.0, "closes": [20000.0, 20000.0, 21000.0, 22000.0, 23000.0, 23500.0, 24000.0], "highs": [], "lows": [], "cv_pairs": []},
+            "vix": {"price": 25.0, "closes": [18.0, 20.0, 21.0, 22.0, 23.0, 24.0, 25.0], "highs": [], "lows": [], "cv_pairs": []},
+        }
+
+        async def _run():
+            with (
+                patch("collectors.macro_collector._fetch_yahoo_quotes", new=AsyncMock(return_value=fake_yahoo)),
+                patch("collectors.macro_collector._fetch_alternative_me_fng", new=AsyncMock(return_value=(None, None))),
+                patch("collectors.macro_collector._fetch_coingecko_dominance", new=AsyncMock(return_value=None)),
+                patch("collectors.macro_collector._fetch_binance_depth_ratios", new=AsyncMock(return_value=(None, None, None))),
+                patch("collectors.macro_collector._fetch_fred_series", new=AsyncMock(return_value=None)),
+                patch("collectors.macro_collector._fetch_treasury_real_yield_10y", new=AsyncMock(return_value=None)),
+                patch("collectors.macro_collector._fetch_farside_etf_flows_sync", return_value=None),
+                patch("collectors.macro_collector._fetch_coinmetrics_onchain", new=AsyncMock(return_value={})),
+                patch("collectors.macro_collector._fetch_defillama_stablecoins", new=AsyncMock(return_value={})),
+                patch("collectors.macro_collector._fetch_deribit_options_summary", new=AsyncMock(return_value={})),
+                patch("collectors.macro_collector._fetch_cross_exchange_perps_and_cb_vol", new=AsyncMock(return_value={})),
+                patch("collectors.macro_collector._fetch_nyfed_liquidity", new=AsyncMock(return_value={})),
+                patch("collectors.macro_collector._fetch_hyperliquid_perp", new=AsyncMock(return_value=None)),
+                patch("collectors.macro_collector._fetch_usd_macro_calendar", new=AsyncMock(return_value=(False, []))),
+            ):
+                return await fetch_macro_and_intermarket_snapshot(None, [])
+
+        snap = asyncio.run(_run())
+        self.assertIn("+6.00 over 5d", snap.dxy_direction_5_10d)
+        self.assertAlmostEqual(snap.us_10y_yield_change_5d, 0.60, places=3)
+        self.assertAlmostEqual(snap.vix_change_5d, 5.0, places=2)
+        self.assertAlmostEqual(snap.sp500_change_5d_pct, round((7200.0 - 7000.0) / 7000.0 * 100.0, 2), places=2)
+        self.assertAlmostEqual(snap.nasdaq_change_5d_pct, 20.0, places=2)
+
+    def test_farside_dash_is_not_treated_as_zero_flow(self):
+        from collectors.macro_collector import _parse_farside_total_m
+
+        self.assertIsNone(_parse_farside_total_m("-"))
+        self.assertIsNone(_parse_farside_total_m(""))
+        self.assertEqual(_parse_farside_total_m("0.0"), 0.0)
+        self.assertEqual(_parse_farside_total_m("(123.4)"), -123.4)
+
+    def test_sqlite_archive_includes_all_71_metrics_and_matches_live_counts(self):
+        import json
+        import sqlite3
+        import tempfile
+        from pathlib import Path
+        from analytics.data_hub_engine import DataHubEngine
+        from core.models import FourGateEvaluation
+
+        store = StateStore()
+        store.binance_spot_price = 62_000.0
+        store.four_gate_evaluation = FourGateEvaluation(last_closed_bar_utc="2026-11-20 08:00:00 UTC")
+        with tempfile.TemporaryDirectory() as tmp:
+            db_file = Path(tmp) / "hub.sqlite"
+            ev = DataHubEngine(DEFAULT_CONFIG, db_path=db_file, write_archive=True).evaluate(store)
+            conn = sqlite3.connect(str(db_file))
+            try:
+                ok_db, un_db, pj_raw = conn.execute(
+                    "SELECT ok_count, unavailable_count, payload_json FROM telemetry_snapshots"
+                ).fetchone()
+            finally:
+                conn.close()
+            pj = json.loads(pj_raw)
+            archived_total = sum(len(rows) for rows in pj["panels"].values())
+            self.assertEqual(ev.total_metrics, 71)
+            self.assertEqual(archived_total, ev.total_metrics)
+            self.assertEqual(ok_db, ev.ok_count)
+            self.assertEqual(un_db, ev.unavailable_count)
+
+
 if __name__ == "__main__":
     unittest.main()

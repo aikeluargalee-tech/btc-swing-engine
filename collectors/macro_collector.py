@@ -202,6 +202,24 @@ async def _fetch_coingecko_dominance(session: aiohttp.ClientSession) -> Optional
     return None
 
 
+def _parse_farside_total_m(v: str) -> Optional[float]:
+    """Parses a Farside ETF table total cell ($M); '-' / empty means unpopulated (None)."""
+    v = v.strip().replace("$", "").replace(",", "")
+    if not v or v == "-":
+        return None
+    if v in ("0.0", "0"):
+        return 0.0
+    if v.startswith("(") and v.endswith(")"):
+        try:
+            return -float(v[1:-1])
+        except ValueError:
+            return None
+    try:
+        return float(v)
+    except ValueError:
+        return None
+
+
 def _fetch_farside_etf_flows_sync() -> Optional[Tuple[str, float, float, float]]:
     """Fetches US Spot Bitcoin ETF flows from Farside Investors (total net flow across all issuers)."""
     import html as _html
@@ -237,20 +255,9 @@ def _fetch_farside_etf_flows_sync() -> Optional[Tuple[str, float, float, float]]
             if cleaned and len(cleaned) >= 3 and date_re.match(cleaned[0]):
                 parsed_rows.append(cleaned)
 
-        def _parse_val(v: str) -> Optional[float]:
-            v = v.strip().replace("$", "").replace(",", "")
-            if not v or v in ("-", "0.0", "0"):
-                return 0.0
-            if v.startswith("(") and v.endswith(")"):
-                return -float(v[1:-1])
-            try:
-                return float(v)
-            except ValueError:
-                return None
-
         valid_totals = []
         for pr in parsed_rows:
-            val = _parse_val(pr[-1])
+            val = _parse_farside_total_m(pr[-1])
             if val is not None:
                 valid_totals.append((pr[0], val))
 
@@ -888,16 +895,16 @@ async def fetch_macro_and_intermarket_snapshot(
         if tnx.get("price") is not None:
             snap.us_10y_treasury_yield = round(float(tnx["price"]), 3)
             closes = tnx.get("closes", [])
-            if len(closes) >= 5:
-                snap.us_10y_yield_change_5d = round(float(closes[-1] - closes[-5]), 3)
+            if len(closes) >= 6:
+                snap.us_10y_yield_change_5d = round(float(closes[-1] - closes[-6]), 3)
 
         # DXY
         dxy = yahoo_data.get("dxy", {})
         if dxy.get("price") is not None:
             snap.dxy_index = round(float(dxy["price"]), 3)
             closes = dxy.get("closes", [])
-            if len(closes) >= 5:
-                diff_5d = closes[-1] - closes[-5]
+            if len(closes) >= 6:
+                diff_5d = closes[-1] - closes[-6]
                 dir_str = "RISING" if diff_5d > 0.3 else ("FALLING" if diff_5d < -0.3 else "NEUTRAL / FLAT")
                 snap.dxy_direction_5_10d = f"{dir_str} ({diff_5d:+.2f} over 5d)"
 
@@ -908,8 +915,8 @@ async def fetch_macro_and_intermarket_snapshot(
             closes = spx.get("closes", [])
             if len(closes) >= 2:
                 snap.sp500_change_1d_pct = round((closes[-1] - closes[-2]) / closes[-2] * 100.0, 2)
-            if len(closes) >= 5:
-                snap.sp500_change_5d_pct = round((closes[-1] - closes[-5]) / closes[-5] * 100.0, 2)
+            if len(closes) >= 6:
+                snap.sp500_change_5d_pct = round((closes[-1] - closes[-6]) / closes[-6] * 100.0, 2)
 
             # Rolling correlation with BTC
             if btc_daily_closes and closes:
@@ -923,8 +930,8 @@ async def fetch_macro_and_intermarket_snapshot(
             closes = nasdaq.get("closes", [])
             if len(closes) >= 2:
                 snap.nasdaq_change_1d_pct = round((closes[-1] - closes[-2]) / closes[-2] * 100.0, 2)
-            if len(closes) >= 5:
-                snap.nasdaq_change_5d_pct = round((closes[-1] - closes[-5]) / closes[-5] * 100.0, 2)
+            if len(closes) >= 6:
+                snap.nasdaq_change_5d_pct = round((closes[-1] - closes[-6]) / closes[-6] * 100.0, 2)
 
         # VIX
         vix = yahoo_data.get("vix", {})
@@ -933,8 +940,8 @@ async def fetch_macro_and_intermarket_snapshot(
             closes = vix.get("closes", [])
             if len(closes) >= 2:
                 snap.vix_change_1d = round(closes[-1] - closes[-2], 2)
-            if len(closes) >= 5:
-                snap.vix_change_5d = round(closes[-1] - closes[-5], 2)
+            if len(closes) >= 6:
+                snap.vix_change_5d = round(closes[-1] - closes[-6], 2)
 
         # HYG/LQD Credit Spread Appetite
         hyg_c = yahoo_data.get("hyg", {}).get("closes", [])

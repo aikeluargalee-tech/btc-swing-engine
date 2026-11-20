@@ -4516,6 +4516,8 @@ class FootprintBarData:
     has_stacked_sell: bool = False
     has_battle_zone: bool = False
     auction_completed: bool = True
+    is_synthetic: bool = False
+    last_trade_ts_ms: int = 0
 
 
 @dataclass
@@ -4523,6 +4525,10 @@ class FootprintEvaluation:
     """Microstructure Footprint Evaluation & 3-Gate Execution Funnel."""
 
     timestamp_utc: str = ""
+    data_source: str = "UNAVAILABLE"
+    is_synthetic: bool = False
+    data_status: str = "UNAVAILABLE"
+    data_age_seconds: Optional[float] = None
     current_price: float = 0.0
     direction: str = "NEUTRAL"           # "ACCUMULATE_BUY", "DISTRIBUTE_SELL", "OBSERVATION"
     active_bar_delta: float = 0.0
@@ -4565,8 +4571,8 @@ class FootprintEvaluation:
     harvest_tranche_pct: float = 50.0    # 50% staged trim or 100% full rotation
 
     # Institutional Gate Hardening & Ergonomic Telemetry
-    auction_completed: bool = True
-    bar_poc_reclaimed: bool = True
+    auction_completed: Optional[bool] = None
+    bar_poc_reclaimed: Optional[bool] = None
     cascade_velocity_veto: bool = False
     ntz_veto_active: bool = False
     ntz_status_text: str = "ALL CLEAR (8A-8F PASS)"

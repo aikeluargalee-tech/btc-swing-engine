@@ -7,6 +7,14 @@ import unittest
 from unittest.mock import MagicMock
 
 from analytics.forward_test_tracker import ForwardTestTracker
+import time as _time
+
+# See test_footprint_engine: the engine now rejects footprint data older than
+# `footprint_stale_after_seconds` (1800s), so epoch-millisecond fixture timestamps are
+# correctly STALE and gates close before evaluation. Shift the literals uniformly so the
+# relative bar structure survives and the newest bar sits a few hours in the past.
+_TS_SHIFT = int(_time.time() * 1000) - 60_000   # one minute ago: comfortably FRESH
+
 from core.models import (
     FootprintBarData,
     FootprintClusterRow,
@@ -48,8 +56,8 @@ class TestForwardTestTracker(unittest.TestCase):
     def test_variant_1_pure_footprint_entry_and_stop_out(self) -> None:
         """Verifies Option 1 (15m scalp) enters on wick absorption + delta flip and stops out cleanly."""
         active_bar = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=80000.0,
             high=80100.0,
             low=79900.0,
@@ -98,8 +106,8 @@ class TestForwardTestTracker(unittest.TestCase):
     def test_variant_2_tp1_trim_and_tp2_harvest(self) -> None:
         """Verifies Option 2 (4-Gate) enters at macro support, trims 50% at TP1 with BE stop, and closes at TP2."""
         active_bar = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=80000.0,
             high=80100.0,
             low=79900.0,
@@ -109,6 +117,10 @@ class TestForwardTestTracker(unittest.TestCase):
         )
         completed_bars = []
         eval_res = FootprintEvaluation(
+            # these fixtures model a COMPLETED auction; the model no longer
+            # defaults auction_completed/bar_poc_reclaimed to True, so say it.
+            auction_completed=True,
+            bar_poc_reclaimed=True,
             timestamp_utc="2026-11-05 12:00:00 UTC",
             current_price=80050.0,
             active_bar_delta=15.0,
@@ -173,8 +185,8 @@ class TestForwardTestTracker(unittest.TestCase):
     def test_variant_1_pure_footprint_sell_entry_and_tp2_harvest(self) -> None:
         """Verifies Option 1 (15m scalp) enters SELL on upper-wick exhaustion + negative delta flip, trims TP1, and harvests TP2."""
         active_bar = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=83900.0,
             high=84100.0,
             low=83850.0,
@@ -227,8 +239,8 @@ class TestForwardTestTracker(unittest.TestCase):
     def test_variant_3_institutional_distribution_sell_lifecycle(self) -> None:
         """Verifies Option 3 (Institutional) enters SELL on TRIGGERED_DISTRIBUTE and manages stop out."""
         active_bar = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=85000.0,
             high=85300.0,
             low=84900.0,
@@ -237,6 +249,10 @@ class TestForwardTestTracker(unittest.TestCase):
         )
         completed_bars = []
         eval_res = FootprintEvaluation(
+            # these fixtures model a COMPLETED auction; the model no longer
+            # defaults auction_completed/bar_poc_reclaimed to True, so say it.
+            auction_completed=True,
+            bar_poc_reclaimed=True,
             timestamp_utc="2026-11-05 15:00:00 UTC",
             current_price=85100.0,
             all_gates_pass=True,
@@ -274,8 +290,8 @@ class TestForwardTestTracker(unittest.TestCase):
     def test_hierarchy_law_enforcement(self) -> None:
         """Verifies Variant 3 can never enter unless Variant 2 qualifies + Pillar 2/3 pass."""
         active_bar = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=76000.0,
             high=76200.0,
             low=75900.0,
@@ -321,8 +337,8 @@ class TestForwardTestTracker(unittest.TestCase):
     def test_level_lockout_and_reclaim_rule(self) -> None:
         """Verifies 4-hour level lockout prevents machine-gunning entries at the same stopped-out level."""
         active_bar = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=77500.0,
             high=77600.0,
             low=77300.0,
@@ -332,6 +348,10 @@ class TestForwardTestTracker(unittest.TestCase):
         )
         completed_bars = []
         eval_res = FootprintEvaluation(
+            # these fixtures model a COMPLETED auction; the model no longer
+            # defaults auction_completed/bar_poc_reclaimed to True, so say it.
+            auction_completed=True,
+            bar_poc_reclaimed=True,
             timestamp_utc="2026-11-06 01:00:00 UTC",
             current_price=77450.0,
             gate1_macro_tap=True,
@@ -377,8 +397,8 @@ class TestForwardTestTracker(unittest.TestCase):
     def test_2r_fee_adjusted_breakeven_ratchet(self) -> None:
         """Verifies Variants 2 and 3 automatically ratchet stop_loss to entry_price * 1.001 at >= +2.0R."""
         active_bar = FootprintBarData(
-            start_ts_ms=1000,
-            end_ts_ms=901000,
+            start_ts_ms=_TS_SHIFT + 1000,
+            end_ts_ms=_TS_SHIFT + 901000,
             open=75300.0,
             high=75500.0,
             low=75208.42,

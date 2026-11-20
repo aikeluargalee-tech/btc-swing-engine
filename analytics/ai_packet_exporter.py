@@ -735,6 +735,7 @@ def build_ai_telemetry_packet(config: EngineConfig, store: StateStore) -> str:
             "",
             f"* **Active 15m Forming Bar Delta**: `{f_ev.active_bar_delta:+,.2f} BTC` | **Preceding Bar Delta**: `{f_ev.prev_bar_delta:+,.2f} BTC`",
             f"* **15m Delta Flip**: `{flip_str}`",
+            f"* **Footprint Provenance**: `{getattr(f_ev, 'data_source', 'UNAVAILABLE')}` | `{getattr(f_ev, 'data_status', 'UNAVAILABLE')}` | Synthetic: `{bool(getattr(f_ev, 'is_synthetic', False))}` | Age: `{getattr(f_ev, 'data_age_seconds', None)}s` | Data timestamp: `{f_ev.timestamp_utc}`",
             (f"* **Gate 1 (Key Level Tap)**: `PASS` ({f_ev.gate1_tapped_level_name} at `${f_ev.gate1_tapped_level_price:,.0f}` [{f_ev.gate1_level_type}])" if f_ev.gate1_level_tap else "* **Gate 1 (Key Level Tap)**: `PENDING` (Monitoring Support: 30D/7D cVAL, cPOC, HVN | Resistance: cVAH, Range High)"),
             f"* **Gate 2 (Footprint Absorption / Exhaustion)**: `{'PASS' if f_ev.gate2_absorption else 'PENDING'}` ({g2_detail_str})",
             f"* **Gate 3 (Delta Flip / Expansion)**: `{'PASS' if f_ev.gate3_delta_flip else 'PENDING'}`",
@@ -2289,6 +2290,18 @@ def copy_ai_packet_to_clipboard_and_disk(config: EngineConfig, store: StateStore
                     "active_battle_zone": round(f_ev.active_battle_zone, 2),
 
                     "signal": str(f_ev.signal_status),
+
+                    "data_source": str(getattr(f_ev, "data_source", "UNAVAILABLE")),
+
+                    "data_status": str(getattr(f_ev, "data_status", "UNAVAILABLE")),
+
+                    "is_synthetic": bool(getattr(f_ev, "is_synthetic", False)),
+
+                    "data_age_seconds": getattr(f_ev, "data_age_seconds", None),
+
+                    "auction_completed": getattr(f_ev, "auction_completed", None),
+
+                    "bar_poc_reclaimed": getattr(f_ev, "bar_poc_reclaimed", None),
 
                     "suggested_entry": round(f_ev.entry_price, 2),
 

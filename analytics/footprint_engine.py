@@ -115,6 +115,8 @@ class FootprintEngine:
                 volume=k.volume,
                 net_delta=k.delta,
                 is_closed=True,
+                is_synthetic=True,
+                last_trade_ts_ms=k.timestamp_ms,
             )
             poc_p = self.round_price(k.typical_price)
             fb.poc_price = poc_p
@@ -142,6 +144,8 @@ class FootprintEngine:
             close=tip.close,
             volume=tip.volume,
             net_delta=tip.delta,
+            is_synthetic=True,
+            last_trade_ts_ms=tip.timestamp_ms,
         )
         tip_poc = self.round_price(tip.typical_price)
         self.active_bar.poc_price = tip_poc
@@ -187,6 +191,8 @@ class FootprintEngine:
             )
 
         bar = self.active_bar
+        bar.is_synthetic = False
+        bar.last_trade_ts_ms = max(bar.last_trade_ts_ms, int(ts_ms))
         bar.high = max(bar.high, price)
         bar.low = min(bar.low, price)
         bar.close = price
@@ -216,6 +222,16 @@ class FootprintEngine:
 
     def analyze_bar(self, bar: FootprintBarData) -> None:
         """Computes diagonal imbalances, battle zones, and bidirectional wick traps/exhaustion."""
+        if getattr(bar, "is_synthetic", False):
+            # Klines have no price-level distribution; retain their warm-up row but
+            # do not derive any auction or cluster-structure conclusions from it.
+            bar.has_wick_absorption = False
+            bar.has_upper_wick_exhaustion = False
+            bar.has_stacked_buy = False
+            bar.has_stacked_sell = False
+            bar.has_battle_zone = False
+            bar.auction_completed = False
+            return
         if not bar.clusters:
             return
 
@@ -401,11 +417,16 @@ class FootprintEngine:
         if self.active_bar is None:
             return False, False, 0.0, 0.0
 
+        if getattr(self.active_bar, "is_synthetic", False):
+            return False, False, 0.0, self.active_bar.net_delta
+
         active_delta = self.active_bar.net_delta
         if not self.completed_bars:
             return (active_delta > 0.0), (active_delta < 0.0), 0.0, active_delta
 
         prev_bar = self.completed_bars[-1]
+        if getattr(prev_bar, "is_synthetic", False):
+            return False, False, prev_bar.net_delta, active_delta
         prev_delta = prev_bar.net_delta
         flipped_bullish = (prev_delta < 0.0 and active_delta > 0.0)
         flipped_bearish = (prev_delta > 0.0 and active_delta < 0.0)
@@ -438,11 +459,12 @@ class FootprintEngine:
         key_levels: Optional[List[Tuple[str, float]]] = None,
     ) -> FootprintEvaluation:
         """Bidirectional 3-Gate evaluation supporting both Spot Accumulation (Buy) and Distribution (Sell/Rebuy)."""
-        now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        now_dt = datetime.now(timezone.utc)
+        now_ms = int(now_dt.timestamp() * 1000)
         current_price = getattr(store, "binance_spot_price", 0.0) or (self.active_bar.close if self.active_bar else 0.0)
 
         eval_res = FootprintEvaluation(
-            timestamp_utc=now_utc,
+            timestamp_utc="",
             current_price=current_price,
         )
 
@@ -450,7 +472,20 @@ class FootprintEngine:
             self.seed_from_klines(list(store.spot_klines_15m))
 
         if self.active_bar is None:
+            eval_res.timestamp_utc = now_dt.strftime("%Y-%m-%d %H:%M:%S UTC")
             eval_res.summary_notes.append("Footprint warming up: waiting for first spot trades.")
+            return self._finalize_evaluation(eval_res, current_price, store)
+
+        data_ts_ms = int(getattr(self.active_bar, "last_trade_ts_ms", 0) or self.active_bar.start_ts_ms)
+        eval_res.timestamp_utc = datetime.fromtimestamp(data_ts_ms / 1000, timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        eval_res.is_synthetic = bool(getattr(self.active_bar, "is_synthetic", False))
+        eval_res.data_source = "SYNTHETIC_KLINE" if eval_res.is_synthetic else "LIVE_TRADES"
+        eval_res.data_age_seconds = max(0.0, (now_ms - data_ts_ms) / 1000.0)
+        stale_limit = max(1, int(getattr(self.config, "footprint_stale_after_seconds", 1800)))
+        eval_res.data_status = "STALE" if eval_res.data_age_seconds > stale_limit else "FRESH"
+        if eval_res.data_status == "STALE":
+            eval_res.data_source = "UNAVAILABLE_STALE"
+            eval_res.summary_notes.append(f"Footprint data STALE: age {eval_res.data_age_seconds:.0f}s exceeds {stale_limit}s limit.")
             return self._finalize_evaluation(eval_res, current_price, store)
 
         self.analyze_bar(self.active_bar)
@@ -582,12 +617,15 @@ class FootprintEngine:
                 active_bz_price = self.active_bar.poc_price
         eval_res.stacked_imbalances_count = stacked_cnt
         eval_res.active_battle_zone = active_bz_price
-        eval_res.auction_completed = bool(getattr(self.active_bar, "auction_completed", False))
-        eval_res.bar_poc_reclaimed = (
+        eval_res.auction_completed = None if eval_res.is_synthetic else bool(getattr(self.active_bar, "auction_completed", False))
+        eval_res.bar_poc_reclaimed = None if eval_res.is_synthetic else (
             (self.active_bar.close >= self.active_bar.poc_price)
             if (self.active_bar and self.active_bar.poc_price > 0)
             else True
         )
+        if eval_res.is_synthetic:
+            eval_res.gate2_detail = "UNAVAILABLE: synthetic kline has no price-level footprint"
+            eval_res.gate3_wick_detail = eval_res.gate2_detail
 
         # -------------------------------------------------------------------------
         # STANDALONE ERGONOMIC TELEMETRY (CPI, NTZ, VWAP, ASIA LOW, 200D SMA)
@@ -700,13 +738,13 @@ class FootprintEngine:
 
             gate2_pass = False
             gate2_details = []
-            if self.active_bar.has_upper_wick_exhaustion:
+            if not eval_res.is_synthetic and self.active_bar.has_upper_wick_exhaustion:
                 gate2_pass = True
                 gate2_details.append(f"Upper-Wick Trapped Buyers at ${self.active_bar.upper_wick_exhaustion_price:,.0f}")
-            if self.active_bar.has_stacked_sell:
+            if not eval_res.is_synthetic and self.active_bar.has_stacked_sell:
                 gate2_pass = True
                 gate2_details.append("Stacked Sell Imbalances")
-            if not gate2_pass and self.completed_bars:
+            if not eval_res.is_synthetic and not gate2_pass and self.completed_bars and not getattr(self.completed_bars[-1], "is_synthetic", False):
                 last_c = self.completed_bars[-1]
                 if last_c.has_upper_wick_exhaustion:
                     gate2_pass = True
@@ -717,11 +755,11 @@ class FootprintEngine:
 
             eval_res.gate3_wick_absorption = gate2_pass
             eval_res.gate2_absorption = gate2_pass
-            eval_res.gate3_wick_detail = " + ".join(gate2_details) if gate2_details else "No Buyer Exhaustion Detected"
+            eval_res.gate3_wick_detail = "UNAVAILABLE: synthetic kline has no price-level footprint" if eval_res.is_synthetic else (" + ".join(gate2_details) if gate2_details else "No Buyer Exhaustion Detected")
             eval_res.gate2_detail = eval_res.gate3_wick_detail
 
             # Gate 4: Bearish Delta Flip (or active delta strongly negative)
-            gate4_pass = flip_bear or (active_d < 0 and (not self.completed_bars or prev_d >= 0))
+            gate4_pass = (flip_bear or (active_d < 0 and (not self.completed_bars or prev_d >= 0))) and not eval_res.is_synthetic
             eval_res.gate4_delta_flip = gate4_pass
             eval_res.gate3_delta_flip = gate4_pass
 
@@ -831,17 +869,17 @@ class FootprintEngine:
 
             gate3_pass = False
             gate3_details = []
-            if self.active_bar.has_wick_absorption:
+            if not eval_res.is_synthetic and self.active_bar.has_wick_absorption:
                 gate3_pass = True
                 gate3_details.append(f"Lower-Wick Trapped Sells at ${self.active_bar.wick_absorption_price:,.0f}")
-            if self.active_bar.has_battle_zone:
+            if not eval_res.is_synthetic and self.active_bar.has_battle_zone:
                 gate3_pass = True
                 gate3_details.append("Battle Zone Churn")
-            if self.active_bar.has_stacked_buy:
+            if not eval_res.is_synthetic and self.active_bar.has_stacked_buy:
                 gate3_pass = True
                 gate3_details.append("Stacked Buy Imbalances")
 
-            if not gate3_pass and self.completed_bars:
+            if not eval_res.is_synthetic and not gate3_pass and self.completed_bars and not getattr(self.completed_bars[-1], "is_synthetic", False):
                 last_comp = self.completed_bars[-1]
                 if last_comp.has_wick_absorption:
                     gate3_pass = True
@@ -852,12 +890,12 @@ class FootprintEngine:
 
             eval_res.gate3_wick_absorption = gate3_pass
             eval_res.gate2_absorption = gate3_pass
-            eval_res.gate3_wick_detail = " + ".join(gate3_details) if gate3_details else "No Absorption Detected"
+            eval_res.gate3_wick_detail = "UNAVAILABLE: synthetic kline has no price-level footprint" if eval_res.is_synthetic else (" + ".join(gate3_details) if gate3_details else "No Absorption Detected")
             eval_res.gate2_detail = eval_res.gate3_wick_detail
 
             # Gate 4: Bullish Delta Flip + Bar POC Reclaim Verification
             raw_delta_flip = flip_bull or (active_d > 0 and (not self.completed_bars or prev_d <= 0))
-            gate4_pass = raw_delta_flip and eval_res.bar_poc_reclaimed
+            gate4_pass = raw_delta_flip and eval_res.bar_poc_reclaimed is True and not eval_res.is_synthetic
             eval_res.gate4_delta_flip = gate4_pass
             eval_res.gate3_delta_flip = gate4_pass
 

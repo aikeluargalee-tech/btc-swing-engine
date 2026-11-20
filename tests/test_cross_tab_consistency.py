@@ -254,6 +254,14 @@ class TestNoImperativesInRenderedOutput(unittest.TestCase):
             self.assertNotIn(banned, self.screen.upper(),
                              f"rendered output contains the imperative {banned!r}")
 
+    def test_every_printed_desk_carries_its_own_explanation(self):
+        """The source list promises 'evidence only', one line per desk. A desk that reports a
+        state with no explanation is worse than no line at all: my first rewrite dropped the
+        regime matrix's fallback and printed 'no reported conclusion' against a desk that was
+        reporting LIVE."""
+        self.assertNotIn("no reported conclusion", self.screen,
+                         "a desk row printed without any explanation")
+
 
 if __name__ == "__main__":
     unittest.main()

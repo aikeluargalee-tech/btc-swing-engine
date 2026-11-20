@@ -88,8 +88,15 @@ def validate_claims(
     max_age_hours: Optional[Mapping[str, float]] = None,
     age_checked_keys: Optional[Sequence[str]] = None,
     default_age_hours: Optional[float] = None,
+    require_timestamp: bool = True,
 ) -> LoadedContext:
     """Validates an already-parsed mapping. Pure: no file access, easy to test.
+
+    require_timestamp distinguishes two kinds of file. A REVIEW RECORD (Tab 2's protocol
+    claims: "no cascade", "risk LOW") is an assertion about the world that decays, so a
+    missing or unreadable review date invalidates every claim. An OVERRIDE FILE (Tab 0's
+    magnet levels) carries values, not assertions: if a review date is present it is
+    enforced, and if it is absent the values are still validated but the gap is reported.
 
     enumerated       key -> permitted string values (case-insensitive on input)
     numeric          key -> (low, high) inclusive bounds
@@ -106,10 +113,13 @@ def validate_claims(
 
     age = _parse_age_hours(raw.get(timestamp_key))
     if age is None:
-        out.status = STATUS_INVALID
-        out.errors.append(f"{timestamp_key} missing, unreadable or in the future")
-        return out
-    if age < 0:
+        if require_timestamp:
+            out.status = STATUS_INVALID
+            out.errors.append(f"{timestamp_key} missing, unreadable or in the future")
+            return out
+        out.errors.append(f"{timestamp_key} absent; age of this file is not verified")
+        age = None
+    if age is not None and age < 0:
         out.status = STATUS_INVALID
         out.errors.append(f"{timestamp_key} is in the future")
         return out
@@ -122,7 +132,7 @@ def validate_claims(
 
     stale_keys: list[str] = []
     for key, limit in max_age_hours.items():
-        if age > float(limit):
+        if age is not None and age > float(limit):
             stale_keys.append(f"{key} age {age:.1f}h exceeds {float(limit):g}h")
     if stale_keys:
         out.status = STATUS_STALE
@@ -143,7 +153,13 @@ def validate_claims(
 
     for key, (low, high) in numeric.items():
         if key not in raw or raw.get(key) is None:
-            out.errors.append(f"{key} missing")
+            # Absent numeric keys are normal (an optional override was not set). Only a key
+            # that IS present but invalid is an error worth reporting.
+            continue
+        if isinstance(raw[key], bool):
+            # bool is a subclass of int; float(True) == 1.0 would silently accept a flag
+            # where a price belongs.
+            out.errors.append(f"{key}={raw[key]!r} is a boolean, not a number")
             continue
         try:
             num = float(raw[key])
@@ -174,6 +190,7 @@ def load_claims_file(
     max_age_hours: Optional[Mapping[str, float]] = None,
     age_checked_keys: Optional[Sequence[str]] = None,
     default_age_hours: Optional[float] = None,
+    require_timestamp: bool = True,
 ) -> LoadedContext:
     """Reads and validates a JSON file. Missing/corrupt never raises and never permits."""
     if path is None:
@@ -218,6 +235,7 @@ def load_claims_file(
         max_age_hours=max_age_hours,
         age_checked_keys=age_checked_keys,
         default_age_hours=default_age_hours,
+        require_timestamp=require_timestamp,
     )
     ctx.source_path = ctx_source
     ctx.raw = dict(raw)

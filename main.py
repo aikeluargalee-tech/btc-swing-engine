@@ -59,7 +59,7 @@ async def _run_engine(
         store.active_tab = 11  # Desk [F: FOOTPRINT SWING]
     elif tab_arg.lower() in ("w", "waterfall", "wf", "12"):
         store.active_tab = 12  # Tab [W: 5-PILLAR DECISION WATERFALL]
-    elif tab_arg.lower() in ("master", "l", "10"):
+    elif tab_arg.lower() in ("master", "l", "10", "z", "decision", "surface", "tabz"):
         store.active_tab = 10  # Tab [L]: Master Supreme Command Center
     elif tab_arg.lower() in ("s0", "spot", "swing", "screener"):
         store.active_tab = 0

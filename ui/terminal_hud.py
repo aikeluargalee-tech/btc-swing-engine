@@ -1836,18 +1836,40 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
     # Tab [10] is the decision surface. The detailed evidence builders remain
     # available through their existing tab dispatch paths.
     states = getattr(msev, "input_states", {})
-    drivers = [f"{row.tab_name}: {row.tab_conclusion}" for row in msev.tab_rows[:4]]
-    catalysts = list(msev.upgrade_catalysts[:3]) or ["No specific upgrade condition was published."]
+    from analytics.master_synthesis import SETUP_TRIGGER_KEY, VETO_GATE_KEY
+
+    def _one_line(value: object) -> str:
+        """An embedded newline in panel text breaks the box border, so flatten it."""
+        return " ".join(str(value).replace("\t", " ").split())
+
+    drivers = [_one_line(f"{row.tab_name}: {row.tab_conclusion}") for row in msev.tab_rows[:4]]
+    catalysts = [_one_line(c) for c in list(msev.upgrade_catalysts[:3])] or [
+        "No specific upgrade condition was published."
+    ]
     refused = []
     if msev.supreme_veto_active:
-        refused.append(f"Active veto: {msev.supreme_veto_reason}")
-    refused.extend(f"{desk}: {state}" for desk, state in states.items()
+        refused.append(_one_line(f"Active veto: {msev.supreme_veto_reason}"))
+    refused.extend(_one_line(f"{desk}: {state}") for desk, state in states.items()
                    if state in {"UNAVAILABLE", "STALE", "SYNTHETIC", "NO_MATCH", "REFUSED"})
     if not refused:
         refused.append("No active veto or non-LIVE input recorded.")
+
+    conclusions = {row.tab_name: _one_line(row.tab_conclusion) for row in msev.tab_rows}
+    # The two reserved keys have no desk row of their own. Without an explicit detail they
+    # inherited the regime matrix's text, so the veto gate read "Active configuration: NO_MATCH"
+    # - the wrong reason, attributed to the wrong desk.
+    conclusions[VETO_GATE_KEY] = (
+        f"supreme veto: {_one_line(msev.supreme_veto_reason)}"
+        if msev.supreme_veto_active else "no active supreme veto"
+    )
+    conclusions[SETUP_TRIGGER_KEY] = (
+        "a desk reports an entry trigger"
+        if states.get(SETUP_TRIGGER_KEY) == "OBSERVED"
+        else "no desk reports an entry trigger"
+    )
     source_lines = [
-        f"{desk} | {states.get(desk, 'UNAVAILABLE')} | "
-        f"{next((r.tab_conclusion for r in msev.tab_rows if r.tab_name == desk), 'Active configuration: ' + getattr(msev, 'regime_code', 'UNAVAILABLE'))}"
+        _one_line(f"{desk} | {states.get(desk, 'UNAVAILABLE')} | "
+                  f"{conclusions.get(desk, 'no reported conclusion')}")
         for desk in states
     ]
     return Group(
@@ -6820,7 +6842,7 @@ def _poll_keyboard_tab_switch(
                         store.last_packet_copied_ts = time.time()
                         store.last_packet_char_count = char_count
                         changed = True
-                elif ch in ("l", "L"):
+                elif ch in ("l", "L", "z", "Z"):
                     store.show_help = False
                     if store.active_tab != 10:
                         store.active_tab = 10
@@ -6969,7 +6991,7 @@ def _poll_keyboard_tab_switch(
                         store.last_packet_copied_ts = time.time()
                         store.last_packet_char_count = char_count
                         changed = True
-                elif ch in ("l", "L"):
+                elif ch in ("l", "L", "z", "Z"):
                     if store.active_tab != 10:
                         store.active_tab = 10
                         changed = True

@@ -39,6 +39,7 @@ import numpy as np
 import pandas as pd
 
 from config.settings import EngineConfig
+from core.context_loader import load_claims_file
 from core.models import (
     KlineBar,
     SpotSwingEvaluation,
@@ -389,6 +390,21 @@ _NUMERIC_OVERRIDE_KEYS = (
 )
 _STRING_OVERRIDE_KEYS = ("headline_filter", "headline_classification")
 
+# (low, high) inclusive. A magnet level is a price; a sizing override is USD notional.
+_PRICE_BOUNDS = (0.0, 1_000_000.0)          # a magnet level is a BTC price
+_SIZE_BOUNDS = (0.0, 1_000_000_000.0)       # a size override is USD notional
+_MAGNET_OVERRIDE_BOUNDS = {
+    "short_liq_magnet_override_usd": _PRICE_BOUNDS,
+    "short_liq_magnet_price": _PRICE_BOUNDS,
+    "long_liq_magnet_override_usd": _PRICE_BOUNDS,
+    "long_liq_magnet_price": _PRICE_BOUNDS,
+    "short_liq_size_override_usd": _SIZE_BOUNDS,
+    "short_liq_magnet_size_usd": _SIZE_BOUNDS,
+    "long_liq_size_override_usd": _SIZE_BOUNDS,
+    "long_liq_magnet_size_usd": _SIZE_BOUNDS,
+}
+assert set(_MAGNET_OVERRIDE_BOUNDS) == set(_NUMERIC_OVERRIDE_KEYS), "bounds must cover every whitelisted key"
+
 
 def _parse_positive_float(val: Any) -> Optional[float]:
     """Parses a finite non-negative float, rejecting bools, NaN/Inf, and negative numbers."""
@@ -414,30 +430,38 @@ def _load_magnet_overrides(config: Optional[EngineConfig]) -> Dict[str, Any]:
         "_context_warning": "",
     }
     warnings: List[str] = []
-    if config is not None and config.protocol_context_path.exists():
-        try:
-            with open(config.protocol_context_path, "r", encoding="utf-8") as fh:
-                raw = json.load(fh)
-        except Exception as exc:
-            msg = f"protocol_context.json unreadable ({type(exc).__name__}); magnet overrides ignored"
+
+    # Shared validation + the SAME age rule Tab 2 applies. Before this, Tab 0 read the same
+    # protocol_context.json as Tab 2 with no age check at all, so magnet overrides were taken
+    # from a review that could be weeks old while Tab 2 correctly refused it as stale.
+    max_age_h = float(getattr(config, "magnet_override_max_age_hours", 72.0) or 72.0)
+    ctx = load_claims_file(
+        getattr(config, "protocol_context_path", None) if config is not None else None,
+        enumerated={},
+        numeric=_MAGNET_OVERRIDE_BOUNDS,
+        max_age_hours={},
+        age_checked_keys=list(_MAGNET_OVERRIDE_BOUNDS),
+        default_age_hours=max_age_h,
+        # Overrides are values, not review assertions: a missing date is reported, not fatal.
+        require_timestamp=False,
+    )
+    for key in _NUMERIC_OVERRIDE_KEYS:
+        val = ctx.values.get(key)
+        if isinstance(val, float) and val > 0.0:
+            out[key] = val
+    if ctx.status == "STALE":
+        msg = (f"protocol_context.json review is {ctx.age_hours:.0f}h old "
+               f"(limit {max_age_h:.0f}h); magnet overrides ignored - operator review required")
+        logger.warning(msg)
+        warnings.append(msg)
+    elif ctx.errors:
+        for err in ctx.errors:
+            msg = f"protocol_context.json: {err}; affected magnet overrides ignored"
             logger.warning(msg)
             warnings.append(msg)
-            raw = None
-        if raw is not None and not isinstance(raw, dict):
-            msg = f"protocol_context.json root must be JSON object, got {type(raw).__name__}; magnet overrides ignored"
-            logger.warning(msg)
-            warnings.append(msg)
-        elif isinstance(raw, dict):
-            for key in _NUMERIC_OVERRIDE_KEYS:
-                if key not in raw or raw[key] is None:
-                    continue
-                parsed = _parse_positive_float(raw[key])
-                if parsed is None:
-                    msg = f"Invalid numeric override '{key}' in protocol_context.json; ignored"
-                    logger.warning(msg)
-                    warnings.append(msg)
-                else:
-                    out[key] = parsed
+    raw = ctx.raw if ctx.status in ("OK", "STALE", "INVALID_TIMESTAMP") else None
+    if isinstance(raw, dict):
+        if True:
             for key in _STRING_OVERRIDE_KEYS:
                 if key not in raw or raw[key] is None:
                     continue

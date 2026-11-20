@@ -104,6 +104,26 @@ class TestValidatedContext(unittest.TestCase):
         assert ctx.age_hours is not None
         self.assertLess(ctx.age_hours, 24.0)
 
+    def test_boolean_is_not_accepted_where_a_number_belongs(self):
+        # bool subclasses int; float(True) == 1.0 would silently turn a flag into a price.
+        ctx = validate_claims(
+            {"last_reviewed_utc": _fresh(), "price": True},
+            enumerated={}, numeric={"price": (0.0, 1_000_000.0)})
+        self.assertEqual(ctx.values["price"], UNAVAILABLE)
+        self.assertTrue(any("boolean" in e for e in ctx.errors))
+
+    def test_optional_timestamp_validates_values_but_reports_the_gap(self):
+        # Override files carry values, not review assertions: a missing date is reported,
+        # not fatal, and staleness is still enforced when a date IS present.
+        ctx = validate_claims(
+            {"price": 108_000.0},
+            enumerated={}, numeric={"price": (0.0, 1_000_000.0)},
+            age_checked_keys=["price"], default_age_hours=72.0,
+            require_timestamp=False)
+        self.assertEqual(ctx.values["price"], 108_000.0)
+        self.assertIsNone(ctx.age_hours)
+        self.assertTrue(any("age" in e for e in ctx.errors))
+
     def test_never_raises_on_garbage(self):
         for bad in ({}, {"last_reviewed_utc": None}, {"last_reviewed_utc": "not-a-date"},
                     {"last_reviewed_utc": ""}):

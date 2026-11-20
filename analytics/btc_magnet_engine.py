@@ -488,22 +488,42 @@ class BTCMagnetEngine:
             provenance["atr_compression"] = "UNAVAILABLE"
         atr_available = atr_compression_pct is not None
 
-        # Positioning ratios (no hardcoded 1.85 / 0.45 / -1.3)
-        explicit_ls = getattr(store, "long_short_ratio", None)
+        # Positioning ratios (only accept observed inputs; never dress untouched 1.0 default as MEASURED)
+        explicit_ls = store.__dict__.get("long_short_ratio", None) if hasattr(store, "__dict__") else getattr(store, "long_short_ratio", None)
+        ls_observable: Optional[str] = None
         if explicit_ls is not None and float(explicit_ls) > 0.0:
             long_short_ratio: Optional[float] = float(explicit_ls)
             ls_ratio_available = True
+            ls_observable = "long_short_ratio"
             provenance["long_short_ratio"] = "MEASURED_STORE"
         else:
             g_ls = float(getattr(store, "global_account_ls_ratio", 1.0) or 1.0)
             t_ls = float(getattr(store, "top_trader_ls_ratio", 1.0) or 1.0)
-            if deriv_populated or g_ls != 1.0:
-                long_short_ratio = g_ls if g_ls != 1.0 else t_ls
+            t_long_pct = float(getattr(store, "top_trader_long_pct", 50.0) or 50.0)
+            tk_ls = float(getattr(store, "taker_long_short_ratio_5m", 1.0) or 1.0)
+            if tk_ls == 1.0 and deriv is not None:
+                tk_ls = float(getattr(deriv, "taker_long_short_ratio_5m", 1.0) or 1.0)
+            p5_delta = float(getattr(store, "perp_5m_delta_btc", 0.0) or 0.0)
+
+            if g_ls > 0.0 and g_ls != 1.0:
+                long_short_ratio = g_ls
                 ls_ratio_available = True
-                provenance["long_short_ratio"] = "MEASURED_STORE_ACCOUNT_LS"
+                ls_observable = "global_account_ls_ratio"
+                provenance["long_short_ratio"] = "MEASURED_GLOBAL_ACCOUNT_LS"
+            elif t_ls > 0.0 and (t_ls != 1.0 or t_long_pct != 50.0):
+                long_short_ratio = t_ls
+                ls_ratio_available = True
+                ls_observable = "top_trader_ls_ratio"
+                provenance["long_short_ratio"] = "MEASURED_TOP_TRADER_LS"
+            elif tk_ls > 0.0 and (tk_ls != 1.0 or p5_delta != 0.0):
+                long_short_ratio = tk_ls
+                ls_ratio_available = True
+                ls_observable = "taker_long_short_ratio_5m"
+                provenance["long_short_ratio"] = "MEASURED_TAKER_5M_LS"
             else:
                 long_short_ratio = None
                 ls_ratio_available = False
+                ls_observable = None
                 provenance["long_short_ratio"] = "UNAVAILABLE"
 
         explicit_depth = getattr(store, "bids_asks_depth_ratio", None)
@@ -548,8 +568,14 @@ class BTCMagnetEngine:
             swing_low_4h=swing_low_4h if swing_low_4h is not None else spot_price,
             upper=upper_magnet,
             lower=lower_magnet,
-            long_short_ratio=long_short_ratio if long_short_ratio is not None else 1.0,
+            long_short_ratio=long_short_ratio,
             store=store,
+            ls_observable=ls_observable,
+        )
+        ladder["split_measured"] = bool(long_short_ratio is not None and long_short_ratio > 0.0)
+        ladder["ls_source"] = "MEASURED" if ladder["split_measured"] else "ASSUMED_1.0"
+        ladder["ls_observable"] = (
+            ls_observable if ladder["split_measured"] else "UNMEASURED (L/S split not measured; raw OI share)"
         )
 
         # 8. Dual Imbalance Accounting (Immediate vs Total Ladder)
@@ -983,8 +1009,9 @@ class BTCMagnetEngine:
         swing_low_4h: float,
         upper: BTCMagnetLevel,
         lower: BTCMagnetLevel,
-        long_short_ratio: float,
+        long_short_ratio: Optional[float] = None,
         store: Optional[StateStore] = None,
+        ls_observable: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Builds canonical 6-tier modeled liquidation ladder (10x/25x/50-100x upper & lower)."""
         cur_p = max(spot_price, 1.0)
@@ -1000,18 +1027,31 @@ class BTCMagnetEngine:
             return []
         oi_source = "MEASURED_OI"
         oi_notional_m = max(10.0, (oi_btc * cur_p) / 1e6)
-        ls_source = "MEASURED" if long_short_ratio > 0.0 else "ASSUMED_1.0"
-        ls = long_short_ratio if long_short_ratio > 0.0 else 1.0
-        long_share = ls / (1.0 + ls)
-        l_crowd_w = max(0.50, long_share / 0.50)
-        u_crowd_w = max(0.50, (1.0 - long_share) / 0.50)
 
         u_near_vol = round(upper.usd_volume / 1e6, 1)
         l_near_vol = round(lower.usd_volume / 1e6, 1)
-        u_25_vol = round(max(1.0, oi_notional_m * 0.032 * u_crowd_w), 1)
-        u_10_vol = round(max(1.0, oi_notional_m * 0.024 * u_crowd_w), 1)
-        l_25_vol = round(max(1.0, oi_notional_m * 0.040 * l_crowd_w), 1)
-        l_10_vol = round(max(1.0, oi_notional_m * 0.028 * l_crowd_w), 1)
+
+        if long_short_ratio is not None and long_short_ratio > 0.0:
+            ls = float(long_short_ratio)
+            long_share = ls / (1.0 + ls)
+            l_crowd_w = max(0.50, long_share / 0.50)
+            u_crowd_w = max(0.50, (1.0 - long_share) / 0.50)
+            u_25_vol = round(max(1.0, oi_notional_m * 0.032 * u_crowd_w), 1)
+            u_10_vol = round(max(1.0, oi_notional_m * 0.024 * u_crowd_w), 1)
+            l_25_vol = round(max(1.0, oi_notional_m * 0.040 * l_crowd_w), 1)
+            l_10_vol = round(max(1.0, oi_notional_m * 0.028 * l_crowd_w), 1)
+            ls_source = "MEASURED"
+            split_measured = True
+            ls_obs_label = ls_observable or "long_short_ratio"
+        else:
+            # No observable L/S ratio: drop the crowding multiplier and publish raw OI shares.
+            u_25_vol = round(max(1.0, oi_notional_m * 0.032), 1)
+            u_10_vol = round(max(1.0, oi_notional_m * 0.024), 1)
+            l_25_vol = round(max(1.0, oi_notional_m * 0.040), 1)
+            l_10_vol = round(max(1.0, oi_notional_m * 0.028), 1)
+            ls_source = "ASSUMED_1.0"
+            split_measured = False
+            ls_obs_label = "UNMEASURED (L/S split not measured; raw OI share)"
 
         hi_ref = max(swing_high_4h, cur_p)
         lo_ref = min(swing_low_4h, cur_p)
@@ -1041,6 +1081,8 @@ class BTCMagnetEngine:
                 "modeled": True,
                 "oi_source": oi_source,
                 "ls_source": ls_source,
+                "ls_observable": ls_obs_label,
+                "split_measured": split_measured,
                 "is_nearest": is_nearest,
             }
 

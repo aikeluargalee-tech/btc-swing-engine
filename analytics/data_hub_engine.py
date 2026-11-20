@@ -216,8 +216,22 @@ def _format_modeled_liq_ladder(mag: Any) -> Optional[str]:
             elif t.get("side") == "lower":
                 dn_parts.append(part)
         if up_parts and dn_parts:
-            ls_assumed = any(isinstance(t, dict) and t.get("ls_source") == "ASSUMED_1.0" for t in tiers_6)
-            tag = " [Modeled \u00b7 L/S assumed 1.0]" if ls_assumed else " [Modeled]"
+            ls_unmeasured = any(
+                isinstance(t, dict)
+                and (t.get("ls_source") == "ASSUMED_1.0" or t.get("split_measured") is False)
+                for t in tiers_6
+            )
+            obs_vals = [
+                str(t.get("ls_observable"))
+                for t in tiers_6
+                if isinstance(t, dict) and t.get("split_measured") and t.get("ls_observable")
+            ]
+            if ls_unmeasured:
+                tag = " [Modeled] (L/S split not measured; raw OI share)"
+            elif obs_vals:
+                tag = f" [Modeled] (L/S:{obs_vals[0]})"
+            else:
+                tag = " [Modeled]"
             return f"Up[{' / '.join(up_parts)}] | Dn[{' / '.join(dn_parts)}]{tag}"
 
     # No tiers means no ladder. The old fallback printed a hardcoded band set

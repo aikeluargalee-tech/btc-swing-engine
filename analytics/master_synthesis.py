@@ -47,6 +47,33 @@ _CONFIG_MULTIPLIER_MAP: Dict[str, float] = {
 }
 
 
+SETUP_TRIGGER_KEY = "[Setup Trigger]"
+VETO_GATE_KEY = "[Veto Gate]"
+BLOCKING_STATES = frozenset({"SYNTHETIC", "STALE", "UNAVAILABLE", "NO_MATCH", "REFUSED"})
+
+
+def tab_z_precedence(input_states: Dict[str, str]) -> str:
+    """Resolve the veto-only decision ladder from the exact states published to operators.
+
+    This is a PURE function of the printed table - nothing outside `input_states` may
+    influence the verdict, so a reader can recompute it from the screen. Two reserved keys
+    carry the non-desk conditions:
+      "[Veto Gate]"     REFUSED when a supreme veto is active (a blocking state)
+      "[Setup Trigger]" OBSERVED when an entry setup exists, NONE otherwise
+
+    Ladder, in order:
+      1. any blocking state (SYNTHETIC / STALE / UNAVAILABLE / NO_MATCH / REFUSED) -> NO_TRADE
+      2. a clean table with an observed setup -> SETUP_STATE_OPERATOR_DECIDES
+      3. otherwise -> SETUP_FORMING
+    Greens never authorize anything, and missing/synthetic/stale evidence cannot lift NO_TRADE.
+    """
+    if any(state in BLOCKING_STATES for state in input_states.values()):
+        return "NO_TRADE"
+    if input_states.get(SETUP_TRIGGER_KEY) == "OBSERVED":
+        return "SETUP_STATE_OPERATOR_DECIDES"
+    return "SETUP_FORMING"
+
+
 class MasterSynthesisEvaluator:
     """Computes the unified Tab [5] Master Conclusion & Reconciled Execution Playbook."""
 
@@ -93,6 +120,8 @@ class MasterSynthesisEvaluator:
                 master_what_is_happening="UNAVAILABLE — missing input: regime_matrix_evaluation; no regime configuration nominated.",
                 master_why_resolution="Master synthesis did not evaluate because Tab [4] regime telemetry is missing.",
             )
+            unavailable_ev.input_states = {"[4] Regime Matrix": "UNAVAILABLE"}
+            unavailable_ev.decision_verdict = "NO_TRADE"
             store.master_synthesis_evaluation = unavailable_ev
             return unavailable_ev
 
@@ -382,6 +411,16 @@ class MasterSynthesisEvaluator:
 
         regime_mult = _CONFIG_MULTIPLIER_MAP.get(config_code, 0.0) if active_cfg else 0.0
         tab_rows = [row_p, row_g, row_r, row_m, row_a, row_f, row_w, row_0]
+        input_states = {row.tab_name: ("UNAVAILABLE" if row.score_or_status == "UNAVAILABLE" else "LIVE")
+                        for row in tab_rows}
+        input_states["[4] Regime Matrix"] = "LIVE" if active_cfg is not None else "NO_MATCH"
+        if fp is not None and bool(getattr(fp, "is_synthetic", False)):
+            input_states["[F] Footprint"] = "SYNTHETIC"
+        # Desks that publish freshness must contribute it: a stale input blocks like a missing
+        # one, and it must be visible in the table rather than inferred from the verdict.
+        for _name, _ev in (("[4] Regime Matrix", rmev), ("[F] Footprint", fp)):
+            if _ev is not None and str(getattr(_ev, "data_status", "")).upper() == "STALE":
+                input_states[_name] = "STALE"
         lights = [r.traffic_light for r in tab_rows]
         g_cnt = lights.count("GREEN")
         b_cnt = lights.count("BLUE")
@@ -421,6 +460,19 @@ class MasterSynthesisEvaluator:
             l1_status = "PASS"
             l1_ruling = "Tell-Tale PASS • Liq Flush NORMAL • 8A–8F CLEAR"
             supreme_veto_reason_str = "NONE"
+
+        for row in tab_rows:
+            if row.traffic_light == "RED":
+                input_states[row.tab_name] = "REFUSED"
+        input_states["[Veto Gate]"] = "REFUSED" if supreme_veto else "LIVE"
+
+        setup_observed = bool(
+            tp or (tpb is not None) or (sw_ev is not None and sw_ev.verdict == "NEW LONG SETUP")
+        )
+        input_states[SETUP_TRIGGER_KEY] = "OBSERVED" if setup_observed else "NONE"
+        decision_verdict = tab_z_precedence(input_states)
+        master_light = "RED" if decision_verdict == "NO_TRADE" else ("BLUE" if decision_verdict == "SETUP_FORMING" else "YELLOW")
+        master_headline = f"{decision_verdict} — regime {config_code if active_cfg else 'NO_MATCH'}"
 
         # Domain Pillar 2: Macro & 4H Trend Filter (Desks A, 0, W)
         has_macro_bars = len(store.spot_klines_1d) >= 50
@@ -800,6 +852,8 @@ class MasterSynthesisEvaluator:
             f"[IF HOLDING SPOT]: {holder_action} | Stop ${reconciled_stop:,.0f} | TP1 ${holder_tp1_usd:,.0f} • TP2 ${holder_tp2_usd:,.0f}."
         )
 
+        master_light = "RED" if decision_verdict == "NO_TRADE" else ("BLUE" if decision_verdict == "SETUP_FORMING" else "YELLOW")
+        master_headline = f"{decision_verdict} — regime {config_code if active_cfg else 'NO_MATCH'}"
         ev = MasterSynthesisEvaluation(
             timestamp_utc=now_str,
             current_price=round(price, 2),
@@ -841,5 +895,9 @@ class MasterSynthesisEvaluator:
             master_why_resolution=master_why,
             master_final_command=master_cmd,
         )
+        # Kept as additive attributes to preserve the shared evaluation model API.
+        ev.input_states = input_states
+        ev.decision_verdict = decision_verdict
+        ev.regime_code = config_code
         store.master_synthesis_evaluation = ev
         return ev

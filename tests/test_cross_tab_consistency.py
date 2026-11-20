@@ -26,6 +26,11 @@ from rich.console import Console
 
 from analytics.ai_packet_exporter import build_ai_telemetry_packet
 from analytics.signal_detector import SignalDetector
+from analytics.master_synthesis import (
+    SETUP_TRIGGER_KEY,
+    VETO_GATE_KEY,
+    tab_z_precedence,
+)
 from config.settings import DEFAULT_CONFIG
 from core.models import KlineBar
 from core.state_store import StateStore
@@ -110,6 +115,30 @@ class TestRegimeAgreement(unittest.TestCase):
         if code == "NO_MATCH" or not code.startswith("Config "):
             self.assertNotEqual(light, "GREEN",
                                 "a refused regime must not produce a GREEN master light")
+
+    def test_tab_z_verdict_is_derivable_from_printed_states(self):
+        # Recompute from the table the operator can see. No hidden argument may be needed:
+        # the trigger and veto gate are reserved keys IN that table.
+        states = dict(self.ms.input_states)
+        self.assertIn(SETUP_TRIGGER_KEY, states,
+                      "the setup trigger is not printed, so the verdict is not derivable")
+        expected = tab_z_precedence(states)
+        self.assertEqual(self.ms.decision_verdict, expected)
+        self.assertEqual(self.ms.regime_code, getattr(self.rm, "active_config_code", "NO_MATCH"))
+
+    def test_blocking_desk_always_yields_no_trade(self):
+        self.assertEqual(
+            tab_z_precedence({"desk": "LIVE", VETO_GATE_KEY: "REFUSED",
+                              SETUP_TRIGGER_KEY: "OBSERVED"}), "NO_TRADE")
+
+    def test_synthetic_and_unavailable_cannot_raise_verdict(self):
+        for state in ("SYNTHETIC", "UNAVAILABLE"):
+            self.assertEqual(
+                tab_z_precedence({"desk": state, SETUP_TRIGGER_KEY: "OBSERVED"}), "NO_TRADE")
+        # a clean table with an observed setup is the only path above NO_TRADE
+        self.assertEqual(
+            tab_z_precedence({"desk": "LIVE", SETUP_TRIGGER_KEY: "OBSERVED"}),
+            "SETUP_STATE_OPERATOR_DECIDES")
 
 
 class TestPacketAgreement(unittest.TestCase):

@@ -1833,6 +1833,32 @@ def _build_tab0_master_synthesis_hud(store: StateStore, header_panel: Panel) -> 
             ),
         )
 
+    # Tab [10] is the decision surface. The detailed evidence builders remain
+    # available through their existing tab dispatch paths.
+    states = getattr(msev, "input_states", {})
+    drivers = [f"{row.tab_name}: {row.tab_conclusion}" for row in msev.tab_rows[:4]]
+    catalysts = list(msev.upgrade_catalysts[:3]) or ["No specific upgrade condition was published."]
+    refused = []
+    if msev.supreme_veto_active:
+        refused.append(f"Active veto: {msev.supreme_veto_reason}")
+    refused.extend(f"{desk}: {state}" for desk, state in states.items()
+                   if state in {"UNAVAILABLE", "STALE", "SYNTHETIC", "NO_MATCH", "REFUSED"})
+    if not refused:
+        refused.append("No active veto or non-LIVE input recorded.")
+    source_lines = [
+        f"{desk} | {states.get(desk, 'UNAVAILABLE')} | "
+        f"{next((r.tab_conclusion for r in msev.tab_rows if r.tab_name == desk), 'Active configuration: ' + getattr(msev, 'regime_code', 'UNAVAILABLE'))}"
+        for desk in states
+    ]
+    return Group(
+        header_panel,
+        Panel(f"{getattr(msev, 'decision_verdict', 'NO_TRADE')} — {msev.master_headline}", title="1. VERDICT"),
+        Panel("\n".join(f"• {item}" for item in drivers), title="2. WHY"),
+        Panel("\n".join(f"• {item}" for item in catalysts), title="3. WHAT CHANGES IT"),
+        Panel("\n".join(f"• {item}" for item in refused), title="4. WHAT IS REFUSED"),
+        Panel("\n".join(source_lines), title="Sources — evidence only"),
+    )
+
     # --- Short Introduction & Purpose Banner ---
     intro_lines = [
         "[bold cyan]▶ PURPOSE OF TAB [L: MASTER]:[/bold cyan] Single-screen [bold yellow]8-Flagship Top-Ribbon Command Matrix ([P, G, R, M, A, F, W, 0])[/bold yellow] — see all 8 primary desks at a glance without flipping through tabs.",

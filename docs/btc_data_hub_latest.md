@@ -1,20 +1,20 @@
 # TAB [D: DATA HUB] | CONSOLIDATED DATA-ONLY TELEMETRY REPORT
-**Retrieval Time (UTC):** `2026-11-22 23:15:26 UTC`  |  **Retrieval Time (SGT):** `2026-11-23 07:15:26 SGT (UTC+8)`
-**Spot Price (BTCUSDT):** `$61,000.46`  |  **Coverage:** `OK=65/71 | UNAVAILABLE=4 | STALE=1 (Genuine=0, Expected_Headless_WS_Offline=1) | PROXY/STATIC=1`
-**24H Range:** `$58,768.51 - $61,669.99`  |  **Returns (24H / 7D / 30D):** `+1.30% / -6.66% / -24.87%`
-**Archive (SQLite):** `44 closed-4H snapshots (Last: 2026-11-22 20:00:00 UTC)`
+**Retrieval Time (UTC):** `2026-11-23 00:05:39 UTC`  |  **Retrieval Time (SGT):** `2026-11-23 08:05:39 SGT (UTC+8)`
+**Spot Price (BTCUSDT):** `$61,209.38`  |  **Coverage:** `OK=65/71 | UNAVAILABLE=4 | STALE=1 (Genuine=0, Expected_Headless_WS_Offline=1) | PROXY/STATIC=1`
+**24H Range:** `$58,768.51 - $61,669.99`  |  **Returns (24H / 7D / 30D):** `+1.66% / -5.66% / -24.33%`
+**Archive (SQLite):** `45 closed-4H snapshots (Last: 2026-11-23 00:00:00 UTC)`
 
 ## 0. BIDIRECTIONAL REGIME ROUTER (GATE 0 — DUAL-INVENTORY SPOT WORKSTATION)
 | Router Field | Value | Rule / Threshold |
 |---|---|---|
-| Latest Closed 1D Candle Close | `$60,215.77 (1D bar 2026-11-21 · closed 2026-11-22 00:00 UTC)` | `Same closed Binance Spot 1D series only (live candle excluded)` |
-| Current 1D SMA 200 | `$72,485.74` | `200-bar SMA of same closed Binance Spot 1D series` |
-| Distance vs 1D SMA 200 | `-16.93% (-$12,269.97)` | `(Closed 1D Close - 1D SMA 200) / 1D SMA 200` |
+| Latest Closed 1D Candle Close | `$61,271.08 (1D bar 2026-11-22 · closed 2026-11-23 00:00 UTC)` | `Same closed Binance Spot 1D series only (live candle excluded)` |
+| Current 1D SMA 200 | `$72,384.86` | `200-bar SMA of same closed Binance Spot 1D series` |
+| Distance vs 1D SMA 200 | `-15.35% (-$11,113.78)` | `(Closed 1D Close - 1D SMA 200) / 1D SMA 200` |
 | 1D SMA 200 Position | `BELOW` | `BELOW if Closed 1D Close < 1D SMA 200 else ABOVE` |
 | Closed 4H Market Structure (`7A`) | `DOWNTREND (LH/LL)` | `UPTREND / DOWNTREND / MIXED (500 closed 4H bars)` |
 | 4H Downside BOS Status (`7A`) | `YES (BOS Down < $62,062.97 (11-19 20:00))` | `YES if latest closed 4H BOS is BOS Down else NO` |
 | Upcoming Macro Event Caution (`7C`) | `CLEAR (>24h / NONE)` | `CAUTION (<24h USD high-impact event) else CLEAR` |
-| Timestamp & Candle Closed Status | `2026-11-22 23:15:26 UTC | 2026-11-23 07:15:26 SGT (UTC+8) · Closed-Candle Inputs Only` | `Strict closed-bar verification gate` |
+| Timestamp & Candle Closed Status | `2026-11-23 00:05:39 UTC | 2026-11-23 08:05:39 SGT (UTC+8) · Closed-Candle Inputs Only` | `Strict closed-bar verification gate` |
 
 **BIDIRECTIONAL REGIME ROUTER STATUS:**
 - **Active Route:** `MACRO_DOWNTREND_DISTRIBUTION`
@@ -26,52 +26,52 @@
 ## 1. PRICE, TREND & MARKET STRUCTURE
 | Metric | Value | Source Tabs | Status |
 |---|---|---|---|
-| Binance Spot / Perp ($) | `$61,000.46 / $60,967.80` | `All Tabs` | `OK` |
-| Coinbase Spot ($) | `$60,910.62` | `1,11,15,17` | `OK` |
-| 1D SMA 200 / Slope | `$72,485.74 (-0.60%)` | `0,2,3,11,15,18` | `OK` |
-| 1D SMA 50 / EMA 50 | `$77,231.67 / $73,470.42` | `0,2,4,15,18,20` | `OK` |
-| 1D EMA 21 / 1W EMA 50 | `$68,188.34 / $78,318.53` | `3,18` | `OK` |
-| 4H EMA 50 / EMA 200 | `$63,170.80 / $71,598.32` | `7,13,18,20` | `OK` |
-| Grok EMA 9/21 & 1H SMA200 | `9:$60,903.25 · 21:$60,607.23 · 1H:$62,740.56` | `5,15` | `OK` |
-| Daily / Weekly VWAP (Z) | `D:$60,332.00 (+0.91σ) | W:$61,442.45` | `4,11,15` | `OK` |
-| RSI(14) 1D / 4H & 4H ROC12 | `1D:25.6 · 4H:47.6 · ROC:+3.72%` | `3,7,20` | `OK` |
-| ADX(14) 1D/4H & ATR(14) 1D/4H/1H | `ADX 1D:48.9 4H:43.6 | ATR:$3,019.77/$1,338.88/$458.66` | `0,1,2,8,13,18,20` | `OK` |
-| 4H ATR(14)% Pctile & RelVol(20) | `ATR%:2.34% (90th pct/120b) · RelVol:0.44x` | `0,1,2,20` | `OK` |
+| Binance Spot / Perp ($) | `$61,209.38 / $61,177.20` | `All Tabs` | `OK` |
+| Coinbase Spot ($) | `$61,100.84` | `1,11,15,17` | `OK` |
+| 1D SMA 200 / Slope | `$72,384.86 (-0.65%)` | `0,2,3,11,15,18` | `OK` |
+| 1D SMA 50 / EMA 50 | `$76,762.02 / $72,999.80` | `0,2,4,15,18,20` | `OK` |
+| 1D EMA 21 / 1W EMA 50 | `$67,576.25 / $77,712.30` | `3,18` | `OK` |
+| 4H EMA 50 / EMA 200 | `$63,096.30 / $71,495.03` | `7,13,18,20` | `OK` |
+| Grok EMA 9/21 & 1H SMA200 | `9:$61,007.78 · 21:$60,684.33 · 1H:$62,721.22` | `5,15` | `OK` |
+| Daily / Weekly VWAP (Z) | `D:$60,393.26 (+1.12σ) | W:$61,413.38` | `4,11,15` | `OK` |
+| RSI(14) 1D / 4H & 4H ROC12 | `1D:26.5 · 4H:50.5 · ROC:+3.93%` | `3,7,20` | `OK` |
+| ADX(14) 1D/4H & ATR(14) 1D/4H/1H | `ADX 1D:50.8 4H:41.7 | ATR:$3,011.32/$1,271.26/$447.52` | `0,1,2,8,13,18,20` | `OK` |
+| 4H ATR(14)% Pctile & RelVol(20) | `ATR%:2.25% (87th pct/120b) · RelVol:0.39x` | `0,1,2,20` | `OK` |
 | Macro 30D VAH / POC / VAL | `BIMODAL (Peaks: $64,859.86 & $80,517.11 — single VA UNAVAILABLE)` | `1,3,6,11,19` | `UNAVAILABLE` |
-| Structure (L20/H20, PW, Asia) | `4H:$55,130.00-$81,196.01 | PW:$62,006.00-$75,599.22 | Asia:$58,768.51-$60,352.16` | `0,8,11,19` | `OK` |
+| Structure (L20/H20, PW, Asia) | `4H:$55,130.00-$81,196.01 | PW:$55,130.00-$65,696.16 | Asia:$61,155.00-$61,322.30` | `0,8,11,19` | `OK` |
 
 ## 2. ORDER FLOW, FOOTPRINT & LIQUIDITY
 | Metric | Value | Source Tabs | Status |
 |---|---|---|---|
-| Spot/Perp CVD (15m / 1h) | `15m:-5.2/-0.2 | 1h:+50.9/+351.2 BTC` | `1,8,15` | `OK` |
-| Spot/Perp CVD (4h / 24h) | `4h:+56.9/+649.0 | 24h:+241.9/+3574.2 BTC` | `0,1,15,16,17` | `OK` |
-| Spot CVD Slopes (7D / 14D) | `7D:-7,553.9 BTC | 14D:-8,791.1 BTC` | `17` | `OK` |
-| Session / UTC-Day CVD | `Sess S:+0.0 P:+0.0 | Day S:+241.9 P:+3518.5` | `REST 15m` | `OK` |
-| 24H Z-Scores (z_S / z_F / D) | `z_S:+0.09 · z_F:+1.35 · D:-1.26` | `1,19` | `OK` |
-| 15m Footprint Delta / Stack | `Δ:-5.2 BTC (Prev:+0.0) · Stacks:0` | `1,11` | `OK` |
-| Coinbase Premium ($ / % / Z) | `-89.8$ (-0.147%, Z=+0.84)` | `1,11,15` | `OK` |
-| Cross-Exch 24H Spot Vol (BN/CB) | `BN:19,590 · CB:8,398 · Tot:27,988 BTC` | `1,11,Macro` | `OK` |
-| L2 Depth ±1%/±2%, OBI & Spread | `1%:1.04x · 2%:0.69x · Spr:0.0016bps · OBI:+1.8%` | `16,Macro` | `OK` |
-| Tactical 7D / Session 24H VP | `7D:$65,299.93/$64,947.72/$59,488.54 | 24H:$61,404.02/$60,920.44/$59,808.21` | `1,11` | `OK` |
+| Spot/Perp CVD (15m / 1h) | `15m:-4.4/-74.0 | 1h:+49.2/+53.5 BTC` | `1,8,15` | `OK` |
+| Spot/Perp CVD (4h / 24h) | `4h:+84.3/-141.7 | 24h:+346.3/+3356.7 BTC` | `0,1,15,16,17` | `OK` |
+| Spot CVD Slopes (7D / 14D) | `7D:-4,470.0 BTC | 14D:-8,305.8 BTC` | `17` | `OK` |
+| Session / UTC-Day CVD | `Sess S:+0.0 P:+0.0 | Day S:-4.4 P:-74.0` | `REST 15m` | `OK` |
+| 24H Z-Scores (z_S / z_F / D) | `z_S:+0.20 · z_F:+1.58 · D:-1.37` | `1,19` | `OK` |
+| 15m Footprint Delta / Stack | `Δ:-4.4 BTC (Prev:+0.0) · Stacks:0` | `1,11` | `OK` |
+| Coinbase Premium ($ / % / Z) | `-108.5$ (-0.177%, Z=-1.01)` | `1,11,15` | `OK` |
+| Cross-Exch 24H Spot Vol (BN/CB) | `BN:19,702 · CB:8,666 · Tot:28,368 BTC` | `1,11,Macro` | `OK` |
+| L2 Depth ±1%/±2%, OBI & Spread | `1%:0.70x · 2%:0.57x · Spr:0.0016bps · OBI:-17.9%` | `16,Macro` | `OK` |
+| Tactical 7D / Session 24H VP | `7D:$65,299.93/$64,595.52/$59,400.49 | 24H:$61,452.38/$60,968.80/$59,856.57` | `1,11` | `OK` |
 | 30D VA Pos% & Dist to VAL | `BIMODAL — DATA UNAVAILABLE` | `1` | `UNAVAILABLE` |
-| SLSP Support / Resistance | `Sup:$60,000.00 | Res:$61,065.63` | `13` | `OK` |
+| SLSP Support / Resistance | `Sup:$61,166.36 | Res:$62,371.96` | `13` | `OK` |
 
 ## 3. DERIVATIVES, OPTIONS & LIQUIDATIONS
 | Metric | Value | Source Tabs | Status |
 |---|---|---|---|
-| BN Open Interest (BTC / USD) | `93,126 BTC ($5.68B)` | `0,1,4,15,17` | `OK` |
-| Cross-Exch Perp OI & Funding | `158,744 BTC ($9.68B) · F:+0.0024% [BN+BYB+OKX 3/3]` | `Macro,15` | `OK` |
-| Hyperliquid Perp OI & Funding | `39,141 BTC ($2.39B) · F:+0.0016% [HL DEX]` | `Macro,15` | `OK` |
-| OI Δ% (15m/1h/4h/24h) & Quad | `-0.07%/+0.04%/-0.30%/+0.55% | NEUTRAL_CHURN` | `1,4,8,11,12,15,17` | `OK` |
-| Funding 8H% / Ann% / 90D Pct | `+0.0034% (+3.7%/yr) · 90D Pct:21.5%` | `0,4,9,11,15,16,19,20` | `OK` |
-| Perp Basis ($ / Ann %) | `-32.7$ (-0.054% | Carry:+3.10%/yr)` | `1,4` | `OK` |
-| 5m Taker L/S & Top/Glb Acct | `5m:1.104 (Δ:+13.3) | Top:1.67(63L) · Glb:2.20` | `1,2,15,16` | `OK` |
-| Options OI & Put/Call (Deribit) | `P/C:0.810 · TotOI:421,155 BTC` | `Macro,19` | `OK` |
-| Options IV Term & Skew (Deribit) | `F:55.2% · B:47.7% · 25dSk:+9.6%` | `Macro,6,19` | `OK` |
-| Vol: DVOL, RV20, GK & BBW% | `DVOL:56.3 · RV20:51.8% · GK:86.6% · BBW:97% · Sk20:-0.29` | `0,4,6,16,19` | `OK` |
-| Upper / Lower Liq Magnet | `Up:$76,334.44 | Dn:$59,902.45` | `0,2,13,17` | `OK` |
+| BN Open Interest (BTC / USD) | `93,198 BTC ($5.70B)` | `0,1,4,15,17` | `OK` |
+| Cross-Exch Perp OI & Funding | `159,028 BTC ($9.73B) · F:+0.0018% [BN+BYB+OKX 3/3]` | `Macro,15` | `OK` |
+| Hyperliquid Perp OI & Funding | `38,789 BTC ($2.37B) · F:+0.0100% [HL DEX]` | `Macro,15` | `OK` |
+| OI Δ% (15m/1h/4h/24h) & Quad | `-0.02%/+0.66%/+0.59%/+0.93% | LEVERAGED_LONG_EXPANSION (Price Up / OI Up)` | `1,4,8,11,12,15,17` | `OK` |
+| Funding 8H% / Ann% / 90D Pct | `+0.0026% (+2.8%/yr) · 90D Pct:17.8%` | `0,4,9,11,15,16,19,20` | `OK` |
+| Perp Basis ($ / Ann %) | `-32.2$ (-0.053% | Carry:+2.20%/yr)` | `1,4` | `OK` |
+| 5m Taker L/S & Top/Glb Acct | `5m:0.589 (Δ:-68.9) | Top:1.67(63L) · Glb:2.19` | `1,2,15,16` | `OK` |
+| Options OI & Put/Call (Deribit) | `P/C:0.809 · TotOI:421,434 BTC` | `Macro,19` | `OK` |
+| Options IV Term & Skew (Deribit) | `F:54.2% · B:47.5% · 25dSk:+8.8%` | `Macro,6,19` | `OK` |
+| Vol: DVOL, RV20, GK & BBW% | `DVOL:55.0 · RV20:51.7% · GK:85.0% · BBW:97% · Sk20:-0.26` | `0,4,6,16,19` | `OK` |
+| Upper / Lower Liq Magnet | `Up:$76,334.44 | Dn:$60,107.61` | `0,2,13,17` | `OK` |
 | Magnet Ratios & LSCE | `Imm:1.81x · Ladder:1.38x · Pull:0.55x · LSCE:UNTESTED` | `13,17` | `OK` |
-| Modeled Liq Ladder (10x-100x) | `Up[10x:$67,100.51($85M) / 25x:$63,440.48($114M) / 50-100x:$61,610.46($194M)] | Dn[100x:$60,390.46($350M) / 25x:$58,560.44($312M) / 10x:$54,900.41($219M)] [Modeled] (L/S:global_account_ls_ratio)` | `17` | `OK` |
+| Modeled Liq Ladder (10x-100x) | `Up[10x:$67,330.32($86M) / 25x:$63,657.76($114M) / 50-100x:$61,821.47($194M)] | Dn[100x:$60,597.29($350M) / 25x:$58,761.00($313M) / 10x:$55,088.44($219M)] [Modeled] (L/S:global_account_ls_ratio)` | `17` | `OK` |
 | Liquidations (1H / 24H) & Flush | `DATA UNAVAILABLE` | `0,8,12,13` | `UNAVAILABLE` |
 
 ## 4. ON-CHAIN, ETF & STABLECOIN FLOWS
@@ -81,11 +81,11 @@
 | On-Chain SOPR / aSOPR | `DATA UNAVAILABLE` | `16` | `UNAVAILABLE` |
 | Exchange Netflow 24H (CM) | `Net:-12,025.4 BTC (-$723.0M) | In:37,664 Out:49,690` | `Macro,16` | `OK` |
 | BTC Exchange Reserves (CM) | `2,698,129 BTC (2026-11-21)` | `Macro,16` | `OK` |
-| Stablecoins USDT+USDC Supply | `$243.17B (USDT:$174.49B · USDC:$68.67B)` | `Macro` | `OK` |
+| Stablecoins USDT+USDC Supply | `$243.17B (USDT:$174.51B · USDC:$68.67B)` | `Macro` | `OK` |
 | Stablecoin Net Issuance (7D/30D) | `7D:-1.28B · 30D:-11.46B` | `Macro` | `OK` |
 | US Spot ETF Flow (Farside 1D/3D) | `1D:-$124.5M | 3D:-$1.01B | 5D:-$1.25B` | `2,13` | `OK` |
 | US ETF Tape Proxy (IBIT+FBTC) | `1DVol:$4.02B · 5D:-$13.65B [PROXY]` | `Macro,2,13` | `PROXY` |
-| Power-Law Fair & ATH DD% | `$150,254.74 (-59.4%) | DD:-51.7%` | `3` | `OK` |
+| Power-Law Fair & ATH DD% | `$150,259.30 (-59.3%) | DD:-51.5%` | `3` | `OK` |
 | MTF MACD (1D / 1H Status) | `1D=negative_slope (Macro Whipsaw Veto) | 1H=positive_slope CROSS` | `13,16,18` | `OK` |
 
 ## 5. MACRO, CREDIT & US LIQUIDITY
@@ -94,62 +94,63 @@
 | US SOFR Rate & Vol (NY Fed) | `3.91% (Vol:$3,161B)` | `Macro` | `OK` |
 | Fed ON RRP Balance (NY Fed) | `$0.40B` | `Macro` | `OK` |
 | Credit Spread HYG/LQD & 5D% | `0.7361 (-1.63% 5D)` | `Macro,3` | `OK` |
-| DXY / US 10Y (^TNX) | `103.82 (NEUTRAL / FLAT (+0.27 over 5d)) | 10Y:4.91%` | `3,13` | `OK` |
+| DXY / US 10Y (^TNX) | `103.83 (NEUTRAL / FLAT (+0.28 over 5d)) | 10Y:4.91%` | `3,13` | `OK` |
 | TIPS Real (DFII10) / BEI | `Real:+2.77% | BEI:2.14%` | `3,13` | `OK` |
 | S&P 500 / Nasdaq (1D%) | `SPX:6,910 (-3.70%) | NDX:22,618` | `3,13` | `OK` |
-| VIX / Brent Crude (BZ=F) | `VIX:35.89 | Brent:$89.95` | `3,13` | `OK` |
-| BTC-SPX Corr (20D / 60D) | `20D:+0.68 | 60D:+0.71` | `3` | `OK` |
+| VIX / Brent Crude (BZ=F) | `VIX:35.89 | Brent:$89.33` | `3,13` | `OK` |
+| BTC-SPX Corr (20D / 60D) | `20D:+0.67 | 60D:+0.71` | `3` | `OK` |
 | Fear & Greed / BTC Dom% | `F&G:11 (Extreme Fear) | Dom:58.90%` | `3,13` | `OK` |
-| USD Macro Calendar (High) | `Core PCE Price Index m/m (in 62.2h Fc:0.3%) | Prelim GDP q/q (in 62.2h Fc:3.5%)` | `Macro` | `OK` |
+| USD Macro Calendar (High) | `Core PCE Price Index m/m (in 61.4h Fc:0.3%) | Prelim GDP q/q (in 61.4h Fc:3.5%)` | `Macro` | `OK` |
 | Manual Context Overrides | `Legacy_200D_Veto_Override: IGNORED (Tab1_Flag=True) · Filter=NONE_SIGNIFICANT` | `2,13` | `OK` |
 
 ## 6. QUANT FEATURES, FEED HEALTH & ARCHIVE
 | Metric | Value | Source Tabs | Status |
 |---|---|---|---|
-| Rough Path Lévy (A_SP / MM) | `4H A_SP:-0.7883 | MM PriceFlow:-2.1910 · Rough:2.840` | `5,19` | `OK` |
-| Hurst / Kalman Vel / FracDiff | `H:0.749 · KVel:-42.10 · d:0.15` | `5,6` | `OK` |
-| Hilbert Cycle / TD9 / TellTale | `Cyc:17.0b · TD(1H/4H):3/4 · RV(15m/5m):0.04/N/A` | `5,9,13` | `OK` |
-| VCR 72H & TSFM Disp% | `VCR:18.46 | Disp:1.28%` | `6` | `OK` |
+| Rough Path Lévy (A_SP / MM) | `4H A_SP:-0.5393 | MM PriceFlow:-2.7520 · Rough:2.690` | `5,19` | `OK` |
+| Hurst / Kalman Vel / FracDiff | `H:0.837 · KVel:-40.90 · d:0.15` | `5,6` | `OK` |
+| Hilbert Cycle / TD9 / TellTale | `Cyc:17.0b · TD(1H/4H):4/5 · RV(15m/5m):0.46/N/A` | `5,9,13` | `OK` |
+| VCR 72H & TSFM Disp% | `VCR:18.18 | Disp:1.28%` | `6` | `OK` |
 | Open FVGs & Sweep FSM | `FVGs:7 | FSM:None (0/12)` | `1,8` | `OK` |
-| WebSocket Feeds & Warmup | `Spot:SYNC (no tick) | Perp:SYNC (no tick) | CB:SYNC (12s ago) | Warm:YES` | `Live Feeds` | `STALE` |
-| Spot Klines (1W/1D/4H/1H/15m) | `1W:100 1D:500 bars · 11-22 00:00 UTC | 4H:500 1H:720 15m:240` | `All Tabs` | `OK` |
-| Perp Klines / Est. Excluded | `1D:100 · 1H:720 · 15m:240 (Excl=400)` | `1,4,11,15,19` | `OK` |
-| Closed 4H Anchor (Tab 19/20) | `2026-11-22 20:00:00 UTC` | `18,19,20` | `OK` |
+| WebSocket Feeds & Warmup | `Spot:SYNC (no tick) | Perp:SYNC (no tick) | CB:SYNC (11s ago) | Warm:YES` | `Live Feeds` | `STALE` |
+| Spot Klines (1W/1D/4H/1H/15m) | `1W:100 1D:500 bars · 11-23 00:00 UTC | 4H:500 1H:720 15m:240` | `All Tabs` | `OK` |
+| Perp Klines / Est. Excluded | `1D:101 · 1H:720 · 15m:240 (Excl=399)` | `1,4,11,15,19` | `OK` |
+| Closed 4H Anchor (Tab 19/20) | `2026-11-23 00:00:00 UTC` | `18,19,20` | `OK` |
 | B1/B2 Rec & Companion Liq | `Rec:PASS (0s delta) | Liq:N/A` | `8,13,17` | `OK` |
-| Telemetry History Archive (SQLite) | `44 bars logged (Last: 2026-11-22 20:00:00 UTC)` | `DB Archive` | `OK` |
+| Telemetry History Archive (SQLite) | `45 bars logged (Last: 2026-11-23 00:00:00 UTC)` | `DB Archive` | `OK` |
 
 ## 7. RECENT CLOSED-4H SNAPSHOT TRAJECTORY (SQLITE ARCHIVE)
 | Closed 4H Bar (UTC) | Spot ($) | 24H Spot/Perp CVD | Cross-Exch Perp OI & Funding | Funding 8H% / 90D Pct | MVRV Ratio |
 |---|---|---|---|---|---|
+| `2026-11-23 00:00:00 UTC` | `$61,209.38` | `24h:+346.3/+3356.7 BTC` | `159,028 BTC ($9.73B) · F:+0.0018% [BN+BYB+OKX 3/3]` | `+0.0026% (+2.8%/yr) · 90D Pct:17.8%` | `1.130 [CoinMetrics 2026-11-21]` |
 | `2026-11-22 20:00:00 UTC` | `$60,715.96` | `24h:+57.3/+2761.9 BTC` | `159,257 BTC ($9.66B) · F:+0.0017% [BN+BYB+OKX 3/3]` | `+0.0024% (+2.6%/yr) · 90D Pct:21.5%` | `1.130 [CoinMetrics 2026-11-21]` |
 | `2026-11-22 16:00:00 UTC` | `$60,912.18` | `24h:+375.5/+3168.4 BTC` | `159,936 BTC ($9.73B) · F:-0.0001% [BN+BYB+OKX 3/3]` | `-0.0008% (-0.8%/yr) · 90D Pct:21.5%` | `1.130 [CoinMetrics 2026-11-21]` |
 | `2026-11-22 12:00:00 UTC` | `$60,790.52` | `24h:+533.1/+3830.1 BTC` | `159,713 BTC ($9.71B) · F:+0.0032% [BN+BYB+OKX 3/3]` | `+0.0035% (+3.9%/yr) · 90D Pct:33.0%` | `1.130 [CoinMetrics 2026-11-21]` |
 | `2026-11-22 08:00:00 UTC` | `$59,652.48` | `24h:+173.0/+5997.3 BTC` | `158,396 BTC ($9.51B) · F:+0.0045% [BN+BYB+OKX 3/3]` | `+0.0060% (+6.6%/yr) · 90D Pct:33.0%` | `1.130 [CoinMetrics 2026-11-21]` |
 | `2026-11-22 04:00:00 UTC` | `$59,227.59` | `24h:-1482.1/+3498.9 BTC` | `157,253 BTC ($9.33B) · F:+0.0050% [BN+BYB+OKX 3/3]` | `+0.0061% (+6.7%/yr) · 90D Pct:1.9%` | `1.130 [CoinMetrics 2026-11-21]` |
-| `2026-11-22 00:00:00 UTC` | `$60,225.64` | `24h:-3119.5/+1145.6 BTC` | `157,370 BTC ($9.47B) · F:-0.0003% [BN+BYB+OKX 3/3]` | `-0.0015% (-1.7%/yr) · 90D Pct:1.9%` | `1.105 [CoinMetrics 2026-11-20]` |
 
 ### 7A. 500-BAR MARKET STRUCTURE & HISTORICAL S/R ZONES (`1D / 4H / 1H`)
 | TF (Bars) | Swing Structure | Last Swing Pivots | Latest BOS | Resistance Zones (Above Spot) | Support Zones (Below Spot) |
 |---|---|---|---|---|---|
 | `1D (499)` | `DOWNTREND (LH/LL)` | `SH:$81,196.01 (11-04) · SL:$79,800.00 (10-15)` | `BOS Down < $79,800.00 (10-29)` | `$62,440.17 (3x), $65,182.19 (5x), $67,124.15 (2x)` | `$60,000.00 (1x), $59,130.91 (1x), $57,957.60 (2x)` |
 | `4H (499)` | `DOWNTREND (LH/LL)` | `SH:$65,696.16 (11-16 12:00) · SL:$55,130.00 (11-21 04:00)` | `BOS Down < $62,062.97 (11-19 20:00)` | `$62,034.49 (2x), $63,620.51 (2x), $65,696.16 (1x)` | `$55,130.00 (1x)` |
-| `1H (500)` | `UPTREND (HH/HL)` | `SH:$61,669.99 (11-22 12:00) · SL:$58,768.51 (11-22 05:00)` | `BOS Up > $60,568.01 (11-22 09:00)` | `$62,166.63 (6x), $63,894.86 (4x), $65,429.09 (7x)` | `$58,768.51 (1x), $57,778.35 (1x), $55,130.00 (1x)` |
+| `1H (500)` | `UPTREND (HH/HL)` | `SH:$61,669.99 (11-22 12:00) · SL:$58,768.51 (11-22 05:00)` | `BOS Up > $60,568.01 (11-22 09:00)` | `$62,166.63 (6x), $63,894.86 (4x), $65,429.09 (7x)` | `$60,951.53 (3x), $58,768.51 (1x), $57,778.35 (1x)` |
 
 ### 7B. RECENT CLOSED KLINES — OHLCV PRICE ACTION (`1D`×7, `4H`×12, `1H`×12)
 **1D Closed Candles (Last 7 of 499 available, Newest First):**
 | Open Time (UTC) | Open | High | Low | Close | Chg% | Vol (BTC) |
 |---|---|---|---|---|---|---|
+| `2026-11-22` | `$60,215.78` | `$61,669.99` | `$58,768.51` | `$61,271.08` | `+1.75%` | `20,137` |
 | `2026-11-21` | `$58,951.51` | `$60,996.00` | `$55,130.00` | `$60,215.77` | `+2.14%` | `48,558` |
 | `2026-11-20` | `$61,986.73` | `$62,639.52` | `$57,778.35` | `$58,951.51` | `-4.90%` | `38,126` |
 | `2026-11-19` | `$63,068.21` | `$64,080.80` | `$61,428.26` | `$61,986.73` | `-1.71%` | `19,880` |
 | `2026-11-18` | `$64,947.36` | `$65,002.00` | `$62,062.97` | `$63,068.22` | `-2.89%` | `18,700` |
 | `2026-11-17` | `$64,882.88` | `$65,447.00` | `$63,336.00` | `$64,947.35` | `+0.10%` | `28,317` |
 | `2026-11-16` | `$65,351.05` | `$65,696.16` | `$63,905.01` | `$64,882.87` | `-0.72%` | `21,929` |
-| `2026-11-15` | `$64,150.01` | `$66,132.01` | `$62,006.00` | `$65,351.05` | `+1.87%` | `29,231` |
 
 **4H Closed Candles (Last 12 of 499 available, Newest First):**
 | Open Time (UTC) | Open | High | Low | Close | Chg% | Vol (BTC) |
 |---|---|---|---|---|---|---|
+| `2026-11-22 20:00` | `$60,737.12` | `$61,407.99` | `$60,581.04` | `$61,271.08` | `+0.88%` | `2,261` |
 | `2026-11-22 16:00` | `$60,894.90` | `$61,411.34` | `$60,537.43` | `$60,737.12` | `-0.26%` | `2,583` |
 | `2026-11-22 12:00` | `$61,062.73` | `$61,669.99` | `$60,464.01` | `$60,894.91` | `-0.27%` | `3,833` |
 | `2026-11-22 08:00` | `$59,170.03` | `$61,365.24` | `$59,086.00` | `$61,062.74` | `+3.20%` | `5,842` |
@@ -161,11 +162,11 @@
 | `2026-11-21 08:00` | `$57,997.00` | `$58,637.49` | `$57,381.45` | `$58,206.10` | `+0.36%` | `6,503` |
 | `2026-11-21 04:00` | `$56,740.43` | `$58,672.05` | `$55,130.00` | `$57,997.00` | `+2.21%` | `18,082` |
 | `2026-11-21 00:00` | `$58,951.51` | `$59,248.06` | `$56,400.00` | `$56,740.43` | `-3.75%` | `9,620` |
-| `2026-11-20 20:00` | `$58,558.66` | `$59,410.63` | `$58,200.00` | `$58,951.51` | `+0.67%` | `6,035` |
 
 **1H Closed Candles (Last 12 of 719 available, Newest First):**
 | Open Time (UTC) | Open | High | Low | Close | Chg% | Vol (BTC) |
 |---|---|---|---|---|---|---|
+| `2026-11-22 23:00` | `$61,115.09` | `$61,407.99` | `$60,796.82` | `$61,271.08` | `+0.26%` | `897` |
 | `2026-11-22 22:00` | `$60,953.86` | `$61,115.09` | `$60,773.56` | `$61,115.08` | `+0.26%` | `579` |
 | `2026-11-22 21:00` | `$60,916.86` | `$61,118.01` | `$60,869.33` | `$60,953.87` | `+0.06%` | `339` |
 | `2026-11-22 20:00` | `$60,737.12` | `$60,977.78` | `$60,581.04` | `$60,916.85` | `+0.30%` | `447` |
@@ -177,24 +178,23 @@
 | `2026-11-22 14:00` | `$60,739.82` | `$61,067.60` | `$60,618.00` | `$60,934.91` | `+0.32%` | `660` |
 | `2026-11-22 13:00` | `$60,852.29` | `$60,937.00` | `$60,516.44` | `$60,739.82` | `-0.18%` | `566` |
 | `2026-11-22 12:00` | `$61,062.73` | `$61,669.99` | `$60,464.01` | `$60,852.29` | `-0.34%` | `2,149` |
-| `2026-11-22 11:00` | `$60,876.22` | `$61,139.23` | `$60,830.44` | `$61,062.74` | `+0.31%` | `532` |
 
 ### 7C. MODELED LIQUIDATION LADDER (`10x-100x`) & USD MACRO CALENDAR
 **6-Tier Modeled Liquidation Ladder (`global_account_ls_ratio`):**
 | Tier | Side | Level ($) | Dist% | Est Pool ($M) |
 |---|---|---|---|---|
-| `10x Shorts` | `UPPER` | `$67,100.51` | `+10.00%` | `$85.2M` |
-| `25x Shorts` | `UPPER` | `$63,440.48` | `+4.00%` | `$113.6M` |
-| `50-100x Shorts` | `UPPER` | `$61,610.46` | `+1.00%` | `$193.8M` |
-| `100x Longs` | `LOWER` | `$60,390.46` | `-1.00%` | `$350.0M` |
-| `25x Longs` | `LOWER` | `$58,560.44` | `-4.00%` | `$312.4M` |
-| `10x Longs` | `LOWER` | `$54,900.41` | `-10.00%` | `$218.7M` |
+| `10x Shorts` | `UPPER` | `$67,330.32` | `+10.00%` | `$85.8M` |
+| `25x Shorts` | `UPPER` | `$63,657.76` | `+4.00%` | `$114.4M` |
+| `50-100x Shorts` | `UPPER` | `$61,821.47` | `+1.00%` | `$193.8M` |
+| `100x Longs` | `LOWER` | `$60,597.29` | `-1.00%` | `$350.0M` |
+| `25x Longs` | `LOWER` | `$58,761.00` | `-4.00%` | `$313.3M` |
+| `10x Longs` | `LOWER` | `$55,088.44` | `-10.00%` | `$219.3M` |
 
 **Upcoming USD High-Impact Macro Events (`-60m` to `+7d`):**
 | Event | Time (UTC) | Countdown | Forecast | Previous |
 |---|---|---|---|---|
-| `Core PCE Price Index m/m` | `2026-11-25T13:30:00Z` | `in 62.2h` | `0.3%` | `0.3%` |
-| `Prelim GDP q/q` | `2026-11-25T13:30:00Z` | `in 62.2h` | `3.5%` | `3.4%` |
+| `Core PCE Price Index m/m` | `2026-11-25T13:30:00Z` | `in 61.4h` | `0.3%` | `0.3%` |
+| `Prelim GDP q/q` | `2026-11-25T13:30:00Z` | `in 61.4h` | `3.5%` | `3.4%` |
 
 ## 8. METRIC FORMULA LEGEND & CORTEX DIBSE BIDIRECTIONAL PROTOCOL
 - **Rough Path Lévy (`4H A_SP`)**: Lévy signed area over 6 closed 4H bars (`> 0`: Spot path leads price markup; `< 0`: Spot path lags price / distribution).
